@@ -17,6 +17,9 @@
   --select-content-min-width: 8rem;
 
   --branched-menu-width: 240px;
+  --rule-template-menu-width: 220px;
+  --branched-menu-font-size: 14px;
+  --branched-menu-icon-line-weight: 1.8;
   --branched-menu-foreground: #f5f5f5;
   --branched-menu-rail-color: #3f3f46;
   --branched-menu-rail-inset: 14px;

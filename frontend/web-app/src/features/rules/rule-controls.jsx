@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import BranchedMenu from '../../components/react-bits/BranchedMenu';
+import { readChartNumber } from '../../components/charts/chart-design-values';
 import { bindTooltip } from '../../components/components';
 import { RuleConditionBlocks } from '@/features/rules/RuleConditionBlocks';
 import { compileRuleBlocks, RULE_LIMITS, ruleBlocksFor, validateRule } from '@/features/rules/rules-logic';
@@ -109,7 +110,7 @@ export function RuleTemplateMenu() {
   const [selected, setSelected] = useState('');
   return <>
     <BranchedMenu items={rules} color="var(--text)" accentColor="var(--text)" lineColor="var(--muted-text)"
-      width={220} className="rule-template-menu" onSelect={(_, item) => setSelected(item.label)} />
+      width={readChartNumber('--rule-template-menu-width', 220)} className="rule-template-menu" onSelect={(_, item) => setSelected(item.label)} />
     {selected && <Text role="status">선택한 템플릿 · {selected}</Text>}
   </>;
 }

@@ -5,7 +5,7 @@
   --bm-ink: var(--branched-menu-foreground);
   --bm-accent: var(--branched-menu-foreground);
   --bm-line: var(--branched-menu-rail-color);
-  --bm-font: var(--aml-type-body-size);
+  --bm-font: var(--branched-menu-font-size);
   --bm-row: var(--selection-control-height-medium);
   --bm-indent: var(--aml-space-40);
   --bm-line-w: var(--branched-menu-line-weight);
@@ -39,7 +39,7 @@
 
 .branched-menu__marker {
   position: absolute;
-  top: calc(-1 * var(--aml-stroke-divider));
+  top: var(--bm-marker-top, calc(-1 * var(--aml-stroke-divider)));
   left: 0;
   z-index: var(--branched-menu-marker-layer);
   width: var(--branched-menu-rail-width);
@@ -55,6 +55,7 @@
 .branched-menu__marker[data-on] {
   opacity: 1;
 }
+.branched-menu__marker[data-snap] { transition: none }
 
 .branched-menu__section {
   display: flex;
@@ -106,6 +107,7 @@
 
 .branched-menu__tree {
   position: relative;
+  height: var(--bm-tree-height);
   padding: var(--aml-space-6) 0;
   box-sizing: border-box;
 }
@@ -139,6 +141,8 @@
 
 .branched-menu__reach {
   stroke: var(--bm-accent);
+  stroke-dasharray: var(--bm-branch-length);
+  stroke-dashoffset: var(--bm-branch-offset);
   transition: stroke-dashoffset var(--bm-draw) var(--bm-ease-out);
 }
 
@@ -176,6 +180,11 @@
 .branched-menu__icon {
   display: inline-flex;
   flex: none;
+}
+.branched-menu__symbol {
+  width: var(--aml-space-16);
+  height: var(--aml-space-16);
+  stroke-width: var(--branched-menu-icon-line-weight);
 }
 
 .branched-menu__label {

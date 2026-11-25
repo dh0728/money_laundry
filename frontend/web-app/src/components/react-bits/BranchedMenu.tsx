@@ -3,6 +3,7 @@
 import React, { isValidElement, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Bell, Download, Layers, MousePointer2, Palette, Rocket, Settings, Type, type LucideIcon } from 'lucide-react';
 import { BranchLines } from './BranchLines';
+import { readChartNumber } from '../charts/chart-design-values';
 
 export interface BranchedMenuChild {
   value: string;
@@ -57,13 +58,10 @@ const DEFAULT_ITEMS: BranchedMenuItem[] = [
     ]
   }
 ];
-const PAD = 6;
-const MARK = 16;
-
 const renderIcon = (icon: ReactNode | LucideIcon) => {
   if (isValidElement(icon)) return icon;
   const Icon = icon as LucideIcon;
-  return <Icon size={16} strokeWidth={1.8} aria-hidden="true" />;
+  return <Icon className="branched-menu__symbol" aria-hidden="true" />;
 };
 const toSet = (open: number | number[]) => new Set(Array.isArray(open) ? open : open >= 0 ? [open] : []);
 
@@ -76,15 +74,15 @@ const BranchedMenu: React.FC<BranchedMenuProps> = ({
   color,
   accentColor,
   lineColor,
-  width = 240,
-  rowHeight = 36,
-  indent = 40,
-  trunk = 14,
-  radius = 10,
-  lineWidth = 1.5,
-  fontSize = 14,
-  drawDuration = 400,
-  foldDuration = 300,
+  width,
+  rowHeight,
+  indent,
+  trunk,
+  radius,
+  lineWidth,
+  fontSize,
+  drawDuration,
+  foldDuration,
   className = ''
 }) => {
   const [open, setOpen] = useState<Set<number>>(() => toSet(defaultOpen));
@@ -109,12 +107,12 @@ const BranchedMenu: React.FC<BranchedMenuProps> = ({
       const el = heads.current[activeSection];
       if (!m) return;
       const on = markerShown && el;
-      if (!glide) m.style.transition = 'none';
-      if (on) m.style.top = `${el.offsetTop + (el.offsetHeight - MARK) / 2}px`;
+      if (!glide) m.setAttribute('data-snap', '');
+      if (on) m.style.setProperty('--bm-marker-top', `calc(${el.offsetTop + el.offsetHeight / 2}px - var(--aml-space-16) / 2)`);
       m.toggleAttribute('data-on', Boolean(on));
       if (!glide) {
         void m.offsetHeight;
-        m.style.transition = '';
+        m.removeAttribute('data-snap');
       }
     };
     place(true);
@@ -145,8 +143,13 @@ const BranchedMenu: React.FC<BranchedMenuProps> = ({
     });
   };
 
-  const r = Math.min(radius, rowHeight / 2 - 2);
-  const rowY = (k: number) => PAD + k * rowHeight + rowHeight / 2;
+  const padding = readChartNumber('--aml-space-6', 6);
+  const rowSize = rowHeight ?? readChartNumber('--selection-control-height-medium', 36);
+  const branchWidth = indent ?? readChartNumber('--aml-space-40', 40);
+  const branchTrunk = trunk ?? readChartNumber('--branched-menu-rail-inset', 14);
+  const turn = Math.min(radius ?? readChartNumber('--aml-space-10', 10), rowSize / 2 - readChartNumber('--aml-space-2', 2));
+  const branchEnd = branchWidth - readChartNumber('--aml-space-8', 8);
+  const rowY = (index: number) => padding + (index + 0.5) * rowSize;
 
   return (
     <nav
@@ -154,16 +157,16 @@ const BranchedMenu: React.FC<BranchedMenuProps> = ({
       className={`branched-menu${className ? ` ${className}` : ''}`}
       style={
         {
-          '--bm-w': `${width}px`,
+          '--bm-w': width == null ? undefined : `${width}px`,
           '--bm-ink': color,
           '--bm-accent': accentColor,
           '--bm-line': lineColor,
-          '--bm-font': `${fontSize}px`,
-          '--bm-row': `${rowHeight}px`,
-          '--bm-indent': `${indent}px`,
+          '--bm-font': fontSize == null ? undefined : `${fontSize}px`,
+          '--bm-row': rowHeight == null ? undefined : `${rowHeight}px`,
+          '--bm-indent': indent == null ? undefined : `${indent}px`,
           '--bm-line-w': lineWidth,
-          '--bm-draw': `${drawDuration}ms`,
-          '--bm-fold': `${foldDuration}ms`
+          '--bm-draw': drawDuration == null ? undefined : `${drawDuration}ms`,
+          '--bm-fold': foldDuration == null ? undefined : `${foldDuration}ms`
         } as CSSProperties
       }
     >
@@ -173,7 +176,7 @@ const BranchedMenu: React.FC<BranchedMenuProps> = ({
         const isOpen = kids ? open.has(i) : false;
         const leafValue = item.value ?? item.label;
         const leafActive = !kids && leafValue === active;
-        const bodyH = kids ? PAD * 2 + kids.length * rowHeight : 0;
+        const treeHeight = kids ? padding * 2 + kids.length * rowSize : 0;
         return (
           <div key={item.value ?? item.label} className="branched-menu__section" data-open={isOpen ? '' : undefined}>
             <button
@@ -192,9 +195,9 @@ const BranchedMenu: React.FC<BranchedMenuProps> = ({
             {kids ? (
               <div className="branched-menu__body" aria-hidden={!isOpen} inert={!isOpen}>
                 <div className="branched-menu__fold">
-                  <div className="branched-menu__tree" style={{ height: bodyH }}>
-                    <BranchLines rows={kids.map((_, k) => rowY(k))} width={indent} height={bodyH}
-                      trunk={trunk} end={indent - 8} radius={r} activeIndex={kids.findIndex(kid => kid.value === active)} />
+                  <div className="branched-menu__tree" style={{ '--bm-tree-height': `${treeHeight}px` } as CSSProperties}>
+                    <BranchLines rows={kids.map((_, index) => rowY(index))} width={branchWidth} height={treeHeight}
+                      trunk={branchTrunk} end={branchEnd} radius={turn} activeIndex={kids.findIndex(kid => kid.value === active)} />
                     {kids.map(kid => (
                       <button
                         key={kid.value}
