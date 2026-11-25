@@ -6,6 +6,7 @@ import {
   Children,
   isValidElement,
   memo,
+  type CSSProperties,
   type ReactNode,
   useCallback,
   useEffect,
@@ -27,6 +28,7 @@ import {
   ringCssVars,
 } from "./ring-context";
 import { RING_GRID_PADDING } from "./ring-grid";
+import "./ring.css";
 
 function RingProvider({
   children,
@@ -439,24 +441,14 @@ const RingChartCore = memo(function RingChartCore({
   return (
     <RingProvider value={contextValue}>
       <div
-        className="grid"
-        style={{
-          gridTemplateColumns: "1fr",
-          gridTemplateRows: "1fr",
-          width: size,
-          height: size,
-        }}
+        className="grid ring-chart-core"
+        style={{ "--ring-chart-size": `${size}px` } as CSSProperties}
       >
         {/* SVG layer with rings */}
         <svg
           aria-hidden="true"
           height={size}
-          style={{
-            gridArea: "1 / 1",
-            // No `paint` containment: it clips hover glow at the svg box.
-            contain: "layout style",
-            overflow: "visible",
-          }}
+          className="ring-chart-layer ring-chart-svg"
           width={size}
         >
           <g transform={`translate(${center}, ${center})`}>
@@ -476,10 +468,7 @@ const RingChartCore = memo(function RingChartCore({
 
         {/* HTML layer with center content - stacked on top via grid */}
         {centerChildren.length > 0 && (
-          <div
-            className="pointer-events-none flex items-center justify-center"
-            style={{ gridArea: "1 / 1" }}
-          >
+          <div className="ring-chart-layer pointer-events-none flex items-center justify-center">
             {centerChildren}
           </div>
         )}
@@ -535,9 +524,9 @@ export function RingChart({
     return (
       <LazyMotion features={domAnimation}>
         <div
-          className={cn("relative flex items-center justify-center", className)}
+          className={cn("ring-chart-fixed relative flex items-center justify-center", className)}
           ref={containerRef}
-          style={{ width: fixedSize, height: fixedSize }}
+          style={{ "--ring-chart-size": `${fixedSize}px` } as CSSProperties}
         >
           <RingChartInner
             baseInnerRadius={baseInnerRadius}

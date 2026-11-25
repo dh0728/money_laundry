@@ -195,7 +195,7 @@ export const Ring = memo(function Ring({
       fill="transparent"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      style={{ cursor: "pointer" }}
+      className="ring-hitbox"
     />
   );
 

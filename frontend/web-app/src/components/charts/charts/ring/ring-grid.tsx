@@ -2,7 +2,7 @@
 
 import { m } from "motion/react";
 import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
-import { memo, useMemo } from "react";
+import { memo, useMemo, type CSSProperties } from "react";
 import {
   GRID_ANGLE_LABEL_FADE_S,
   GRID_ANGLE_LABEL_STAGGER_S,
@@ -178,10 +178,10 @@ export const RingGrid = memo(function RingGrid({
 
   const labels = showLabels ? (
     <g
-      className="font-mono tabular-nums"
+      className="ring-grid-labels font-mono tabular-nums"
       fill={labelColor}
       fontSize={fontSize}
-      style={{ fill: labelColor }}
+      style={{ "--ring-grid-label-color": labelColor } as CSSProperties}
     >
       {geometry.map((t, i) => {
         const text = (

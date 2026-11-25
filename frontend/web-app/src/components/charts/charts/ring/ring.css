@@ -1,0 +1,37 @@
+@import '../../../../styles/ring-chart-tokens.css';
+
+.ring-chart-core,
+.ring-chart-fixed,
+.completion-ring {
+  width: var(--ring-chart-size);
+  height: var(--ring-chart-size);
+}
+
+.ring-chart-core {
+  grid-template: 1fr / 1fr;
+}
+
+.ring-chart-layer {
+  grid-area: 1 / 1;
+}
+
+.ring-chart-svg {
+  contain: layout style;
+  overflow: visible;
+}
+
+.ring-hitbox {
+  cursor: pointer;
+}
+
+.ring-grid-labels {
+  fill: var(--ring-grid-label-color);
+}
+
+.completion-ring {
+  --border: var(--inner-surface);
+}
+
+.completion-ring-value {
+  font-size: var(--completion-ring-value-size);
+}
