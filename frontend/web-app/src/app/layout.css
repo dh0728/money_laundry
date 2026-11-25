@@ -299,16 +299,16 @@ body:has(#sidebar:not([hidden])) .sidebar-chrome .drawer-chrome__primary > .butt
   min-block-size: var(--header-control-size);
   block-size: var(--header-control-size);
 }
-.app-header .drawer-chrome:where(body:has(#sidebar:not([hidden])) .sidebar-chrome, .inbox-header:has(#inbox-toggle[aria-expanded="true"])) .button {
+.drawer-chrome:where(body:has(#sidebar:not([hidden])) .sidebar-chrome, .inbox-header:has(#inbox-toggle[aria-expanded="true"])) .button {
   background: var(--drawer-chrome-action-background, transparent);
   box-shadow: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
-.app-header .drawer-chrome:where(body:has(#sidebar:not([hidden])) .sidebar-chrome, .inbox-header:has(#inbox-toggle[aria-expanded="true"])) .button:where(:hover:not(:disabled, [aria-disabled="true"])) {
+.drawer-chrome:where(body:has(#sidebar:not([hidden])) .sidebar-chrome, .inbox-header:has(#inbox-toggle[aria-expanded="true"])) .button:where(:hover:not(:disabled, [aria-disabled="true"])) {
   --drawer-chrome-action-background: var(--hover);
 }
-.app-header .drawer-chrome:where(body:has(#sidebar:not([hidden])) .sidebar-chrome, .inbox-header:has(#inbox-toggle[aria-expanded="true"])) .button:where(:active:not(:disabled, [aria-disabled="true"])) {
+.drawer-chrome:where(body:has(#sidebar:not([hidden])) .sidebar-chrome, .inbox-header:has(#inbox-toggle[aria-expanded="true"])) .button:where(:active:not(:disabled, [aria-disabled="true"])) {
   --drawer-chrome-action-background: var(--pressed);
 }
 .brand {
@@ -543,6 +543,15 @@ body:has(#sidebar:not([hidden])) .sidebar-chrome .drawer-chrome__primary > .butt
   inline-size: min(var(--sidebar-width), 100vw);
   display: flex;
   flex-direction: column;
+}
+.account-footer > .divider { z-index: var(--layer-local-overlay) }
+body:has(#sidebar[hidden]) .account-footer .divider { display: none }
+body:has(#sidebar:not([hidden])) .account-footer {
+  box-shadow: inset calc(-1 * var(--aml-stroke-divider)) 0 var(--glass-shell-edge);
+  border-end-end-radius: var(--aml-radius-panel);
+  background: var(--glass-shell-face);
+  -webkit-backdrop-filter: var(--glass-material-blur);
+  backdrop-filter: var(--glass-material-blur);
 }
 .account-controls { padding-block: var(--header-inset) }
 body:has(#sidebar[hidden]) #account-toggle { --glass-surface-face: var(--glass-control-face) }
