@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
 import { checkWorkspaceLayout } from './check-workspace-layout.mjs';
+import { checkRecordCardMaterial } from './check-record-card-material.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const selectedTransaction = 'T-261111-00000001';
@@ -197,8 +198,12 @@ try {
   const executablePath = process.env.SCROLL_CHECK_BROWSER_EXECUTABLE;
   const channel = !executablePath && process.platform === 'win32' && !existsSync(chromium.executablePath()) ? 'chrome' : undefined;
   browser = await chromium.launch({ executablePath, channel });
+  const cardRegression = process.argv.includes('--inject-card-regression') ? 'wrapper'
+    : process.argv.includes('--inject-ledger-glow-regression') ? 'ledger' : undefined;
+  const origin = `http://127.0.0.1:${port}`;
+  if (!regression) await checkRecordCardMaterial(browser, origin, { inject: cardRegression });
   const results = await Promise.all(matrix.map(viewport =>
-    checkViewport(browser, `http://127.0.0.1:${port}`, viewport, regression)));
+    checkViewport(browser, origin, viewport, regression)));
   const failures = results.flatMap(result => result.failures);
   const exceptions = results.reduce((count, result) => count + result.exceptions, 0);
   if (exceptions) console.log(`Approved long-chart scroll exceptions on /dashboard/all: ${exceptions}.`);

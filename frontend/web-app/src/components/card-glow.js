@@ -58,6 +58,17 @@ export function bindCardGlow(workspace) {
     }
     return scale;
   }
+  function fadeGlowAtScrollEdge(surface, bounds, area) {
+    const style = page.defaultView.getComputedStyle(surface);
+    const gutter = parseFloat(style.getPropertyValue('--record-card-shadow-gutter'));
+    if (!gutter) return;
+
+    // Fade inside the scrollport before it clips the light. Leave room for the tilt projection.
+    const fadeInset = room => room < gutter ? `${gutter - room + 2}px` : '';
+    surface.style.setProperty('--card-glow-clip-top', fadeInset(bounds.top - area.top));
+    surface.style.setProperty('--card-glow-clip-bottom', fadeInset(area.bottom - bounds.bottom));
+  }
+
   function clear() {
     active?.removeAttribute('data-card-spotlight');
     active?.removeAttribute('data-card-tilted');
@@ -88,8 +99,10 @@ export function bindCardGlow(workspace) {
     if (surface !== active) {
       clear();
       active = surface;
+      workspace.removeAttribute('data-card-glow-scrolling');
       if (surface.hasAttribute('data-card-interactive')) {
         clipping = clipArea(surface);
+        fadeGlowAtScrollEdge(surface, bounds, clipping);
         if (bounds.left >= clipping.left - 1 && bounds.right <= clipping.right + 1
             && bounds.top >= clipping.top - 1 && bounds.bottom <= clipping.bottom + 1) tiltBounds = bounds;
       }
@@ -105,17 +118,22 @@ export function bindCardGlow(workspace) {
       active.style.setProperty('--card-tilt-scale', String(tiltScale(active, tiltBounds, clipping, rx, ry)));
     }
   }
+  function clearOnScroll() {
+    workspace.setAttribute('data-card-glow-scrolling', '');
+    clear();
+  }
   workspace.addEventListener('pointermove', move, { passive: true });
   workspace.addEventListener('pointerleave', clear);
   workspace.addEventListener('pointercancel', clear);
-  page.addEventListener('scroll', clear, { passive: true, capture: true });
+  page.addEventListener('scroll', clearOnScroll, { passive: true, capture: true });
   page.addEventListener('aml:appearance', clear);
   return () => {
     clear();
     workspace.removeEventListener('pointermove', move);
     workspace.removeEventListener('pointerleave', clear);
     workspace.removeEventListener('pointercancel', clear);
-    page.removeEventListener('scroll', clear, true);
+    page.removeEventListener('scroll', clearOnScroll, true);
     page.removeEventListener('aml:appearance', clear);
+    workspace.removeAttribute('data-card-glow-scrolling');
   };
 }
