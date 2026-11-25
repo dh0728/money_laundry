@@ -2,6 +2,7 @@ import { patternName } from '@/mocks/dashboard-data'
 import type { JudgmentRecord } from '@/lib/workspace-store'
 import { verdictLabel } from './report-model'
 import { createExportCanvas } from '@/components/export-canvas'
+import { downloadFile } from '@/components/file-download'
 
 type CsvValue = string | number | boolean | null | undefined
 export const MAX_PDF_JUDGMENTS = 25
@@ -16,14 +17,7 @@ export function createCsv(headers: readonly string[], rows: readonly (readonly C
   return `\uFEFF${[headers, ...rows].map(row => row.map(quote).join(',')).join('\r\n')}\r\n`
 }
 export function downloadBlob(filename: string, blob: Blob) {
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename.replace(/[\\/:*?"<>|]/g, '-')
-  document.body.append(anchor)
-  anchor.click()
-  anchor.remove()
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+  downloadFile(filename.replace(/[\\/:*?"<>|]/g, '-'), blob)
 }
 export function downloadCsv(filename: string, headers: readonly string[], rows: readonly (readonly CsvValue[])[]) {
   downloadBlob(filename, new Blob([createCsv(headers, rows)], { type: 'text/csv;charset=utf-8' }))

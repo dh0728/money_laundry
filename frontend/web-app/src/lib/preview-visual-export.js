@@ -1,4 +1,5 @@
 import { createExportCanvas } from '../components/export-canvas';
+import { downloadFile } from '../components/file-download';
 
 const svgNamespace = 'http://www.w3.org/2000/svg';
 const graphSnapshots = new WeakMap();
@@ -277,12 +278,5 @@ export async function downloadVisualizations({ format, filename, root = document
   if (!panels.length) throw new Error('이 화면에서 저장할 차트나 그래프를 찾을 수 없습니다.');
   const graphic = makeSVG(panels, format);
   const blob = format === 'png' ? await toPNG(graphic) : graphic.image;
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `${filename.replace(/\.(svg|png)$/i, '')}.${format}`;
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadFile(`${filename.replace(/\.(svg|png)$/i, '')}.${format}`, blob);
 }

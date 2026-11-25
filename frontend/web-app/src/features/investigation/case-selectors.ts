@@ -1,5 +1,6 @@
 import { riskBand } from '@/mocks/dashboard-data'
 import type { LedgerTransaction, WorkspaceCase } from '@/lib/workspace-store'
+import { downloadFile } from '@/components/file-download'
 
 export const caseDataBudget = { transactions: 10_000, records: 10_000, references: 10_000 }
 function caseReferencesWithinBudget(records: WorkspaceCase[]) {
@@ -147,9 +148,7 @@ export function downloadCaseCsv(filename: string, rows: (string | number | null)
     return `"${(/^\s*[=+@-]/.test(text) ? `'${text}` : text).replaceAll('"', '""')}"`
   }
   const blob = new Blob(['\uFEFF' + rows.map(row => row.map(escape).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' })
-  const href = URL.createObjectURL(blob)
-  const anchor = document.createElement('a'); anchor.href = href; anchor.download = filename; anchor.click()
-  setTimeout(() => URL.revokeObjectURL(href), 0)
+  downloadFile(filename, blob, 0)
 }
 export function downloadTransactionsCsv(rows: LedgerTransaction[], name: string) {
   downloadCaseCsv(`${name}-transactions.csv`, [['거래 ID', '거래 시각', '출금 계좌', '입금 계좌', '금액 (USD)', '유형 코드', '모델 확률', '모델 점수', '사람 판정'], ...rows.map(tx => [tx.displayId, tx.occurredAt, tx.fromAccountId, tx.toAccountId, tx.amountUsd, tx.typeCode, tx.probability, tx.score, tx.humanVerdict === 'normal' ? '정상' : tx.humanVerdict === 'abnormal' ? '이상' : '판정 전'])])
