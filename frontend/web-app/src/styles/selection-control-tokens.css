@@ -59,11 +59,23 @@
   --jelly-radio-press-scale: 0.97;
 
   --rubber-segment-foreground: #fafafa;
+  --rubber-segment-radius: 10px;
   --rubber-segment-inset: 3px;
   --rubber-segment-thumb-radius: 7px;
+  --rubber-segment-label-size-small: 12px;
+  --rubber-segment-label-size-large: 14px;
+  --rubber-segment-padding-small: 10px;
+  --rubber-segment-padding-large: 18px;
   --rubber-segment-padding: 14px;
+  --rubber-segment-minimum-width-small: 36px;
+  --rubber-segment-minimum-width-large: 48px;
   --rubber-segment-minimum-width: 44px;
   --rubber-segment-inactive-opacity: 0.7;
   --rubber-segment-hover-opacity: 0.9;
   --rubber-segment-press-scale: 0.96;
+
+  --header-nav-radius: var(--aml-space-24);
+  --header-nav-focus-layer: 1;
+  --header-nav-inactive-opacity: 1;
+  --header-nav-hover-opacity: 0.82;
 }

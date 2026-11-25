@@ -5,12 +5,15 @@
   --rs-thumb: var(--rubber-segment-foreground);
   --rs-ink: var(--rubber-segment-foreground);
   --rs-ink-active: var(--selection-control-selected-foreground);
-  --rs-radius: var(--aml-radius-card);
+  --rs-radius: var(--rubber-segment-radius);
   --rs-inset: var(--rubber-segment-inset);
   --rs-thumb-radius: var(--rubber-segment-thumb-radius);
-  --rs-h: var(--selection-control-height-medium);
-  --rs-font: var(--selection-control-label-size-medium);
-  --rs-pad: var(--rubber-segment-padding);
+  --rs-size-height: var(--selection-control-height-medium);
+  --rs-size-font: var(--selection-control-label-size-medium);
+  --rs-size-padding: var(--rubber-segment-padding);
+  --rs-h: var(--segment-height, var(--rs-size-height));
+  --rs-font: var(--segment-label-size, var(--rs-size-font));
+  --rs-pad: var(--segment-inline-padding, var(--rs-size-padding));
   --rs-min: var(--rubber-segment-minimum-width);
   --rs-idle: var(--rubber-segment-inactive-opacity);
   --rs-hover: var(--rubber-segment-hover-opacity);
@@ -30,6 +33,20 @@
   -webkit-user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+.rubber-segment[data-segment-size="sm"] {
+  --rs-size-height: var(--selection-control-height-small);
+  --rs-size-font: var(--rubber-segment-label-size-small);
+  --rs-size-padding: var(--rubber-segment-padding-small);
+  --rs-min: var(--rubber-segment-minimum-width-small);
+}
+
+.rubber-segment[data-segment-size="lg"] {
+  --rs-size-height: var(--selection-control-height-large);
+  --rs-size-font: var(--rubber-segment-label-size-large);
+  --rs-size-padding: var(--rubber-segment-padding-large);
+  --rs-min: var(--rubber-segment-minimum-width-large);
 }
 
 .rubber-segment[data-equal] {
@@ -103,6 +120,7 @@
   grid-auto-columns: auto;
   background: var(--rs-thumb);
   color: var(--rs-ink-active);
+  clip-path: var(--rs-thumb-clip, none);
   pointer-events: none;
 }
 

@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { bindTooltip } from '../components/components.js';
 import { previewUrl } from './preview-route.js';
 import RubberSegment from '../components/react-bits/RubberSegment';
+import { readChartNumber } from '../components/charts/chart-design-values';
 import './screen-navigation.css';
 import { Box, Text } from '../components/layout-primitives';
 
@@ -12,7 +13,8 @@ let currentNavigation;
 
 function NavigationSegments({ label, items, active, onSelect, reduced, linkTo }) {
   return <RubberSegment
-    key={reduced} aria-label={label} size="sm" radius={24} inset={0} equalSlots={false} draggable={false}
+    key={reduced} aria-label={label} size="sm" radius={readChartNumber('--header-nav-radius', 24)} inset={0}
+    equalSlots={false} draggable={false}
     tabThroughInactiveItems
     items={items} value={active} onChange={onSelect} reducedMotion={reduced} linkTo={linkTo}
     trackColor="transparent" thumbColor="var(--selection-surface)"

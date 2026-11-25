@@ -20,7 +20,7 @@
 }
 .workspace-icon-nav a:not([aria-current]):hover { opacity: var(--rs-hover) }
 .segmented-navigation a[aria-current]:focus-visible {
-  z-index: 1;
+  z-index: var(--header-nav-focus-layer);
   outline-color: var(--selection-ink);
 }
 
@@ -62,7 +62,10 @@
   max-width: none;
 }
 
-.segmented-navigation .rubber-segment__item { --rs-idle: 1; --rs-hover: 0.82; }
+.segmented-navigation .rubber-segment__item {
+  --rs-idle: var(--header-nav-inactive-opacity);
+  --rs-hover: var(--header-nav-hover-opacity);
+}
 .segmented-navigation .rubber-segment__item:focus-visible {
   outline: var(--aml-stroke-focus) solid var(--focus-ring);
   outline-offset: calc(-1 * var(--aml-stroke-focus));
