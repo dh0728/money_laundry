@@ -6,9 +6,10 @@ import { TableBody, TableCell, TableHead, TableHeader, TableRow, TableRowHead } 
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
 import { Panel } from '../../components/panel';
 import { Progress } from '../../components/progress';
+import { activateRecordCard } from '../../components/record-card';
 import { ScreenActions } from '../../components/screen-actions';
 import { StatusTag } from '../../components/semantic-tags';
-import { csvDownloadEntry } from '../../components/query-controls';
+import { csvDownloadEntry, TableQueryTools } from '../../components/query-controls';
 import { SortableTableHead, tableCount, useTableSort, WorkflowTable } from '../../components/workflow-table';
 import { sidedText, sideOf, templateOf } from './rule-definition';
 import { transactionCode } from '../investigation/live-data.js';
@@ -55,9 +56,14 @@ const judgements = { SUSPICIOUS: '의심', NORMAL: '정상' };
 const active = status => status === 'QUEUED' || status === 'RUNNING';
 const windowText = minutes => (minutes % 60 === 0 ? `${minutes / 60}시간` : `${minutes}분`);
 
-function RunTime({ value }) {
+function runTimeText(value) {
   const date = new Date(value);
-  return value && Number.isFinite(date.getTime()) ? <Text as="time" dateTime={value}>{timeFormat.format(date)} KST</Text> : '—';
+  return value && Number.isFinite(date.getTime()) ? `${timeFormat.format(date)} KST` : '';
+}
+
+function RunTime({ value }) {
+  const text = runTimeText(value);
+  return text ? <Text as="time" dateTime={value}>{text}</Text> : '—';
 }
 
 function Metric({ label, value, unit, note }) {
@@ -193,22 +199,51 @@ function Cases({ run, catalog, side, order, templateKey, noun, registerTableTool
   </Box>;
 }
 
-function History({ rows, selectedId, onOpen }) {
-  return <Panel className="rule-backtest-history" aria-label="실행 기록">
-    <Heading>실행 기록</Heading>
-    {rows.length ? <Box as="ol" className="workflow-rule-history">
-      {rows.map(row => <Box as="li" key={row.backtestId}>
-        <Box>
-          <ActionButton className="workflow-rule-select" aria-pressed={row.backtestId === selectedId} onClick={() => onOpen(row.backtestId)}>
-            v{row.versionNo} · {statusNames[row.status]}{row.baseline ? ` · 운영 v${row.baseline.versionNo} 과 비교` : ''}
-          </ActionButton>
-          <Text as="span">{row.requestedBy} · <RunTime value={row.requestedAt} /></Text>
-        </Box>
-        <Text>{row.period.from} ~ {row.period.to}{row.txCount != null ? ` · 거래 ${count(row.txCount)}건` : ''}
-          {row.currentDefinition ? '' : ' · 조건을 고치기 전'}</Text>
-      </Box>)}
-    </Box> : <Text>아직 돌린 백테스트가 없습니다.</Text>}
-  </Panel>;
+const historyComparison = row => row.baseline ? `운영 v${row.baseline.versionNo} 과 비교` : '';
+const historyPeriod = row => `${row.period.from} ~ ${row.period.to}`;
+const previousConditions = '조건을 고치기 전';
+
+function History({ rows, selectedId, onOpen, unavailableText }) {
+  const sorting = useTableSort(rows);
+  const download = csvDownloadEntry('실행 기록', 'rule-backtest-history',
+    ['버전', '상태', '비교 기준', '검사 기간', '검사한 거래', '요청자', '요청 시각'], sorting.rows.map(row => [
+      `v${row.versionNo}`, statusNames[row.status], historyComparison(row),
+      row.currentDefinition ? historyPeriod(row) : `${historyPeriod(row)} · ${previousConditions}`,
+      row.txCount ?? '', row.requestedBy, runTimeText(row.requestedAt),
+    ]));
+  return <Box as="section" className="rule-backtest-history" aria-label="실행 기록">
+    <WorkflowTable label="실행 기록" summary={unavailableText ? undefined : tableCount(rows.length)}
+      tools={rows.length > 0 && <TableQueryTools actions={{ entries: [download] }} />}>
+      <TableHeader><TableRow>
+        <SortableTableHead sorting={sorting} column="version" value={row => row.versionNo}>버전</SortableTableHead>
+        <SortableTableHead sorting={sorting} column="status" value={row => statusNames[row.status]}>상태</SortableTableHead>
+        <SortableTableHead sorting={sorting} column="kind" value={row => row.baseline?.versionNo}>비교 기준</SortableTableHead>
+        <SortableTableHead sorting={sorting} column="거래 기간" value={row => `${row.period.from}/${row.period.to}`}>검사 기간</SortableTableHead>
+        <SortableTableHead sorting={sorting} column="거래 건수" value={row => row.txCount}>검사한 거래</SortableTableHead>
+        <SortableTableHead sorting={sorting} column="author" value={row => row.requestedBy}>요청자</SortableTableHead>
+        <SortableTableHead sorting={sorting} column="시각" value={row => row.requestedAt}>요청 시각</SortableTableHead>
+      </TableRow></TableHeader>
+      <TableBody>{sorting.rows.map(row => {
+        const selected = row.backtestId === selectedId;
+        const comparison = historyComparison(row);
+        const period = historyPeriod(row);
+        const openRun = () => onOpen(row.backtestId);
+        const label = [`v${row.versionNo}`, statusNames[row.status], comparison, period, runTimeText(row.requestedAt)].filter(Boolean).join(' · ');
+        return <TableRow key={row.backtestId} data-selected={selected} onClick={event => activateRecordCard(event, openRun)}>
+          <TableRowHead><ActionButton className="workflow-rule-select" aria-pressed={selected} aria-label={label}
+            onClick={openRun}>v{row.versionNo}</ActionButton></TableRowHead>
+          <TableCell><StatusTag preset={statusPresets[row.status]}>{statusNames[row.status]}</StatusTag></TableCell>
+          <TableCell>{comparison || '—'}</TableCell>
+          <TableCell>{period}{!row.currentDefinition && <> · <Text as="span" className="workflow-rule-note">{previousConditions}</Text></>}</TableCell>
+          <TableCell numeric>{row.txCount == null ? '—' : `${count(row.txCount)}건`}</TableCell>
+          <TableCell>{row.requestedBy}</TableCell>
+          <TableCell><RunTime value={row.requestedAt} /></TableCell>
+        </TableRow>;
+      })}
+        {!rows.length && <TableRow><TableCell colSpan={7}>{unavailableText ?? '아직 돌린 백테스트가 없습니다.'}</TableCell></TableRow>}
+      </TableBody>
+    </WorkflowTable>
+  </Box>;
 }
 
 export function LiveRuleBacktest({ initialRule, registerTableTools, actionsHost }) {
@@ -371,7 +406,8 @@ export function LiveRuleBacktest({ initialRule, registerTableTools, actionsHost 
       </Box>
       <Cases run={done} catalog={catalog} side={side} order={template?.metrics} templateKey={done.template} noun={noun} registerTableTools={registerTableTools} />
     </>}
-    <History rows={history} selectedId={run?.backtestId} onOpen={open} />
+    <History rows={history} selectedId={run?.backtestId} onOpen={open}
+      unavailableText={!detail ? (message ? '실행 기록을 불러오지 못했습니다.' : '실행 기록을 불러오는 중입니다.') : undefined} />
     <ScreenActions host={actionsHost} stackOnNarrow>
       {running && <PrimaryButton tone="negative" disabled={run.cancelRequested} onClick={() => void cancel()}>취소</PrimaryButton>}
       <PrimaryButton tone="inverse" as="a" href={code ? `/rules?rule=${code}` : '/rules'}>룰 목록</PrimaryButton>

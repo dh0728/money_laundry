@@ -65,6 +65,7 @@ it('고른 룰의 새 버전과 비교할 운영 버전을 보여 주고, 실행
   expect(card('백테스트 대상 룰').getByRole('combobox', { name: '룰' })).toHaveTextContent('RULE-004');
   expect(card('비교 기준').getByText('운영 버전 · v1')).toBeInTheDocument();
   expect(card('실행 상태').getByText(/아직 돌린 백테스트가 없습니다/)).toBeInTheDocument();
+  expect(card('실행 기록').getByRole('table', { name: '실행 기록' })).toHaveTextContent('아직 돌린 백테스트가 없습니다.');
   expect(within(footer).getByRole('link', { name: '조건 고치기' })).toHaveAttribute('href', '/rules/new?rule=RULE-004');
 
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
@@ -99,7 +100,8 @@ it('고른 룰의 새 버전과 비교할 운영 버전을 보여 주고, 실행
 });
 
 it('끝난 백테스트의 값 변화 표, 검사 범위, 사례, 알아 둘 것을 보여 준다', async () => {
-  vi.mocked(fetchBacktests).mockResolvedValue([completed]);
+  const earlier = head('CANCELLED', { backtestId: 30, versionNo: 1, baseline: null, currentDefinition: false });
+  vi.mocked(fetchBacktests).mockResolvedValue([completed, earlier]);
   vi.mocked(fetchBacktest).mockResolvedValue({ ...completed, currentDefinition: false, evidenceShare: 12.5, chunkedCount: 1 });
   render(<LiveRuleBacktest initialRule="RULE-004" actionsHost={footer} />);
 
@@ -136,8 +138,26 @@ it('끝난 백테스트의 값 변화 표, 검사 범위, 사례, 알아 둘 것
   expect(notices.getByText(/바쁜 계좌 2개는 평가하지 않았습니다/)).toHaveTextContent('72시간 안 같은 방향 거래 512건 초과');
   expect(notices.getByText(/바쁜 계좌 2개는 평가하지 않았습니다/)).not.toHaveTextContent('경로 자리');
   expect(notices.getByText(/32건을 넘는 대상이 1개/)).toBeInTheDocument();
-  expect(within(screen.getByRole('region', { name: '실행 기록' })).getByRole('button', { name: /v2 · 완료 · 운영 v1 과 비교/ }))
-    .toHaveAttribute('aria-pressed', 'true');
+  const history = card('실행 기록');
+  const historyTable = history.getByRole('table', { name: '실행 기록' });
+  expect(historyTable.closest('.data-table-frame')).toContainElement(history.getByRole('heading', { name: '실행 기록' }));
+  expect(historyTable.closest('.screen-panel')).toBeNull();
+  expect(history.getAllByRole('columnheader').map(cell => cell.textContent))
+    .toEqual(['버전', '상태', '비교 기준', '검사 기간', '검사한 거래', '요청자', '요청 시각']);
+  expect(history.getByRole('button', { name: '다운로드' })).toBeInTheDocument();
+  const currentRun = history.getByRole('button', { name: /v2 · 완료 · 운영 v1 과 비교/ });
+  expect(currentRun).toHaveAttribute('aria-pressed', 'true');
+  const currentRunRow = within(currentRun.closest('tr'));
+  expect(currentRunRow.getByText('12,000건')).toHaveAttribute('data-numeric', 'true');
+  expect(currentRunRow.getByText('2023-09-08 ~ 2023-09-16')).toBeInTheDocument();
+  expect(currentRunRow.getByText('L1 심사자 A')).toBeInTheDocument();
+  fireEvent.click(history.getByRole('button', { name: '버전 · 오름차순 정렬' }));
+  const earlierRunRow = history.getAllByRole('row')[1];
+  expect(earlierRunRow).toHaveTextContent('조건을 고치기 전');
+  vi.mocked(fetchBacktest).mockResolvedValue(earlier);
+  fireEvent.click(within(earlierRunRow).getByText('취소됨'));
+  expect(await card('실행 상태').findByText('취소됨')).toBeInTheDocument();
+  expect(within(earlierRunRow).getByRole('button', { name: /v1 · 취소됨/ })).toHaveAttribute('aria-pressed', 'true');
 });
 
 it('경로형 룰은 경로의 거래 수를 바꿔 본 결과와 측정값(가장 긴 경로의 거래 수)을 보여 준다', async () => {
