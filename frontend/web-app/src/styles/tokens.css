@@ -173,6 +173,7 @@
   --chart-initial-height: 200px;
   --chart-tooltip-min-width: 8rem;
   --chart-tooltip-fade-duration: 100ms;
+  --chart-loading-sweep-box-size: 1;
   --chart-x-axis-slide-duration: 500ms;
   --chart-x-axis-slide-ease: cubic-bezier(0.85, 0, 0.15, 1);
   --chart-x-axis-label-fade-duration: 400ms;

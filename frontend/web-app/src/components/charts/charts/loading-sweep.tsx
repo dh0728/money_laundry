@@ -12,6 +12,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { readChartNumber } from "../chart-design-values";
 import { chartCssVars, useChartStable } from "./chart-context";
 import {
   LINE_LOADING_PULSE_EASE,
@@ -115,19 +116,20 @@ function LoadingSweepMask({
   onSweepComplete: () => void;
 }) {
   const gradientStops = useMemo(() => generateEasedGradientStops(), []);
+  const [sweepBoxSize] = useState(() => readChartNumber("--chart-loading-sweep-box-size", 1));
   const lastXRef = useRef(SWEEP_START_X);
 
   const handleUpdate = useCallback(
     (latest: { x?: number }) => {
       const xValue = typeof latest.x === "number" ? latest.x : SWEEP_START_X;
-      // Re-roll once the band has cleared the visible area (crossed past 1),
+      // Re-roll once the band has cleared the visible area,
       // so the silhouette never changes shape under the user's eye.
-      if (xValue >= 1 && lastXRef.current < 1) {
+      if (xValue >= sweepBoxSize && lastXRef.current < sweepBoxSize) {
         onSweepComplete();
       }
       lastXRef.current = xValue;
     },
-    [onSweepComplete]
+    [onSweepComplete, sweepBoxSize]
   );
 
   return (
@@ -143,19 +145,19 @@ function LoadingSweepMask({
         ))}
       </linearGradient>
       <pattern
-        height="1"
+        height={sweepBoxSize}
         id={`${chartId}-pattern`}
         patternContentUnits="objectBoundingBox"
         patternTransform={`rotate(${SWEEP_ANGLE_DEG})`}
         patternUnits="objectBoundingBox"
-        width={3}
+        width={SWEEP_END_X - SWEEP_START_X}
         x="0"
         y="0"
       >
         <m.rect
           animate={{ x: SWEEP_END_X }}
           fill={`url(#${chartId}-grad)`}
-          height="1"
+          height={sweepBoxSize}
           initial={{ x: SWEEP_START_X }}
           onUpdate={handleUpdate}
           transition={{
@@ -164,7 +166,7 @@ function LoadingSweepMask({
             repeat: Number.POSITIVE_INFINITY,
             repeatType: "loop",
           }}
-          width="1"
+          width={sweepBoxSize}
           y="0"
         />
       </pattern>
