@@ -638,6 +638,9 @@ body {
   --aml-type-body-strong-lineHeight: var(--aml-density-body-line-height);
   --aml-type-section-title-size: var(--aml-density-section-size);
   --aml-type-section-title-lineHeight: var(--aml-density-section-line-height);
+  --aml-type-panel-title-size: max(var(--aml-type-section-title-size), var(--aml-space-20));
+  --aml-type-panel-title-lineHeight: var(--aml-type-section-title-lineHeight);
+  --aml-type-panel-title-weight: 700;
   --aml-type-page-title-size: var(--aml-density-page-size);
   --aml-type-page-title-lineHeight: var(--aml-density-page-line-height);
   --aml-type-metric-size: var(--aml-density-metric-size);

@@ -482,8 +482,9 @@
 }
 .dashboard-board-heading h2 {
   margin: 0;
-  font-size: max(var(--aml-type-section-title-size), var(--aml-space-20));
-  line-height: var(--aml-type-section-title-lineHeight);
+  font-size: var(--aml-type-panel-title-size);
+  line-height: var(--aml-type-panel-title-lineHeight);
+  font-weight: var(--aml-type-panel-title-weight);
 }
 .dashboard-loading [data-slot="skeleton"] {
   border-radius: var(--aml-radius-small);

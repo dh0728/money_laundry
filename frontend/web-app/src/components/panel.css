@@ -1,3 +1,11 @@
+:is(.screen-panel, .panel-inset) > h2,
+:is(.screen-panel, .panel-inset) > :where(header, div):first-child > h2 {
+  margin: 0;
+  font-size: var(--aml-type-panel-title-size);
+  line-height: var(--aml-type-panel-title-lineHeight);
+  font-weight: var(--aml-type-panel-title-weight);
+}
+
 .panel-disclosure {
   --panel-disclosure-radius: var(--aml-radius-card);
   --panel-disclosure-inline-inset: var(--aml-panel-text-inset);

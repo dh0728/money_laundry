@@ -132,12 +132,6 @@
   margin: 0;
 }
 
-.workflow-rule-overview .screen-panel h2,
-.screen-rule-editor .screen-panel h2 {
-  font-size: var(--ui-font-size);
-  font-weight: var(--aml-type-section-title-weight);
-}
-
 .workflow-rule-overview .workflow-risk-legend {
   margin-block: 0;
 }

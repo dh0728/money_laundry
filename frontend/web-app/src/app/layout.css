@@ -803,7 +803,8 @@ html:has(dialog:modal, #sidebar:not([hidden]), #inbox:not([hidden])) {
 :is(.screen-panel, .screen-overlay, .glass-dialog, .login-card, .query-tool-popover) {
   border-radius: var(--aml-radius-panel);
 }
-:is(.screen-panel, .screen-overlay, .screen-section) h2 { margin: 0; font-size: var(--ui-font-size) }
+:is(.screen-panel, .screen-overlay, .screen-section) h2 { margin: 0 }
+:where(.screen-overlay, .screen-section) h2 { font-size: var(--ui-font-size) }
 .screen-section { min-inline-size: 0 }
 .screen-row { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--workspace-panel-gap) }
 .screen-two-column, .screen-cards { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)) }
