@@ -175,9 +175,9 @@
   --chart-tooltip-indicator-border-width: 1.5px;
   --chart-series-swatch-radius: 2px;
   --chart-grid-border-strength: 50%;
-  --dashboard-workload-donut-size: 112px;
-  --dashboard-workload-inner-radius: 34px;
-  --dashboard-workload-slice-gap: 0.045;
+  --dashboard-personal-flow-min-width: 36rem;
+  --dashboard-history-min-height: 12rem;
+  --dashboard-history-max-height: 18rem;
   --alert-status-chart-height: 260px;
   --alert-status-category-gap: 18%;
   --alert-status-axis-tick-gap: 28px;

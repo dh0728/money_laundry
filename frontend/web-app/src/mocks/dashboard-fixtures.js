@@ -152,7 +152,20 @@ export function dashboardFixtures({ T = [], A = [], E = [] }) {
     row.overlappingAlerts = alertCases.filter(alert => alert.related.some(transaction => relatedCodes.has(transaction.code)));
     row.linkedAlerts = row.linkedAlertCodes?.length ?? row.overlappingAlerts.length;
   }
-  return { transactions: [...allTransactions.values()], cases, mine: cases.filter(row => row.assigned) };
+  const defaultStaff = previewStaff.username;
+  const incoming = cases.find(row => row.kind === 'Alert' && row.open && assignments.get(row.code) === defaultStaff);
+  const outgoing = cases.find(row => row.kind === 'Episode' && row.open
+    && assignments.has(row.code) && assignments.get(row.code) !== defaultStaff);
+  const otherStaff = outgoing ? assignments.get(outgoing.code) : otherAnalysts[0].username;
+  const assignmentChanges = [
+    { row: incoming, previous: otherStaff, next: defaultStaff },
+    { row: outgoing, previous: defaultStaff, next: otherStaff },
+  ].filter(change => change.row).map(({ row, previous, next }) => ({
+    id: `sample-assign-${row.code}`, code: row.code, before: { assignee: previous }, assignee: next,
+    appliedAt: new Date(Date.parse(row.createdAt) + 45 * 60_000).toISOString(),
+  }));
+  return { transactions: [...allTransactions.values()], cases, mine: cases.filter(row => row.assigned),
+    staff, assignmentChanges };
 }
 
 function dashboardMetrics(transactions, cases, range, history, completedPopulation, coveredEvidence) {

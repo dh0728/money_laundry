@@ -13,6 +13,11 @@ export const flowColors = {
 };
 
 export const statusLabels = { pending: '검토 대기', inProgress: '처리 중', done: '처리 완료' };
+const verdictNodes = [
+  { key: 'normal', label: '정상 판정', color: flowColors.normal },
+  { key: 'suspicious', label: '이상 판정', color: flowColors.suspect },
+  { key: 'unclassified', label: '판정 정보 없음', color: flowColors.neutral },
+];
 
 function graph() {
   const nodes = [];
@@ -90,6 +95,48 @@ export function transactionFlow(data) {
   return { ...flow, scale, sample, hasData: total > 0 };
 }
 
+function addStatusAndVerdicts(flow, routeNodes, stage, weight = 1) {
+  for (const [key, label] of Object.entries(statusLabels)) {
+    const total = routeNodes.reduce((sum, { route }) => sum + route[key], 0);
+    if (total === 0) continue;
+    const state = flow.node(label, stage, total, flowColors[key]);
+    for (const { id, route } of routeNodes) flow.link(id, state, route[key], { weight: route[key] * weight });
+    if (key !== 'done') continue;
+    for (const verdict of verdictNodes) {
+      const value = routeNodes.reduce((sum, { route }) => sum + route.verdicts[verdict.key], 0);
+      if (value === 0) continue;
+      const result = flow.node(verdict.label, stage + 1, value, verdict.color);
+      flow.link(state, result, value, { weight: value * weight });
+    }
+  }
+}
+
+export function personalInvestigationFlow(mine, { statusByCode, verdictByCode }) {
+  const flow = graph();
+  const byKind = Map.groupBy(mine, row => row.kind);
+  const routeNodes = [];
+  for (const [kind, color] of [
+    ['Alert', 'var(--alert-standalone-series-accent)'],
+    ['Episode', 'var(--case-comparison-pink)'],
+  ]) {
+    const cases = byKind.get(kind) ?? [];
+    if (!cases.length) continue;
+    const route = { pending: 0, inProgress: 0, done: 0, verdicts: { normal: 0, suspicious: 0, unclassified: 0 } };
+    for (const row of cases) {
+      const status = statusByCode[row.code] ?? row.status;
+      const key = status === '처리 완료' ? 'done' : status === '처리 중' ? 'inProgress' : 'pending';
+      route[key]++;
+      if (key === 'done') {
+        const verdict = verdictByCode[row.code] ?? row.verdict;
+        route.verdicts[verdict === 'normal' ? 'normal' : verdict === 'abnormal' ? 'suspicious' : 'unclassified']++;
+      }
+    }
+    routeNodes.push({ id: flow.node(kind, 0, cases.length, color), route });
+  }
+  addStatusAndVerdicts(flow, routeNodes, 1);
+  return { ...flow, hasData: routeNodes.length > 0 };
+}
+
 export function investigationFlow(data) {
   const flow = graph();
   const status = data.investigation;
@@ -129,23 +176,6 @@ export function investigationFlow(data) {
   }));
   routeNodes.forEach(route => flow.link(alerts, route.id, route.value, { weight: route.value * weight }));
 
-  for (const [key, label] of Object.entries(statusLabels)) {
-    const total = routeNodes.reduce((sum, { route }) => sum + route[key], 0);
-    if (total === 0) continue;
-    const state = flow.node(label, 3, total, flowColors[key]);
-    for (const { id, route } of routeNodes) flow.link(id, state, route[key], { weight: route[key] * weight });
-    if (key !== 'done') continue;
-    const verdicts = [
-      { key: 'normal', label: '정상 판정', color: flowColors.normal },
-      { key: 'suspicious', label: '이상 판정', color: flowColors.suspect },
-      { key: 'unclassified', label: '판정 정보 없음', color: flowColors.neutral },
-    ];
-    for (const verdict of verdicts) {
-      const value = routeNodes.reduce((sum, { route }) => sum + route.verdicts[verdict.key], 0);
-      if (value === 0) continue;
-      const result = flow.node(verdict.label, 4, value, verdict.color);
-      flow.link(state, result, value, { weight: value * weight });
-    }
-  }
+  addStatusAndVerdicts(flow, routeNodes, 3, weight);
   return { ...flow, hasData: true };
 }

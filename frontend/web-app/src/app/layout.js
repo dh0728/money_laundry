@@ -13,6 +13,7 @@ import { DialogClose, DialogFooter, DialogHeader } from '../components/dialog-pa
 import { SearchField } from '../components/search-field.jsx';
 import { downloadCsv, inDateRange, QueryRadio, QueryToolbar, setupQueryControls } from '../components/query-controls.jsx';
 import { dashboardFixtureBoardPage, dashboardFixtureResponse, dashboardFixtures, dashboardPeriodEnd, dashboardRecordCodes } from '../mocks/dashboard-fixtures.js';
+import { personalWorkHistory } from '../features/dashboard/personal-work-history.js';
 import { liveCodes, liveSource, liveSourceLoaded, loadLiveSource, rebuildLiveSource, resetLiveSource } from '../features/investigation/live-data.js';
 import { changeLiveEpisode, editLiveTransactions, markLiveRead, saveLiveJudgment, startLiveReview } from '../features/investigation/live-actions.js';
 import { liveWorkRequests, liveWorkRequestsReady, loadLiveWorkRequests, readLiveWorkRequests, resetLiveWorkRequests, resolveLiveWorkRequest,
@@ -723,6 +724,13 @@ function loadPreviewDashboard(mounted, source, query) {
       if (mountedWorkflows !== mounted) return;
       const show = summary => {
         if (mountedWorkflows !== mounted) return;
+        if (query.mine) {
+          const username = serviceMode ? currentPreviewUser()?.username : source.staff;
+          const requests = serviceMode
+            ? (liveWorkRequestsReady() ? liveWorkRequests() : undefined)
+            : [...source.assignmentChanges, ...previewWorkRequests({ source: 'fixture', username })];
+          summary = { ...summary, workHistory: personalWorkHistory(source.cases, requests, username, query.range) };
+        }
         mounted.updateDashboard(summary);
         afterWorkspacePaint(() => {
           if (mountedWorkflows !== mounted) return;

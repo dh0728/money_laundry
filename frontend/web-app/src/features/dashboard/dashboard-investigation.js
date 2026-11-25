@@ -50,6 +50,7 @@ export function investigationDashboard(allCases, cases, dates, { assignmentRows 
   const routes = { individual: routeCounts(), episode: routeCounts() };
   const linkedEpisodes = new Set();
   const statusByCode = {};
+  const verdictByCode = {};
   let individualAlerts = 0;
   let episodeAlerts = 0;
   for (const row of cases) {
@@ -59,6 +60,7 @@ export function investigationDashboard(allCases, cases, dates, { assignmentRows 
       const status = row.open ? 'inProgress' : 'done';
       if (day) day[status]++;
       statusByCode[row.code] = boardStatuses[status];
+      if (status === 'done') verdictByCode[row.code] = row.verdict;
       continue;
     }
     if (row.kind !== 'Alert') continue;
@@ -74,7 +76,11 @@ export function investigationDashboard(allCases, cases, dates, { assignmentRows 
       individualAlerts++;
     }
     route[status]++;
-    if (status === 'done') route.verdicts[verdicts[(episode ?? row).verdict] ?? 'unclassified']++;
+    if (status === 'done') {
+      const verdict = (episode ?? row).verdict;
+      verdictByCode[row.code] = verdict;
+      route.verdicts[verdicts[verdict] ?? 'unclassified']++;
+    }
     const day = alertDays.get(date);
     if (day) day[status]++;
   }
@@ -91,7 +97,7 @@ export function investigationDashboard(allCases, cases, dates, { assignmentRows 
     institutionWorkload: staffWorkload(openWork, overdueWork, assignmentRows, dates, roster),
     investigation: {
       totalAlerts: individualAlerts + episodeAlerts,
-      individualAlerts, episodeAlerts, linkedEpisodes: linkedEpisodes.size, routes, dailyAlertStatus, statusByCode,
+      individualAlerts, episodeAlerts, linkedEpisodes: linkedEpisodes.size, routes, dailyAlertStatus, statusByCode, verdictByCode,
     },
   };
 }

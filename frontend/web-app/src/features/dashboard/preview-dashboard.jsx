@@ -13,16 +13,13 @@ import { benchmarkDashboardMetrics } from './benchmark-dashboard-metrics';
 import { ActionButton } from '../../components/primary-button';
 import { exportCases } from '../../components/query-controls';
 import { BoardSectionDownload, SectionDownloadHeading } from '../../components/section-download';
-import { Meter } from '../../components/meter';
-import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings';
 import { Box, Heading, Stack, Text } from '../../components/layout-primitives';
-import { isOverdueCaseAge } from '../investigation/case-age';
-import { LinkTag, StatusTag, reviewStates } from '../../components/semantic-tags';
-import { PieChart } from '../../components/charts/charts/pie/pie-chart';
-import { PieSlice } from '../../components/charts/charts/pie/pie-slice';
-import { readChartNumber } from '../../components/charts/chart-design-values';
+import { LinkTag, VerdictTag } from '../../components/semantic-tags';
 import { AccountTrailGraph } from '../../components/charts/charts/account-trail-graph';
-import { flowColors } from './dashboard-flows';
+import { StagedSankey } from '../../components/charts/charts/sankey/staged-sankey';
+import { previewJudgmentReason } from '../investigation/case-judgment-data';
+import { workRequestUserName } from '../investigation/preview-work-requests';
+import { personalInvestigationFlow } from './dashboard-flows';
 
 const formatter = new Intl.NumberFormat('ko-KR');
 const count = value => `${formatter.format(value)}건`;
@@ -32,47 +29,8 @@ const animated = new Set();
 const Analytics = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.Analytics })));
 const BenchmarkCharts = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.BenchmarkCharts })));
 
-function WorkloadDonut({ composition, reduced, children }) {
-  const data = reviewStates.map(({ label, preset }) => ({ label, value: composition[preset], color: flowColors[preset] }))
-    .filter(({ value }) => value > 0);
-  const slices = data.length ? data : [{ label: '업무 없음', value: 1, color: 'var(--inner-surface)' }];
-  return <Box className="dashboard-workload-composition">
-    <Box className="dashboard-workload-donut">
-      <Box aria-hidden="true">
-        <PieChart data={slices} size={readChartNumber('--dashboard-workload-donut-size', 112)}
-          innerRadius={readChartNumber('--dashboard-workload-inner-radius', 34)}
-          cornerRadius={readChartNumber('--aml-radius-small', 4)}
-          padAngle={slices.length > 1 ? readChartNumber('--dashboard-workload-slice-gap', 0.045) : 0}
-          geometryScrubbing={reduced}>
-          {!reduced && slices.map(({ label }, index) => <PieSlice key={label} index={index} />)}
-        </PieChart>
-      </Box>
-      {children}
-    </Box>
-    <Box className="dashboard-legend" role="group" aria-label="내 담당 업무 처리 상태">
-      {reviewStates.map(({ preset, label }) => <Text as="span" className="dashboard-status-legend-item" key={preset}>
-        <StatusTag preset={preset}>{label}</StatusTag>
-        <Text as="strong">{count(composition[preset])}</Text>
-      </Text>)}
-    </Box>
-  </Box>;
-}
-
-function MetricBreakdown({ caption, rows, total }) {
-  return <Box as="figure" className="dashboard-metric-breakdown">
-    <Text as="figcaption" className="dashboard-note">{caption}</Text>
-    <Box as="ul" className="dashboard-breakdown-rows">
-      {rows.map(({ label, value }) => <Box as="li" key={label}>
-        <Text as="span">{label}</Text>
-        <Meter value={value} max={total || 1} aria-hidden="true" />
-        <Text as="strong">{count(value)}</Text>
-      </Box>)}
-    </Box>
-  </Box>;
-}
-
 function Metric({ item, reduced }) {
-  const { label, value, unit, detail, key, breakdown, composition } = item;
+  const { label, value, unit, detail, key } = item;
   const wide = (typeof value === 'number' ? formatter.format(value).length : value.length) >= 8;
   const reading = <Box className="dashboard-metric-reading">
       <Text as="strong" className="dashboard-metric-value" data-wide-value={wide || undefined}>
@@ -84,9 +42,8 @@ function Metric({ item, reduced }) {
     </Box>;
   return <Box className="dashboard-metric">
     <SectionDownloadHeading as="h3">{label}</SectionDownloadHeading>
-    {composition ? <WorkloadDonut composition={composition} reduced={reduced}>{reading}</WorkloadDonut> : reading}
+    {reading}
     {detail && <Text>{detail}</Text>}
-    {breakdown && <MetricBreakdown {...breakdown} total={value} />}
   </Box>;
 }
 
@@ -97,46 +54,41 @@ function Metrics({ items, appearance }) {
   }))} appearance={appearance} />;
 }
 
-const creationHours = ['00–05시', '06–11시', '12–17시', '18–23시'];
+const personalStages = ['배정된 업무', '현재 상태', '완료 판정'];
+const historyClock = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Asia/Seoul', dateStyle: 'short', timeStyle: 'short',
+});
 
-function creationBreakdown(cases) {
-  const buckets = Map.groupBy(cases, ({ hour }) => {
-    const kstHour = hour + 9;
-    return Number.isInteger(hour) && kstHour >= 0 && kstHour < 24
-      ? creationHours[Math.floor(kstHour / 6)] : '시간 미기록';
-  });
-  const labels = buckets.has('시간 미기록') ? [...creationHours, '시간 미기록'] : creationHours;
-  return { caption: '생성 시간대 · KST', rows: labels.map(label => ({ label, value: buckets.get(label)?.length ?? 0 })) };
+function PersonalInvestigation({ data, reduced }) {
+  const flow = personalInvestigationFlow(data.mine, data.investigation);
+  return <Panel as="article" className="dashboard-chart dashboard-personal-flow">
+    <SectionDownloadHeading downloadLabel={flow.hasData ? '내 담당 업무 처리 흐름' : undefined}>내 담당 업무 처리 흐름</SectionDownloadHeading>
+    {flow.hasData ? <StagedSankey data={flow} stages={personalStages} label="내 담당 업무 처리 흐름" reduced={reduced} />
+      : <Text className="dashboard-note">조회 조건에 맞는 배정 업무가 없습니다.</Text>}
+  </Panel>;
 }
 
-function personalIndicators(data) {
-  const riskDetail = '미완료 · 위험 점수 ' + modelRiskLabels().high;
-  const statusByCode = data.investigation.statusByCode;
-  const casesByStatus = Map.groupBy(data.mine, row => statusByCode[row.code] ?? row.status);
-  const composition = Object.fromEntries(reviewStates.map(({ value, preset }) =>
-    [preset, casesByStatus.get(value)?.length ?? 0]));
-  const unfinished = data.mine.filter(row => row.open);
-  const highRisk = Map.groupBy(unfinished.filter(row => modelRiskBand(row.score) === 'high'), row => row.kind);
-  const alerts = highRisk.get('Alert') ?? [];
-  const episodes = highRisk.get('Episode') ?? [];
-  const overdue = unfinished.filter(row => isOverdueCaseAge(row.elapsed));
-  return [
-    { label: '내 담당 업무', value: data.mine.length, composition },
-    { label: '고위험 Alert', value: alerts.length, detail: riskDetail, breakdown: creationBreakdown(alerts) },
-    { label: '3일 초과 경과', value: overdue.length, detail: 'Alert ' + count(data.overdueAlerts) + ' · Episode ' + count(data.overdueEpisodes),
-      breakdown: { caption: '경과일 분포', rows: [
-        { label: '4–6일', value: overdue.filter(row => row.elapsed < 7).length },
-        { label: '7–13일', value: overdue.filter(row => row.elapsed >= 7 && row.elapsed < 14).length },
-        { label: '14일 이상', value: overdue.filter(row => row.elapsed >= 14).length },
-      ] } },
-    { label: '고위험 Episode', value: episodes.length, detail: riskDetail, breakdown: creationBreakdown(episodes) },
-  ];
-}
-
-function PersonalIndicators({ data, reduced }) {
-  return personalIndicators(data).map(item => <Panel as="article" className="dashboard-priority-metric" key={item.label}>
-    <Metric item={{ unit: '건', key: item.label, ...item }} reduced={reduced} />
-  </Panel>);
+function WorkHistoryPanel({ title, entries, empty, renderEntry }) {
+  return <Panel as="section" className="dashboard-chart dashboard-personal-history">
+    <SectionDownloadHeading>{title}</SectionDownloadHeading>
+    {entries?.length ? <>
+      <Text className="dashboard-note">한국 표준시</Text>
+      <Box as="ol" className="dashboard-work-history" aria-label={title} tabIndex={0}>
+        {entries.map(entry => <Box as="li" key={entry.id}>
+          <Stack>
+            <Stack direction="row" wrap align="center">
+              <LinkTag code={entry.code} />
+              {renderEntry(entry)}
+              <Text as="time" className="dashboard-note dashboard-history-time" dateTime={entry.at}>
+                {historyClock.format(new Date(entry.at))}
+              </Text>
+            </Stack>
+            {entry.judgment?.reason && <Text as="span">{previewJudgmentReason(entry.judgment)}</Text>}
+          </Stack>
+        </Box>)}
+      </Box>
+    </> : <Text className="dashboard-note">{entries === null ? '담당 변경 기록을 불러오지 못했습니다.' : empty}</Text>}
+  </Panel>;
 }
 
 function EvidenceRecord({ evidence, direction }) {
@@ -201,7 +153,14 @@ export function PreviewDashboard({ mine, data, appearance }) {
   const summary = <DashboardSummary trail={data.accountRecommendation} reduced={appearance.reduced} />;
   return <Box className="preview-dashboard" data-mine={mine}>
     {mine ? <PersonalDashboardOverview recommendation={summary}>
-      <PersonalIndicators data={data} reduced={appearance.reduced} />
+      <PersonalInvestigation data={data} reduced={appearance.reduced} />
+      <WorkHistoryPanel title="담당 변경 기록" entries={data.workHistory?.assignments} empty="담당자가 바뀐 기록이 없습니다."
+        renderEntry={entry => <>
+          <Text as="strong">{entry.incoming ? '받음' : '넘김'}</Text>
+          <Text as="span">{workRequestUserName(entry.previous)} → {workRequestUserName(entry.next)}</Text>
+        </>} />
+      <WorkHistoryPanel title="판정 기록" entries={data.workHistory?.judgments} empty="기록된 판정이 없습니다."
+        renderEntry={entry => <VerdictTag verdict={entry.verdict} />} />
     </PersonalDashboardOverview> :
       <React.Suspense fallback={<DashboardAnalyticsSkeleton reduced={appearance.reduced} />}>
         <Analytics data={data} reduced={appearance.reduced} summary={summary} />

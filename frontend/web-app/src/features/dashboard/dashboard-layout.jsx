@@ -23,7 +23,7 @@ export function DashboardIndicatorsGrid({ children, ...props }) {
 
 export function PersonalDashboardOverview({ children, recommendation, ...props }) {
   return <Grid columns={12} className="dashboard-personal-overview" {...props}>
-    <Grid as="section" columns={2} className="dashboard-personal-metrics" aria-label="내 우선 업무 지표">
+    <Grid as="section" columns={2} className="dashboard-personal-work" aria-label="내 담당 업무와 처리 기록">
       {children}
     </Grid>
     {recommendation}
@@ -47,15 +47,11 @@ function LoadingSeries({ className }) {
   </LoadingChart>;
 }
 
-function LoadingMetric({ detail, trend, composition }) {
+function LoadingMetric({ detail, trend }) {
   return <Box className="dashboard-metric">
     <Skeleton className="dashboard-loading-title" />
-    {!composition && <Skeleton className="dashboard-loading-value" />}
+    <Skeleton className="dashboard-loading-value" />
     {detail && <Skeleton className="dashboard-loading-note" />}
-    {composition && <Box className="dashboard-workload-composition">
-      <Skeleton className="dashboard-workload-donut" />
-      <Skeleton className="dashboard-loading-note" />
-    </Box>}
     {trend && <Skeleton className="dashboard-loading-trend" />}
   </Box>;
 }
@@ -100,16 +96,19 @@ export function DashboardAnalyticsSkeleton({ reduced }) {
 
 export function DashboardSkeleton({ mine, appearance, benchmark = false }) {
   if (benchmark) return <BenchmarkDashboardSkeleton mine={mine} appearance={appearance} />;
-  const indicators = mine ? ['workload', 'high-risk-alert', 'overdue', 'high-risk-episode'] : ['incoming', 'suspect', 'alerts'];
-  const cards = indicators.map((indicator, index) => <Panel as="article" className="dashboard-priority-metric" key={indicator}>
-    <LoadingMetric detail={mine ? index > 0 : index === 1} trend={!mine || index > 0} composition={mine && index === 0} />
-  </Panel>);
   return <Box className="preview-dashboard dashboard-loading" data-mine={mine} aria-busy="true">
     <Text as="span" className="visually-hidden" role="status">대시보드 불러오는 중</Text>
     {mine ? <PersonalDashboardOverview aria-hidden="true" recommendation={<LoadingRecommendation reduced={appearance.reduced} />}>
-      {cards}
+      <LoadingChart className="dashboard-personal-flow" chartClass="staged-sankey-chart" showNote={false} />
+      <LoadingChart className="dashboard-personal-history" chartClass="dashboard-loading-history" />
+      <LoadingChart className="dashboard-personal-history" chartClass="dashboard-loading-history" />
     </PersonalDashboardOverview> : <>
-      <DashboardIndicatorsGrid aria-hidden="true">{cards}</DashboardIndicatorsGrid>
+      <DashboardIndicatorsGrid aria-hidden="true">
+        {['incoming', 'suspect', 'alerts'].map((indicator, index) =>
+          <Panel as="article" className="dashboard-priority-metric" key={indicator}>
+            <LoadingMetric detail={index === 1} trend />
+          </Panel>)}
+      </DashboardIndicatorsGrid>
       <DashboardAnalyticsSkeleton reduced={appearance.reduced} />
     </>}
     <DashboardBoardSkeleton />
