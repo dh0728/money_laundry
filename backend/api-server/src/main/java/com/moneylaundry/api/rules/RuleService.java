@@ -1,305 +1,589 @@
 package com.moneylaundry.api.rules;
 
-import com.moneylaundry.api.analysis.AnalysisService;
 import com.moneylaundry.api.common.ApiException;
 import com.moneylaundry.api.common.BusinessTime;
-import com.moneylaundry.api.dashboard.DashboardProjection;
+import com.moneylaundry.api.review.ReviewJson;
+import com.moneylaundry.api.rules.catalog.RuleCatalog;
+import com.moneylaundry.api.rules.definition.RuleDefinition;
+import com.moneylaundry.api.rules.definition.RuleSentence;
+import com.moneylaundry.api.rules.definition.RuleValidator;
 import java.sql.Timestamp;
-import java.time.LocalDate;
 import java.util.*;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** 룰엔진 화면의 룰 목록, 초안 저장, 승인 요청·승인·반려·중지, 삭제, 백테스트. 룰은 분석 파이프라인의 탐지에 쓰이지 않는다. */
+/**
+ * 룰을 만들고 고치는 명령: 저장 전 검증, 룰 만들기, 초안 저장, 초안 삭제, 새 버전 만들기, 상태 명령(시험 운영 · 승인 요청 · 승인 · 반려 · 중지 · 재개).
+ * 룰은 이름표(rules.rules)이고 조건은 버전(rules.rule_versions)이 갖는다. 모든 명령은 rules.events 에 한 줄씩 남는다.
+ */
 @Service
 public class RuleService {
-  public record Input(
-      String name,
-      String description,
-      Integer typeCode,
-      Double scoreMin,
-      Integer minTransactions,
-      Integer windowHours) {}
+  public record ValidateInput(String template, Map<String, Object> definition, Long ruleId) {}
 
-  public record Review(String status, String reason) {}
+  public record CreateInput(String name, String template, Map<String, Object> definition) {}
 
-  public record Backtest(
-      Input rule, LocalDate start, LocalDate end, Integer offset, Integer limit) {}
+  /** 복제 요청. 둘 다 비워도 된다. versionId 가 없으면 운영 버전(없으면 작업 중 버전)을, name 이 없으면 "원래 이름 복사본" 을 쓴다. */
+  public record CloneInput(Long versionId, String name) {}
+
+  /** 복제한 룰의 이름 뒤에 붙는 말. */
+  static final String COPY_SUFFIX = " 복사본";
+
+  public record SaveInput(String name, Map<String, Object> definition, Long revision) {}
+
+  /**
+   * 상태 명령. action 은 START_SHADOW · SUBMIT · WITHDRAW · APPROVE · REJECT · PAUSE · RESUME. requestId
+   * 를 주면 같은 요청이 두 번 와도 한 번만 적용한다.
+   */
+  public record CommandInput(
+      String requestId, String action, Long versionId, Long revision, String comment) {}
+
+  /** 사유의 길이. 조사 화면의 판정 사유와 같은 값이다. */
+  private static final int COMMENT_LIMIT = 2000;
 
   private final JdbcTemplate jdbc;
   private final TransactionTemplate tx;
   private final BusinessTime time;
+  private final RuleCatalog catalog;
+  private final boolean selfApproval;
 
-  public RuleService(JdbcTemplate jdbc, TransactionTemplate tx, BusinessTime time) {
+  public RuleService(
+      JdbcTemplate jdbc,
+      TransactionTemplate tx,
+      BusinessTime time,
+      RuleCatalog catalog,
+      @Value("${app.rules.self-approval:true}") boolean selfApproval) {
     this.jdbc = jdbc;
     this.tx = tx;
     this.time = time;
+    this.catalog = catalog;
+    this.selfApproval = selfApproval;
   }
 
-  private static Input valid(Input in) {
-    if (in == null
-        || in.name() == null
-        || in.name().isBlank()
-        || in.name().strip().length() > 80
-        || in.description() == null
-        || in.description().isBlank()
-        || in.description().length() > 1000
-        || (in.typeCode() != null && (in.typeCode() < 0 || in.typeCode() > 8))
-        || in.scoreMin() == null
-        || !(in.scoreMin() >= 0 && in.scoreMin() <= 1)
-        || in.minTransactions() == null
-        || in.minTransactions() < 1
-        || in.windowHours() == null
-        || in.windowHours() < 1
-        || in.windowHours() > 720) throw AnalysisService.invalid();
-    return in;
+  /** 화면에 보이는 룰 번호. RULE-003. */
+  public static String code(long ruleId) {
+    return String.format("RULE-%03d", ruleId);
   }
 
-  public List<Map<String, Object>> list() {
-    var history = new HashMap<Long, List<Map<String, Object>>>();
-    for (var row :
+  private static ApiException invalid(String detail) {
+    return new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", detail);
+  }
+
+  private String name(String value) {
+    if (value == null || value.isBlank() || value.strip().length() > catalog.limit("nameLength"))
+      throw invalid("룰 이름은 1자 이상 " + catalog.limit("nameLength") + "자 이하여야 합니다.");
+    return value.strip();
+  }
+
+  // ---- 검증 ----
+
+  /** 저장 없이 검증한다. 체크리스트, 경고, 문장, 한 줄 요약을 같이 준다. */
+  public Map<String, Object> validate(ValidateInput in) {
+    if (in == null || in.template() == null) throw invalid("템플릿을 골라야 합니다.");
+    return view(check(in.template(), in.definition(), in.ruleId()));
+  }
+
+  /** 저장 전 검증. 원장에 쌓인 기간과 겹치는 운영 룰을 같이 본다. */
+  public RuleValidator.Result check(String template, Object definition, Long ruleId) {
+    Integer ledgerDays =
+        jdbc.queryForObject(
+            "select max(business_date)-min(business_date)+1 from ledger.transactions where integration_status='ACTIVE'",
+            Integer.class);
+    Number window =
+        definition instanceof Map<?, ?> map
+            ? RuleDefinition.number(map.get("windowMinutes"))
+            : null;
+    var overlapping = new ArrayList<String>();
+    // 운영 중인 다른 룰 가운데 템플릿과 기간이 같은 것. 막지는 않고 경고로 알린다.
+    for (Long other :
         jdbc.queryForList(
-            "select h.rule_id,h.at,u.name as actor,h.action,h.reason from review.rule_history h join core.users u on u.user_id=h.actor_id order by h.history_id")) {
-      var entry = new LinkedHashMap<String, Object>();
-      entry.put("at", ((Timestamp) row.get("at")).toInstant().toString());
-      entry.put("actor", row.get("actor"));
-      entry.put("action", row.get("action"));
-      entry.put("reason", row.get("reason"));
-      history
-          .computeIfAbsent(((Number) row.get("rule_id")).longValue(), key -> new ArrayList<>())
-          .add(entry);
+            """
+            select r.rule_id from rules.rules r join rules.rule_versions v using(rule_id)
+            where v.status='ACTIVE' and r.template=? and r.rule_id<>?
+              and v.definition->>'windowMinutes' is not distinct from ?::text
+            order by r.rule_id
+            """,
+            Long.class,
+            template,
+            ruleId == null ? 0L : ruleId,
+            window instanceof Long ? window.toString() : null)) overlapping.add(code(other));
+    return RuleValidator.check(
+        catalog, template, definition, new RuleValidator.Facts(ledgerDays, overlapping));
+  }
+
+  private Map<String, Object> view(RuleValidator.Result result) {
+    var items = new ArrayList<Map<String, Object>>();
+    for (var item : result.items()) {
+      var row = new LinkedHashMap<String, Object>();
+      row.put("key", item.key());
+      row.put("label", item.label());
+      row.put("ok", item.ok());
+      row.put("message", item.message());
+      row.put("errors", item.errors());
+      items.add(row);
     }
-    var out = new ArrayList<Map<String, Object>>();
-    for (var row :
-        jdbc.queryForList(
-            "select r.*,u.name as author from review.rules r join core.users u on u.user_id=r.author_id order by r.rule_id")) {
-      long id = ((Number) row.get("rule_id")).longValue();
-      var rule = new LinkedHashMap<String, Object>();
-      rule.put("id", String.format("RULE-%03d", id));
-      rule.put("name", row.get("name"));
-      rule.put("description", row.get("description"));
-      rule.put("typeCode", row.get("type_code"));
-      rule.put("scoreMin", row.get("score_min"));
-      rule.put("minTransactions", row.get("min_transactions"));
-      rule.put("windowHours", row.get("window_hours"));
-      rule.put("status", row.get("status"));
-      rule.put("version", row.get("version"));
-      rule.put("author", row.get("author"));
-      rule.put("updatedAt", ((Timestamp) row.get("updated_at")).toInstant().toString());
-      rule.put("history", history.getOrDefault(id, List.of()));
-      out.add(rule);
-    }
+    var out = new LinkedHashMap<String, Object>();
+    out.put("items", items);
+    out.put("warnings", result.warnings());
+    out.put("canSave", result.canSave());
+    out.put("canRun", result.canRun());
+    boolean readable = result.definition() != null;
+    out.put("sentence", readable ? RuleSentence.sentence(catalog, result.definition()) : null);
+    out.put("summary", readable ? RuleSentence.summary(catalog, result.definition()) : null);
     return out;
   }
 
-  private Map<String, Object> one(long id) {
-    return list().stream()
-        .filter(rule -> rule.get("id").equals(String.format("RULE-%03d", id)))
-        .findFirst()
-        .orElseThrow();
+  /** 형식을 통과하지 못한 정의는 저장하지 않는다. 값이 빈 초안은 저장할 수 있다. */
+  private RuleValidator.Result savable(String template, Object definition, Long ruleId) {
+    var result = check(template, definition, ruleId);
+    if (!result.canSave()) throw invalid(result.items().getFirst().message());
+    return result;
   }
 
-  private void history(long id, long user, String action, String reason, Timestamp at) {
-    jdbc.update(
-        "insert into review.rule_history(rule_id,actor_id,action,reason,at) values(?,?,?,?,?)",
-        id,
-        user,
-        action,
-        reason,
-        at);
-  }
+  // ---- 명령 ----
 
-  /** 초안 저장. id가 없으면 새 룰, 있으면 초안·반려·중지 상태의 룰을 고쳐 다시 초안으로 둔다. */
-  public Map<String, Object> save(Long id, long user, Input input) {
-    var in = valid(input);
+  /** 룰과 v1 초안을 만든다. 정의를 안 주면 템플릿의 기본값으로 채운다. */
+  public Map<String, Object> create(long user, CreateInput in) {
+    if (in == null || in.template() == null) throw invalid("템플릿을 골라야 합니다.");
+    String name = name(in.name());
+    Object given = in.definition() == null ? catalog.defaults(in.template()) : in.definition();
     return tx.execute(
         s -> {
+          var definition = savable(in.template(), given, null).definition();
+          String digest = RuleDefinition.digest(definition);
+          String summary = RuleSentence.summary(catalog, definition);
           Timestamp at = Timestamp.from(time.now());
-          long rule;
-          if (id == null)
-            rule =
-                jdbc.queryForObject(
-                    "insert into review.rules(name,description,type_code,score_min,min_transactions,window_hours,status,author_id,updated_at) values(?,?,?,?,?,?,'DRAFT',?,?) returning rule_id",
-                    Long.class,
-                    in.name().strip(),
-                    in.description(),
-                    in.typeCode(),
-                    in.scoreMin(),
-                    in.minTransactions(),
-                    in.windowHours(),
-                    user,
-                    at);
-          else {
-            var found =
-                jdbc.queryForList(
-                    "select status from review.rules where rule_id=? for update", String.class, id);
-            if (found.isEmpty()) throw ApiException.notFound("룰이 없습니다.");
-            if (!Set.of("DRAFT", "REJECTED", "STOPPED").contains(found.getFirst()))
-              throw ApiException.invalidTransition("현재 상태의 룰은 수정할 수 없습니다.");
-            jdbc.update(
-                "update review.rules set name=?,description=?,type_code=?,score_min=?,min_transactions=?,window_hours=?,status='DRAFT',version=version+1,author_id=?,updated_at=? where rule_id=?",
-                in.name().strip(),
-                in.description(),
-                in.typeCode(),
-                in.scoreMin(),
-                in.minTransactions(),
-                in.windowHours(),
-                user,
-                at,
-                id);
-            rule = id;
-          }
-          history(rule, user, id == null ? "초안 생성" : "초안 수정", in.description().strip(), at);
-          return one(rule);
+          long rule =
+              jdbc.queryForObject(
+                  "insert into rules.rules(name,template,owner_id,created_at) values(?,?,?,?) returning rule_id",
+                  Long.class,
+                  name,
+                  in.template(),
+                  user,
+                  at);
+          long version =
+              jdbc.queryForObject(
+                  """
+                  insert into rules.rule_versions(rule_id,version_no,status,definition,definition_digest,summary,author_id,created_at)
+                  values(?,1,'DRAFT',?::jsonb,?,?,?,?) returning version_id
+                  """,
+                  Long.class,
+                  rule,
+                  ReviewJson.encode(definition),
+                  digest,
+                  summary,
+                  user,
+                  at);
+          event(rule, version, user, "CREATED", snapshot(1, name, summary, digest), at);
+          var out = new LinkedHashMap<String, Object>();
+          out.put("ruleId", rule);
+          out.put("code", code(rule));
+          out.put("versionId", version);
+          out.put("revision", 0L);
+          return out;
         });
   }
 
-  /** 승인 요청(초안), 승인·반려(승인 대기, 관리자만), 중지(시험 중·운영 중, 관리자만). */
-  public Map<String, Object> review(long id, long user, boolean admin, Review in) {
-    if (in == null
-        || in.reason() == null
-        || in.reason().isBlank()
-        || in.reason().length() > 1000
-        || !Set.of("PENDING_APPROVAL", "TESTING", "REJECTED", "STOPPED")
-            .contains(Objects.toString(in.status(), ""))) throw AnalysisService.invalid();
+  /** 초안 저장. 작성 중(DRAFT)인 버전을 작성자만 고칠 수 있고, 기대 revision 이 다르면 409 다. 이름은 룰에, 조건은 버전에 저장한다. */
+  public Map<String, Object> save(long ruleId, long versionId, long user, SaveInput in) {
+    if (in == null || in.revision() == null || in.definition() == null)
+      throw invalid("정의와 revision 이 필요합니다.");
+    String name = name(in.name());
     return tx.execute(
         s -> {
           var found =
               jdbc.queryForList(
-                  "select status from review.rules where rule_id=? for update", String.class, id);
-          if (found.isEmpty()) throw ApiException.notFound("룰이 없습니다.");
-          boolean request = "PENDING_APPROVAL".equals(in.status());
-          if (!request && !admin)
-            throw new ApiException(
-                HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE", "관리자만 승인·반려하거나 중지할 수 있습니다.");
-          boolean stop = "STOPPED".equals(in.status());
-          if (!(stop ? Set.of("TESTING", "ACTIVE") : Set.of(request ? "DRAFT" : "PENDING_APPROVAL"))
-              .contains(found.getFirst()))
-            throw ApiException.invalidTransition("룰 상태와 처리 권한을 확인해 주세요.");
-          Timestamp at = Timestamp.from(time.now());
+                  """
+                  select r.template,v.status,v.author_id,v.revision,v.version_no,v.definition_digest
+                  from rules.rule_versions v join rules.rules r using(rule_id)
+                  where v.rule_id=? and v.version_id=? for update of v
+                  """,
+                  ruleId,
+                  versionId);
+          if (found.isEmpty()) throw ApiException.notFound("룰 버전이 없습니다.");
+          var row = found.getFirst();
+          if (ReviewJson.number(row.get("author_id")) != user)
+            throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE", "작성자만 저장할 수 있습니다.");
+          if (!"DRAFT".equals(row.get("status")))
+            throw ApiException.invalidTransition("작성 중인 버전만 고칠 수 있습니다.");
+          if (ReviewJson.number(row.get("revision")) != in.revision())
+            throw ApiException.invalidTransition("다른 곳에서 먼저 저장했습니다. 다시 조회하세요.");
+          var result = savable(row.get("template").toString(), in.definition(), ruleId);
+          String digest = RuleDefinition.digest(result.definition());
+          String summary = RuleSentence.summary(catalog, result.definition());
+          int versionNo = ((Number) row.get("version_no")).intValue();
           jdbc.update(
-              "update review.rules set status=?,version=version+1,updated_at=? where rule_id=?",
-              in.status(),
-              at,
-              id);
-          history(
-              id,
+              "update rules.rule_versions set definition=?::jsonb,definition_digest=?,summary=?,revision=revision+1 where version_id=?",
+              ReviewJson.encode(result.definition()),
+              digest,
+              summary,
+              versionId);
+          jdbc.update("update rules.rules set name=? where rule_id=?", name, ruleId);
+          // 조건이 바뀌면 예전 조건으로 시험 운영하며 쌓은 적중은 이 버전의 것이 아니다
+          if (!digest.equals(row.get("definition_digest").toString().strip()))
+            jdbc.update("delete from rules.hits where version_id=? and mode='SHADOW'", versionId);
+          event(
+              ruleId,
+              versionId,
               user,
-              request ? "승인 요청" : stop ? "중지" : "TESTING".equals(in.status()) ? "승인" : "반려",
-              in.reason().strip(),
-              at);
-          return one(id);
+              "EDITED",
+              snapshot(versionNo, name, summary, digest),
+              Timestamp.from(time.now()));
+          var out = new LinkedHashMap<String, Object>();
+          out.put("ruleId", ruleId);
+          out.put("code", code(ruleId));
+          out.put("name", name);
+          out.put("versionId", versionId);
+          out.put("versionNo", versionNo);
+          out.put("status", "DRAFT");
+          out.put("revision", in.revision() + 1);
+          out.put("definition", result.definition());
+          out.putAll(view(result));
+          return out;
         });
   }
 
-  /** 룰과 그 이력을 지운다. 초안·반려는 담당자(마지막 저장자)와 관리자, 그 밖의 상태는 관리자만 지울 수 있다. */
-  public void delete(long id, long user, boolean admin) {
+  /**
+   * 초안 삭제. 한 번도 시험 운영·승인 요청을 하지 않은 작성 중 버전만, 작성자와 관리자가 지울 수 있다. 그 룰에 다른 버전이 없으면 룰과 변경 기록도 같이 지운다.
+   * 다른 버전이 있으면 버전만 지우고 변경 기록에 삭제를 남긴다.
+   */
+  public void delete(long ruleId, long versionId, long user, boolean admin) {
     tx.executeWithoutResult(
         s -> {
           var found =
               jdbc.queryForList(
-                  "select status,author_id from review.rules where rule_id=? for update", id);
-          if (found.isEmpty()) throw ApiException.notFound("룰이 없습니다.");
-          boolean draft = Set.of("DRAFT", "REJECTED").contains(found.getFirst().get("status"));
-          if (!admin && !draft)
+                  "select status,author_id,version_no,summary from rules.rule_versions where rule_id=? and version_id=? for update",
+                  ruleId,
+                  versionId);
+          if (found.isEmpty()) throw ApiException.notFound("룰 버전이 없습니다.");
+          var row = found.getFirst();
+          if (!admin && ReviewJson.number(row.get("author_id")) != user)
             throw new ApiException(
-                HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE", "승인 요청 이후의 룰은 관리자만 삭제할 수 있습니다.");
-          if (!admin && ((Number) found.getFirst().get("author_id")).longValue() != user)
-            throw new ApiException(
-                HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE", "초안·반려 룰은 담당자와 관리자만 삭제할 수 있습니다.");
-          jdbc.update("delete from review.rule_history where rule_id=?", id);
-          jdbc.update("delete from review.rules where rule_id=?", id);
+                HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE", "작성자와 관리자만 초안을 지울 수 있습니다.");
+          if (!"DRAFT".equals(row.get("status")))
+            throw ApiException.invalidTransition("작성 중인 버전만 지울 수 있습니다.");
+          if (Boolean.TRUE.equals(
+              jdbc.queryForObject(
+                  "select exists(select 1 from rules.events where version_id=? and action in ('SHADOW_STARTED','SUBMITTED'))",
+                  Boolean.class,
+                  versionId)))
+            throw ApiException.invalidTransition("시험 운영이나 승인 요청을 한 적이 있는 버전은 지울 수 없습니다.");
+          boolean last =
+              jdbc.queryForObject(
+                      "select count(*) from rules.rule_versions where rule_id=? and version_id<>?",
+                      Long.class,
+                      ruleId,
+                      versionId)
+                  == 0;
+          jdbc.update("delete from rules.backtests where version_id=?", versionId);
+          if (last) jdbc.update("delete from rules.events where rule_id=?", ruleId);
+          jdbc.update("delete from rules.rule_versions where version_id=?", versionId);
+          if (last) jdbc.update("delete from rules.rules where rule_id=?", ruleId);
+          else {
+            var snapshot = new LinkedHashMap<String, Object>();
+            snapshot.put("versionNo", row.get("version_no"));
+            snapshot.put("summary", row.get("summary"));
+            event(ruleId, null, user, "DRAFT_DELETED", snapshot, Timestamp.from(time.now()));
+          }
         });
   }
 
-  private static final String MATCHED =
-      """
-      with candidates as (
-        select t.tx_id,t.occurred_at,t.from_account_id,t.amount_usd,coalesce(s.p_laundering,0) as score
-        %s
-          and t.business_date between ? and ?
-          and (?::int is null or coalesce(w.type_class,0)=?::int)
-          and coalesce(s.p_laundering,0)>=?
-      ), starts as (
-        select c.*,lead(c.occurred_at,?) over account_time-c.occurred_at<=make_interval(hours=>?) as opens
-        from candidates c window account_time as (partition by c.from_account_id order by c.occurred_at,c.tx_id)
-      ), matched as (
-        select * from (
-          select s.*,max(case when s.opens then s.occurred_at+make_interval(hours=>?) end)
-            over (partition by s.from_account_id order by s.occurred_at,s.tx_id) as covered_until
-          from starts s) m where m.covered_until>=m.occurred_at
-      )
-      """
-          .formatted(DashboardProjection.SCORE_BASE);
-
-  /** 조회 기간의 원장 전체에 룰 조건을 적용한다. 같은 송금 계좌에서 시간 창 안에 조건 거래가 최소 건수 이상 모인 거래만 남긴다. */
-  public Map<String, Object> backtest(Backtest in) {
-    if (in == null
-        || in.start() == null
-        || in.end() == null
-        || in.start().isAfter(in.end())
-        || in.start().plusYears(2).isBefore(in.end())) throw AnalysisService.invalid();
-    var rule = valid(in.rule());
-    int limit = in.limit() == null || in.limit() < 1 ? 25 : Math.min(100, in.limit());
-    int offset = in.offset() == null || in.offset() < 0 ? 0 : in.offset();
-    Object[] scope = {
-      java.sql.Date.valueOf(in.start()),
-      java.sql.Date.valueOf(in.end()),
-      rule.typeCode(),
-      rule.typeCode(),
-      rule.scoreMin(),
-      rule.minTransactions() - 1,
-      rule.windowHours(),
-      rule.windowHours()
-    };
+  /**
+   * 룰을 복제한다. 그 룰의 한 버전의 조건을 그대로 가진 <b>새 룰</b>의 v1 초안이 생기고 복제한 사람이 담당자가 된다. 원래 룰은 건드리지 않는다. 같은 룰의 다음
+   * 버전을 만드는 {@link #newVersion} 과 다르다.
+   *
+   * <p>어느 상태의 버전이든 복제할 수 있다. versionId 를 주지 않으면 운영 버전, 없으면 작업 중 버전, 그것도 없으면 가장 나중 버전이다. 조건은 다시 검증하지
+   * 않고 그대로 옮긴다(저장할 때 검증한다). 백테스트 · 적중 · 변경 기록은 옮기지 않는다.
+   */
+  public Map<String, Object> clone(long ruleId, long user, CloneInput in) {
     return tx.execute(
         s -> {
-          jdbc.execute("set local statement_timeout='90s'");
-          var out = new LinkedHashMap<String, Object>();
-          out.putAll(
-              jdbc.queryForMap(
-                  MATCHED
-                      + "select count(*) as \"matchedCount\",count(distinct from_account_id) as \"accountCount\",coalesce(sum(amount_usd),0) as \"amountUsd\",coalesce(array_agg(distinct a.service_account_id::text),'{}') as accounts from matched m left join core.accounts a on a.account_id=m.from_account_id",
-                  scope));
-          try {
-            out.put(
-                "matchedAccountIds",
-                List.of((String[]) ((java.sql.Array) out.remove("accounts")).getArray()));
-          } catch (java.sql.SQLException e) {
-            throw new IllegalStateException(e);
-          }
-          out.put(
-              "scannedCount",
-              jdbc.queryForObject(
-                  "select count(*) from ledger.transactions where integration_status='ACTIVE' and business_date between ? and ?",
-                  Long.class,
-                  scope[0],
-                  scope[1]));
-          var page = new ArrayList<Object>(Arrays.asList(scope));
-          page.add(limit);
-          page.add(offset);
-          var rows =
+          var rules =
+              jdbc.queryForList("select name,template from rules.rules where rule_id=?", ruleId);
+          if (rules.isEmpty()) throw ApiException.notFound("룰이 없습니다.");
+          var source =
               jdbc.queryForList(
-                  MATCHED
-                      + """
-                      select m.tx_id as "txId",m.occurred_at as "occurredAt",t.business_date::text as date,
-                        f.service_account_id::text as "fromAccountId",r.service_account_id::text as "toAccountId",
-                        fo.display_name as "fromOwnerName",ro.display_name as "toOwnerName",
-                        t.amount_paid as "amountPaid",t.payment_currency as "paymentCurrency",
-                        t.payment_format as "paymentFormat",m.amount_usd as "amountUsd",m.score
-                      from matched m join ledger.transactions t using(tx_id)
-                      join core.accounts f on f.account_id=t.from_account_id
-                      join core.accounts r on r.account_id=t.to_account_id
-                      join core.owners fo on fo.owner_id=f.owner_id join core.owners ro on ro.owner_id=r.owner_id
-                      order by m.occurred_at,m.tx_id limit ? offset ?
-                      """,
-                  page.toArray());
-          for (var row : rows)
-            row.put("occurredAt", ((Timestamp) row.get("occurredAt")).toInstant().toString());
-          out.put("transactions", rows);
+                  """
+                  select version_no,definition::text as definition,definition_digest,summary
+                  from rules.rule_versions
+                  where rule_id=? and (?::bigint is null or version_id=?)
+                  order by case when status in ('ACTIVE','PAUSED') then 0
+                                when status in ('DRAFT','SHADOW','PENDING') then 1 else 2 end,
+                           version_no desc
+                  limit 1
+                  """,
+                  ruleId,
+                  in == null ? null : in.versionId(),
+                  in == null ? null : in.versionId());
+          if (source.isEmpty()) throw ApiException.notFound("복제할 버전이 없습니다.");
+          var base = source.getFirst();
+          String name =
+              in == null || in.name() == null
+                  ? copyName(rules.getFirst().get("name").toString())
+                  : name(in.name());
+          Timestamp at = Timestamp.from(time.now());
+          String digest = base.get("definition_digest").toString();
+          String summary = base.get("summary").toString();
+          long rule =
+              jdbc.queryForObject(
+                  "insert into rules.rules(name,template,owner_id,created_at) values(?,?,?,?) returning rule_id",
+                  Long.class,
+                  name,
+                  rules.getFirst().get("template"),
+                  user,
+                  at);
+          long version =
+              jdbc.queryForObject(
+                  """
+                  insert into rules.rule_versions(rule_id,version_no,status,definition,definition_digest,summary,author_id,created_at)
+                  values(?,1,'DRAFT',?::jsonb,?,?,?,?) returning version_id
+                  """,
+                  Long.class,
+                  rule,
+                  base.get("definition"),
+                  digest,
+                  summary,
+                  user,
+                  at);
+          // 새 룰의 첫 기록에 어디서 복제했는지 남긴다
+          var snapshot = snapshot(1, name, summary, digest);
+          var origin = new LinkedHashMap<String, Object>();
+          origin.put("ruleId", ruleId);
+          origin.put("code", code(ruleId));
+          origin.put("versionNo", base.get("version_no"));
+          snapshot.put("clonedFrom", origin);
+          event(rule, version, user, "CREATED", "", snapshot, at);
+          var out = new LinkedHashMap<String, Object>();
+          out.put("ruleId", rule);
+          out.put("code", code(rule));
+          out.put("name", name);
+          out.put("versionId", version);
+          out.put("revision", 0L);
           return out;
         });
+  }
+
+  /** "원래 이름 복사본". 이름 길이 한도를 넘으면 원래 이름의 뒤를 잘라 맞춘다. */
+  private String copyName(String original) {
+    int room = catalog.limit("nameLength") - COPY_SUFFIX.length();
+    return (original.length() > room ? original.substring(0, room).stripTrailing() : original)
+        + COPY_SUFFIX;
+  }
+
+  /** 운영 버전을 복사해 새 초안을 만든다. 운영 중인 조건은 직접 고치지 못하므로 고치려면 이 버전을 고쳐 승인받는다. 작업 중 버전이 이미 있으면 409 다. */
+  public Map<String, Object> newVersion(long ruleId, long user) {
+    return tx.execute(
+        s -> {
+          String name = lock(ruleId);
+          var operating =
+              jdbc.queryForList(
+                  "select version_no,definition::text as definition,definition_digest,summary from rules.rule_versions where rule_id=? and status in ('ACTIVE','PAUSED')",
+                  ruleId);
+          if (operating.isEmpty())
+            throw ApiException.invalidTransition("운영 버전이 있는 룰만 새 버전을 만들 수 있습니다.");
+          if (Boolean.TRUE.equals(
+              jdbc.queryForObject(
+                  "select exists(select 1 from rules.rule_versions where rule_id=? and status in ('DRAFT','SHADOW','PENDING'))",
+                  Boolean.class,
+                  ruleId))) throw ApiException.invalidTransition("작업 중인 버전이 이미 있습니다.");
+          var base = operating.getFirst();
+          int versionNo =
+              jdbc.queryForObject(
+                  "select max(version_no)+1 from rules.rule_versions where rule_id=?",
+                  Integer.class,
+                  ruleId);
+          Timestamp at = Timestamp.from(time.now());
+          String digest = base.get("definition_digest").toString();
+          String summary = base.get("summary").toString();
+          long version =
+              jdbc.queryForObject(
+                  """
+                  insert into rules.rule_versions(rule_id,version_no,status,definition,definition_digest,summary,author_id,created_at)
+                  values(?,?,'DRAFT',?::jsonb,?,?,?,?) returning version_id
+                  """,
+                  Long.class,
+                  ruleId,
+                  versionNo,
+                  base.get("definition"),
+                  digest,
+                  summary,
+                  user,
+                  at);
+          var snapshot = snapshot(versionNo, name, summary, digest);
+          snapshot.put("basedOnVersionNo", base.get("version_no"));
+          event(ruleId, version, user, "CREATED", "", snapshot, at);
+          var out = new LinkedHashMap<String, Object>();
+          out.put("ruleId", ruleId);
+          out.put("code", code(ruleId));
+          out.put("versionId", version);
+          out.put("versionNo", versionNo);
+          out.put("revision", 0L);
+          return out;
+        });
+  }
+
+  /**
+   * 상태 명령 하나를 적용한다. 누가 무엇을 할 수 있는지는 {@link RuleTransitions} 의 표를 따른다.
+   *
+   * <ul>
+   *   <li>시험 운영 시작 · 승인 요청은 지금 조건으로 끝낸 백테스트가 있어야 한다
+   *   <li>승인하면 같은 트랜잭션에서 기존 운영 버전(운영 중 · 중지)은 RETIRED 가 된다
+   *   <li>매일 실행할지는 eval_from_seq 로 정한다. 시험 운영 · 운영이 되는 순간의 가장 큰 분석 순번을 적고, 그 뒤에 입력이 고정된 분석부터 돈다. 작성
+   *       중으로 돌아가거나 중지하면 비운다
+   * </ul>
+   */
+  public void command(long ruleId, long user, boolean admin, CommandInput in) {
+    var transition = in == null ? null : RuleTransitions.of(in.action());
+    if (transition == null) throw invalid("알 수 없는 명령입니다.");
+    if (in.versionId() == null || in.revision() == null) throw invalid("버전과 revision 이 필요합니다.");
+    String comment = in.comment() == null ? "" : in.comment().strip();
+    if (comment.length() > COMMENT_LIMIT) throw invalid("사유는 " + COMMENT_LIMIT + "자 이하여야 합니다.");
+    if (transition.comment() && comment.isEmpty()) throw invalid("사유를 적어야 합니다.");
+    String requestId = in.requestId() == null || in.requestId().isBlank() ? null : in.requestId();
+    if (requestId != null && requestId.length() > 100) throw invalid("requestId 가 너무 깁니다.");
+    tx.executeWithoutResult(
+        s -> {
+          String name = lock(ruleId);
+          if (requestId != null
+              && Boolean.TRUE.equals(
+                  jdbc.queryForObject(
+                      "select exists(select 1 from rules.events where rule_id=? and snapshot->>'requestId'=?)",
+                      Boolean.class,
+                      ruleId,
+                      requestId))) return; // 같은 요청이 다시 왔다
+          var found =
+              jdbc.queryForList(
+                  "select status,author_id,revision,version_no,definition_digest,summary from rules.rule_versions where rule_id=? and version_id=? for update",
+                  ruleId,
+                  in.versionId());
+          if (found.isEmpty()) throw ApiException.notFound("룰 버전이 없습니다.");
+          var row = found.getFirst();
+          boolean author = ReviewJson.number(row.get("author_id")) == user;
+          String refused =
+              RuleTransitions.forbidden(in.action(), transition, author, admin, selfApproval);
+          if (refused != null)
+            throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE", refused);
+          if (!transition.from().contains(row.get("status").toString()))
+            throw ApiException.invalidTransition("지금 상태에서는 할 수 없는 명령입니다.");
+          if (ReviewJson.number(row.get("revision")) != in.revision())
+            throw ApiException.invalidTransition("다른 곳에서 먼저 바꿨습니다. 다시 조회하세요.");
+          String digest = row.get("definition_digest").toString();
+          if (transition.backtest() && !backtested(in.versionId(), digest))
+            throw ApiException.invalidTransition(RuleTransitions.NEEDS_BACKTEST);
+
+          Timestamp at = Timestamp.from(time.now());
+          int versionNo = ((Number) row.get("version_no")).intValue();
+          var snapshot = snapshot(versionNo, name, row.get("summary").toString(), digest);
+          if (requestId != null) snapshot.put("requestId", requestId);
+          // 이 순번 뒤에 입력이 고정된 분석부터 매일 돈다
+          long seq =
+              jdbc.queryForObject(
+                  "select coalesce(max(input_seq),0) from analysis.runs", Long.class);
+          switch (in.action()) {
+            case "START_SHADOW" ->
+                jdbc.update(
+                    "update rules.rule_versions set status='SHADOW',eval_from_seq=coalesce(eval_from_seq,?),revision=revision+1 where version_id=?",
+                    seq,
+                    in.versionId());
+            case "SUBMIT" ->
+                jdbc.update(
+                    "update rules.rule_versions set status='PENDING',submitted_at=?,revision=revision+1 where version_id=?",
+                    at,
+                    in.versionId());
+            case "WITHDRAW", "REJECT" ->
+                jdbc.update(
+                    "update rules.rule_versions set status='DRAFT',eval_from_seq=null,submitted_at=null,revision=revision+1 where version_id=?",
+                    in.versionId());
+            case "APPROVE" -> {
+              // 운영 버전은 룰마다 하나라서 기존 것을 먼저 물린다
+              var retired =
+                  jdbc.queryForList(
+                      "update rules.rule_versions set status='RETIRED',eval_from_seq=null,revision=revision+1 where rule_id=? and status in ('ACTIVE','PAUSED') returning version_no",
+                      Integer.class,
+                      ruleId);
+              if (!retired.isEmpty()) snapshot.put("retiredVersionNo", retired.getFirst());
+              if (author) snapshot.put("selfApproved", true);
+              jdbc.update(
+                  "update rules.rule_versions set status='ACTIVE',eval_from_seq=coalesce(eval_from_seq,?),decided_at=?,decided_by=?,revision=revision+1 where version_id=?",
+                  seq,
+                  at,
+                  user,
+                  in.versionId());
+            }
+            case "PAUSE" ->
+                jdbc.update(
+                    "update rules.rule_versions set status='PAUSED',eval_from_seq=null,revision=revision+1 where version_id=?",
+                    in.versionId());
+            case "RESUME" ->
+                jdbc.update(
+                    "update rules.rule_versions set status='ACTIVE',eval_from_seq=?,revision=revision+1 where version_id=?",
+                    seq,
+                    in.versionId());
+            default -> throw invalid("알 수 없는 명령입니다.");
+          }
+          event(ruleId, in.versionId(), user, transition.event(), comment, snapshot, at);
+        });
+  }
+
+  /** 룰 한 줄을 잠그고 이름을 돌려준다. 한 룰의 버전을 바꾸는 명령끼리 순서를 세운다. */
+  private String lock(long ruleId) {
+    var names =
+        jdbc.queryForList(
+            "select name from rules.rules where rule_id=? for update", String.class, ruleId);
+    if (names.isEmpty()) throw ApiException.notFound("룰이 없습니다.");
+    return names.getFirst();
+  }
+
+  /** 지금 조건(digest)으로 끝낸 백테스트가 있는가. */
+  boolean backtested(long versionId, String digest) {
+    return Boolean.TRUE.equals(
+        jdbc.queryForObject(
+            "select exists(select 1 from rules.backtests where version_id=? and definition_digest=? and status='COMPLETED')",
+            Boolean.class,
+            versionId,
+            digest));
+  }
+
+  // ---- 변경 기록 ----
+
+  private static Map<String, Object> snapshot(
+      int versionNo, String name, String summary, String digest) {
+    var snapshot = new LinkedHashMap<String, Object>();
+    snapshot.put("versionNo", versionNo);
+    snapshot.put("name", name);
+    snapshot.put("summary", summary);
+    snapshot.put("digest", digest);
+    return snapshot;
+  }
+
+  private void event(
+      long rule,
+      Long version,
+      long user,
+      String action,
+      Map<String, Object> snapshot,
+      Timestamp at) {
+    event(rule, version, user, action, "", snapshot, at);
+  }
+
+  private void event(
+      long rule,
+      Long version,
+      long user,
+      String action,
+      String comment,
+      Map<String, Object> snapshot,
+      Timestamp at) {
+    jdbc.update(
+        "insert into rules.events(rule_id,version_id,actor_id,action,comment,snapshot,business_at) values(?,?,?,?,?,?::jsonb,?)",
+        rule,
+        version,
+        user,
+        action,
+        comment,
+        ReviewJson.encode(snapshot),
+        at);
   }
 }
