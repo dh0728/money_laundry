@@ -40,7 +40,9 @@ export type RuleTemplate = {
   group: 'PATTERN' | 'GENERAL'
   /** false 면 이후 제공 템플릿. 아래 값이 없다. */
   available: boolean
+  /** 그 템플릿의 세는 방식. 값이나 조건을 바꿔도 달라지지 않는 것만 적혀 있다(이후 제공 템플릿은 제공하지 않는 이유) */
   note?: string
+  /** 대응하는 업계 시나리오 이름. 기본값의 근거 기록이고 화면에는 쓰지 않는다 */
   oracle?: string
   pattern?: number | null
   evaluator?: 'AGGREGATE' | 'TWO_HOP' | 'PATH'
@@ -60,6 +62,7 @@ export type RuleTemplate = {
   metrics?: string[]
   whereMin?: number
   defaults?: Omit<RuleDefinition, 'schema' | 'template'>
+  /** 기본값을 고른 실험의 성능. 기본값의 근거 기록이고 화면에는 쓰지 않는다 */
   performance?: { dataset: string; period: string; precision: number; recall: number; pickedTransactions: number; recallBase: string }
 }
 export type RuleItemSpec = {

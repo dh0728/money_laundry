@@ -19,8 +19,6 @@ import './live-rule-engine.css';
 // 쓸 수 있는 항목 · 범위 · 기본값은 서버 카탈로그가, 문장과 검토 체크리스트는 서버 검증(validate)이 정한다.
 
 const groupTitles = { PATTERN: '패턴 템플릿', GENERAL: '일반 템플릿' };
-const percent = value => `${value}%`;
-const countFormat = new Intl.NumberFormat('ko-KR');
 
 function Select({ label, value, options, onChange, disabled }) {
   return <select className="rule-select" aria-label={label} value={value ?? ''} disabled={disabled}
@@ -234,12 +232,11 @@ function TemplateLibrary({ catalog, selected, locked, onPick }) {
       disabled={!template.available || (locked && template.key !== selected)} onClick={() => onPick(template.key)}>
       <strong>{template.name}</strong>
       <span>{template.available ? template.shape : template.note}</span>
-      {template.oracle && <span className="rule-template-source">Oracle · {template.oracle}</span>}
     </button>
   </li>;
   return <Panel className="rule-template-library" aria-label="템플릿 고르기">
     <h2>템플릿 고르기</h2>
-    <p className="workflow-rule-note">{locked ? '저장한 룰의 템플릿은 바꿀 수 없습니다.' : `템플릿 ${available.length}개에서 고르면 실험으로 정한 기본값이 채워집니다.`}</p>
+    <p className="workflow-rule-note">{locked ? '저장한 룰의 템플릿은 바꿀 수 없습니다.' : `템플릿 ${available.length}개에서 고르면 기본값이 채워집니다.`}</p>
     {Object.entries(groupTitles).map(([group, title]) => <section key={group} aria-label={title}>
       <h3>{title}</h3>
       <ul>{available.filter(template => template.group === group).map(card)}</ul>
@@ -251,15 +248,14 @@ function TemplateLibrary({ catalog, selected, locked, onPick }) {
   </Panel>;
 }
 
+// 템플릿이 정해 둔 것만 보여 준다: 대상, 검사 시점, 세는 방식. 값이나 조건을 바꿔도 달라지지 않는 내용이다.
+// 카탈로그에는 기본값을 고른 실험의 성능(performance)과 대응하는 업계 시나리오 이름(oracle)도 있지만 화면에는 쓰지 않는다.
+// 실제 원장에서는 정답이 없어 잴 수 없는 숫자이고, 값을 고치면 맞지 않는다. 고친 조건의 결과는 백테스트가 보여 준다.
 function TemplateFacts({ template }) {
-  const performance = template.performance;
   return <dl className="rule-condition-facts rule-template-facts">
     <div><dt>대상</dt><dd>{template.subjectLabel}</dd></div>
     <div><dt>검사 시점</dt><dd>{template.trigger}</dd></div>
-    {performance && <div className="rule-template-wide"><dt>기본값 성능 · {performance.dataset} · {performance.period}</dt>
-      <dd>정밀도 {percent(performance.precision)} · 재현율 {percent(performance.recall)} · 고른 거래 {countFormat.format(performance.pickedTransactions)}건</dd>
-      <dd className="workflow-rule-note">재현율의 분모: {performance.recallBase}</dd></div>}
-    {template.note && <div className="rule-template-wide"><dt>값을 고칠 때</dt><dd>{template.note}</dd></div>}
+    {template.note && <div className="rule-template-wide"><dt>세는 방식</dt><dd>{template.note}</dd></div>}
   </dl>;
 }
 

@@ -58,6 +58,11 @@ it('첫 템플릿의 기본값을 IF → THEN 블록에 채우고 서버가 읽�
   expect(part('세는 거래').getByLabelText('건당 금액 값')).toHaveValue('1,000');
   expect(part('기간').getByLabelText('기간')).toHaveValue('10080');
   expect(part('적중 조건').getByLabelText('서로 다른 수취 계좌 수 값')).toHaveValue('6');
+  // 템플릿 설명은 대상 · 검사 시점 · 세는 방식뿐이다. 기본값을 고른 실험의 성능과 다른 제품의 시나리오 이름은 보여 주지 않는다.
+  expect(screen.getByText('세는 방식').nextElementSibling).toHaveTextContent('한 송금 계좌가 기간 안에 보낸 거래를 셉니다. 같은 계좌에 여러 번 보내도 수취 계좌 수는 1개입니다.');
+  expect(screen.queryByText(/기본값 성능|정밀도|재현율|HI-Medium/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Oracle/)).not.toBeInTheDocument();
+  expect(screen.getByText('템플릿 4개에서 고르면 기본값이 채워집니다.')).toBeInTheDocument();
   // Alert 생성은 4단계 전까지 고를 수 없다
   expect(block.getByRole('option', { name: 'Alert 생성 (준비 중)' })).toBeDisabled();
 
