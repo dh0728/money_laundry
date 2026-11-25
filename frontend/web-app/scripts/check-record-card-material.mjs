@@ -144,6 +144,9 @@ async function checkLedgerGlow(browser, origin, inject) {
         const card = side === 'bottom' ? cards.nth(bottomCardIndex) : firstCard
         await page.mouse.move(1, 1)
         const placement = await card.evaluate(async (card, { side, requestedClearance }) => {
+          // The previous hover can still be tilting this card back to its idle geometry.
+          void getComputedStyle(card).transform
+          await Promise.all(card.getAnimations().map(animation => animation.finished.catch(() => {})))
           const scroller = card.closest('.record-card-scroll')
           scroller.scrollTop = 0
           const top = Math.ceil(scroller.getBoundingClientRect().top + scroller.clientTop)
