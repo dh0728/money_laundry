@@ -2,7 +2,7 @@
   appearance: none;
   display: block;
   inline-size: 100%;
-  block-size: var(--aml-space-16);
+  block-size: var(--meter-height, var(--aml-space-16));
   overflow: hidden;
   border: 0;
   border-radius: var(--aml-radius-full);
@@ -19,10 +19,10 @@
 .meter::-webkit-meter-optimum-value {
   block-size: 100%;
   border-radius: inherit;
-  background: var(--muted-text);
+  background: var(--meter-fill, var(--muted-text));
 }
 
 .meter::-moz-meter-bar {
   border-radius: inherit;
-  background: var(--muted-text);
+  background: var(--meter-fill, var(--muted-text));
 }

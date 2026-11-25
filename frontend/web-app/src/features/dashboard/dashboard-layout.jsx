@@ -50,12 +50,12 @@ function LoadingSeries({ className }) {
 function LoadingMetric({ detail, trend, composition }) {
   return <Box className="dashboard-metric">
     <Skeleton className="dashboard-loading-title" />
-    <Skeleton className="dashboard-loading-value" />
+    {!composition && <Skeleton className="dashboard-loading-value" />}
     {detail && <Skeleton className="dashboard-loading-note" />}
-    {composition && <Stack className="dashboard-workload-composition">
-      <Skeleton className="dashboard-score-band dashboard-workload-bar" />
+    {composition && <Box className="dashboard-workload-composition">
+      <Skeleton className="dashboard-workload-donut" />
       <Skeleton className="dashboard-loading-note" />
-    </Stack>}
+    </Box>}
     {trend && <Skeleton className="dashboard-loading-trend" />}
   </Box>;
 }

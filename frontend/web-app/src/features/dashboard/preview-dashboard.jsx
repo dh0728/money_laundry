@@ -13,14 +13,14 @@ import { benchmarkDashboardMetrics } from './benchmark-dashboard-metrics';
 import { ActionButton } from '../../components/primary-button';
 import { exportCases } from '../../components/query-controls';
 import { BoardSectionDownload, SectionDownloadHeading } from '../../components/section-download';
-import { BarSparkline } from '../../components/charts/sparkline';
+import { Meter } from '../../components/meter';
 import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings';
 import { Box, Heading, Stack, Text } from '../../components/layout-primitives';
-import { dashboardDateKey } from './dashboard-investigation';
-import { readWorkspaceLength } from './workspace-metrics';
+import { isOverdueCaseAge } from '../investigation/case-age';
 import { LinkTag, StatusTag, reviewStates } from '../../components/semantic-tags';
-import { Bar } from '../../components/charts/charts/bar';
-import { BarChart } from '../../components/charts/charts/bar-chart';
+import { PieChart } from '../../components/charts/charts/pie/pie-chart';
+import { PieSlice } from '../../components/charts/charts/pie/pie-slice';
+import { readChartNumber } from '../../components/charts/chart-design-values';
 import { AccountTrailGraph } from '../../components/charts/charts/account-trail-graph';
 import { flowColors } from './dashboard-flows';
 
@@ -28,51 +28,65 @@ const formatter = new Intl.NumberFormat('ko-KR');
 const count = value => `${formatter.format(value)}건`;
 const smallPercent = new Intl.NumberFormat('ko-KR', { style: 'percent', maximumFractionDigits: 3 });
 const share = (value, total) => total ? smallPercent.format(value / total) : '—';
-const noMargin = { top: 0, right: 0, bottom: 0, left: 0 };
 const animated = new Set();
 const Analytics = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.Analytics })));
 const BenchmarkCharts = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.BenchmarkCharts })));
 
-function WorkloadBar({ composition, total }) {
-  return <Stack className="dashboard-workload-composition">
-    {total > 0 && <Box className="dashboard-score-band dashboard-workload-bar" aria-hidden="true">
-      <BarChart data={[{ name: '내 담당 업무', ...composition }]} stacked orientation="horizontal" barGap={0}
-        margin={noMargin} horizontalValueDomain={[0, total]}>
-        {reviewStates.map(({ preset }) => <Bar key={preset} dataKey={preset}
-          fill={flowColors[preset]} lineCap="butt" animate={false} />)}
-      </BarChart>
-    </Box>}
+function WorkloadDonut({ composition, reduced, children }) {
+  const data = reviewStates.map(({ label, preset }) => ({ label, value: composition[preset], color: flowColors[preset] }))
+    .filter(({ value }) => value > 0);
+  const slices = data.length ? data : [{ label: '업무 없음', value: 1, color: 'var(--inner-surface)' }];
+  return <Box className="dashboard-workload-composition">
+    <Box className="dashboard-workload-donut">
+      <Box aria-hidden="true">
+        <PieChart data={slices} size={readChartNumber('--dashboard-workload-donut-size', 112)}
+          innerRadius={readChartNumber('--dashboard-workload-inner-radius', 34)}
+          cornerRadius={readChartNumber('--aml-radius-small', 4)}
+          padAngle={slices.length > 1 ? readChartNumber('--dashboard-workload-slice-gap', 0.045) : 0}
+          geometryScrubbing={reduced}>
+          {!reduced && slices.map(({ label }, index) => <PieSlice key={label} index={index} />)}
+        </PieChart>
+      </Box>
+      {children}
+    </Box>
     <Box className="dashboard-legend" role="group" aria-label="내 담당 업무 처리 상태">
       {reviewStates.map(({ preset, label }) => <Text as="span" className="dashboard-status-legend-item" key={preset}>
         <StatusTag preset={preset}>{label}</StatusTag>
         <Text as="strong">{count(composition[preset])}</Text>
       </Text>)}
     </Box>
-  </Stack>;
+  </Box>;
 }
 
-function Metric({ item, reduced, trendHeight }) {
-  const { label, value, unit, detail, key, trend, composition } = item;
-  const hasTrend = trend?.rows.some(row => row[trend.key] > 0);
+function MetricBreakdown({ caption, rows, total }) {
+  return <Box as="figure" className="dashboard-metric-breakdown">
+    <Text as="figcaption" className="dashboard-note">{caption}</Text>
+    <Box as="ul" className="dashboard-breakdown-rows">
+      {rows.map(({ label, value }) => <Box as="li" key={label}>
+        <Text as="span">{label}</Text>
+        <Meter value={value} max={total || 1} aria-hidden="true" />
+        <Text as="strong">{count(value)}</Text>
+      </Box>)}
+    </Box>
+  </Box>;
+}
+
+function Metric({ item, reduced }) {
+  const { label, value, unit, detail, key, breakdown, composition } = item;
   const wide = (typeof value === 'number' ? formatter.format(value).length : value.length) >= 8;
-  return <Box className="dashboard-metric">
-    <SectionDownloadHeading as="h3">{label}</SectionDownloadHeading>
-    <Box className="dashboard-metric-reading">
+  const reading = <Box className="dashboard-metric-reading">
       <Text as="strong" className="dashboard-metric-value" data-wide-value={wide || undefined}>
         {typeof value === 'number' && !reduced && !animated.has(key)
           ? <CountUp to={value} className="count-up-fast" trigger="view" separator="," onEnd={() => animated.add(key)} />
           : typeof value === 'number' ? formatter.format(value) : value}
         {unit && <Text as="small">{unit}</Text>}
       </Text>
-    </Box>
+    </Box>;
+  return <Box className="dashboard-metric">
+    <SectionDownloadHeading as="h3">{label}</SectionDownloadHeading>
+    {composition ? <WorkloadDonut composition={composition} reduced={reduced}>{reading}</WorkloadDonut> : reading}
     {detail && <Text>{detail}</Text>}
-    {composition && <WorkloadBar composition={composition} total={value} />}
-    {hasTrend && <Box className="dashboard-metric-trend">
-      <BarSparkline data={trend.rows} dataKey={trend.key} color={trend.color} height={trendHeight}
-        dot={false} animate={!reduced} aria-label={label + ' · ' + trend.caption + ' · ' +
-          trend.rows.map(row => row.label + ' ' + count(row[trend.key])).join(', ')} />
-      <Text as="span" className="dashboard-note">{trend.caption}</Text>
-    </Box>}
+    {breakdown && <MetricBreakdown {...breakdown} total={value} />}
   </Box>;
 }
 
@@ -83,33 +97,45 @@ function Metrics({ items, appearance }) {
   }))} appearance={appearance} />;
 }
 
+const creationHours = ['00–05시', '06–11시', '12–17시', '18–23시'];
+
+function creationBreakdown(cases) {
+  const buckets = Map.groupBy(cases, ({ hour }) => {
+    const kstHour = hour + 9;
+    return Number.isInteger(hour) && kstHour >= 0 && kstHour < 24
+      ? creationHours[Math.floor(kstHour / 6)] : '시간 미기록';
+  });
+  const labels = buckets.has('시간 미기록') ? [...creationHours, '시간 미기록'] : creationHours;
+  return { caption: '생성 시간대 · KST', rows: labels.map(label => ({ label, value: buckets.get(label)?.length ?? 0 })) };
+}
+
 function personalIndicators(data) {
-  const hourly = (key, color) => ({ rows: data.hourly, key, color, caption: '생성 시간대 · KST' });
-  const highRiskColor = 'var(--chart-risk-high)';
   const riskDetail = '미완료 · 위험 점수 ' + modelRiskLabels().high;
   const statusByCode = data.investigation.statusByCode;
   const casesByStatus = Map.groupBy(data.mine, row => statusByCode[row.code] ?? row.status);
   const composition = Object.fromEntries(reviewStates.map(({ value, preset }) =>
     [preset, casesByStatus.get(value)?.length ?? 0]));
-  const episodes = data.mine.filter(row => row.kind === 'Episode' && row.open && modelRiskBand(row.score) === 'high');
-  const episodesByDay = Map.groupBy(episodes, row => dashboardDateKey(row.date));
+  const unfinished = data.mine.filter(row => row.open);
+  const highRisk = Map.groupBy(unfinished.filter(row => modelRiskBand(row.score) === 'high'), row => row.kind);
+  const alerts = highRisk.get('Alert') ?? [];
+  const episodes = highRisk.get('Episode') ?? [];
+  const overdue = unfinished.filter(row => isOverdueCaseAge(row.elapsed));
   return [
     { label: '내 담당 업무', value: data.mine.length, composition },
-    { label: '고위험 Alert', value: data.highRisk, detail: riskDetail, trend: hourly('highRisk', highRiskColor) },
-    { label: '3일 초과 경과', value: data.overdue, detail: 'Alert ' + count(data.overdueAlerts) + ' · Episode ' + count(data.overdueEpisodes),
-      trend: hourly('overdue', highRiskColor) },
-    { label: '고위험 Episode', value: episodes.length, detail: riskDetail,
-      trend: {
-        rows: data.operationalDaily.map(({ date, label }) => ({ label, count: episodesByDay.get(date)?.length ?? 0 })),
-        key: 'count', color: highRiskColor, caption: '생성일 · KST',
-      } },
+    { label: '고위험 Alert', value: alerts.length, detail: riskDetail, breakdown: creationBreakdown(alerts) },
+    { label: '3일 초과 경과', value: overdue.length, detail: 'Alert ' + count(data.overdueAlerts) + ' · Episode ' + count(data.overdueEpisodes),
+      breakdown: { caption: '경과일 분포', rows: [
+        { label: '4–6일', value: overdue.filter(row => row.elapsed < 7).length },
+        { label: '7–13일', value: overdue.filter(row => row.elapsed >= 7 && row.elapsed < 14).length },
+        { label: '14일 이상', value: overdue.filter(row => row.elapsed >= 14).length },
+      ] } },
+    { label: '고위험 Episode', value: episodes.length, detail: riskDetail, breakdown: creationBreakdown(episodes) },
   ];
 }
 
 function PersonalIndicators({ data, reduced }) {
-  const trendHeight = readWorkspaceLength('--chart-detail-sparkline-height') || undefined;
   return personalIndicators(data).map(item => <Panel as="article" className="dashboard-priority-metric" key={item.label}>
-    <Metric item={{ unit: '건', key: item.label, ...item }} reduced={reduced} trendHeight={trendHeight} />
+    <Metric item={{ unit: '건', key: item.label, ...item }} reduced={reduced} />
   </Panel>);
 }
 
