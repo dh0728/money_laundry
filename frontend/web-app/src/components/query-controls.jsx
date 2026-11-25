@@ -73,7 +73,8 @@ export function LocalQueryTools({ actions, relatedRows, onRelatedQuery, download
     if (relatedRows) controller.current.setScreen('related-candidates', [], { rows: relatedRows });
   }, [onRelatedQuery, relatedRows, downloadSurface]);
   useEffect(() => controller.current.registerTableTools(actions), [actions, onRelatedQuery, downloadSurface]);
-  return <div ref={host} data-local-query-tools="" dangerouslySetInnerHTML={embeddedToolbar} />;
+  return <div ref={host} data-local-query-tools=""
+    data-page-only-download={actions?.panelDownload === false || undefined} dangerouslySetInnerHTML={embeddedToolbar} />;
 }
 
 export { LocalQueryTools as TableQueryTools };
@@ -540,7 +541,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     const applied = {
       filter: tableTools?.filter ? tableTools.filter.value !== 'all'
         : groups.some(({ key }) => key === 'assignment' ? value.assignment !== 'all' : value[key].length),
-      sort: Boolean(value.sort),
+      sort: tableTools?.sort ? tableTools.sort.value !== tableTools.sort.defaultValue : Boolean(value.sort),
       period: Boolean(tableTools?.period?.range ?? value.range),
     };
     for (const button of queryButtons) {
@@ -554,9 +555,13 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     target.append(controls);
   }
   function visibleLocalDownloads() {
-    return [...workspace.querySelectorAll('[data-local-query-tools] [data-query-tool="download"]:not([hidden])')]
-      .filter(button => button.getClientRects().length > 0)
-      .map(button => embeddedDownloads.get(button.closest('[data-local-query-tools]')))
+    return [...workspace.querySelectorAll('[data-local-query-tools]')]
+      .filter(element => {
+        const anchor = element.matches('[data-page-only-download]') ? element.closest('.data-table-heading, .data-table-frame') ?? element
+          : element.querySelector('[data-query-tool="download"]:not([hidden])');
+        return anchor?.getClientRects().length > 0;
+      })
+      .map(element => embeddedDownloads.get(element))
       .filter(Boolean);
   }
   function syncTools(hasVisibleVisuals = !localTable && hasVisualizations(workspace), workspaceReady = true) {
@@ -573,9 +578,10 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     const hasDownloadEntries = tableTools?.entries?.some(entry => !entry.disabled);
     const available = {
       filter: hasRows || Boolean(tableTools?.filter),
-      sort: hasRows && !localTable,
+      sort: hasRows && !localTable || Boolean(tableTools?.sort),
       period: Boolean(tableTools?.period || scope && (hasRows || periodAnchor)),
-      download: (hasRows || hasDownloadEntries) && (embedded || localTable || !pageDownload),
+      download: tableTools?.panelDownload !== false && (hasRows || hasDownloadEntries)
+        && (!pageDownload || localTable && hasDownloadEntries),
     };
     for (const button of toolbarButtons) {
       const hidden = !available[button.dataset.queryTool];
@@ -688,9 +694,12 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     const Panel = queryPanels[tool];
     const tableFilter = tool === 'filter' ? tableTools?.filter : undefined;
     const tablePeriod = tool === 'period' ? tableTools?.period : undefined;
+    const tableSort = tool === 'sort' ? tableTools?.sort : undefined;
     const content = isDownload
       ? <DownloadOptions entries={downloadEntries(isPageDownload)} onDone={close} showLabels={isPageDownload} />
       : tableFilter ? <TableFilterPane filter={tableFilter} onApply={next => { close(); tableFilter.onChange(next); }} />
+      : tableSort ? <SortPane value={{ sort: tableSort.value }} sorts={tableSort.options}
+        onApply={({ sort }) => { close(); tableSort.onChange(sort); }} />
       : tablePeriod ? <PeriodPane value={{ range: tablePeriod.range }} asOf={tablePeriod.asOf}
         onApply={next => { close(); tablePeriod.onChange(next.range); }} onResize={position} />
       : <Panel value={value} groups={filterGroups(rows, scope)} sorts={availableSorts(rows)} asOf={asOf}
@@ -769,7 +778,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
   });
   const observationRoot = embedded ? workspace.closest('.data-table-frame') : workspace;
   if (observationRoot) watchVisualizations.observe(observationRoot, {
-    childList: true, subtree: true, attributes: true, attributeFilter: ['aria-selected', 'aria-sort', 'hidden'],
+    childList: true, subtree: true, attributes: true, attributeFilter: ['aria-selected', 'aria-sort', 'hidden', 'data-page-only-download'],
   });
   return {
     dispose() {

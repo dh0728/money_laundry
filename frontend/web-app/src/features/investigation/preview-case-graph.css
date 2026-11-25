@@ -64,7 +64,7 @@
 .preview-graph-center {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: var(--preview-graph-height);
+  grid-template-rows: minmax(var(--preview-graph-height), auto);
   row-gap: var(--preview-graph-gap);
   isolation: isolate;
 }
@@ -100,7 +100,6 @@
   flex-direction: column;
   inline-size: calc(var(--preview-graph-control-size) + 2 * var(--aml-panel-inset));
   min-inline-size: 0;
-  max-block-size: 100%;
   overflow: hidden;
   border-radius: var(--aml-radius-panel);
   color: var(--text);
@@ -121,9 +120,7 @@
 .preview-graph-settings-body {
   min-block-size: 0;
   max-block-size: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
+  overflow: clip;
   overflow-wrap: anywhere;
   padding: 0 var(--aml-panel-text-inset);
   opacity: 0;
@@ -132,7 +129,7 @@
     opacity var(--aml-motion-drawer-duration) var(--aml-motion-drawer-ease);
 }
 .preview-graph-settings[data-expanded="true"] .preview-graph-settings-body {
-  max-block-size: calc(var(--preview-graph-height) - var(--preview-graph-control-size) - 3 * var(--aml-panel-inset));
+  max-block-size: none;
   padding-block-end: var(--aml-panel-inset);
   opacity: 1;
 }
@@ -406,6 +403,5 @@
   .preview-graph-center > .preview-graph-actions { grid-row: 3 }
   .preview-graph-settings[data-expanded="true"] {
     inline-size: 100%;
-    block-size: var(--preview-graph-height);
   }
 }

@@ -2,6 +2,15 @@
 
 :root { --record-card-shadow-gutter: var(--aml-space-16) }
 
+:is(.record-card-scroll, .animated-list__viewport.record-card-scroll) {
+  --record-card-scroll-bleed: min(var(--record-card-shadow-gutter), var(--workspace-inset, var(--aml-space-8)));
+  --record-card-scroll-start: var(--record-card-scroll-bleed);
+  --record-card-scroll-end: var(--record-card-scroll-bleed);
+  margin-inline: calc(-1 * var(--record-card-scroll-start)) calc(-1 * var(--record-card-scroll-end));
+  padding-inline: var(--record-card-scroll-start) var(--record-card-scroll-end);
+  overflow-x: hidden;
+}
+
 [data-glow-surface] {
   --panel-material-edge: var(--record-card-edge, var(--aml-data-grid));
   position: relative;

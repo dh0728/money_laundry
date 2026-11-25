@@ -39,6 +39,8 @@ export interface TooltipBoxProps {
   containerWidth: number;
   /** Container height for bounds clamping */
   containerHeight: number;
+  /** Scroller that sets the visible horizontal bounds of an oversized chart */
+  horizontalViewportRef?: RefObject<HTMLElement | null>;
   /** Offset from the target position */
   offset?: number;
   /** Custom class name */
@@ -515,6 +517,8 @@ function resolveTooltipTarget({
   offset,
   containerWidth,
   containerHeight,
+  visibleLeft = 0,
+  visibleRight = containerWidth,
 }: {
   x: number;
   flipX?: number;
@@ -524,11 +528,13 @@ function resolveTooltipTarget({
   offset: number;
   containerWidth: number;
   containerHeight: number;
+  visibleLeft?: number;
+  visibleRight?: number;
 }) {
-  const flipped = flipX + width + offset > containerWidth;
+  const flipped = flipX + width + offset > visibleRight;
   return {
     flipped,
-    left: Math.max(0, Math.min(flipped ? x - offset - width : x + offset, containerWidth - width)),
+    left: Math.max(visibleLeft, Math.min(flipped ? x - offset - width : x + offset, visibleRight - width)),
     top: Math.max(
       offset,
       Math.min(y - height / 2, containerHeight - height - offset)
@@ -563,6 +569,7 @@ function TooltipBoxInner({
   y,
   containerWidth,
   containerHeight,
+  horizontalViewportRef,
   offset = 16,
   className = "",
   children,
@@ -625,7 +632,7 @@ function TooltipBoxInner({
 
   // Re-places the panel for the latest props; set by the layout effect below
   // and called by the size observer when the panel resizes.
-  const placeRef = useRef<((fromObserver: boolean) => void) | null>(null);
+  const placeRef = useRef<((fromObserver: boolean, fromScroll?: boolean) => void) | null>(null);
   // The size is read synchronously once, on show. After that a
   // `ResizeObserver` reports changes after layout (before paint), so a
   // pointer move never forces a layout just to measure the panel.
@@ -636,11 +643,18 @@ function TooltipBoxInner({
     if (!el) {
       return;
     }
+    const viewport = horizontalViewportRef?.current;
     if (!sizeObservedRef.current) {
+      if (viewport) {
+        el.style.setProperty("--chart-tooltip-viewport-width", `${viewport.clientWidth}px`);
+      }
       readPanelBoxSize(el, tooltipWidthRef, tooltipHeightRef);
       sizeObservedRef.current = typeof ResizeObserver !== "undefined";
     }
-    const place = (fromObserver: boolean) => {
+    const place = (fromObserver: boolean, fromScroll = false) => {
+      const visibleLeft = viewport
+        ? viewport.getBoundingClientRect().left + viewport.clientLeft - container.getBoundingClientRect().left
+        : undefined;
       const target = resolveTooltipTarget({
         x,
         flipX,
@@ -650,6 +664,8 @@ function TooltipBoxInner({
         offset,
         containerWidth,
         containerHeight,
+        visibleLeft,
+        visibleRight: visibleLeft === undefined ? undefined : visibleLeft + (viewport?.clientWidth ?? 0),
       });
       const updateFlip = () =>
         setFlip((prev) =>
@@ -677,7 +693,7 @@ function TooltipBoxInner({
         }
         return;
       }
-      const snap = reducedMotion || !hasPositionedRef.current;
+      const snap = reducedMotion || !hasPositionedRef.current || fromScroll;
       hasPositionedRef.current = true;
       if (leftOverride === undefined) {
         moveTo(animatedLeft, tx, snap);
@@ -694,6 +710,8 @@ function TooltipBoxInner({
     y,
     containerWidth,
     containerHeight,
+    horizontalViewportRef,
+    container,
     offset,
     leftOverride,
     topOverride,
@@ -702,6 +720,24 @@ function TooltipBoxInner({
     animatedTop,
     reducedMotion,
   ]);
+
+  useLayoutEffect(() => {
+    const viewport = horizontalViewportRef?.current;
+    const el = tooltipRef.current;
+    if (!viewport || !el) return;
+    const onScroll = () => placeRef.current?.(false, true);
+    viewport.addEventListener("scroll", onScroll, { passive: true });
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => {
+      el.style.setProperty("--chart-tooltip-viewport-width", `${viewport.clientWidth}px`);
+      readPanelBoxSize(el, tooltipWidthRef, tooltipHeightRef);
+      placeRef.current?.(true, true);
+    });
+    observer?.observe(viewport);
+    return () => {
+      viewport.removeEventListener("scroll", onScroll);
+      observer?.disconnect();
+    };
+  }, [horizontalViewportRef]);
 
   // Content changes resize the panel: re-place it from the new size. The
   // callback runs after layout, so reading the size there is free.
@@ -739,6 +775,7 @@ function TooltipBoxInner({
     return createPortal(
       <div
         className={cn("bklit-tooltip-anchor pointer-events-none absolute z-50", className)}
+        data-horizontal-viewport={horizontalViewportRef ? "" : undefined}
         ref={tooltipRef}
         style={{
           "--chart-tooltip-left": `${staticPosition.left}px`,
@@ -761,6 +798,7 @@ function TooltipBoxInner({
     <m.div
       animate={{ opacity: 1 }}
       className={cn("bklit-tooltip-anchor pointer-events-none absolute z-50", className)}
+      data-horizontal-viewport={horizontalViewportRef ? "" : undefined}
       exit={{ opacity: 0 }}
       initial={{ opacity: 0 }}
       ref={tooltipRef}
@@ -776,7 +814,7 @@ function TooltipBoxInner({
         animateSize={animateSize && animate && !reducedMotion}
         className={panelClassName}
         entrance={
-          reducedMotion ? false : { scale: 0.85, x: isFlipped ? 20 : -20 }
+          reducedMotion ? false : { scale: 0.85, x: horizontalViewportRef ? 0 : isFlipped ? 20 : -20 }
         }
         key={flipKey}
         backgroundColor={panelBackground}

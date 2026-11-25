@@ -219,6 +219,8 @@ function StaffWorkloadMetric({ workload, reduced, showAssignments }) {
     count: showAssignments ? person.assignments : person.total,
   }));
   const baseline = showAssignments ? equalAssignments : null;
+  const visibleRowLimit = readChartNumber('--dashboard-staff-visible-rows', 7);
+  const longChart = rows.length >= 2 * visibleRowLimit;
   const upperBound = Math.max(1, ...rows.map(row => row.count)) + 1;
   const title = showAssignments ? '분석가별 최근 배정' : '분석가별 현재 미완료';
   const note = showAssignments
@@ -237,7 +239,7 @@ function StaffWorkloadMetric({ workload, reduced, showAssignments }) {
       { key: 'withinThreeDays', label: `3일 이하 ${count(total - overdue.length)}`, color },
       { key: 'overdue', label: `3일 초과 ${count(overdue.length)}`, color: flowColors.suspect },
     ]} />}
-    {rows.length ? <Box className="dashboard-staff-scroll">
+    {rows.length ? <Box className="dashboard-staff-scroll" data-scroll-exception={longChart ? 'long-chart' : undefined}>
       <Box as="figure" className="dashboard-staff-chart" aria-label={title}
         style={{ '--dashboard-staff-row-count': rows.length,
           '--dashboard-staff-reference-position': baseline == null ? undefined : `${100 * baseline / upperBound}%` }}>

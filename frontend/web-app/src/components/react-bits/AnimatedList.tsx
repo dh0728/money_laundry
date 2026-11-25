@@ -57,6 +57,7 @@ interface AnimatedListProps {
   maxHeight?: number | string;
   className?: string;
   itemClassName?: string;
+  viewportClassName?: string;
   itemDecoration?: ReactNode;
   itemData?: (item: AnimatedListItem, index: number) => Record<`data-${string}`, string>;
   surface?: 'workspace' | 'ledger';
@@ -97,6 +98,7 @@ const AnimatedList = ({
   maxHeight,
   className = '',
   itemClassName = '',
+  viewportClassName = '',
   itemDecoration,
   itemData,
   surface
@@ -458,7 +460,7 @@ const AnimatedList = ({
     >
       <div
         ref={viewportRef}
-        className={`animated-list__viewport${displayScrollbar ? '' : ' animated-list__viewport--bare'}`}
+        className={`animated-list__viewport${displayScrollbar ? '' : ' animated-list__viewport--bare'} ${viewportClassName}`.trim()}
         role={renderItemHeader ? 'grid' : 'listbox'}
         aria-label={ariaLabel}
         tabIndex={0}

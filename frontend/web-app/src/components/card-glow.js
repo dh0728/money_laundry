@@ -20,12 +20,15 @@ export function bindCardGlow(workspace) {
   function clipArea(surface) {
     const area = { left: -Infinity, right: Infinity, top: -Infinity, bottom: Infinity };
     for (let parent = surface.parentElement; parent && parent !== workspace; parent = parent.parentElement) {
-      const { overflowX, overflowY } = page.defaultView.getComputedStyle(parent);
+      const style = page.defaultView.getComputedStyle(parent);
+      const { overflowX, overflowY } = style;
       if (overflowX === 'visible' && overflowY === 'visible') continue;
       const { left, top, right, bottom } = parent.getBoundingClientRect();
       if (overflowX !== 'visible') {
-        area.left = Math.max(area.left, left);
-        area.right = Math.min(area.right, overflowX === 'clip' ? right : left + parent.clientLeft + parent.clientWidth);
+        const reservesGlow = parent.classList.contains('record-card-scroll');
+        area.left = Math.max(area.left, left + (reservesGlow ? parseFloat(style.paddingLeft) : 0));
+        const scrollRight = overflowX === 'clip' ? right : left + parent.clientLeft + parent.clientWidth;
+        area.right = Math.min(area.right, scrollRight - (reservesGlow ? parseFloat(style.paddingRight) : 0));
       }
       if (overflowY !== 'visible') {
         area.top = Math.max(area.top, top);

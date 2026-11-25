@@ -8,7 +8,6 @@ import { ruleConditionSummary } from '@/features/rules/rules-logic';
 import { Check, Circle, CircleAlert, Info, TriangleAlert } from 'lucide-react';
 import StatusMark from '../components/react-bits/StatusMark';
 import Stepper, { Step } from '../components/react-bits/Stepper';
-import MagicBento from '../components/react-bits/MagicBento';
 import { ActionButton, PrimaryButton } from '../components/primary-button';
 import { CardHeader } from '../components/card-header';
 import { RecordCard } from '../components/record-card';
@@ -16,13 +15,13 @@ import { Panel } from '../components/panel';
 import { ScreenActions } from '../components/screen-actions';
 import { CompletionRing } from '../components/completion-ring';
 import { SectionDownloadHeading } from '../components/section-download';
-import { LinkTag, PatternTag, StatusTag, VerdictTag, verdictLabels } from '../components/semantic-tags';
+import { CountTag, LinkTag, PatternTag, StatusTag, VerdictTag, verdictLabels } from '../components/semantic-tags';
 import { csvDownloadEntry, downloadCsv, inDateRange, LocalQueryTools } from '../components/query-controls';
 import { RuleList } from '../features/rules/preview-rule-workspace';
 import { ruleRepository } from '../features/rules/rule-repository';
 import { useRules } from '../features/rules/use-rules';
 import { RuleConditionFacts } from '../features/rules/rule-condition-tree';
-import { readWorkspaceDuration, readWorkspaceGap, readWorkspaceLength } from '../features/dashboard/workspace-metrics';
+import { readWorkspaceDuration, readWorkspaceLength } from '../features/dashboard/workspace-metrics';
 import { SortableTableHead, tableCount, useTableSort, WorkflowQueryHeading, WorkflowTable } from '../components/workflow-table';
 import { DashboardSkeleton } from '../features/dashboard/dashboard-layout';
 import { PreviewEpisodeDialog } from '../features/investigation/preview-episode-dialog';
@@ -40,10 +39,15 @@ import { Box, Heading, Text } from '@/components/layout-primitives';
 const PreviewDashboard = lazy(() => import('../features/dashboard/preview-dashboard').then(module => ({ default: module.PreviewDashboard })));
 const BenchmarkDashboard = lazy(() => import('../features/dashboard/preview-dashboard').then(module => ({ default: module.BenchmarkDashboard })));
 const PreviewCaseOverview = lazy(() => import('../features/investigation/preview-case-overview').then(module => ({ default: module.PreviewCaseOverview })));
-const reportSelection = { ids: [], verdict: 'all' };
+const reportSelection = { ids: [], verdict: 'all', order: 'recent' };
 const verdictChoices = [
   { label: '전체', value: 'all' }, { label: '정상', value: 'normal' }, { label: '이상', value: 'abnormal' },
 ];
+const reportSortOptions = [
+  { label: '최근 판정순', value: 'recent' },
+  { label: '오래된 판정순', value: 'oldest' },
+];
+const reportColumns = ['abnormal', 'normal'];
 const reportTime = new Intl.DateTimeFormat('sv-SE', {
   timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
 });
@@ -392,18 +396,28 @@ function ReportAudit({ row }) {
   </Box>;
 }
 
-function Report({ view, data, appearance, registerTableTools, documentId, actionsHost }) {
+function compareJudgments(left, right, order) {
+  const [leftTime, rightTime] = [Date.parse(left.at), Date.parse(right.at)];
+  const [leftDated, rightDated] = [Number.isFinite(leftTime), Number.isFinite(rightTime)];
+  if (leftDated !== rightDated) return leftDated ? -1 : 1;
+  const timestampDifference = leftDated ? leftTime - rightTime : 0;
+  return (order === 'oldest' ? 1 : -1) * (timestampDifference || left.id.localeCompare(right.id));
+}
+
+function Report({ view, data, registerTableTools, documentId, actionsHost }) {
   const history = reportHistory(data);
   const target = history.find(row => row.id === documentId);
   const [selected, setSelected] = useState(() => target ? [target.id] : reportSelection.ids);
   const [filter, setFilter] = useState(() => target ? 'all' : reportSelection.verdict);
   const [range, setRange] = useState(() => target ? undefined : reportSelection.range);
+  const [order, setOrder] = useState(reportSelection.order);
   const [status, setStatus] = useState('pending');
-  const records = history.filter(row => (filter === 'all' || row.verdict === filter)
+  const tableView = view !== 'card';
+  const records = history.filter(row => (!tableView || filter === 'all' || row.verdict === filter)
     && (!range || row.at && inDateRange(reportDate(row.at), range)));
   const sorting = useTableSort(records);
-  const selectedRows = records.filter(row => selected.includes(row.id));
-  const tableView = view !== 'card';
+  const shown = tableView ? sorting.rows : records.toSorted((left, right) => compareJudgments(left, right, order));
+  const selectedRows = (tableView ? records : shown).filter(row => selected.includes(row.id));
   function changeFilter(value) {
     reportSelection.verdict = value;
     setFilter(value);
@@ -411,6 +425,10 @@ function Report({ view, data, appearance, registerTableTools, documentId, action
   function changeRange(value) {
     reportSelection.range = value;
     setRange(value);
+  }
+  function changeOrder(value) {
+    reportSelection.order = value;
+    setOrder(value);
   }
   function updateSelection(ids, checked) {
     const next = new Set(selected);
@@ -443,11 +461,13 @@ function Report({ view, data, appearance, registerTableTools, documentId, action
       ])),
   });
   const actions = {
-    filter: { label: '판정 결과', options: verdictChoices, value: filter, onChange: changeFilter },
+    filter: tableView ? { label: '판정 결과', options: verdictChoices, value: filter, onChange: changeFilter } : undefined,
+    sort: tableView ? undefined : { options: reportSortOptions, value: order, defaultValue: 'recent', onChange: changeOrder },
     period: { asOf: reportDate(new Date()), range, onChange: changeRange },
+    panelDownload: !registerTableTools,
     entries: [
-      ...(records.length ? [csvEntry('표시 중인 판정 이력', 'aml-judgment-history', sorting.rows)] : []),
-      ...(history.length > records.length ? [csvEntry('전체 판정 이력', 'aml-judgment-history-all', history)] : []),
+      ...(records.length ? [csvEntry('표시 중인 판정 이력', 'judgment-history', shown)] : []),
+      ...(history.length > records.length ? [csvEntry('전체 판정 이력', 'judgment-history-all', history)] : []),
     ],
   };
   useEffect(() => registerTableTools?.(actions));
@@ -459,11 +479,15 @@ function Report({ view, data, appearance, registerTableTools, documentId, action
   const patterns = row => row.patterns.length ? row.patterns.map(pattern => <PatternTag emphasis="solid" key={pattern}>{pattern}</PatternTag>) : '자료 없음';
   return <Box as="section" className="screen-section workflow-report workflow-panel">
     {!tableView && <WorkflowQueryHeading title="판정 이력" summary={summary} tools={tools} />}
-    {view === 'card' ? <Box className="workflow-report-cards">
-      <MagicBento key={appearance.reduced} className="report-bento preview-tilt-cards" columns={4} rowHeight={0} gap={readWorkspaceGap()}
-        theme={appearance.theme} disableAnimations={appearance.reduced} intro={false} textAutoHide={false}
-        enableBorderGlow={false} enableSpotlight={false} enableStars={false} clickEffect={false}
-        items={records.map(row => ({ id: row.id, content: <RecordCard className="preview-case-card" label={row.id}
+    {!tableView ? <Box className="workflow-report-cards">
+      {reportColumns.map(result => {
+        const rows = shown.filter(row => row.verdict === result);
+        const label = `${verdictLabels[result]} 판정`;
+        return <Box as="section" className="workflow-report-lane" aria-label={label} key={result}>
+          <SectionDownloadHeading as="h3" entries={rows.length ? [csvEntry(label, `judgments-${result}`, rows)] : []}>
+            <VerdictTag verdict={result} /> <CountTag count={rows.length} />
+          </SectionDownloadHeading>
+          {rows.map(row => <RecordCard key={row.id} className="preview-case-card" label={row.id}
           verdict={row.verdict} selected={selected.includes(row.id)}>
           <CardHeader code={row.id} openRecord={false} selection={{
             checked: selected.includes(row.id), disabled: status === 'running',
@@ -477,7 +501,10 @@ function Report({ view, data, appearance, registerTableTools, documentId, action
             <Box as="dl"><Box><Box as="dt">대상 ID</Box><Box as="dd">{targets(row)}</Box></Box></Box>
             <ReportAudit row={row} />
           </Box>
-        </RecordCard> }))} />
+          </RecordCard>)}
+          {!rows.length && <Text tone="muted">표시할 판정이 없습니다.</Text>}
+        </Box>;
+      })}
     </Box> :
       <WorkflowTable label="판정 로그" title="판정 이력" tools={tools} scrollbarGutter="auto"
         cellAlignment="top" invertSelectedControls
@@ -511,7 +538,6 @@ function Report({ view, data, appearance, registerTableTools, documentId, action
             {!records.length && <TableRow><TableCell colSpan={6}>조회 조건과 일치하는 판정이 없습니다.</TableCell></TableRow>}
           </TableBody>
       </WorkflowTable>}
-    {!tableView && !records.length && <Text>조회 조건과 일치하는 판정이 없습니다.</Text>}
     {status !== 'pending' && <ResultStatus status={status} />}
     <ScreenActions host={actionsHost} stackOnNarrow><PrimaryButton tone="brand"
       disabled={selectedRows.length === 0 || status === 'running'} onHold={download}>AI 보고서 다운로드</PrimaryButton></ScreenActions>
@@ -523,7 +549,7 @@ function AlertEpisodeActions({ overview }) {
   const user = useSyncExternalStore(subscribePreviewUser, currentPreviewUser);
   if (!canManagePreviewEpisodes(user)) return null;
   return <ScreenActions host={overview.actionsHost}>
-    <PrimaryButton tone="inverse" aria-haspopup="dialog" onClick={() => setOpen(true)}>Episode로 묶기</PrimaryButton>
+    <PrimaryButton tone="brand" aria-haspopup="dialog" onClick={() => setOpen(true)}>Episode로 묶기</PrimaryButton>
     {open && <PreviewEpisodeDialog cases={overview.reportData.cases} save={overview.saveEpisode}
       onClose={saved => saved ? overview.refreshEpisode() : setOpen(false)} />}
   </ScreenActions>;
@@ -617,7 +643,6 @@ function Workflow({ kind, view, dashboard, overview, reason }) {
     {kind === 'backtest' ? <Backtest selectedRule={overview?.rule} registerTableTools={overview?.registerTableTools}
       actionsHost={overview?.actionsHost} /> : kind === 'report' &&
       <Report view={view} data={overview?.reportData} documentId={overview?.reportDocument}
-        appearance={appearance}
         registerTableTools={overview?.registerTableTools} actionsHost={overview?.actionsHost} />}
   </MotionConfig>;
 }

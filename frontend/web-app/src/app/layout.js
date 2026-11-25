@@ -183,7 +183,7 @@ function AccountControls() {
     'id="profile-context" class="account-text"',
   );
   const account = ProfileAvatarHTML(avatarUrl, '') + '\n    ' + context;
-  return BoxHTML(Divider() + DrawerChromeRow('account-controls sidebar-chrome',
+  return BoxHTML(DrawerChromeRow('account-controls sidebar-chrome',
     Button(account, { variant: 'account', surface: 'floating', shape: 'pill', attributes: 'id="account-toggle" aria-label="계정" aria-describedby="profile-context" aria-haspopup="dialog" aria-controls="account-dialog"' }),
     IconButton(Icon('settings'), '설정', 'id="settings-toggle" aria-haspopup="dialog" aria-controls="settings-dialog"', '', 'floating')),
   'class="account-footer"');

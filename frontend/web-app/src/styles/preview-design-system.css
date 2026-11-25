@@ -424,7 +424,7 @@
   --glass-edge: color-mix(in srgb, var(--text) 17%, transparent);
   --glass-border-strength: 0%;
   --glass-surface-edge: color-mix(in srgb, var(--glass-edge) var(--glass-border-strength), transparent);
-  --glass-material-frost: color-mix(in srgb, var(--information-panel-surface) 88%, transparent);
+  --glass-material-frost: color-mix(in srgb, var(--information-panel-surface) 80%, transparent);
   --glass-surface: color-mix(in srgb, var(--information-panel-surface) 44%, transparent);
   --glass-hover-tint: 9%;
   --glass-press-tint: 15%;
@@ -432,11 +432,11 @@
   --glass-strong: color-mix(in srgb, var(--text) var(--glass-press-tint), var(--glass-material-frost));
   --glass-shadow: light-dark(var(--aml-black-010), var(--aml-black-030));
   --glass-control-solid: light-dark(var(--aml-gray-095), var(--aml-gray-030));
-  --glass-control-face: color-mix(in srgb, var(--glass-control-solid) 76%, transparent);
+  --glass-control-face: color-mix(in srgb, var(--glass-control-solid) 64%, transparent);
   --glass-control-edge: color-mix(in srgb, light-dark(var(--aml-black-020), var(--aml-white-030)) var(--glass-border-strength), transparent);
   --floating-panel-face: light-dark(var(--information-panel-surface),
     color-mix(in srgb, var(--information-panel-surface), var(--aml-white-100) 5%));
-  --glass-shell-face: color-mix(in srgb, var(--floating-panel-face) 78%, transparent);
+  --glass-shell-face: color-mix(in srgb, var(--floating-panel-face) 66%, transparent);
   --glass-shell-edge: light-dark(var(--aml-black-010), var(--aml-white-020));
   --glass-shell-highlight: light-dark(var(--aml-white-080), var(--aml-white-020));
   --glass-shell-shadow: light-dark(rgb(28 47 69 / 18%), var(--aml-black-040));

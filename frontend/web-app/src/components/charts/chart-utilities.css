@@ -16,12 +16,17 @@
   left: var(--chart-tooltip-left);
   top: var(--chart-tooltip-top);
 }
+.bklit-tooltip-anchor[data-horizontal-viewport] {
+  inline-size: max-content;
+  max-inline-size: var(--chart-tooltip-viewport-width, 100%);
+  overflow-wrap: anywhere;
+}
 .bklit-tooltip-entrance { transform-origin: left top }
 .bklit-tooltip-entrance[data-flipped],
 .bklit-tooltip-panel[data-flipped] { transform-origin: right top }
 .bklit-tooltip-panel.glass {
   --glass-surface-face: var(--chart-tooltip-panel-background, var(--chart-tooltip-glass-face));
-  min-width: var(--chart-tooltip-min-width);
+  min-width: min(var(--chart-tooltip-min-width), var(--chart-tooltip-viewport-width, var(--chart-tooltip-min-width)));
   border: var(--aml-stroke-control) solid var(--glass-surface-edge);
   border-radius: var(--chart-tooltip-panel-radius, var(--aml-radius-card));
   transform: var(--chart-tooltip-panel-scale, none);

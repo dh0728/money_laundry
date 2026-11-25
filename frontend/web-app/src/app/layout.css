@@ -6,18 +6,23 @@
   scrollbar-gutter: stable;
   --unread-dot-size: var(--aml-space-8);
   --glass-optical-softness: var(--aml-space-4);
-  --glass-material-blur-radius: var(--aml-space-32);
+  --glass-material-blur-radius: var(--aml-space-8);
   --glass-material-blur: blur(var(--glass-material-blur-radius));
+  --glass-modal-backdrop: blur(var(--aml-space-4));
   --header-inset: var(--aml-density-gap);
   --workspace-inset: var(--aml-density-gap);
   --app-inline-gutter: max(0px, (100% - var(--aml-layout-max-width)) / 2);
   --workspace-gap: var(--aml-density-gap);
+  --workspace-panel-gap: max(var(--aml-space-8), var(--workspace-gap));
   --layer-workspace: var(--aml-layer-base);
   --layer-drawers: var(--aml-layer-popover);
   --layer-shell: var(--aml-layer-dialog);
   --scrollbar-size: var(--aml-space-8);
   --scrollbar-track: var(--glass-surface);
   --scrollbar-thumb: var(--muted-text);
+  --workspace-top-inset: min(var(--workspace-inset), var(--aml-space-4));
+  --workspace-full-block: max(0px, calc(100dvh - var(--header-height) - var(--workspace-top-inset)));
+  --workspace-footer-inset: var(--app-footer-height, var(--account-footer-reserve));
   --workspace-available-block: max(0px, calc(100dvh - var(--header-height) - 2 * var(--workspace-inset)));
   --workspace-list-limit: max(var(--workspace-panel-min-height), var(--workspace-available-block));
   --ui-font-size: var(--aml-density-body-size);
@@ -40,6 +45,7 @@
   --sidebar-width: var(--aml-density-drawer-width);
   --inbox-width: var(--aml-density-drawer-width);
   color-scheme: light;
+  scroll-padding-block-end: var(--workspace-footer-inset);
 }
 
 :root[data-theme="dark"] {
@@ -55,6 +61,7 @@
   --glass-shell-edge: var(--glass-surface-edge);
   --glass-shell-muted: var(--muted-text);
   --glass-shell-scrim: var(--backdrop);
+  --glass-modal-backdrop: blur(var(--aml-space-16));
   --panel-glass-opacity: 100%;
   --floating-sheen: none;
   --floating-rim: inset 0 0 0 var(--aml-stroke-control) var(--glass-control-edge);
@@ -216,9 +223,14 @@ body {
 [data-drawer-button]:is(:hover, :focus-visible) .idle-icon { display: none }
 [data-drawer-button]:is(:hover, :focus-visible) .alternate-icon { display: block }
 
+:is(.app-header, .app-footer) {
+  position: fixed;
+  background: none;
+  pointer-events: none;
+  z-index: var(--layer-shell);
+}
 .app-header {
   --header-rail-width: var(--sidebar-width);
-  position: fixed;
   --header-side-track: max(var(--header-rail-width), var(--app-inline-gutter));
   --header-right-track: var(--header-side-track);
   inset-block-start: 0;
@@ -228,8 +240,6 @@ body {
   grid-template-columns: var(--header-side-track) minmax(0, 1fr) var(--header-right-track);
   grid-template-areas: "left center right";
   align-items: center;
-  z-index: var(--layer-shell);
-  pointer-events: none;
 }
 .header-frame { display: flex; align-items: center; gap: var(--header-inset); min-width: 0 }
 .header-frame--left { grid-area: left; justify-content: flex-start }
@@ -289,16 +299,16 @@ body:has(#sidebar:not([hidden])) .sidebar-chrome .drawer-chrome__primary > .butt
   min-block-size: var(--header-control-size);
   block-size: var(--header-control-size);
 }
-.drawer-chrome:where(body:has(#sidebar:not([hidden])) .sidebar-chrome, .inbox-header:has(#inbox-toggle[aria-expanded="true"])) .button {
+.app-header .drawer-chrome:where(body:has(#sidebar:not([hidden])) .sidebar-chrome, .inbox-header:has(#inbox-toggle[aria-expanded="true"])) .button {
   background: var(--drawer-chrome-action-background, transparent);
   box-shadow: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
-.drawer-chrome:where(body:has(#sidebar:not([hidden])) .sidebar-chrome, .inbox-header:has(#inbox-toggle[aria-expanded="true"])) .button:where(:hover:not(:disabled, [aria-disabled="true"])) {
+.app-header .drawer-chrome:where(body:has(#sidebar:not([hidden])) .sidebar-chrome, .inbox-header:has(#inbox-toggle[aria-expanded="true"])) .button:where(:hover:not(:disabled, [aria-disabled="true"])) {
   --drawer-chrome-action-background: var(--hover);
 }
-.drawer-chrome:where(body:has(#sidebar:not([hidden])) .sidebar-chrome, .inbox-header:has(#inbox-toggle[aria-expanded="true"])) .button:where(:active:not(:disabled, [aria-disabled="true"])) {
+.app-header .drawer-chrome:where(body:has(#sidebar:not([hidden])) .sidebar-chrome, .inbox-header:has(#inbox-toggle[aria-expanded="true"])) .button:where(:active:not(:disabled, [aria-disabled="true"])) {
   --drawer-chrome-action-background: var(--pressed);
 }
 .brand {
@@ -371,7 +381,7 @@ body:has(#sidebar:not([hidden])) .sidebar-chrome .drawer-chrome__primary > .butt
   }
 }
 :is(.sidebar, .glass-dialog) {
-  --glass-optical-softness: var(--aml-space-10);
+  --glass-optical-softness: var(--aml-space-6);
   --glass-surface-face: var(--glass-shell-face);
   --muted-text: var(--glass-shell-muted);
   box-shadow: var(--shadow-overlay);
@@ -522,13 +532,10 @@ body:has(#sidebar:not([hidden])) .sidebar-chrome .drawer-chrome__primary > .butt
 }
 
 .app-footer {
-  position: fixed;
   inset: auto 0 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: end;
-  pointer-events: none;
-  z-index: var(--layer-shell);
 }
 .account-footer {
   grid-column: 1;
@@ -536,15 +543,6 @@ body:has(#sidebar:not([hidden])) .sidebar-chrome .drawer-chrome__primary > .butt
   inline-size: min(var(--sidebar-width), 100vw);
   display: flex;
   flex-direction: column;
-}
-.account-footer > .divider { z-index: var(--layer-local-overlay) }
-body:has(#sidebar[hidden]) .account-footer .divider { display: none }
-body:has(#sidebar:not([hidden])) .account-footer {
-  box-shadow: inset calc(-1 * var(--aml-stroke-divider)) 0 var(--glass-shell-edge);
-  border-end-end-radius: var(--aml-radius-panel);
-  background: var(--glass-shell-face);
-  -webkit-backdrop-filter: var(--glass-material-blur);
-  backdrop-filter: var(--glass-material-blur);
 }
 .account-controls { padding-block: var(--header-inset) }
 body:has(#sidebar[hidden]) #account-toggle { --glass-surface-face: var(--glass-control-face) }
@@ -666,8 +664,8 @@ body:has(#sidebar[hidden]) #account-toggle { --glass-surface-face: var(--glass-c
 .glass-dialog[open] { display: flex; flex-direction: column }
 .glass-dialog::backdrop {
   background: var(--glass-shell-scrim);
-  backdrop-filter: blur(var(--aml-space-16));
-  -webkit-backdrop-filter: blur(var(--aml-space-16));
+  backdrop-filter: var(--glass-modal-backdrop);
+  -webkit-backdrop-filter: var(--glass-modal-backdrop);
 }
 html:has(dialog:modal, #sidebar:not([hidden]), #inbox:not([hidden])) {
   overflow: hidden;
@@ -755,12 +753,14 @@ html:has(dialog:modal, #sidebar:not([hidden]), #inbox:not([hidden])) {
 }
 .screen-layout {
   margin: var(--header-height) 0 0;
-  padding: min(var(--workspace-inset), var(--aml-space-4)) var(--workspace-inset) var(--workspace-inset);
+  padding: var(--workspace-top-inset) var(--workspace-inset) var(--workspace-inset);
   display: grid;
   align-content: start;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--workspace-gap);
+  gap: var(--workspace-panel-gap);
   min-height: calc(100dvh - var(--header-height));
+  block-size: var(--workspace-scroll-block-size, auto);
+  overflow-block: var(--workspace-scroll-block-overflow, visible);
 }
 .screen-layout > [data-workflow] { display: grid; min-width: 0 }
 .screen-layout h1 {
@@ -796,7 +796,7 @@ html:has(dialog:modal, #sidebar:not([hidden]), #inbox:not([hidden])) {
 }
 :is(.screen-panel, .screen-overlay, .screen-section) h2 { margin: 0; font-size: var(--ui-font-size) }
 .screen-section { min-inline-size: 0 }
-.screen-row { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--workspace-gap) }
+.screen-row { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--workspace-panel-gap) }
 .screen-two-column, .screen-cards { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)) }
 .screen-two-column { grid-template-columns: repeat(2, minmax(0, 1fr)) }
 .screen-board > .screen-panel { min-block-size: clamp(var(--workspace-panel-min-height), calc(var(--workspace-available-block) / 3), var(--workspace-panel-max-height)) }
@@ -804,7 +804,7 @@ html:has(dialog:modal, #sidebar:not([hidden]), #inbox:not([hidden])) {
 .screen-rule-list { grid-template-columns: minmax(0, 4fr) minmax(0, 1fr) }
 .screen-analysis { grid-template-columns: minmax(0, 1fr) minmax(0, 3fr) minmax(0, 1fr) }
 .screen-related { grid-template-columns: var(--workspace-related-list-share) minmax(0, 1fr) }
-.screen-related > div { display: grid; gap: var(--workspace-gap) }
+.screen-related > div { display: grid; gap: var(--workspace-panel-gap) }
 .screen-tall > .screen-panel { min-block-size: clamp(var(--workspace-panel-min-height), calc(var(--workspace-available-block) / 2), var(--workspace-tall-panel-max-height)) }
 .screen-graph { min-block-size: clamp(var(--workspace-panel-min-height), calc(var(--workspace-available-block) / 2), var(--workspace-panel-max-height)) }
 .screen-overlay { width: min(var(--workspace-overlay-width), 100%); min-height: var(--workspace-overlay-min-height); justify-self: center }
@@ -815,11 +815,23 @@ html:has(dialog:modal, #sidebar:not([hidden]), #inbox:not([hidden])) {
 .case-list-panel .case-list, .screen-entries .entry-list { flex: 1; min-block-size: 0 }
 .case-list-panel .case-list { block-size: var(--workspace-list-limit) }
 @media (min-width: 769px) and (min-height: 481px) {
-  .screen-layout:has(> [data-investigation-component="cards"], > .screen-entries) {
-    block-size: calc(100dvh - var(--header-height));
+  .screen-layout[data-workspace-scroll="panels"] {
     grid-template-rows: auto minmax(0, 1fr);
+    padding-block-end: 0;
+  }
+  #workspace:has(> .screen-layout[data-workspace-scroll="panels"]) {
+    --workspace-scroll-block-size: calc(100dvh - var(--header-height));
+    --workspace-scroll-block-overflow: clip;
+    --workspace-scroll-footer-reserve: 0px;
   }
   .case-list-panel .case-list { block-size: auto }
+}
+@media (min-width: 1121px) and (min-height: 481px) {
+  #workspace:has(> .screen-layout[data-workspace-scroll="wide-panels"]) {
+    --workspace-scroll-block-size: calc(100dvh - var(--header-height));
+    --workspace-scroll-block-overflow: clip;
+    --workspace-scroll-footer-reserve: 0px;
+  }
 }
 .entry-list .row { width: 100%; font-weight: var(--aml-type-body-weight) }
 .entry-list .row[data-verdict] {
@@ -894,16 +906,13 @@ body:has(#inbox:not([hidden])) #footer-actions {
   padding-block: var(--header-inset);
 }
 #footer-pagination:empty { display: none }
-body:has(#footer-pagination > *) #workspace {
-  padding-block-end: calc(var(--account-control-size) + 2 * var(--header-inset));
+body:has(:is(#footer-pagination, #footer-actions) > *) #workspace {
+  padding-block-end: var(--workspace-scroll-footer-reserve, var(--workspace-footer-inset));
 }
 @media (width < 720px) {
   .app-footer:has(#footer-pagination > *) #footer-pagination {
     grid-column: 1 / -1;
     grid-row: 2;
-  }
-  body:has(#footer-pagination > *) #workspace {
-    padding-block-end: calc(2 * (var(--account-control-size) + 2 * var(--header-inset)));
   }
 }
 .case-judgment-mount:empty { display: none }

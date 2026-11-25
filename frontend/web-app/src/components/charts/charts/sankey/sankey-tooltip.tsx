@@ -1,6 +1,7 @@
 "use client";
 
 import type { SankeyLink, SankeyNode } from "d3-sankey";
+import type { RefObject } from "react";
 import { intFmt } from "../chart-formatters";
 import { TooltipBox } from "../tooltip/tooltip-box";
 import { TooltipContent, type TooltipRow } from "../tooltip/tooltip-content";
@@ -37,6 +38,8 @@ export interface SankeyTooltipProps {
   className?: string;
   /** Class applied to the tooltip panel. */
   panelClassName?: string;
+  /** Scroller whose visible width the tooltip should fit. */
+  horizontalViewportRef?: RefObject<HTMLElement | null>;
   /** Fade the panel out when hover ends. Default: true */
   exit?: boolean;
   /** Scale/fade the panel in when it opens. Default: true */
@@ -49,6 +52,7 @@ export function SankeyTooltip({
   formatValue = intFmt,
   className = "",
   panelClassName,
+  horizontalViewportRef,
   exit = true,
   entrance = true,
 }: SankeyTooltipProps) {
@@ -124,6 +128,7 @@ export function SankeyTooltip({
       containerHeight={height}
       containerRef={containerRef}
       containerWidth={width}
+      horizontalViewportRef={horizontalViewportRef}
       animate={entrance}
       entrance={entrance}
       exit={exit}

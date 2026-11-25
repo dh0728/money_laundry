@@ -122,6 +122,7 @@ export function useLedgerList(load, key) {
   const [state, setState] = useState({ key, pages: [], status: 'loading' });
   const [request, setRequest] = useState({ key, page: 0, attempt: 0 });
   const current = request.key === key ? request : { key, page: 0, attempt: 0 };
+  if (current !== request) setRequest(current);
   const loadRef = useRef(load);
   useEffect(() => { loadRef.current = load; });
   useEffect(() => {

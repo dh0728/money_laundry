@@ -12,7 +12,7 @@ export interface TooltipRow {
 
 export interface TooltipContentProps {
   title?: string;
-  rows: TooltipRow[];
+  rows?: TooltipRow[];
   /** Optional additional content (e.g., markers) */
   children?: ReactNode;
 }
@@ -41,7 +41,7 @@ export function TooltipHeader({ children, className }: TooltipHeaderProps) {
 
 TooltipHeader.displayName = "TooltipHeader";
 
-export function TooltipContent({ title, rows, children }: TooltipContentProps) {
+export function TooltipContent({ title, rows = [], children }: TooltipContentProps) {
   const hasBody = rows.length > 0 || Boolean(children);
   return (
     <div>

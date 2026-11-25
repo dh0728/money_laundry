@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { sankey } from 'd3-sankey';
 import { Box, Text } from '@/components/layout-primitives';
 import { SankeyChart } from './sankey-chart';
@@ -6,6 +6,7 @@ import { useSankey } from './sankey-context';
 import { SankeyLink } from './sankey-link';
 import { SankeyNode } from './sankey-node';
 import { SankeyTooltip } from './sankey-tooltip';
+import { TooltipContent } from '../tooltip/tooltip-content';
 import { readChartNumber } from '../../chart-design-values';
 
 const formatCount = new Intl.NumberFormat('ko-KR');
@@ -64,13 +65,13 @@ function Labels() {
 }
 
 function TooltipValue({ title, count, unit, note }) {
-  return <Box>
-    <Text as="strong">{title}</Text>
+  return <TooltipContent title={title}>
     <Text tone="muted">{[countLabel(count, unit), note].filter(Boolean).join(' · ')}</Text>
-  </Box>;
+  </TooltipContent>;
 }
 
 export function StagedSankey({ data, stages, label, reduced }) {
+  const scrollerRef = useRef(null);
   const layout = useMemo(() => layoutFor(stages.length), [stages.length]);
   const [design] = useState(() => {
     const inset = readChartNumber('--aml-space-8', 8);
@@ -81,7 +82,7 @@ export function StagedSankey({ data, stages, label, reduced }) {
       linkOpacity: readChartNumber('--chart-sankey-link-opacity', 0.3),
     };
   });
-  return <Box className="staged-sankey-scroller">
+  return <Box ref={scrollerRef} className="staged-sankey-scroller">
     <Box className="staged-sankey-content">
       <Box className="staged-sankey-stages" data-stage-count={stages.length}>
         {stages.map(name => <Text as="span" key={name}>{name}</Text>)}
@@ -91,7 +92,7 @@ export function StagedSankey({ data, stages, label, reduced }) {
         <SankeyLink reveal={!reduced} useGradient={false} strokeOpacity={design.linkOpacity} getLinkColor={link => link.color ?? link.target.color} />
         <SankeyNode showLabels={false} showValueLabels={false} getNodeColor={nodeColor} />
         <Labels />
-        <SankeyTooltip entrance={!reduced} exit={!reduced}
+        <SankeyTooltip horizontalViewportRef={scrollerRef} entrance={!reduced} exit={!reduced}
           nodeContent={({ node }) => <TooltipValue title={node.name} count={node.count} unit={node.unit} note={node.detail ?? node.ratio} />}
           linkContent={({ link }) => <TooltipValue title={link.source.name + ' → ' + link.target.name} count={link.count}
             unit={link.unit} note={link.note} />} />

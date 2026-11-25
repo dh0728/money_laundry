@@ -15,6 +15,10 @@ pre-commit:
       root: frontend/web-app/
       glob: "*.{js,jsx,ts,tsx,css,mjs,json}"
       run: pnpm run lint:design:staged
+    workspace-scroll:
+      root: frontend/web-app/
+      glob: "*.{js,jsx,ts,tsx,css,mjs,json,html}"
+      run: pnpm run test:scroll
 
 pre-push:
   commands:

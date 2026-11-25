@@ -14,6 +14,7 @@
     "lint:design": "node scripts/design-report.mjs",
     "lint:design:staged": "node scripts/design-report-staged.mjs",
     "test": "vitest run",
+    "test:scroll": "node scripts/check-scroll-ownership.mjs",
     "preview": "vite preview",
     "storybook": "storybook dev --host 127.0.0.1 --port 6006 --no-open --ci --disable-telemetry",
     "build-storybook": "storybook build --disable-telemetry",

@@ -206,6 +206,7 @@
   --dashboard-personal-flow-min-width: 36rem;
   --dashboard-history-min-height: 12rem;
   --dashboard-history-max-height: 18rem;
+  --dashboard-staff-visible-rows: 7;
   --alert-status-chart-height: 260px;
   --alert-status-category-gap: 18%;
   --alert-status-axis-tick-gap: 28px;

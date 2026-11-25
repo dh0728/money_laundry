@@ -1,6 +1,7 @@
 import React, { useLayoutEffect, useMemo, useRef, useSyncExternalStore, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { SearchField } from '../../components/search-field';
+import GlideSelect from '../../components/react-bits/GlideSelect';
 import { TableBody, TableCell, TableColumns, TableHead, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
 import { CardHeader } from '../../components/card-header';
 import { RecordCard, recordCardSurface } from '../../components/record-card';
@@ -13,10 +14,10 @@ import { ActionButton, WorkTabAddButton } from '../../components/primary-button'
 import AnimatedList from '../../components/react-bits/AnimatedList';
 import { BorderGlowEdge } from '../../components/react-bits/BorderGlow';
 import { TableBranchToggle, TableFieldLabel, TableRecordCell, WorkflowTable } from '../../components/workflow-table';
-import { csvDownloadEntry, exportCases, TableQueryTools } from '../../components/query-controls';
-import { BoardSectionDownload, SectionDownload, SectionDownloadHeading } from '../../components/section-download';
+import { csvDownloadEntry, TableQueryTools } from '../../components/query-controls';
+import { SectionDownload, SectionDownloadHeading } from '../../components/section-download';
 import './investigation-components.css';
-import { Box, Heading, Text } from '@/components/layout-primitives';
+import { Box, Text } from '@/components/layout-primitives';
 import { FlowConnectionOverlay, TransactionDirectionArrow } from '@/components/charts/charts/transaction-flow-graphics';
 
 export { sampleTransactions } from '../../mocks/transaction-fixtures';
@@ -132,6 +133,7 @@ function List({ label, items, selected, onSelect, reduced, renderItem, renderIte
   return <Box ref={listRef} className={`ledger-scroll-shell ${className}`}>
     <AnimatedList ariaLabel={label} items={items} initialSelectedIndex={selected} renderItem={renderItem} itemData={itemData}
       itemClassName={itemData ? 'border-glow-card border-glow-card--record' : undefined}
+      viewportClassName={itemData ? 'record-card-scroll' : undefined}
       itemDecoration={itemData ? <BorderGlowEdge /> : undefined}
       renderItemHeader={renderItemHeader} selectOnHover={false}
       animation={reduced ? 'none' : renderItemHeader ? 'fade' : 'pop'} stagger={0.035} animateOnce showGradients={false} frame={false}
@@ -195,7 +197,7 @@ export function TransactionCard({ record, onAction }) {
 }
 
 function CaseList({ entries, transaction }) {
-  return <Box className="case-list">
+  return <Box className="case-list record-card-scroll">
     {entries.map(row =>
       <Box className="list-item-enter" key={row.code}>
         <PreviewCaseCard row={row} selectedTransaction={transaction} />
@@ -276,10 +278,20 @@ function LedgerRecordId({ code, addable = true, ...buttonProps }) {
   </TableRecordCell>;
 }
 
-/** 상단 작업 코드 검색과 같은 pill 검색 필드(.search-field)를 쓴다. */
-function LedgerSearch({ label, value, onChange, placeholder, disabled }) {
-  return <SearchField variant="compact" className="ledger-search" label={label} placeholder={placeholder} value={value} disabled={disabled}
-    onChange={event => onChange(event.target.value)} />;
+const ledgerSearchOptions = [
+  { value: 'owner', label: '소유주' },
+  { value: 'account', label: '계좌' },
+  { value: 'transaction', label: '거래' },
+];
+
+function LedgerSearch({ target, query, onChange }) {
+  const label = `${target.label} 검색`;
+  return <Box className="ledger-search-bar" role="group" aria-label="원장 목록 검색">
+    <GlideSelect ariaLabel="원장 검색 대상" options={ledgerSearchOptions} value={target.value}
+      onChange={value => onChange({ target: value, query: '' })} />
+    <SearchField variant="compact" label={label} placeholder={label} value={query}
+      onChange={event => onChange({ target: target.value, query: event.target.value })} />
+  </Box>;
 }
 
 function LedgerListStatus({ list, empty }) {
@@ -311,22 +323,74 @@ function LedgerMoreRow({ label, list, level }) {
   </TableRow>;
 }
 
-function LedgerHierarchy({ owners, accounts, transactions, selection, select, queries }) {
+function LedgerHierarchy({ owners, accounts, transactions, selection, select, search, searchTarget, filtering }) {
   const scroll = useRef(null);
   const selectedRow = useRef(null);
   const { owner, account, transaction } = selection;
   const records = transactions.items;
+  const transactionResults = searchTarget === 'transaction' && !account;
+  const accountResults = searchTarget === 'account' && !owner;
+  const resultList = transactionResults ? transactions : accountResults ? accounts : owners;
+  // A search can reveal an ancestor outside the first page. Leave its open branch visible when switching targets.
+  const withOpenBranch = (rows, current, target) => current && (!filtering || searchTarget !== target) && !rows.some(row => row.id === current.id)
+    ? [current, ...rows] : rows;
   const ownerOpen = row => owner?.id === row.id;
   const summary = <>
-    <CountTag label="소유주" count={owners.items.length} total={owners.total} unit="명" />
-    {owner && <CountTag label="계좌" count={accounts.items.length} total={accounts.total} unit="개" />}
-    {account && <CountTag label="거래" count={records.length} total={transactions.total} />}
+    {!transactionResults && !accountResults && <CountTag label="소유주" count={owners.items.length} total={owners.total} unit="명" />}
+    {!transactionResults && (owner || accountResults) && <CountTag label="계좌" count={accounts.items.length} total={accounts.total} unit="개" />}
+    {(account || transactionResults) && <CountTag label="거래" count={records.length} total={transactions.total} />}
   </>;
   const entries = [
-    ownerDownload(owners.items),
-    ...(owner ? [accountDownload(accounts.items)] : []),
-    ...(account ? [transactionDownload(records, account)] : []),
-  ].filter(entry => !entry.disabled);
+    !transactionResults && !accountResults && ownerDownload(owners.items),
+    !transactionResults && (owner || accountResults) && accountDownload(accounts.items),
+    (account || transactionResults) && transactionDownload(records, account),
+  ].filter(entry => entry && !entry.disabled);
+
+  const emptyRow = (list, label) => list.status === 'success' && list.items.length === 0 && <TableRow>
+    <TableCell colSpan={ledgerColumns.length}>조건과 일치하는 {label} 검색 결과가 없습니다.</TableCell>
+  </TableRow>;
+
+  function transactionRows(ownerName, accountLabel) {
+    return <>
+      {records.map(record => {
+        const active = transaction?.id === record.id;
+        const subject = record.incoming ? record.to : record.from;
+        return <TableRow key={record.id} level={3} ref={active ? selectedRow : undefined} data-selected={active || undefined}>
+          <TableCell>{!ownerName && subject.owner}</TableCell>
+          <TableCell>{!accountLabel && <Text as="code">{subject.code}</Text>}</TableCell>
+          <LedgerRecordId code={record.code} addable={record.openable} aria-pressed={active}
+            aria-description={`${ownerName || subject.owner} · ${accountLabel || subject.code}`} onClick={() => select.transaction(record)} />
+          <TableCell><Text as="time" dateTime={`${record.timestamp.replace(' ', 'T')}+09:00`}>{record.timestamp}</Text></TableCell>
+          <TableCell>{transactionDirection(record)}</TableCell>
+          <TableCell><Text as="code">{counterpartyCode(record)}</Text></TableCell>
+          <TableCell numeric>{amountFormat.format(record.amount)} {record.currency}</TableCell>
+          <TableCell>{record.method}</TableCell>
+          <TableCell><VerdictTag verdict={record.verdict} /></TableCell>
+        </TableRow>;
+      })}
+      {emptyRow(transactions, '거래')}
+      <LedgerMoreRow label={accountLabel ? `${accountLabel} 거래` : '거래'} list={transactions} level={3} />
+    </>;
+  }
+
+  function accountRows(ownerName) {
+    return <>
+      {withOpenBranch(accounts.items, account, 'account').map(item => {
+        const open = account?.id === item.id;
+        return <React.Fragment key={item.id}>
+          <TableRow level={2}>
+            <TableCell>{!ownerName && item.ownerName}</TableCell>
+            <TableRowHead><TableBranchToggle label={`${item.label}의 거래`} expanded={open}
+              onClick={() => select.account(open ? null : item)}><Text as="code" title={item.id}>{item.label}</Text></TableBranchToggle></TableRowHead>
+            <TableCell colSpan={ledgerColumns.length - 2} />
+          </TableRow>
+          {open && transactionRows(ownerName || item.ownerName, item.label)}
+        </React.Fragment>;
+      })}
+      {emptyRow(accounts, '계좌')}
+      <LedgerMoreRow label={ownerName ? `${ownerName} 계좌` : '계좌'} list={accounts} level={2} />
+    </>;
+  }
 
   useLayoutEffect(() => {
     const viewport = scroll.current;
@@ -344,60 +408,27 @@ function LedgerHierarchy({ owners, accounts, transactions, selection, select, qu
   }, [transaction?.id]);
 
   return <Box className="ledger-hierarchy">
-    <Box className="ledger-table-controls" role="group" aria-label="원장 목록 검색">
-      {[['소유주', queries.owner, true], ['계좌', queries.account, Boolean(owner)], ['거래', queries.transaction, Boolean(account)]]
-        .map(([label, query, enabled]) => <LedgerSearch key={label} label={`${label} 검색`}
-          placeholder={enabled ? `${label} 검색` : `${label} 검색 · 상위 항목을 먼저 선택`} value={query.value} onChange={query.set}
-          disabled={!enabled} />)}
-    </Box>
+    {search}
     <WorkflowTable hierarchy scrollRef={scroll} label="통합 테이블" summary={summary}
-      tools={entries.length > 0 && <TableQueryTools actions={{ entries }} />}>
+      tools={entries.length > 0 && <TableQueryTools actions={{ entries, panelDownload: Boolean(transaction) }} />}>
       <TableColumns widths={ledgerColumns.map(([key, , width]) => ({ key, width: `${width}%` }))} />
       <LedgerColumns columns={ledgerColumns} />
       <TableBody>
-      {owners.items.map(row => <React.Fragment key={row.id}>
+      {transactionResults && transactionRows()}
+      {accountResults && accountRows()}
+      {!transactionResults && !accountResults && withOpenBranch(owners.items, owner, 'owner').map(row => <React.Fragment key={row.id}>
         <TableRow level={1}>
           <TableRowHead scope="rowgroup"><TableBranchToggle label={`${row.name}의 계좌`} expanded={ownerOpen(row)}
             onClick={() => select.owner(ownerOpen(row) ? null : row)}>{row.name}</TableBranchToggle></TableRowHead>
           <TableCell colSpan={ledgerColumns.length - 1} />
         </TableRow>
-        {ownerOpen(row) && <>
-          {accounts.items.map(item => {
-            const open = account?.id === item.id;
-            return <React.Fragment key={item.id}>
-              <TableRow level={2}>
-                <TableCell aria-hidden="true" />
-                <TableRowHead><TableBranchToggle label={`${item.label}의 거래`} expanded={open}
-                  onClick={() => select.account(open ? null : item)}><Text as="code" title={item.id}>{item.label}</Text></TableBranchToggle></TableRowHead>
-                <TableCell colSpan={ledgerColumns.length - 2} />
-              </TableRow>
-              {open && records.map(record => {
-                const active = transaction?.id === record.id;
-                return <TableRow key={record.id} level={3} ref={active ? selectedRow : undefined} data-selected={active || undefined}>
-                  <TableCell aria-hidden="true" /><TableCell aria-hidden="true" />
-                  <LedgerRecordId code={record.code} addable={record.openable} aria-pressed={active}
-                    aria-description={`${row.name} · ${item.label}`} onClick={() => select.transaction(record)} />
-                  <TableCell><Text as="time" dateTime={`${record.timestamp.replace(' ', 'T')}+09:00`}>{record.timestamp}</Text></TableCell>
-                  <TableCell>{transactionDirection(record)}</TableCell>
-                  <TableCell><Text as="code">{counterpartyCode(record)}</Text></TableCell>
-                  <TableCell numeric>{amountFormat.format(record.amount)} {record.currency}</TableCell>
-                  <TableCell>{record.method}</TableCell>
-                  <TableCell><VerdictTag verdict={record.verdict} /></TableCell>
-                </TableRow>;
-              })}
-              {open && <LedgerMoreRow label={`${item.label} 거래`} list={transactions} level={3} />}
-            </React.Fragment>;
-          })}
-          <LedgerMoreRow label={`${row.name} 계좌`} list={accounts} level={2} />
-        </>}
+        {ownerOpen(row) && accountRows(row.name)}
       </React.Fragment>)}
-        {owners.status === 'success' && !owners.items.length && <TableRow>
-          <TableCell colSpan={ledgerColumns.length}>조건과 일치하는 소유주가 없습니다.</TableCell>
-        </TableRow>}
-        <LedgerMoreRow label="소유주" list={owners} level={1} />
+        {!transactionResults && !accountResults && emptyRow(owners, '소유주')}
+        {!transactionResults && !accountResults && <LedgerMoreRow label="소유주" list={owners} level={1} />}
       </TableBody>
     </WorkflowTable>
-    <LedgerListStatus list={owners} empty="" />
+    <LedgerListStatus list={resultList} empty="" />
   </Box>;
 }
 
@@ -449,12 +480,16 @@ export function LedgerWorkspace({ source, code, caseRows, tableView = false, tar
   const [owner, setOwner] = useState(initial?.owner ?? null);
   const [account, setAccount] = useState(initial?.account ?? null);
   const [transaction, setTransaction] = useState(initial?.transaction ?? null);
-  const [ownerQuery, setOwnerQuery] = useState('');
-  const [accountQuery, setAccountQuery] = useState('');
-  const [transactionQuery, setTransactionQuery] = useState(() => targetTransaction ? String(targetTransaction.txId) : '');
-  const ownerSearch = useDebouncedValue(ownerQuery);
-  const accountSearch = useDebouncedValue(accountQuery);
-  const transactionSearch = useDebouncedValue(transactionQuery);
+  const [search, setSearch] = useState(() => targetTransaction
+    ? { target: 'transaction', query: String(targetTransaction.txId) }
+    : { target: 'owner', query: '' });
+  const openedTarget = targetTransaction && transaction?.code === targetTransaction.code;
+  const searchTarget = ledgerSearchOptions.find(option => option.value === search.target);
+  const debouncedSearch = useDebouncedValue(search);
+  const searchQuery = target => searchTarget.value === target && debouncedSearch.target === target ? debouncedSearch.query : '';
+  const ownerSearch = searchQuery('owner');
+  const accountSearch = searchQuery('account');
+  const transactionSearch = searchQuery('transaction');
   const ownerKey = JSON.stringify([ownerSearch]);
   const accountKey = JSON.stringify([owner?.id ?? null, accountSearch]);
   const transactionKey = JSON.stringify([owner?.id ?? null, account?.id ?? null, transactionSearch]);
@@ -470,26 +505,26 @@ export function LedgerWorkspace({ source, code, caseRows, tableView = false, tar
   const select = {
     owner: row => {
       if ((row?.id ?? null) === (owner?.id ?? null)) return;
+      if (tableView && (search.target === 'transaction' || (!row && search.target === 'account'))) {
+        setSearch({ target: 'owner', query: '' });
+      }
       setOwner(row); setAccount(null); setTransaction(null);
     },
     account: row => {
       if ((row?.id ?? null) === (account?.id ?? null)) return;
+      if (tableView && !row && search.target === 'transaction') setSearch({ target: 'account', query: '' });
+      if (tableView && !owner && row?.ownerId) setOwner({ id: row.ownerId, name: row.ownerName });
       setAccount(row); setTransaction(null);
     },
     transaction: row => setTransaction(row),
   };
-  const queries = {
-    owner: { value: ownerQuery, set: setOwnerQuery },
-    account: { value: accountQuery, set: setAccountQuery },
-    transaction: { value: transactionQuery, set: setTransactionQuery },
-  };
   const selection = { owner, account, transaction };
-  const openedTarget = targetTransaction && transaction?.code === targetTransaction.code;
   const linkedCases = source.kind === 'server' && !openedTarget ? undefined : caseRows;
+  const searchBar = <LedgerSearch target={searchTarget} query={search.query} onChange={setSearch} />;
 
   if (tableView) return <Box className="ledger-tables" data-ledger-view="table" data-ledger-source={source.kind}>
     <LedgerHierarchy owners={owners} accounts={accounts} transactions={transactions} selection={selection}
-      select={select} queries={queries} />
+      select={select} search={searchBar} searchTarget={searchTarget.value} filtering={Boolean(searchQuery(searchTarget.value).trim())} />
     <LinkedCaseTable transaction={transaction} caseRows={linkedCases} />
   </Box>;
 
@@ -501,24 +536,24 @@ export function LedgerWorkspace({ source, code, caseRows, tableView = false, tar
   const transactionIndex = records.findIndex(row => row.id === transaction?.id);
   // 더 보기로 이어 붙일 때는 목록을 다시 만들지 않고, 새 조건의 첫 응답에서만 다시 만든다.
   const listKey = (list, key) => `${key}:${list.status === 'loading' ? 'loading' : 'ready'}`;
-  const pane = (name, title, suffix, list, query, emptyText, entry, content) =>
+  const pane = (name, title, suffix, list, emptyText, entry, content) =>
     <Box as="section" className={`ledger-pane ledger-${name}`} aria-labelledby={`ledger-${name}-title`} aria-busy={list.status === 'loading' || undefined}>
       <LedgerHeading id={`ledger-${name}-title`} title={title} count={list.items.length} total={list.total} suffix={suffix} entry={entry} />
-      <LedgerSearch label={`${title} 검색`} placeholder={`${title} 검색`} value={query.value} onChange={query.set} />
       <LedgerListStatus list={list} empty={emptyText} />
       {content}
       <LedgerMore label={title} list={list} />
     </Box>;
 
   return <Box className="ledger-components" data-ledger-view="cards" data-ledger-source={source.kind}>
-    {pane('owners', '소유주', '명', owners, queries.owner, '조건과 일치하는 소유주가 없습니다.', ownerDownload(ownerRows),
+    {searchBar}
+    {pane('owners', '소유주', '명', owners, '조건과 일치하는 소유주가 없습니다.', ownerDownload(ownerRows),
       <List key={listKey(owners, ownerKey)} label="소유주 목록" items={ownerRows.map(row => ({ id: row.id, title: row.name }))}
         selected={ownerIndex} reduced={reduced} onSelect={(_, index) => select.owner(ownerRows[index])} />)}
-    {pane('accounts', '계좌', '개', accounts, queries.account, '조건과 일치하는 계좌가 없습니다.', accountDownload(accountRows),
+    {pane('accounts', '계좌', '개', accounts, '조건과 일치하는 계좌가 없습니다.', accountDownload(accountRows),
       <List key={listKey(accounts, accountKey)} label={owner ? `${owner.name} 계좌 목록` : '계좌 목록'}
         items={accountRows.map(row => ({ id: row.id, title: row.label }))}
         selected={accountIndex} reduced={reduced} onSelect={(_, index) => select.account(accountRows[index])} />)}
-    {pane('transactions', '거래', '건', transactions, queries.transaction, '조건과 일치하는 거래가 없습니다.', transactionDownload(records, account),
+    {pane('transactions', '거래', '건', transactions, '조건과 일치하는 거래가 없습니다.', transactionDownload(records, account),
       <List key={listKey(transactions, transactionKey)} label={account ? `${account.label} 거래 목록` : '거래 목록'}
         items={records.map(record => ({ id: record.id, title: record.code }))}
         className="ledger-transaction-list" selected={transactionIndex} reduced={reduced}
@@ -546,11 +581,7 @@ export function CaseCards({ codes, label, caseRows }) {
   const reduced = useSyncExternalStore(subscribeAppearance, readReducedMotion);
   const rows = codes.map(code => caseRows.get(code)).filter(Boolean);
   return <Box as="section" className="screen-section case-list-panel" aria-label={label}>
-    {rows.length > 0 && <Box className="section-download-heading">
-      <Heading>{label}</Heading>
-      <BoardSectionDownload records={rows} label={label} onDownload={entries => exportCases(entries, 'case-board')} />
-    </Box>}
-    <CaseProgressBoard key={codes.join(',')} rows={rows} reduced={reduced} pageSize={8} />
+    <CaseProgressBoard key={codes.join(',')} rows={rows} reduced={reduced} pageSize={8} className="record-card-scroll" />
   </Box>;
 }
 

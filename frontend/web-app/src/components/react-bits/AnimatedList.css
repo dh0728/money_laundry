@@ -23,6 +23,12 @@
   outline: var(--aml-stroke-focus) solid var(--al-accent);
   outline-offset: var(--animated-list-focus-offset);
 }
+.animated-list:has(> .record-card-scroll:focus-visible [data-glow-surface][aria-selected="true"]) {
+  outline: none;
+}
+.record-card-scroll:focus-visible [data-glow-surface][aria-selected="true"] {
+  outline-color: var(--al-accent);
+}
 
 .animated-list__frame-rim {
   position: absolute;
@@ -202,6 +208,11 @@
     inset 0 0 0 var(--aml-stroke-divider) var(--al-tile-edge),
     inset 0 var(--aml-stroke-divider) 0 var(--al-tile-highlight);
   pointer-events: none;
+}
+
+.animated-list__item[data-glow-surface] > .animated-list__rim,
+.animated-list__track:has(> [data-glow-surface][data-selected]) > .animated-list__indicator {
+  visibility: hidden;
 }
 
 .animated-list__indicator {

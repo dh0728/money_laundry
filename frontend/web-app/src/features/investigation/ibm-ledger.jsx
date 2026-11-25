@@ -99,6 +99,7 @@ export function BenchmarkLedger({ dataset, code = '', filters, tableView = true,
   };
 
   const tools = rows.length > 0 && <TableQueryTools actions={{
+    panelDownload: false,
     entries: [ledgerEntry('조회된 원본 원장', 'ibm-hi-small-transactions', rows)],
   }} />;
 

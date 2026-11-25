@@ -219,6 +219,9 @@ function Utility(path) {
 export function ScreenLayout(path, { code = '', hasQuery = false, showCaseJudgment = false, content: customContent, source } = {}) {
   const categoryName = category(path);
   const route = caseRoute(path);
+  const scroll = customContent ? 'page'
+    : isLedgerScreen(path) || path === 'alert/overview-perpanel' ? 'wide-panels'
+    : categoryName === 'add-tab' ? 'panels' : 'page';
   const content = customContent ?? (route ? CaseDetail(path) : ({
     dashboard: Dashboard, 'rule-engine': RuleEngine, 'add-tab': InvestigationList,
     report: Report, utility: Utility,
@@ -240,7 +243,7 @@ export function ScreenLayout(path, { code = '', hasQuery = false, showCaseJudgme
     queryArea +
     content +
     (judgment ? BoxHTML('', 'class="case-judgment-mount" data-workflow="case-judgment"') : ''),
-    `class="screen-layout" data-figma-frame="${screenFrame(path)}"`, 'section',
+    `class="screen-layout" data-workspace-scroll="${scroll}" data-figma-frame="${screenFrame(path)}"`, 'section',
   );
 }
 

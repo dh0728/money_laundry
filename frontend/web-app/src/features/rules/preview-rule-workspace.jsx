@@ -249,6 +249,7 @@ export function RuleList({ reason = false, initialRule, registerTableTools, acti
   const ruleFilter = [{ value: 'all', label: '전체' }, ...breakdown.filter(row => row.count).map(({ value, label }) => ({ value, label }))];
   useEffect(() => registerTableTools?.({
     filter: { label: '룰 상태', options: ruleFilter, value: status, onChange: setStatus },
+    panelDownload: false,
     entries: [csvDownloadEntry('조회된 룰', 'rules', ['상태', '룰 ID', '룰 이름', '버전', '담당자'],
       sorting.rows.map(rule => [ruleStatusLabels[rule.status], rule.id, rule.name, rule.version, rule.author]))],
   }));

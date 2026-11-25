@@ -45,8 +45,8 @@ function EmptyState({ children, announce = false }) {
   return <Text className="case-progress-empty" role={announce ? 'status' : undefined}>{children}</Text>;
 }
 
-export function CaseProgressLanes({ renderLane, notice }) {
-  return <Box className="case-progress-board">
+export function CaseProgressLanes({ renderLane, notice, className = '' }) {
+  return <Box className={`case-progress-board ${className}`.trim()}>
     {notice}
     <Box className="case-progress-lanes" style={{ '--case-progress-columns': reviewStates.length }}>
       {reviewStates.map(renderLane)}
@@ -54,10 +54,12 @@ export function CaseProgressLanes({ renderLane, notice }) {
   </Box>;
 }
 
-export function CaseProgressBoard({ rows, reduced, theme, orderRows, showAssignee = true, pageSize, statusByCode }) {
+export function CaseProgressBoard({ rows, reduced, theme, orderRows, showAssignee = true, showLaneDownload = true,
+  pageSize, statusByCode, className }) {
   const [limits, setLimits] = React.useState({});
   const isEmpty = rows.length === 0;
   return <CaseProgressLanes
+    className={className}
     notice={isEmpty && <EmptyState announce>조회 조건에 해당하는 업무가 없습니다.</EmptyState>}
     renderLane={({ label, preset, value }) => {
         const matching = rows.filter(row => (statusByCode?.[row.code] ?? row.status) === value);
@@ -69,7 +71,7 @@ export function CaseProgressBoard({ rows, reduced, theme, orderRows, showAssigne
               <StatusTag preset={preset}>{label}</StatusTag>
               <CountTag count={Math.min(limit, cards.length)} total={cards.length} />
             </Heading>
-            {cards.length > 0 && <BoardSectionDownload records={cards} label={`${label} 업무`}
+            {showLaneDownload && cards.length > 0 && <BoardSectionDownload records={cards} label={`${label} 업무`}
               onDownload={entries => exportCases(entries, `work-board-${preset}`)} />}
           </Box>
           {cards.length > 0 ? <MagicBento key={reduced} className="case-progress-cards preview-tilt-cards"

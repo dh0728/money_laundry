@@ -39,16 +39,16 @@
   flex: 1;
   min-block-size: 0;
   max-block-size: var(--workspace-list-limit);
-  overflow: auto;
+  overflow-y: auto;
   padding-block: var(--record-card-shadow-gutter);
-  padding-inline: 0;
+  padding-block-end: max(var(--record-card-shadow-gutter), var(--workspace-footer-inset));
   scrollbar-gutter: auto;
 }
 @media (max-width: 768px), (max-height: 480px) {
   .case-list-panel > .case-progress-board {
     max-block-size: none;
     overflow: visible;
-    padding-block-end: max(var(--record-card-shadow-gutter), var(--account-footer-reserve));
+    padding-block-end: var(--record-card-shadow-gutter);
   }
 }
 .case-progress-lanes {
@@ -71,7 +71,7 @@
   --muted-text: var(--status-surface-secondary-ink);
 }
 .case-progress-lane.screen-panel {
-  padding: var(--aml-panel-inset);
+  --panel-content-padding: var(--aml-panel-inset);
 }
 .case-progress-lane .case-progress-heading {
   display: flex;

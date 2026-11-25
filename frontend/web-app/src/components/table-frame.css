@@ -78,7 +78,7 @@
 }
 .data-table-frame[data-hierarchy] table { table-layout: fixed }
 .data-table-frame[data-hierarchy] tr[data-row-level="3"] {
-  scroll-margin-block: var(--header-height) var(--app-footer-height, var(--account-footer-reserve));
+  scroll-margin-block-start: var(--header-height);
 }
 .data-table-frame[data-hierarchy] tbody tr[data-row-level="1"] { background-color: var(--information-panel-surface) }
 .data-table-frame[data-hierarchy] tbody tr[data-row-level] > :is(th, td) { padding-block: var(--aml-space-4) }
@@ -218,9 +218,7 @@
 
 /* 전체 폭 화면, 사건 목록과 원장처럼 스크롤 영역을 갖는 공용 표. */
 @media (min-width: 769px) and (min-height: 481px) {
-  .screen-layout:has(> [data-case-list-table]) {
-    padding-block-end: max(var(--workspace-inset), var(--account-footer-reserve));
-  }
+  [data-case-list-table] .data-table-scroll { padding-block-end: var(--workspace-footer-inset) }
 }
 .screen-layout > [data-case-list-table] {
   display: flex;
@@ -228,9 +226,6 @@
   max-block-size: var(--workspace-available-block);
 }
 .case-table-scroll.entry-list { margin-block-start: 0 }
-@media (min-width: 769px) and (min-height: 481px) {
-  body:has(#footer-pagination > *) #workspace:has(.screen-layout > [data-case-list-table]) { padding-block-end: 0 }
-}
 @media (max-width: 768px), (max-height: 480px) {
   .screen-layout > [data-case-list-table],
   [data-case-list-table] .case-table-scroll.entry-list { max-block-size: none }
@@ -244,19 +239,17 @@
 }
 .overview-panel-visual:has(.case-evidence-table) { justify-content: start }
 .preview-case-overview .case-evidence-table { margin-block-start: var(--workspace-gap); min-inline-size: 0; min-block-size: 0 }
-.benchmark-table { max-block-size: min(var(--table-scroll-region-max-height), var(--workspace-available-block)); }
 .ledger-tables {
   display: grid;
   min-inline-size: 0;
   align-content: start;
-  gap: var(--workspace-gap);
+  gap: var(--workspace-panel-gap);
 }
 @media (min-width: 1121px) and (min-height: 481px) {
   .screen-layout:has(> [data-investigation-component="ledger"] > .ledger-tables) {
     display: flex;
     flex-direction: column;
-    block-size: calc(100dvh - var(--header-height));
-    padding-block-end: max(var(--workspace-inset), var(--app-footer-height, var(--account-footer-reserve)));
+    padding-block-end: 0;
   }
   .screen-layout:has(> [data-investigation-component="ledger"] > .ledger-tables)
     > [data-investigation-component="ledger"] {
@@ -266,14 +259,8 @@
     min-block-size: 0;
   }
   .ledger-tables { grid-template-rows: minmax(var(--workspace-panel-min-height), 1fr) minmax(0, auto) }
+  .ledger-tables .data-table-scroll { padding-block-end: var(--workspace-footer-inset) }
 }
-.ledger-table-controls {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--table-ledger-filter-min-width)), 1fr));
-  gap: var(--aml-space-8) var(--workspace-gap);
-  margin-block-end: var(--workspace-gap);
-}
-.ledger-table-controls .ledger-search { margin-block-start: 0 }
 
 /* 필터가 붙는 표 헤더와 화면별 행 읽기 방식. */
 .data-table-tools > .context-query-tools { margin-inline-start: auto }

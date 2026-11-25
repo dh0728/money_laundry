@@ -11,8 +11,8 @@ import {
 import { ibmLaundering, ibmTotal } from '../investigation/ibm-hi-small-aggregate';
 import { benchmarkDashboardMetrics } from './benchmark-dashboard-metrics';
 import { ActionButton } from '../../components/primary-button';
-import { csvDownloadEntry, exportCases } from '../../components/query-controls';
-import { BoardSectionDownload, SectionDownloadHeading } from '../../components/section-download';
+import { csvDownloadEntry } from '../../components/query-controls';
+import { SectionDownloadHeading } from '../../components/section-download';
 import { Box, Heading, Stack, Text } from '../../components/layout-primitives';
 import { LinkTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
 import { AccountTrailGraph } from '../../components/charts/charts/account-trail-graph';
@@ -175,11 +175,11 @@ function WorkBoard({ records, mine, sort, appearance, statusByCode }) {
       <Box data-dashboard-sort-tags></Box>
       <Box className="dashboard-board-actions">
         <Box data-dashboard-sort></Box>
-        <BoardSectionDownload records={records} label="업무 현황" onDownload={rows => exportCases(rows, 'work-board')} />
       </Box>
     </Box>
     <Box className="dashboard-board-scroll">
-      <CaseProgressBoard rows={records} reduced={appearance.reduced} theme={appearance.theme} showAssignee={!mine} pageSize={8} statusByCode={statusByCode}
+      <CaseProgressBoard rows={records} reduced={appearance.reduced} theme={appearance.theme} showAssignee={!mine}
+        showLaneDownload={!mine} pageSize={8} statusByCode={statusByCode}
         orderRows={mine && !sort ? interleaveCaseKinds : undefined} />
     </Box>
   </Box>;
