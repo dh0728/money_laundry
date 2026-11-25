@@ -22,6 +22,7 @@ import { episodeCode } from '@/features/alerts/alertFilters'
 import { usd } from '@/features/alerts/metrics'
 import { useDataTable } from '@/hooks/use-data-table'
 import { useMemoryState } from '@/lib/memory'
+import { downloadBlob } from '@/lib/report-io'
 import { workStatusLabels, type WorkStatus } from '@/lib/workStatus'
 import { ageOptions } from '@/features/alerts/alertFilters'
 import { episodeFilterLabel, episodeFilterNames, matchesEpisode, riskOptions, type EpisodeFilter, type EpisodeFilterField } from './episodeFilters'
@@ -116,9 +117,7 @@ export default function EpisodeList({ rows, today, onOpen, remote }: { rows: Epi
       ['ID', '위험도', 'Alert', '거래', '거래 총액(통화별)', '담당자', '상태'],
       ...result.map(r => [episodeCode(r.episodeId), r.riskScore, r.alertCount, r.txCount, r.amountLabel ?? (r.totalAmountUsd == null ? '' : `${r.totalAmountUsd} USD`), r.assignee.name, r.status]),
     ].map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
-    const a = document.createElement('a')
-    a.href = url; a.download = 'Episode-목록.csv'; a.click(); URL.revokeObjectURL(url)
+    downloadBlob('Episode-목록.csv', new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
   }
 
   return (

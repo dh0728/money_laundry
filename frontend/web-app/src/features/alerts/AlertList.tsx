@@ -21,6 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useDataTable } from '@/hooks/use-data-table'
 import { useMemoryState } from '@/lib/memory'
+import { downloadBlob } from '@/lib/report-io'
 import { ageOptions, riskOptions, alertCode, episodeCode, filterFieldNames, filterLabel, matchesAlert, type AlertFilter, type AlertFilterField } from './alertFilters'
 import { canLink, episodeLinkReducer, initialLinkState, linkableEpisodes, type EpisodeTarget } from './episodeLink'
 import { Box, Text } from '@/components/layout-primitives'
@@ -158,9 +159,7 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
       ['ID', '위험도', '탐지 유형', '거래', '담당자', '상태'],
       ...result.map(r => [alertCode(r.alertId), r.riskScore, r.primaryType.name, r.txCount, r.assignee.name, r.status]),
     ].map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
-    const a = document.createElement('a')
-    a.href = url; a.download = 'Alert-목록.csv'; a.click(); URL.revokeObjectURL(url)
+    downloadBlob('Alert-목록.csv', new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
   }
 
   return (
