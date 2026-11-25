@@ -18,9 +18,6 @@
 }
 
 /* 템플릿 라이브러리 */
-.rule-builder > .rule-template-library {
-  --panel-material-solid: color-mix(in srgb, var(--inner-surface), var(--aml-figma-surface-neutral-subtle-pressed));
-}
 .rule-template-library section { display: grid; gap: var(--aml-space-6) }
 .rule-template-library h3,
 .rule-part h4 {
@@ -117,7 +114,7 @@
   min-block-size: var(--aml-panel-control-size);
 }
 .rule-lines > [data-rule-match] > .rule-condition {
-  padding: var(--aml-space-4) var(--aml-space-8);
+  padding: var(--aml-space-6);
   border-radius: var(--aml-panel-control-radius);
   background: var(--rule-match-fill);
 }
@@ -228,7 +225,6 @@ button.rule-connector:hover { background: color-mix(in srgb, var(--rule-match-fi
   line-height: var(--aml-type-body-strong-lineHeight);
 }
 .rule-summary-lines [data-summary-value] { display: inline-block; max-inline-size: 100% }
-.rule-builder > .rule-checklist { --panel-material-solid: var(--inner-surface) }
 .rule-check-items, .rule-check-warnings {
   display: grid;
   gap: var(--aml-space-8);
