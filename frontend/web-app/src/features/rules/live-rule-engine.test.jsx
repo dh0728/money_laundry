@@ -270,11 +270,12 @@ it('이어서 작성은 저장된 초안을 불러오고, 고칠 수 없는 룰�
   expect(screen.getByRole('status')).toHaveTextContent('RULE-002 에는 내가 고칠 수 있는 작성 중 버전이 없습니다.');
 });
 
-it('목록은 상태별 수 · 템플릿 · 대상 · 조건을 보여 주고, 고른 룰의 문장과 변경 기록을 읽어 온다', async () => {
+it('목록은 상태별 수 · 템플릿 · 대상 · 조건을 보여 주고, 상세는 조건 요약과 변경 기록을 보여 준다', async () => {
   render(<LiveRuleList initialRule="RULE-004" actionsHost={footer} />);
-  // 상세는 목록이 온 뒤에 따로 읽는다. 문장은 상세에만 나온다(목록은 요약).
-  expect(await screen.findByText(draftRuleFixture.working.sentence)).toBeInTheDocument();
+  // 상세는 목록이 온 뒤에 따로 읽는다.
+  await waitFor(() => expect(part('룰 상세').getByText(draftRuleFixture.working.summary)).toBeInTheDocument());
   expect(screen.getByRole('region', { name: '룰 상세' })).toHaveTextContent('작업 중 버전 · v1');
+  expect(part('룰 상세').queryByText(draftRuleFixture.working.sentence)).not.toBeInTheDocument();
   expect(fetchRule).toHaveBeenCalledWith(4);
 
   expect(within(screen.getByLabelText('룰 상태별 수')).getByText('등록된 룰').nextElementSibling).toHaveTextContent('2');
@@ -299,17 +300,24 @@ it('목록은 상태별 수 · 템플릿 · 대상 · 조건을 보여 주고, �
   expect(screen.getByRole('region', { name: '룰 상세' })).toHaveTextContent('백테스트를 아직 돌리지 않았습니다.');
   expect(screen.queryByRole('region', { name: '룰 일일 실행' })).not.toBeInTheDocument();
 
-  // 운영 중 룰에는 고칠 초안이 없다. 적중 수와 Alert 수, 일일 실행 기록을 보여 준다.
+  // 운영 중 룰에는 고칠 초안이 없다. 상세에만 있는 날짜와 판정 비율, 일일 실행 기록을 보여 준다.
   fireEvent.click(screen.getByRole('button', { name: /RULE-002/ }));
-  expect(await screen.findByText(activeRuleFixture.operating.sentence)).toBeInTheDocument();
+  await waitFor(() => expect(part('룰 상세').getByText(activeRuleFixture.operating.summary)).toBeInTheDocument());
   const detail = screen.getByRole('region', { name: '룰 상세' });
   expect(detail).toHaveTextContent('운영 버전 · v1');
-  expect(within(detail).getByText('운영 적중').nextElementSibling).toHaveTextContent('3건 · 마지막 2023-09-15');
-  expect(within(detail).getByText('연결 Alert').nextElementSibling).toHaveTextContent('2건 · 정상 판정 50%');
+  expect(within(detail).getByText('마지막 적중일').nextElementSibling).toHaveTextContent('2023-09-15');
+  expect(within(detail).getByText('연결 Alert 정상 판정 비율').nextElementSibling).toHaveTextContent('50%');
+  for (const duplicate of ['운영 적중', '연결 Alert', '대상 · 계좌', activeRuleFixture.templateName]) {
+    expect(within(detail).queryByText(duplicate)).not.toBeInTheDocument();
+  }
   expect(sharedTableHeading('일일 실행', '2건').getByRole('button', { name: '다운로드' })).toBeInTheDocument();
-  const runs = within(screen.getByRole('region', { name: '룰 일일 실행' })).getAllByRole('row');
+  const executions = within(screen.getByRole('table', { name: '일일 실행' }));
+  const runs = executions.getAllByRole('row');
   expect(runs[1]).toHaveTextContent('2023-09-16v1운영실패 · 쿼리 120초 초과');
   expect(runs[2]).toHaveTextContent('2023-09-15v1운영완료1,20430');
+  expect(within(runs[2]).getByText('1,204')).toHaveAttribute('data-numeric', 'true');
+  fireEvent.click(executions.getByRole('button', { name: '분석 날짜 · 오름차순 정렬' }));
+  expect(executions.getAllByRole('row')[1]).toHaveTextContent('2023-09-15');
   expect(actions.getByRole('button', { name: '이어서 작성' })).toBeDisabled();
   expect(actions.getByRole('button', { name: '초안 삭제' })).toBeDisabled();
   expect(actions.getByRole('button', { name: '중지' })).toHaveAttribute('title', '관리자만 할 수 있습니다.');
@@ -398,6 +406,8 @@ it('새 버전 만들기는 운영 버전을 복사한 초안을 만들고 상�
   await waitFor(() => expect(actions.getByRole('link', { name: '이어서 작성' })).toHaveAttribute('href', '/rules/new?rule=RULE-002'));
   expect(actions.getByRole('button', { name: '새 버전 만들기' })).toHaveAttribute('title', '작업 중인 버전이 이미 있습니다.');
   expect(screen.getByRole('region', { name: '룰 상세' })).toHaveTextContent('새 버전 · v2');
+  expect(part('룰 상세').getByText('운영 버전과 같은 조건입니다.')).toBeInTheDocument();
+  expect(part('룰 상세').getAllByText(activeRuleFixture.operating.summary)).toHaveLength(1);
 }));
 
 it('복제는 그 버전의 조건으로 새 룰을 만들고, 목록을 다시 읽어 새 룰을 고른다', () => withDialog(async () => {

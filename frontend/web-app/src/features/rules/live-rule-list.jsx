@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { cloneRule, commandRule, createRuleVersion, deleteRuleDraft, fetchRule } from '@/api/rules';
 import { Textarea } from '@/components/ui/textarea';
-import { TableBody, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
+import { TableBody, TableCell, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
 import { DialogFrame } from '../../components/dialog-parts';
 import { Panel } from '../../components/panel';
@@ -11,6 +11,7 @@ import { StatusTag } from '../../components/semantic-tags';
 import { csvDownloadEntry, TableQueryTools } from '../../components/query-controls';
 import { SectionDownloadHeading } from '../../components/section-download';
 import { SortableTableHead, tableCount, useTableSort, WorkflowTable } from '../../components/workflow-table';
+import { sameDefinition } from './rule-definition';
 import {
   loadRuleCatalog, problemText, refreshLiveRules, ruleEventNames, ruleStatusNames, ruleStatusOrder, ruleStatusPresets,
 } from './live-rule-store';
@@ -160,20 +161,25 @@ function backtestNote(version) {
   return version.backtest.currentDefinition ? '지금 조건으로 백테스트를 끝냈습니다.' : '조건을 고친 뒤에는 백테스트를 돌리지 않았습니다.';
 }
 
-function VersionSummary({ label, version }) {
+function VersionSummary({ label, version, conditions, rowStatus }) {
   const note = backtestNote(version);
   return <Box className="rule-version-summary">
     <Box className="workflow-rule-detail-tags">
       <StatusTag preset="neutral">{label} · v{version.versionNo}</StatusTag>
-      <StatusChip status={version.status} />
+      {version.status !== rowStatus && <StatusChip status={version.status} />}
     </Box>
-    <Text>{version.sentence || version.summary}</Text>
+    {conditions && <Text>{conditions}</Text>}
     {note && <Text className="workflow-rule-note">{note}</Text>}
   </Box>;
 }
 
 function RuleDetail({ rule, row, subject }) {
   const appliedVersions = [rule.operating, rule.working];
+  const operatingSummary = rule.operating?.summary || rule.operating?.sentence;
+  const workingSummary = rule.working?.summary || rule.working?.sentence;
+  const sameConditions = rule.operating?.definition && rule.working?.definition
+    && sameDefinition(rule.operating.definition, rule.working.definition);
+  const showSentences = rule.operating && rule.working && !sameConditions && operatingSummary === workingSummary;
   const changeTime = formatRuleTime(row?.changedAt ?? rule.createdAt);
   const details = csvDownloadEntry('룰 상세', rule.code + '-detail',
     ['룰 ID', '이름', '상태', '템플릿', '대상', '담당자', '마지막 변경 (KST)', '운영 버전', '운영 조건', '작업 중 버전', '작업 중 조건',
@@ -187,25 +193,18 @@ function RuleDetail({ rule, row, subject }) {
       formatRuleTime(version.createdAt), version.summary]));
   return <Panel className="workflow-rule-detail" aria-label="룰 상세">
     <SectionDownloadHeading entries={versions.disabled ? [details] : [details, versions]}><Text as="code">{rule.code}</Text> {rule.name}</SectionDownloadHeading>
-    <Box className="workflow-rule-detail-tags">
-      {rule.status && <StatusChip status={rule.status} />}
-      <StatusTag preset="neutral">{rule.templateName}</StatusTag>
-      {subject && <StatusTag preset="neutral">대상 · {subject}</StatusTag>}
-    </Box>
     <Box as="dl" className="rule-condition-facts">
-      <Box><Box as="dt">담당자</Box><Box as="dd">{rule.owner}</Box></Box>
+      {rule.owner !== row?.owner && <Box><Box as="dt">담당자</Box><Box as="dd">{rule.owner}</Box></Box>}
       <Box><Box as="dt">마지막 변경</Box><Box as="dd"><RuleTime value={row?.changedAt ?? rule.createdAt} /></Box></Box>
-      {/* 적중 수와 Alert 수는 따로다. 적중은 대상 × 날짜이고, 그중 Alert 의 거래와 겹친 것만 Alert 에 보인다. */}
-      {row?.hitCount != null && (rule.operating || row.hitCount > 0) && <Box><Box as="dt">운영 적중</Box>
-        <Box as="dd">{countFormat.format(row.hitCount)}건{row.lastHitDate && ` · 마지막 ${row.lastHitDate}`}</Box></Box>}
-      {row?.linkedAlertCount != null && (rule.operating || row.linkedAlertCount > 0) && <Box><Box as="dt">연결 Alert</Box>
-        <Box as="dd">{countFormat.format(row.linkedAlertCount)}건{row.normalRate != null && ` · 정상 판정 ${row.normalRate}%`}</Box></Box>}
-      {row?.shadowHitCount != null && <Box><Box as="dt">시험 운영 적중</Box><Box as="dd">{countFormat.format(row.shadowHitCount)}건 · Alert 에는 보이지 않음</Box></Box>}
-      {row?.lastRunFailed && <Box><Box as="dt">최근 일일 실행</Box><Box as="dd"><StatusTag preset="caution">실패</StatusTag></Box></Box>}
+      {row?.lastHitDate && <Box><Box as="dt">마지막 적중일</Box><Box as="dd">{row.lastHitDate}</Box></Box>}
+      {row?.normalRate != null && <Box><Box as="dt">연결 Alert 정상 판정 비율</Box><Box as="dd">{row.normalRate}%</Box></Box>}
+      {row?.shadowHitCount != null && <Box><Box as="dt">시험 운영 적중</Box><Box as="dd">{countFormat.format(row.shadowHitCount)}건</Box></Box>}
     </Box>
     <Heading level={3}>적용 조건</Heading>
-    {rule.operating && <VersionSummary label="운영 버전" version={rule.operating} />}
-    {rule.working && <VersionSummary label={rule.operating ? '새 버전' : '작업 중 버전'} version={rule.working} />}
+    {rule.operating && <VersionSummary label="운영 버전" version={rule.operating} rowStatus={row?.status}
+      conditions={showSentences ? rule.operating.sentence || operatingSummary : operatingSummary} />}
+    {rule.working && <VersionSummary label={rule.operating ? '새 버전' : '작업 중 버전'} version={rule.working} rowStatus={row?.status}
+      conditions={sameConditions ? '운영 버전과 같은 조건입니다.' : showSentences ? rule.working.sentence || workingSummary : workingSummary} />}
     <Heading level={3}>버전 이력</Heading>
     <Box as="ol" className="workflow-rule-history">
       {rule.versions.map(version => <Box as="li" key={version.versionId}>
@@ -221,26 +220,36 @@ function RuleDetail({ rule, row, subject }) {
 /** 일일 실행 기록. 분석이 ALERTS 단계에 들어올 때 시험 운영 · 운영 중인 버전이 한 번씩 돈다. */
 function RuleExecutions({ rule }) {
   const executions = rule.executions ?? [];
+  const sorting = useTableSort(executions);
   if (!executions.length) return null;
-  const columns = ['분석 날짜', '버전', '방식', '결과', '검사 시점', '적중', '건너뛴 바쁜 계좌'];
-  const rows = executions.map(run => [run.analysisDate, 'v' + run.versionNo, executionModes[run.mode] ?? run.mode,
-    run.status === 'FAILED' ? '실패 · ' + (executionErrors[run.errorCode] ?? run.errorCode) : '완료',
+  const mode = run => executionModes[run.mode] ?? run.mode;
+  const result = run => run.status === 'FAILED' ? '실패 · ' + (executionErrors[run.errorCode] ?? run.errorCode) : '완료';
+  const columns = [
+    { column: 'date', label: '분석 날짜', value: run => run.analysisDate },
+    { column: 'version', label: '버전', value: run => run.versionNo },
+    { column: 'kind', label: '방식', value: mode },
+    { column: 'status', label: '결과', value: result },
+    { column: '거래 건수', label: '검사 시점', value: run => run.triggerCount },
+    { column: 'value', label: '적중', value: run => run.hitCount },
+    { column: '관련 계좌 수', label: '건너뛴 바쁜 계좌', value: run => run.skippedBusySubjects },
+  ];
+  const rows = executions.map(run => [run.analysisDate, `v${run.versionNo}`, mode(run), result(run),
     run.triggerCount, run.hitCount, run.skippedBusySubjects]);
-  const download = csvDownloadEntry('일일 실행', rule.code + '-executions', columns, rows);
+  const download = csvDownloadEntry('일일 실행', rule.code + '-executions', columns.map(({ label }) => label), rows);
   const displayCount = value => value == null ? '—' : countFormat.format(value);
   return <Box as="section" className="rule-executions" aria-label="룰 일일 실행">
-    <WorkflowTable label="일일 실행" tableClassName="rule-backtest-table"
-      summary={<>{tableCount(executions.length)} <Text as="span">분석에 새로 들어온 날짜를 검사합니다.</Text></>}
+    <WorkflowTable label="일일 실행" summary={tableCount(executions.length)}
       tools={<TableQueryTools actions={{ entries: [download] }} />}>
-      <TableHeader><TableRow>{columns.map(label => <TableHead scope="col" key={label}>{label}</TableHead>)}</TableRow></TableHeader>
-      <TableBody>{rows.map(([date, version, mode, result, scanned, hits, skipped], index) => <TableRow key={index}>
-        <TableRowHead>{date ?? '—'}</TableRowHead>
-        <TableCell>{version}</TableCell>
-        <TableCell>{mode}</TableCell>
-        <TableCell>{result}</TableCell>
-        <TableCell>{displayCount(scanned)}</TableCell>
-        <TableCell>{displayCount(hits)}</TableCell>
-        <TableCell>{displayCount(skipped)}</TableCell>
+      <TableHeader><TableRow>{columns.map(({ column, label, value }) => <SortableTableHead key={column} sorting={sorting}
+        column={column} value={value}>{label}</SortableTableHead>)}</TableRow></TableHeader>
+      <TableBody>{sorting.rows.map((run, index) => <TableRow key={index}>
+        <TableRowHead>{run.analysisDate ?? '—'}</TableRowHead>
+        <TableCell>v{run.versionNo}</TableCell>
+        <TableCell>{mode(run)}</TableCell>
+        <TableCell>{result(run)}</TableCell>
+        <TableCell numeric>{displayCount(run.triggerCount)}</TableCell>
+        <TableCell numeric>{displayCount(run.hitCount)}</TableCell>
+        <TableCell numeric>{displayCount(run.skippedBusySubjects)}</TableCell>
       </TableRow>)}</TableBody>
     </WorkflowTable>
   </Box>;
