@@ -49,13 +49,16 @@ function transferPath(source, target, bend) {
   return `M ${x1} ${y1} Q ${(x1 + x2) / 2 - directionY * bend} ${(y1 + y2) / 2 + directionX * bend}, ${x2} ${y2}`;
 }
 
-export function AccountTrailGraph({ comparison, focus }) {
+export function AccountTrailGraph({ comparison, focus, alwaysShowContext = false }) {
   const graphId = useId();
   const [selection, setSelection] = useState(null);
-  const [showContext, setShowContext] = useState(false);
-  const transfers = showContext ? comparison.transfers : comparison.transfers.slice(0, 2);
+  const [contextExpanded, setContextExpanded] = useState(false);
+  const showContext = alwaysShowContext || contextExpanded;
+  const coreTransfers = comparison.transfers.slice(0, 2);
+  const coreCodes = new Set(coreTransfers.map(row => row.code));
+  const transfers = showContext ? comparison.transfers : coreTransfers;
   const moreCount = comparison.transfers.length - 2;
-  const leadingAccounts = new Set([focus, transfers[0].from.code, transfers[1].to.code]);
+  const leadingAccounts = new Set([focus, coreTransfers[0].from.code, coreTransfers[1].to.code]);
   const accounts = accountLayout(transfers, focus);
   const accountsById = new Map(accounts.map(account => [account.code, account]));
   const pairs = Map.groupBy(transfers, row => [row.from.code, row.to.code].toSorted().join('\u0001'));
@@ -64,12 +67,13 @@ export function AccountTrailGraph({ comparison, focus }) {
     const bend = (index - (rows.length - 1) / 2) * 24 * direction;
     return { ...row, scope: scopeOf(row), path: transferPath(accountsById.get(row.from.code), accountsById.get(row.to.code), bend) };
   }));
+  if (alwaysShowContext) edges.sort((a, b) => Number(coreCodes.has(b.code)) - Number(coreCodes.has(a.code)));
   const selectedTransfer = selection?.type === 'transfer' && transfers.find(row => row.code === selection.code);
   const selectedAccount = accountsById.get(selection?.type === 'account' ? selection.code : focus) ?? accountsById.get(focus);
   const activeAccount = selectedTransfer ? undefined : selectedAccount.code;
   const presentScopes = new Set(edges.map(row => row.scope));
   const scopes = Object.keys(scopeLabels).filter(scope => presentScopes.has(scope));
-  const viewHeight = showContext ? height : height / 2;
+  const viewHeight = showContext && moreCount > 0 ? height : height / 2;
   const activate = (type, code) => {
     const target = { type, code };
     return { onPointerEnter: () => setSelection(target), onFocus: () => setSelection(target), onClick: () => setSelection(target) };
@@ -81,22 +85,30 @@ export function AccountTrailGraph({ comparison, focus }) {
         <Text as="span">{scopeLabels[scope]}</Text>
       </Box>)}
     </Box>
-    <svg id={graphId} className="account-trail-graph" viewBox={`0 ${(height - viewHeight) / 2} ${width} ${viewHeight}`}
+    <svg id={graphId} className="account-trail-graph" data-always-show-context={alwaysShowContext || undefined}
+      viewBox={`0 ${(height - viewHeight) / 2} ${width} ${viewHeight}`}
       role="group" aria-labelledby={`${graphId}-title`}>
       <title id={`${graphId}-title`}>{`${comparison.alert}와 ${comparison.episode}의 계좌 및 거래`}</title>
       <defs>{scopes.map(scope => <marker key={scope} id={`${graphId}-${scope}`} data-scope={scope}
         viewBox="0 0 8 8" refX="7" refY="4" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto">
         <path className="account-trail-arrow" d="M 0 0 L 8 4 L 0 8 Z" />
       </marker>)}</defs>
-      {edges.map(row => <g key={row.code} data-transfer={row.code} data-scope={row.scope}
-        data-active={row.code === selectedTransfer?.code || row.from.code === activeAccount || row.to.code === activeAccount || undefined}
-        role="graphics-symbol" tabIndex={0} aria-label={`${row.code} · ${row.from.code} → ${row.to.code} · ${scopeLabels[row.scope]}`}
-        {...activate('transfer', row.code)}>
-        <path className="account-trail-edge-hit" d={row.path} />
-        <path className="account-trail-edge" d={row.path} markerEnd={`url(#${graphId}-${row.scope})`} />
-      </g>)}
+      {edges.map(row => {
+        const context = alwaysShowContext && !coreCodes.has(row.code);
+        const connected = row.from.code === activeAccount || row.to.code === activeAccount;
+        const active = row.code === selectedTransfer?.code || connected && (!context || selection?.type === 'account');
+        return <g key={row.code} data-transfer={row.code} data-scope={row.scope}
+          data-context={context || undefined} data-active={active || undefined}
+          role="graphics-symbol" tabIndex={0} aria-label={`${row.code} · ${row.from.code} → ${row.to.code} · ${scopeLabels[row.scope]}`}
+          {...activate('transfer', row.code)}>
+          <path className="account-trail-edge-hit" d={row.path} />
+          <path className="account-trail-edge" d={row.path} markerEnd={`url(#${graphId}-${row.scope})`} />
+        </g>;
+      })}
       {accounts.map(account => <g key={account.code} data-account={account.code}
         data-shared={comparison.shared.includes(account.code) || undefined} data-focus={account.code === focus || undefined}
+        data-context={alwaysShowContext && !leadingAccounts.has(account.code) || undefined}
+        data-active={alwaysShowContext && selection?.type === 'account' && account.code === activeAccount || undefined}
         className="account-trail-node" transform={`translate(${account.x} ${account.y})`}
         role="graphics-symbol" tabIndex={0} aria-label={`계좌 ${account.code}`} {...activate('account', account.code)}>
         <circle className="account-trail-node-hit" />
@@ -117,9 +129,9 @@ export function AccountTrailGraph({ comparison, focus }) {
         {showContext && <Text as="span">표시된 연결 거래 {transfers.filter(row => row.from.code === activeAccount || row.to.code === activeAccount).length}건</Text>}
       </>}
     </Box>
-    {moreCount > 0 && <ActionButton className="account-trail-context-toggle" shape="pill" surface="floating"
+    {!alwaysShowContext && moreCount > 0 && <ActionButton className="account-trail-context-toggle" shape="pill" surface="floating"
       aria-expanded={showContext} aria-controls={graphId} onClick={() => {
-        setShowContext(open => !open);
+        setContextExpanded(open => !open);
         setSelection(null);
       }}>{showContext ? '주변 거래 접기' : `주변 거래 ${moreCount}건 펼치기`}</ActionButton>}
     {(showContext || !moreCount) && comparison.omittedTransfers > 0 &&

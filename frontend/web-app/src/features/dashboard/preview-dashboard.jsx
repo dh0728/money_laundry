@@ -171,7 +171,7 @@ function timeBetweenTransactions(trail) {
     .filter(Boolean).join(' ') || '1분 이내';
 }
 
-function DashboardSummary({ trail, reduced }) {
+function DashboardSummary({ trail, reduced, showContext }) {
   const downloads = trail ? [csvDownloadEntry('분석 추천 근거 거래', 'recommendation-evidence',
     ['순서', '업무 ID', '거래 ID', '송금 계좌', '수취 계좌', '시각 (KST)', '금액', '통화'],
     [trail.received, trail.sent].map(({ record, transaction }, index) => [
@@ -189,7 +189,7 @@ function DashboardSummary({ trail, reduced }) {
         {trail.returned ? ' 원 송금 계좌로 다시 송금' : ' 후속 송금'}
         {trail.sameAmount ? ' · 같은 통화와 금액' : ''}
       </Text>
-      <AccountTrailGraph key={`${trail.received.transaction.code}/${trail.sent.transaction.code}`} comparison={trail.comparison} focus={trail.account} />
+      <AccountTrailGraph key={`${trail.received.transaction.code}/${trail.sent.transaction.code}`} comparison={trail.comparison} focus={trail.account} alwaysShowContext={showContext} />
       <Heading level={3} className="dashboard-trail-step-heading">먼저 확인할 거래</Heading>
       <Box as="ol" className="dashboard-trail-records" aria-label="권장 확인 순서 · 한국 표준시">
         <EvidenceRecord evidence={trail.received} direction="공유 계좌 수취 확인" />
@@ -231,7 +231,7 @@ function WorkBoard({ records, mine, sort, appearance, statusByCode }) {
 
 export function PreviewDashboard({ mine, data, appearance }) {
   const rows = data.board?.content;
-  const summary = <DashboardSummary trail={data.accountRecommendation} reduced={appearance.reduced} />;
+  const summary = <DashboardSummary trail={data.accountRecommendation} reduced={appearance.reduced} showContext={!mine} />;
   return <Box className="preview-dashboard" data-mine={mine}>
     {mine ? <PersonalDashboardOverview recommendation={summary}>
       <PersonalInvestigation data={data} reduced={appearance.reduced} />

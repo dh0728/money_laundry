@@ -3,6 +3,7 @@
 .account-trail-network {
   --account-trail-comparison-color: var(--recommendation-comparison-transaction);
   --account-trail-episode-color: var(--recommendation-episode-transaction);
+  --account-trail-context-opacity: var(--chart-sankey-link-opacity);
 
   display: grid;
   gap: var(--aml-space-8);
@@ -44,15 +45,23 @@
 .account-trail-graph [data-transfer]:focus-visible .account-trail-edge {
   stroke-width: calc(var(--aml-stroke-focus) + var(--aml-stroke-divider));
 }
+.account-trail-graph [data-context]:not([data-active]):not(:hover):not(:focus-visible) .account-trail-edge {
+  opacity: var(--account-trail-context-opacity);
+  stroke-width: var(--aml-stroke-divider);
+}
 .account-trail-node { --account-trail-dot-color: var(--ai-summary-note) }
 .account-trail-node[data-shared], .account-trail-node:focus-visible { --account-trail-dot-color: currentColor }
 .account-trail-node-hit { r: var(--aml-space-10); fill: transparent }
 .account-trail-node-dot { r: var(--aml-radius-small); fill: var(--account-trail-dot-color) }
+.account-trail-node[data-context]:not([data-active]):not(:hover):not(:focus-visible) .account-trail-node-dot { opacity: var(--account-trail-context-opacity) }
 .account-trail-node[data-focus] .account-trail-node-dot {
   r: var(--aml-space-6);
   fill: transparent;
   stroke: currentColor;
   stroke-width: var(--aml-stroke-focus);
+}
+.account-trail-graph[data-always-show-context] [data-focus] .account-trail-node-dot {
+  stroke-width: calc(var(--aml-stroke-focus) + var(--aml-stroke-divider));
 }
 .account-trail-node-label {
   transform: translateY(calc(-1 * var(--aml-space-12)));
