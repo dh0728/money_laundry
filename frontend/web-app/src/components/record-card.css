@@ -45,6 +45,15 @@
   --divider: var(--record-card-divider);
 }
 [data-card-interactive]:has(.card-header-main:focus-visible) { outline-color: var(--focus-ring) }
+/* RecordCard owns the surface and glow in both appearance modes. */
+.magic-bento__card:has([data-card-interactive]) {
+  overflow: visible;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.magic-bento__card:has([data-card-interactive]) > :is(.magic-bento__rim, .magic-bento__border) { display: none }
 @media (hover: hover) {
   [data-card-interactive]:hover:not(:has(.card-header > .work-tab-add:hover)) {
     --record-card-interaction: 22%;
@@ -68,9 +77,6 @@
   :root:not([data-reduced-motion="true"]) :is(.magic-bento__cell, .case-list > *, .preview-related-cases > ul > li):has([data-card-spotlight]) {
     position: relative;
     z-index: 1;
-  }
-  :root:not([data-reduced-motion="true"]) .magic-bento__card:has([data-card-interactive]) {
-    overflow: visible;
   }
   :root:not([data-reduced-motion="true"]) [data-card-spotlight] { z-index: 1 }
   :root:not([data-reduced-motion="true"]) [data-card-tilted] {
