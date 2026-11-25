@@ -1,10 +1,9 @@
 // 기관 전체 "일별 Alert 유입과 처리 상태". 그날 들어온 Alert를 지금 처리 상태(처리 전·중·완료)로 나눠 쌓는다.
 // 단독 여부는 청록으로 구분하고, Episode 진행 중과 종결에는 상태 배지와 같은 파랑·초록을 쓴다.
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import type { DashboardRequested } from '@/api/dashboard'
+import { AlertStatusBars } from '@/components/charts/alert-status-bars'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { ChartContainer, ChartTooltip, type ChartConfig } from '@/components/ui/chart'
 import { fmt } from '@/lib/format'
 import { Box, Text } from '@/components/layout-primitives'
 
@@ -16,8 +15,6 @@ const series = [
   { key: 'inProgress', label: '진행 중 · Episode', color: 'var(--status-info-accent)' },
   { key: 'done', label: '종결', color: 'var(--status-positive-accent)' },
 ] as const
-
-const chartConfig = Object.fromEntries(series.map(s => [s.key, { label: s.label, color: s.color }])) satisfies ChartConfig
 
 const md = (value: string) => new Date(value).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })
 
@@ -59,15 +56,7 @@ export function AlertStatusChart({ data, unavailable = false }: { data: DailySta
         {unavailable && <Text className="text-xs text-muted-foreground">상태별 일별 집계 API 미연결 · 데이터 준비 중</Text>}
       </CardHeader>
       <CardContent className="min-w-0 px-2 pt-2 sm:px-6">
-        <ChartContainer config={chartConfig} className="aspect-auto h-[260px] w-full min-w-0 max-w-full">
-          <BarChart accessibilityLayer data={data} barCategoryGap="18%">
-            <CartesianGrid vertical={false} />
-            <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} minTickGap={28} tickFormatter={md} />
-            <YAxis width={36} tickLine={false} axisLine={false} allowDecimals={false} />
-            <ChartTooltip cursor={{ fill: 'var(--muted)', opacity: .5 }} content={<StatusTooltip />} />
-            {series.map((s, i) => <Bar key={s.key} dataKey={s.key} name={s.label} stackId="status" fill={s.color} radius={i === series.length - 1 ? [3, 3, 0, 0] : 0} />)}
-          </BarChart>
-        </ChartContainer>
+        <AlertStatusBars data={data} series={series} formatDay={md} tooltip={<StatusTooltip />} />
         <StatusLegend />
         <Table className="sr-only" containerClassName="sr-only" aria-label="일별 Alert 현재 처리 상태 집계">
           <TableHeader><TableRow><TableHead>생성일</TableHead>{series.map(s => <TableHead key={s.key}>{s.label}</TableHead>)}<TableHead>유입</TableHead></TableRow></TableHeader>

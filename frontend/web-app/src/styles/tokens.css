@@ -175,6 +175,12 @@
   --chart-tooltip-indicator-border-width: 1.5px;
   --chart-series-swatch-radius: 2px;
   --chart-grid-border-strength: 50%;
+  --alert-status-chart-height: 260px;
+  --alert-status-category-gap: 18%;
+  --alert-status-axis-tick-gap: 28px;
+  --alert-status-value-axis-width: 36px;
+  --alert-status-cursor-opacity: 0.5;
+  --alert-status-bar-top-radius: 3px;
   --pattern-graph-number-font-size: 20px;
   --pattern-graph-selection-fill-strength: 10%;
   --owner-graph-section-font-size: 10px;
