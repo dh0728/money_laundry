@@ -334,7 +334,7 @@ function LoginScreen() {
     'class="glass login-card"', 'section',
   );
   return BoxHTML(
-    DecorativeCanvasHTML('class="login-scene"') +
+    BoxHTML('', 'class="login-particle-layer" aria-hidden="true"') + DecorativeCanvasHTML('class="login-scene"') +
     card +
     PreferenceDialog('login-help', '계정 찾기', TextHTML('', 'id="login-help-instructions"', 'p')),
     'id="preview-login" aria-label="로그인" hidden', 'main',

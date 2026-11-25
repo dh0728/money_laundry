@@ -285,7 +285,7 @@ const Particles = ({
   particleCount = 200,
   particleSpread = 10,
   speed = 0.1,
-  particleColors = ['#ffffff'],
+  particleColors = [],
   moveParticlesOnHover = true,
   particleHoverFactor = 1,
   alphaParticles = false,
@@ -311,7 +311,6 @@ const Particles = ({
   lightMode = false,
   paused = false,
   className = '',
-  style
 }) => {
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
@@ -321,7 +320,7 @@ const Particles = ({
     count: clamp(Math.round(particleCount), 1, MAX_COUNT),
     spread: Math.max(0.1, particleSpread),
     speed,
-    colors: palette.length ? palette : ['#ffffff'],
+    colors: palette,
     mouse: moveParticlesOnHover,
     hoverFactor: Math.max(0, particleHoverFactor),
     soft: alphaParticles,
@@ -406,14 +405,15 @@ const Particles = ({
     gl.bindVertexArray(null);
 
     const probe = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+    const defaultColor = getComputedStyle(container).getPropertyValue('--particles-default-color').trim();
     const reduce = appReducedMotion();
     const cache = new Map();
     const parse = value => {
       if (cache.has(value)) return cache.get(value);
       let rgb = [1, 1, 1];
-      if (probe) {
+      if (probe && defaultColor) {
         probe.clearRect(0, 0, 1, 1);
-        probe.fillStyle = '#ffffff';
+        probe.fillStyle = defaultColor;
         probe.fillStyle = value;
         probe.fillRect(0, 0, 1, 1);
         const [r, g, b] = probe.getImageData(0, 0, 1, 1).data;
@@ -429,7 +429,7 @@ const Particles = ({
       return linear.map(v => Math.pow(v * depth, 1 / 2.2));
     };
 
-    const view = { width: 1, height: 1, ratio: 1 };
+    let view;
     const pointer = { x: 0, y: 0, sx: 0, sy: 0, nx: 0, ny: 0, inside: false, active: 0 };
     const state = {
       clock: 0,
@@ -467,7 +467,8 @@ const Particles = ({
       const positions = new Float32Array(total * 3);
       const randoms = new Float32Array(total * 4);
       const tints = new Float32Array(total * 3);
-      const swatches = s.colors.map(value => (s.lightMode ? ink(parse(value)) : parse(value)));
+      const colors = s.colors.length ? s.colors : [defaultColor];
+      const swatches = colors.map(value => (s.lightMode ? ink(parse(value)) : parse(value)));
       for (let i = 0; i < total; i++) {
         let x;
         let y;
@@ -765,11 +766,9 @@ const Particles = ({
       const width = Math.max(1, container.clientWidth);
       const height = Math.max(1, container.clientHeight);
       const ratio = Math.min(s.dpr || window.devicePixelRatio || 1, 2);
-      view.width = width;
-      view.height = height;
       canvas.width = Math.max(1, Math.round(width * ratio));
       canvas.height = Math.max(1, Math.round(height * ratio));
-      view.ratio = canvas.width / width;
+      view = { width, height, ratio: canvas.width / width };
       render();
       wake();
     };
@@ -872,7 +871,7 @@ const Particles = ({
   });
 
   return (
-    <div ref={containerRef} className={`particles-container${className ? ` ${className}` : ''}`} style={style}>
+    <div ref={containerRef} className={`particles-container${className ? ` ${className}` : ''}`}>
       <canvas ref={canvasRef} className="particles-canvas" aria-hidden="true" />
     </div>
   );

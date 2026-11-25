@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import { readChartDurationSeconds } from '../../components/charts/chart-design-values';
+import { readChartDurationSeconds, readChartNumber } from '../../components/charts/chart-design-values';
 import './preview-login-scene.css';
 
 const goldenAngle = Math.PI * (3 - Math.sqrt(5));
@@ -9,7 +9,7 @@ const particleOptions = {
   particleCount: 112, particleSpread: 9, cameraDistance: 33, speed: .2,
   particleBaseSize: 110, sizeRandomness: .8, glow: .42, twinkle: .2, depthOfField: .26,
   hoverEffect: 'parallax', particleHoverFactor: 2.6, clickBurst: false,
-  intro: false, alphaParticles: true, opacity: .43, pixelRatio: 1.35,
+  intro: false, alphaParticles: true, pixelRatio: 1.35,
 };
 
 const nodeCount = 432;
@@ -190,11 +190,8 @@ function drawShell(context, width, height, time, camera, progress, dark, palette
 export function mountLoginScene(host, motionPreference) {
   const canvas = host.querySelector('.login-scene');
   const card = host.querySelector('.login-card');
+  const particleLayer = host.querySelector('.login-particle-layer');
   const context = canvas.getContext('2d');
-  const particleLayer = document.createElement('div');
-  particleLayer.className = 'login-particle-layer';
-  particleLayer.setAttribute('aria-hidden', 'true');
-  host.prepend(particleLayer);
 
   let frame = 0;
   let timeout = 0;
@@ -296,6 +293,7 @@ export function mountLoginScene(host, motionPreference) {
     particleAppearance = appearance;
     particleRoot ??= createRoot(particleLayer);
     particleRoot.render(createElement(Particles, { ...particleOptions,
+      opacity: readChartNumber('--login-scene-particle-opacity', 0.43),
       particleColors: palette.particles, lightMode: !isDark, paused,
       moveParticlesOnHover: !paused,
     }));

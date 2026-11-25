@@ -210,6 +210,7 @@
   --login-travel-card-exit-scale: 1.12;
   --login-travel-particle-exit-scale: 1.24;
   --login-scene-particle-colors: #257799, #605fa0, #237e80;
+  --login-scene-particle-opacity: 0.43;
   --login-scene-network-ink: #376f8a;
   --login-scene-network-highlight: #426e9b;
   --login-scene-radar-trail-mask: #00000008, #00000020, #00000050, #0000009a, #000000db, #000;
