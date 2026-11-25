@@ -40,3 +40,6 @@
   border: var(--aml-stroke-divider) solid var(--divider);
   border-radius: var(--aml-radius-control);
 }
+.variable-swatch[data-swatch="color"] { background-color: var(--variable-swatch-value) }
+.variable-swatch[data-swatch="gradient"] { background-image: var(--variable-swatch-value) }
+.variable-swatch[data-swatch="shadow"] { box-shadow: var(--variable-swatch-value) }

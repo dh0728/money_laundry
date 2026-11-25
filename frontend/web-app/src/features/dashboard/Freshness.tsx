@@ -30,7 +30,7 @@ export function DashboardFreshness({ businessDate }: { businessDate: string }) {
     <Text as="span" className="tabular-nums">조사 집계 {hms(investigationAt)}</Text>
     {offline
       ? <Text as="span" role="alert" className="flex items-center gap-1.5 text-destructive-text"><Text as="i" className="size-2 rounded-full bg-destructive" aria-hidden />연결 끊김 · 마지막 성공 {hms(lastOk)} 값 표시 중 · {wait}초 뒤 다시 시도</Text>
-      : <Text as="span" className="flex items-center gap-1.5"><Text as="i" className="size-2 rounded-full" style={{ backgroundColor: 'var(--status-info-accent)' }} aria-hidden />1초마다 확인</Text>}
+      : <Text as="span" className="flex items-center gap-1.5"><Text as="i" className="size-2 rounded-full bg-(color:--status-info-accent)" aria-hidden />1초마다 확인</Text>}
     <Box as="label" className="ml-1 flex items-center gap-1.5 rounded border border-dashed px-1.5 py-0.5">시안: 연결 끊김 보기<Switch checked={offline} onCheckedChange={setOffline} /></Box>
   </Box>
 }

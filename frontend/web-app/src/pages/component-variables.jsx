@@ -59,13 +59,13 @@ function readVariables() {
 function VariableSample({ token }) {
   const value = `var(${token.name})`;
   if (CSS.supports('color', token.value)) {
-    return <Text as="span" className="variable-swatch" style={{ backgroundColor: value }} aria-hidden="true" />;
+    return <Text as="span" className="variable-swatch" data-swatch="color" style={{ '--variable-swatch-value': value }} aria-hidden="true" />;
   }
   if (CSS.supports('background-image', token.value) && token.value.includes('gradient(')) {
-    return <Text as="span" className="variable-swatch" style={{ backgroundImage: value }} aria-hidden="true" />;
+    return <Text as="span" className="variable-swatch" data-swatch="gradient" style={{ '--variable-swatch-value': value }} aria-hidden="true" />;
   }
   if (token.name.includes('shadow') && CSS.supports('box-shadow', token.value)) {
-    return <Text as="span" className="variable-swatch" style={{ boxShadow: value }} aria-hidden="true" />;
+    return <Text as="span" className="variable-swatch" data-swatch="shadow" style={{ '--variable-swatch-value': value }} aria-hidden="true" />;
   }
   return null;
 }

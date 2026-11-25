@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { SectionTitle } from '@/components/page'
 import { Card, CardContent } from '@/components/ui/card'
 import { card, content } from './detailText'
@@ -14,7 +14,12 @@ export function BarList({ rows, format = usd }: { rows: { name: string; v: numbe
         <Box key={r.name} className="contents">
           <Text as="span" title={r.name} className="max-w-24 truncate font-mono text-2xs">{r.name}</Text>
           <Text as="span" className="text-right tabular-nums">{format(r.v)}</Text>
-          <Text as="span" className="h-2 overflow-hidden rounded-full bg-muted"><Text as="span" className="block h-full rounded-full" style={{ width: `${(r.v / max) * 100}%`, backgroundColor: dataSeriesColors.sky }} /></Text>
+          <Text as="span" className="h-2 overflow-hidden rounded-full bg-muted">
+            <Text as="span" className="block h-full w-(--alert-amount-breakdown-width) rounded-full bg-(color:--alert-amount-breakdown-fill)" style={{
+              '--alert-amount-breakdown-width': `${(r.v / max) * 100}%`,
+              '--alert-amount-breakdown-fill': dataSeriesColors.sky,
+            } as CSSProperties} />
+          </Text>
         </Box>
       ))}
     </Box>

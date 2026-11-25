@@ -14,7 +14,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAlertOverrides, withOverride } from '@/features/alerts/alertOverrides'
 import { useReviewRequests } from '@/features/episodes/reviewStore'
 import { RadarSweep } from '@/components/radar-sweep'
-import { rdrSummaryBackground } from '@/features/agent/rdrSummaryStyle'
 import { fmt } from '@/lib/format'
 import { useAsync } from '@/lib/useAsync'
 import { boardStatuses, boardStatusHints, type WorkStatus } from '@/lib/workStatus'
@@ -38,7 +37,7 @@ function PersonalAiSummary({ pending }: { pending: AlertRow[] }) {
 }
 export function PersonalSummaryView({ children }: { children: ReactNode }) {
   return (
-    <Card data-testid="personal-ai-summary" className="h-full w-full min-w-0 shadow-none @xl:col-span-2 @5xl:col-span-2" style={rdrSummaryBackground}>
+    <Card data-testid="personal-ai-summary" className="rdr-summary-panel h-full w-full min-w-0 shadow-none @xl:col-span-2 @5xl:col-span-2">
       <CardContent>
         <Box className="flex flex-wrap items-center gap-2">
           <RadarSweep className="size-5 shrink-0" />

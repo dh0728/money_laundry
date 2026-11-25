@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { AgeBadge, PatternBadge, RiskBadge } from '@/components/badges'
 import type { WorkItem } from './workItems'
 import { Text, TextLink } from '@/components/layout-primitives'
@@ -13,8 +14,11 @@ export function WorkCard({ item, tone }: { item: Pick<WorkItem, 'kind' | 'href' 
       data-testid="work-card"
       data-kind={item.kind}
       data-tone={tone}
-      style={tone ? { background: `var(--badge-${tone}-background)`, borderColor: `var(--badge-${tone}-border)` } : undefined}
-      className="flex flex-col gap-2 rounded-lg border bg-card px-5 py-4 interactive-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      style={tone ? {
+        '--work-card-background': `var(--badge-${tone}-background)`,
+        '--work-card-border': `var(--badge-${tone}-border)`,
+      } as CSSProperties : undefined}
+      className="dashboard-work-card flex flex-col gap-2 rounded-lg border bg-card px-5 py-4 interactive-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <Text as="span" className="flex items-center justify-between gap-3">
         <Text as="span" className="font-mono text-sm">{item.code}</Text>

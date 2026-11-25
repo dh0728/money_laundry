@@ -6,7 +6,6 @@ import { ProvenanceBadge } from '@/components/Provenance'
 import { PatternBadge } from '@/components/badges'
 import { Card, CardContent } from '@/components/ui/card'
 import { RadarSweep } from '@/components/radar-sweep'
-import { rdrSummaryBackground } from '@/features/agent/rdrSummaryStyle'
 import { Box, Heading, Text } from '@/components/layout-primitives'
 
 const HIGH_RISK = 0.8
@@ -32,7 +31,7 @@ export function DailyReportView({ generatedAt, changeSummary, operation, focus }
   generatedAt?: string | null; changeSummary: string; operation: string; focus: ReactNode
 }) {
   return (
-    <Card data-testid="ai-daily-report" className="h-full min-w-0 overflow-hidden shadow-none" style={rdrSummaryBackground}>
+    <Card data-testid="ai-daily-report" className="rdr-summary-panel h-full min-w-0 overflow-hidden shadow-none">
       <CardContent className="flex min-h-0 flex-1 flex-col">
         <Box className="shrink-0">
           <Box className="flex items-center gap-2"><RadarSweep className="size-5 shrink-0" /><Heading level={3} className="text-base font-semibold tracking-tight">RDR 9000 Daily Report</Heading><ProvenanceBadge kind="mock" title="규칙 기반 시연 문장. LLM 미연동." /></Box>
