@@ -134,7 +134,7 @@
   position: sticky;
   inset-block-start: 0;
   z-index: var(--table-header-layer);
-  background-color: var(--information-panel-surface);
+  background-color: var(--canvas-surface);
   color: var(--text);
   font-weight: var(--aml-type-body-strong-weight);
   text-align: start;
@@ -287,7 +287,6 @@
 
 .rule-backtest-table { inline-size: 100%; font-variant-numeric: tabular-nums }
 .rule-backtest-table :is(th, td):not(:first-child) { text-align: end }
-.rule-backtest-table tr[data-current] { background: var(--brand-accent-tint) }
 .rule-backtest-table tr[data-current] th { font-weight: var(--aml-type-body-strong-weight) }
 
 @media print {
