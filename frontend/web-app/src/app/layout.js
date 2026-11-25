@@ -11,7 +11,7 @@ import { bindCardGlow } from '../components/card-glow.js';
 import { ConfirmHoldButton, PrimaryButton } from '../components/primary-button.jsx';
 import { DialogClose, DialogFooter, DialogHeader } from '../components/dialog-parts.jsx';
 import { SearchField } from '../components/search-field.jsx';
-import { downloadCsv, inDateRange, QueryRadio, QueryToolbar, setupQueryControls } from '../components/query-controls.jsx';
+import { downloadCsv, inDateRange, PageDownloadControl, QueryRadio, QueryToolbar, setupQueryControls } from '../components/query-controls.jsx';
 import { dashboardFixtureBoardPage, dashboardFixtureResponse, dashboardFixtures, dashboardPeriodEnd, dashboardRecordCodes } from '../mocks/dashboard-fixtures.js';
 import { personalWorkHistory } from '../features/dashboard/personal-work-history.js';
 import { liveCodes, liveSource, liveSourceLoaded, loadLiveSource, rebuildLiveSource, resetLiveSource } from '../features/investigation/live-data.js';
@@ -125,7 +125,7 @@ function Header() {
       'id="search-toggle" aria-haspopup="dialog" aria-controls="search-dialog" data-drawer-button', '', 'floating'),
     'data-drawer-controls'), 'class="header-frame header-frame--left"');
   const navigation = BoxHTML(BoxHTML(
-    BoxHTML('', 'id="screen-navigation" class="header-frame screen-navigation" hidden'),
+    BoxHTML('', 'id="screen-navigation" class="header-frame screen-navigation" hidden') + PageDownloadControl(),
     'class="contextual-header"',
   ), 'class="header-frame header-frame--center"');
   const viewControls = BoxHTML(
@@ -558,6 +558,7 @@ const queryControls = setupQueryControls({
   },
   workspace: byId('workspace'),
   controls: queryToolStorage.firstElementChild,
+  pageDownload: byId('page-download').firstElementChild,
 });
 mountWorkflowNotifications(byId('workflow-notifications'));
 mountNotificationPreference(byId('notification-preference'));
@@ -683,13 +684,7 @@ function showBenchmarkWorkspace(path, code, navigationMode, params) {
       }
       benchmarkLedgerView = mountBenchmarkLedger(host, {
         paginationHost: byId('footer-pagination'),
-        dataset, code, tableView: path === ledgerTableScreen, onVisibleRecordsChange: records => {
-          if (!host.isConnected) return;
-          registerBenchmarkExport('ibm-hi-small-transactions', '조회된 원본 원장',
-            ['거래 코드', '원본 시각', '송금 은행 코드', '송금 계좌', '수취 은행 코드', '수취 계좌', '송금 금액', '송금 통화', '수취 금액', '수취 통화', '거래 방식', '원본 세탁 라벨'],
-            records.map(row => [row.code, row.timestamp, row.from.bank, row.from.account, row.to.bank, row.to.account,
-              row.paidAmount, row.paidCurrency, row.receivedAmount, row.receivedCurrency, row.method, Number(row.labeled)]));
-        },
+        dataset, code, tableView: path === ledgerTableScreen,
       });
       return;
     }

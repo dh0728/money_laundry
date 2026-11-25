@@ -38,6 +38,7 @@
   block-size: var(--query-control-size, var(--header-control-size));
 }
 .query-control:has(.query-trigger[hidden]) { display: none }
+.query-trigger > .icon { pointer-events: none }
 .query-control > .query-trigger {
   inline-size: 100%;
   min-inline-size: 0;

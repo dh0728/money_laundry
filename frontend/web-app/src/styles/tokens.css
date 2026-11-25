@@ -189,6 +189,11 @@
   --chart-tooltip-min-width: 8rem;
   --chart-tooltip-fade-duration: 100ms;
   --chart-loading-sweep-box-size: 1;
+  --chart-mask-box-size: 1;
+  --chart-effect-padding-ratio: 1;
+  --chart-shimmer-band-start: 40%;
+  --chart-shimmer-band-end: 60%;
+  --chart-shimmer-background-width: 300%;
   --chart-x-axis-slide-duration: 500ms;
   --chart-x-axis-slide-ease: cubic-bezier(0.85, 0, 0.15, 1);
   --chart-x-axis-label-fade-duration: 400ms;

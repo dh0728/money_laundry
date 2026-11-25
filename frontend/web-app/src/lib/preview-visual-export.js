@@ -16,7 +16,7 @@ const visualSelector = [
   '[data-export-visualization]',
 ].join(', ');
 const omitted = [
-  'button', 'input', '.visually-hidden', '.screen-title-accessible', '.sr-only',
+  'button', 'input', '.icon', '.visually-hidden', '.screen-title-accessible', '.sr-only',
   '[role="tooltip"]',
 ].join(', ');
 const presentationAttributes = [
@@ -131,7 +131,7 @@ function placeSVG(layer, source, bounds, visual = copySVG(source)) {
 }
 
 function opaquePaint(paint) {
-  return paint && paint !== 'transparent' && paint !== 'rgba(0, 0, 0, 0)';
+  return paint && paint !== 'transparent' && !/^(?:rgba\(|color\().*(?:,|\/)\s*0\)$/.test(paint);
 }
 
 function paintBox(layer, element, bounds, scale = 1) {

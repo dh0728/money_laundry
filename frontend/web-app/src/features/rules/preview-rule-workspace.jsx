@@ -1,7 +1,7 @@
 import React, { cloneElement, useEffect, useId, useRef, useState } from 'react';
 import { TableBody, TableCell, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { RULE_LIMITS, ruleStatusLabels, ruleTransitionActions } from '@/features/rules/rules-logic';
+import { RULE_LIMITS, ruleConditionSummary, ruleStatusLabels, ruleTransitionActions } from '@/features/rules/rules-logic';
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
 import { bindTooltip } from '../../components/components.js';
 import { DialogFrame } from '../../components/dialog-parts';
@@ -10,7 +10,8 @@ import { RuleConditionFacts } from './rule-condition-tree';
 import { activateRecordCard } from '../../components/record-card';
 import { ScreenActions } from '../../components/screen-actions';
 import { StatusTag } from '../../components/semantic-tags';
-import { downloadCsv } from '../../components/query-controls';
+import { csvDownloadEntry } from '../../components/query-controls';
+import { SectionDownloadHeading } from '../../components/section-download';
 import { SortableTableHead, tableCount, useTableSort, WorkflowTable } from '../../components/workflow-table';
 import { ruleRepository } from './rule-repository';
 import { useRules } from './use-rules';
@@ -236,12 +237,20 @@ export function RuleList({ reason = false, initialRule, registerTableTools, acti
     value, label, count: rules.filter(rule => rule.status === value).length,
   }));
   const history = selected ? [...selected.history].reverse() : [];
+  const shownHistory = reason ? history : history.slice(0, 1);
+  const historyTitle = reason ? '변경 사유' : '최근 변경';
+  const detailDownloads = selected ? [csvDownloadEntry('룰 상세', `${selected.id}-detail`,
+    ['룰 ID', '룰 이름', '버전', '상태', '담당자', '마지막 변경', '설명', '조건'],
+    [[selected.id, selected.name, selected.version, ruleStatusLabels[selected.status], selected.author,
+      selected.updatedAt, selected.description, ruleConditionSummary(selected)]])] : [];
+  const historyDownloads = shownHistory.length ? [csvDownloadEntry(historyTitle, `${selected.id}-history`,
+    ['룰 ID', '시각', '작업', '담당자', '변경 사유'],
+    shownHistory.map(entry => [selected.id, entry.at, entry.action, entry.actor, entry.reason]))] : [];
   const ruleFilter = [{ value: 'all', label: '전체' }, ...breakdown.filter(row => row.count).map(({ value, label }) => ({ value, label }))];
   useEffect(() => registerTableTools?.({
     filter: { label: '룰 상태', options: ruleFilter, value: status, onChange: setStatus },
-    entries: [{ label: '조회된 룰', format: 'CSV', count: sorting.rows.length,
-      download: () => downloadCsv('rules', ['상태', '룰 ID', '룰 이름', '버전', '담당자'],
-        sorting.rows.map(rule => [ruleStatusLabels[rule.status], rule.id, rule.name, rule.version, rule.author])) }],
+    entries: [csvDownloadEntry('조회된 룰', 'rules', ['상태', '룰 ID', '룰 이름', '버전', '담당자'],
+      sorting.rows.map(rule => [ruleStatusLabels[rule.status], rule.id, rule.name, rule.version, rule.author]))],
   }));
   const actions = <RuleActions rule={selected} actionsHost={actionsHost} listLink={reason}
     onTransition={setDeciding} onRemove={() => setRemoving(selected)} />;
@@ -288,7 +297,7 @@ export function RuleList({ reason = false, initialRule, registerTableTools, acti
         </WorkflowTable>
       </Panel>
       {selected && <Panel className="workflow-rule-detail" aria-label="룰 상세">
-        <Heading><Text as="code">{selected.id}</Text> {selected.name}</Heading>
+        <SectionDownloadHeading entries={detailDownloads}><Text as="code">{selected.id}</Text> {selected.name}</SectionDownloadHeading>
         <Box className="workflow-rule-detail-tags">
           <StatusTag preset={presets[selected.status]}>{ruleStatusLabels[selected.status]}</StatusTag>
           <StatusTag preset="neutral">v{selected.version}</StatusTag>
@@ -303,9 +312,9 @@ export function RuleList({ reason = false, initialRule, registerTableTools, acti
       </Panel>}
     </Box>
     {selected && <Panel className="workflow-rule-reason" aria-label={reason ? '룰 변경 사유' : '룰 최근 변경'}>
-      <Heading>{reason ? '변경 사유' : '최근 변경'}</Heading>
+      <SectionDownloadHeading entries={historyDownloads}>{historyTitle}</SectionDownloadHeading>
       {history.length ? <Box as="ol" className="workflow-rule-history">
-        {(reason ? history : history.slice(0, 1)).map((entry, index) => <Box as="li" key={index}>
+        {shownHistory.map((entry, index) => <Box as="li" key={index}>
           <Box><Text as="strong">{entry.action}</Text> <Text as="span">{entry.actor} · <RuleTime value={entry.at} /></Text></Box>
           <Text>{entry.reason}</Text>
         </Box>)}

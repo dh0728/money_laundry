@@ -4,9 +4,18 @@ export { bindTooltip, hideTooltip } from './warm-tooltip-dom.jsx';
 export const Icon = (name, variant = '') =>
   `<svg class="icon ${variant}" viewBox="0 0 24 24" aria-hidden="true">${icons[name]}</svg>`;
 
-// Animated AML RADAR symbol. Shape comes from /aml_radar_symbol_*.svg; color follows currentColor.
+// Lucide Radar geometry with the AML RADAR rings and echoes.
 export const BrandSymbol = (variant = '') =>
-  `<span class="icon aml-radar-symbol ${variant}" aria-hidden="true"></span>`;
+  `<svg class="icon aml-radar-symbol ${variant}" viewBox="0 0 24 24" aria-hidden="true">
+    <g class="aml-radar-symbol__sweep">
+      <circle class="aml-radar-symbol__outer" cx="12" cy="12" r="10"/>
+      <circle class="aml-radar-symbol__inner" cx="12" cy="12" r="6"/>
+      <path class="aml-radar-symbol__echo aml-radar-symbol__echo--outer" d="M4 6h.01"/>
+      <path class="aml-radar-symbol__echo aml-radar-symbol__echo--inner" d="M12 18h.01"/>
+      <circle cx="12" cy="12" r="2"/>
+      <path d="m13.41 10.59 5.66-5.66"/>
+    </g>
+  </svg>`;
 
 export function buttonPresentation({ className = '', shape, surface, type = 'button' } = {}) {
   return {

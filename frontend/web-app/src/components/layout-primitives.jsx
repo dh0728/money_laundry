@@ -6,7 +6,6 @@ import './layout-primitives.css';
 // Stack·Grid는 배치를 부품이 정한다. 간격은 space 토큰 숫자만 받는다.
 const space = gap => (gap === undefined ? undefined : `var(--aml-space-${gap})`);
 /** @typedef {import('react').AllHTMLAttributes<HTMLElement> & import('react').RefAttributes<any> & { as?: import('react').ElementType } & Record<string, any>} PrimitiveProps */
-const vars = entries => Object.fromEntries(Object.entries(entries).filter(([, value]) => value !== undefined));
 
 /** 배치 없는 상자(div·section·ul·li·dl·label 등). @param {PrimitiveProps} props */
 export function Box({ as: Tag = 'div', ...props }) {
@@ -14,16 +13,16 @@ export function Box({ as: Tag = 'div', ...props }) {
 }
 
 /** @param {PrimitiveProps} props */
-export function Stack({ as: Tag = 'div', direction = 'column', gap = 8, align, justify, wrap = false, className = '', style, ...props }) {
+export function Stack({ as: Tag = 'div', direction = 'column', gap = 8, align, justify, wrap = false, className = '', ...props }) {
   return <Tag {...props} className={`aml-stack ${className}`.trim()} data-direction={direction} data-wrap={wrap || undefined}
-    style={{ ...style, ...vars({ '--stack-gap': space(gap), '--stack-align': align, '--stack-justify': justify }) }} />;
+    style={{ '--stack-gap': space(gap), '--stack-align': align, '--stack-justify': justify }} />;
 }
 
 /** @param {PrimitiveProps} props */
-export function Grid({ as: Tag = 'div', columns = 2, min, gap = 8, className = '', style, ...props }) {
+export function Grid({ as: Tag = 'div', columns = 2, min, gap = 8, className = '', ...props }) {
   const template = min ? `repeat(auto-fit, minmax(min(100%, ${min}), 1fr))` : `repeat(${columns}, minmax(0, 1fr))`;
   return <Tag {...props} className={`aml-grid ${className}`.trim()}
-    style={{ ...style, ...vars({ '--grid-columns': template, '--grid-gap': space(gap) }) }} />;
+    style={{ '--grid-columns': template, '--grid-gap': space(gap) }} />;
 }
 
 /** 글자(p·span·strong·code·time 등). tone을 주면 공용 글자색을 쓴다. @param {PrimitiveProps} props */

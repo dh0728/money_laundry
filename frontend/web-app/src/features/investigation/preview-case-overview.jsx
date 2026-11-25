@@ -14,8 +14,10 @@ import { NativeSelect } from '../../components/ui/select';
 import { Panel } from '../../components/panel';
 import { AISummaryPanel } from '../../components/ai-summary-panel';
 import { SectionDownloadHeading } from '../../components/section-download';
+import { csvDownloadEntry } from '../../components/query-controls';
 import { OverviewScoreChart, overviewScorePoints } from './overview-score-chart';
-import { CaseActorTag, CaseAgeTag, CountTag, LinkTag, ModelScoreTag, PatternTag, ReviewStatusTag, VerdictTag } from '../../components/semantic-tags';
+import { CaseActorTag, CaseAgeTag, CountTag, LinkTag, ModelScoreTag, PatternTag, ReviewStatusTag, VerdictTag,
+  reviewStatusLabel, verdictLabels } from '../../components/semantic-tags';
 import { TransactionEvidenceTable } from './preview-case-table';
 import { useCaseEvidenceSelection } from './case-evidence-selection';
 import { caseOverviewEvidence, episodeAlertEvidence, relatedJudgments } from './case-overview-evidence';
@@ -30,6 +32,7 @@ const decimal = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 });
 const kst = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul', dateStyle: 'short', timeStyle: 'short' });
 const amount = record => `${number.format(record.amount)} ${record.currency}`;
 const reviewAssignee = row => row.assigned ? '내 담당' : '다른 담당자';
+const caseTime = value => Number.isFinite(Date.parse(value)) ? kst.format(new Date(value)) : '';
 
 function EvidencePeriod({ records }) {
   if (!records.length) return '자료 없음';
@@ -102,11 +105,17 @@ function CurrencyValues({ flows, field }) {
   </Text>;
 }
 
+function connectedTotals(records) {
+  return [...Map.groupBy(records, record => record.currency)].map(([currency, group]) => ({
+    currency, total: group.reduce((sum, record) => sum + record.amount, 0),
+    count: group.length, first: group[0].timestamp, last: group.at(-1).timestamp,
+  }));
+}
+
 function FlowSummary({ evidence, compact = false }) {
   const { focus, flows, inflows, outflows } = evidence;
   if (!flows.length) {
-    const totals = [...Map.groupBy(evidence.records, record => record.currency)]
-      .map(([currency, records]) => ({ currency, total: records.reduce((sum, record) => sum + record.amount, 0) }));
+    const totals = connectedTotals(evidence.records);
     return totals.length > 0
       ? <Text className="overview-flow-total">연결 거래 금액 <CurrencyValues flows={totals} field="total" /></Text>
       : <Text className="overview-note">연결된 거래가 없습니다.</Text>;
@@ -405,6 +414,37 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
   };
   const graphicPanels = { judgment: records.length > 0, accounts: accounts.length > 0, past: prior.length > 0,
     detection: scorePoints.length > 0, flow: records.length > 0 };
+  const caseCsv = (id, columns, rows) => csvDownloadEntry(panels[id].title, `${row.code}-${id}`, columns, rows);
+  const compositionRows = composition.map(part => [part.label, part.value]);
+  const distribution = csvDownloadEntry('근거 거래 구성', `${row.code}-distribution`, ['구분', '건수'], compositionRows);
+  const downloads = {
+    judgment: caseCsv('judgment', ['업무 ID', '판정', '처리 기한', '근거 거래 수', '계좌 수', '판정 사유'],
+      [[row.code, verdictLabels[row.verdict], row.reviewDueOn, records.length, accounts.length,
+        row.judgment && previewJudgmentReason(row.judgment)]]),
+    accounts: caseCsv('accounts', ['계좌', '소유주', '참여 거래 수', '송금 거래 수', '수취 거래 수'],
+      accounts.map(account => [account.code, account.owner, account.transactions.size, account.sent, account.received])),
+    past: caseCsv('past', ['판정 ID', '판정', '시각 (KST)', '대상 ID', '공유 계좌'],
+      prior.flatMap(item => item.targets.map(target => [
+        item.id, verdictLabels[item.verdict], caseTime(item.at), target.code, target.sharedAccounts.join(' · '),
+      ]))),
+    history: caseCsv('history', ['업무 ID', '처리 상태', '담당 범위', '판정자', '판정 시각 (KST)', '판정 사유'],
+      [[row.code, reviewStatusLabel(row.status), reviewAssignee(row), row.judgment?.reviewer, caseTime(row.judgment?.at),
+        row.judgment && previewJudgmentReason(row.judgment)]]),
+    detection: caseCsv('detection', ['거래 ID', '시각 (KST)', '송금 계좌', '수취 계좌', '모델 점수', '탐지 패턴'],
+      records.filter(record => Number.isFinite(record.score)).map(record => [
+        record.code, record.timestamp, record.from.code, record.to.code, record.score, row.pattern,
+      ])),
+    flow: flows.length
+      ? caseCsv('flow', ['중심 계좌', '통화', '유입', '유출', '순유입', '경유 비율 (%)'],
+        flows.map(flow => [focus.code, flow.currency, flow.inflow, flow.outflow, flow.net, flow.ratio]))
+      : caseCsv('flow', ['통화', '연결 거래 금액', '거래 수', '첫 거래 (KST)', '마지막 거래 (KST)'],
+        connectedTotals(records).map(row => [row.currency, row.total, row.count, row.first, row.last])),
+    rules: csvDownloadEntry('현재 운영 중인 룰', `${row.code}-active-rules`, ['룰 ID', '버전', '이름', '조건'],
+      activeRules.map(rule => [rule.id, rule.version, rule.name, rule.conditions])),
+    composition: episode ? csvDownloadEntry('Alert 연결', `${row.code}-alerts`, ['Alert ID', '관계', '공통 거래 수'],
+      [['소속', episodeRelations.members], ['거래 공유', episodeRelations.related]].flatMap(([relation, items]) =>
+        items.map(item => [item.code, relation, item.value]))) : distribution,
+  };
   const layout = episode
     ? [['judgment', 4], ['flow', 8], ['history', 4], ['accounts', 4], ['detection', 4], ['rules', 4], ['composition', 8], ['transactions', 12]]
     : [['judgment', 3], ['accounts', 3], ['past', 3], ['history', 3], ['detection', 9], ['composition', 3],
@@ -417,6 +457,8 @@ function buildPanels(row, evidence, history, activeRules, reduced, evidenceSelec
       panelVisual: id === 'flow' ? flowChart : undefined,
       panelDetails: id === 'flow' ? <><FlowSummary evidence={evidence} />{panel.details}</> : undefined,
       graphic,
+      entries: downloads[id] && !downloads[id].disabled ? [downloads[id]] : [],
+      distributionEntries: id === 'composition' && !distribution.disabled ? [distribution] : [],
       overviewGraphic: id === 'detection' ? scorePoints.length > 0
         : id === 'flow' ? flows.length > 0 : ['accounts', 'composition'].includes(id) && graphic,
     };
@@ -466,6 +508,7 @@ function PanelOverview({ panels, initialPanel, paginationHost }) {
         </Box>
       </Panel>
       <Panel className="overview-current overview-panel-details" aria-label={`${panel.title} 상세`}>
+        {panel.entries.length > 0 && <SectionDownloadHeading entries={panel.entries}>{panel.title} 상세</SectionDownloadHeading>}
         {panel.panelDetails ?? panel.details ?? panel.content}
       </Panel>
     </Box>
@@ -476,7 +519,7 @@ function PanelOverview({ panels, initialPanel, paginationHost }) {
 function OverviewTile({ panel, span = panel.span, title = panel.title, children }) {
   const { id, count, content, details, visualContent, overviewGraphic, compact } = panel;
   return <Panel data-overview-panel={id} data-overview-span={span} data-export-visualization={overviewGraphic || undefined}>
-    <SectionDownloadHeading downloadLabel={overviewGraphic ? title : undefined}>
+    <SectionDownloadHeading downloadLabel={overviewGraphic ? title : undefined} entries={panel.entries}>
       {title}{count !== undefined && <CountTag count={count} />}
     </SectionDownloadHeading>
     {children ?? compact ?? content ?? <>{visualContent}{details}</>}
@@ -557,7 +600,8 @@ function EpisodeOverview({ panels, evidence, summary }) {
     </Box>
     <Box className="overview-tiles">
       <ScoreOverviewTile panel={{ ...byId.get('detection'), span: 8 }} lead={lead} />
-      <OverviewTile panel={{ ...composition, id: 'distribution' }} title="근거 거래 구성" span={4}>{composition.distribution}</OverviewTile>
+      <OverviewTile panel={{ ...composition, id: 'distribution', entries: composition.distributionEntries }}
+        title="근거 거래 구성" span={4}>{composition.distribution}</OverviewTile>
       <Panel data-overview-panel="transactions" data-overview-span="12">{byId.get('transactions').visualContent}</Panel>
     </Box>
   </>;
@@ -582,7 +626,10 @@ export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, h
   const trends = trendSeries.filter(({ points }) => points.filter(point => point.value > 0).length >= 2);
   const summary = <AISummaryPanel className="overview-ai-summary" reduced={appearance.reduced} aria-labelledby="overview-summary-title"
           data-export-visualization={trends.length > 0 || undefined}>
-          <SectionDownloadHeading id="overview-summary-title" downloadLabel={trends.length ? 'AI 요약' : undefined}>
+          <SectionDownloadHeading id="overview-summary-title" downloadLabel={trends.length ? 'AI 요약' : undefined}
+            entries={representative ? [csvDownloadEntry('AI 요약 근거', `${row.code}-summary`,
+              ['중심 계좌', '연결 계좌 수', '근거 거래 수', '중심 계좌 유입 건수', '중심 계좌 유출 건수', '대표 거래 ID', '모델 점수'],
+              [[focus?.code, accounts.length, records.length, inflows.length, outflows.length, representative.code, lead?.score]])] : []}>
             <Sparkles className="icon" aria-hidden="true" /> AI 요약
           </SectionDownloadHeading>
           <Text as="strong">{focus ? <><Text as="code">{focus.code}</Text> · 근거 거래 {focus.transactions.size}건 집중</>

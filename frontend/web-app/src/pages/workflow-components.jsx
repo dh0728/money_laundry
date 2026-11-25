@@ -17,7 +17,7 @@ import { ScreenActions } from '../components/screen-actions';
 import { CompletionRing } from '../components/completion-ring';
 import { SectionDownloadHeading } from '../components/section-download';
 import { LinkTag, PatternTag, StatusTag, VerdictTag, verdictLabels } from '../components/semantic-tags';
-import { downloadCsv, inDateRange, LocalQueryTools } from '../components/query-controls';
+import { csvDownloadEntry, downloadCsv, inDateRange, LocalQueryTools } from '../components/query-controls';
 import { RuleList } from '../features/rules/preview-rule-workspace';
 import { ruleRepository } from '../features/rules/rule-repository';
 import { useRules } from '../features/rules/use-rules';
@@ -211,6 +211,12 @@ function BacktestRun({ rule, scope, registerTableTools, actionsHost }) {
   const matches = results?.transactions ?? [];
   const sorting = useTableSort(matches.filter(record => inDateRange(new Date(`${record.date}T00:00:00`), resultRange)));
   const running = status === 'running';
+  const ruleEntry = csvDownloadEntry('백테스트 대상 룰', 'backtest-rule', ['룰 ID', '이름', '버전', '기록된 룰 조건'],
+    [[rule.id, rule.name, rule.version, ruleConditionSummary(rule)]]);
+  const scopeEntry = csvDownloadEntry('백테스트 대상 거래', 'backtest-scope', ['시작일 (KST)', '종료일 (KST)', '대상 거래 수'],
+    [[scope.start, scope.end, scope.count]]);
+  const conditionsEntry = csvDownloadEntry('백테스트 적용 조건', 'backtest-conditions', ['룰 ID', '적용 조건'],
+    [[rule.id, runConditions]]);
   const reset = () => {
     setResults(null);
     setResultRange(undefined);
@@ -250,7 +256,10 @@ function BacktestRun({ rule, scope, registerTableTools, actionsHost }) {
   return <Box as="section" className="screen-section workflow-panel workflow-backtest" aria-label="백테스트">
     <Box className="backtest-grid">
       <Panel className="backtest-card">
-        <Box as="header" className="backtest-card-heading"><Heading>백테스트 대상 룰</Heading><ResultStatus status={status} /></Box>
+        <Box as="header" className="backtest-card-heading">
+          <SectionDownloadHeading entries={[ruleEntry]}>백테스트 대상 룰</SectionDownloadHeading>
+          <ResultStatus status={status} />
+        </Box>
         <Text as="strong" className="backtest-rule-name">{rule.name}</Text>
         <Text className="backtest-meta"><Text as="code">{rule.id}</Text> · v{rule.version}</Text>
         <Box as="dl" className="backtest-rule-conditions">
@@ -258,7 +267,7 @@ function BacktestRun({ rule, scope, registerTableTools, actionsHost }) {
         </Box>
       </Panel>
       <Panel className="backtest-card">
-        <Heading>백테스트 대상 거래</Heading>
+        <SectionDownloadHeading entries={[scopeEntry]}>백테스트 대상 거래</SectionDownloadHeading>
         <Text className="backtest-metric-number"><Text as="strong">{scope.count.toLocaleString('ko-KR')}</Text> <Text as="span">거래</Text></Text>
         <Text className="backtest-meta"><Text as="time" dateTime={backtestPeriod.start}>{backtestPeriod.start}</Text>
           {' ~ '}<Text as="time" dateTime={backtestPeriod.end}>{backtestPeriod.end}</Text> · KST</Text>
@@ -279,21 +288,24 @@ function BacktestRun({ rule, scope, registerTableTools, actionsHost }) {
             <Text id="backtest-score-range" className="backtest-meta">0~100점 · 소수 둘째 자리까지</Text>
           </Panel>}
           <Panel className="backtest-card">
-            <Heading>백테스트 적용 조건</Heading>
+            <SectionDownloadHeading entries={scoreValid ? [conditionsEntry] : []}>백테스트 적용 조건</SectionDownloadHeading>
             {scoreValid ? <RuleConditionFacts input={appliedRule} /> : <Text>{runConditions}</Text>}
           </Panel>
         </Box>
       </Step>
       <Step title="실행 확인">
         <Panel className="backtest-card">
-          <Heading>실행할 조건</Heading>
+          <SectionDownloadHeading entries={[conditionsEntry]}>실행할 조건</SectionDownloadHeading>
           <RuleConditionFacts input={appliedRule} />
         </Panel>
       </Step>
       <Step title="결과">
         {results && <>
           <Panel className="backtest-card" data-export-visualization={results.scannedCount > 0 || undefined}>
-            <SectionDownloadHeading downloadLabel={results.scannedCount > 0 ? '백테스트 적중률' : undefined}>
+            <SectionDownloadHeading downloadLabel={results.scannedCount > 0 ? '백테스트 적중률' : undefined}
+              entries={[csvDownloadEntry('백테스트 결과', 'backtest-summary',
+                ['룰 ID', '검사 거래 수', '적중 거래 수', '적중 계좌 수', '합계 (USD)', '적용 조건'],
+                [[rule.id, results.scannedCount, results.matchedCount, results.accountCount, results.amountUsd, runConditions]])]}>
               백테스트 결과
             </SectionDownloadHeading>
             <Box className="backtest-result-summary">

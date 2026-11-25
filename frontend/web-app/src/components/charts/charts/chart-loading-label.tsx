@@ -1,7 +1,9 @@
 "use client";
 
 import { m } from "motion/react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { readChartNumber } from "../chart-design-values";
 import { ShimmeringText } from "../shimmering-text";
 import {
   LINE_LOADING_PULSE_EASE,
@@ -22,6 +24,7 @@ export function ChartLoadingLabel({
   className,
   exiting = false,
 }: ChartLoadingLabelProps) {
+  const [exitBlur] = useState(() => readChartNumber("--aml-space-2", 2));
   if (!text.trim()) {
     return null;
   }
@@ -31,11 +34,11 @@ export function ChartLoadingLabel({
       animate={{
         y: exiting ? LOADING_LABEL_EXIT_Y_PX : 0,
         opacity: exiting ? 0 : 1,
-        filter: exiting ? "blur(2px)" : "blur(0px)",
+        "--chart-loading-label-blur": exiting ? exitBlur : 0,
       }}
       aria-live="polite"
       className={cn(
-        "pointer-events-none absolute inset-0 flex items-center justify-center",
+        "chart-loading-label pointer-events-none absolute inset-0 flex items-center justify-center",
         className
       )}
       initial={false}

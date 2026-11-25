@@ -8,12 +8,14 @@ import { readChartNumber } from '../../components/charts/chart-design-values';
 import { RiskBandArc, riskBandPoint } from '../../components/charts/charts/risk-band-ring';
 import { bindTooltip } from '../../components/components';
 import { RuleConditionBlocks } from '@/features/rules/RuleConditionBlocks';
-import { compileRuleBlocks, RULE_LIMITS, ruleBlocksFor, validateRule } from '@/features/rules/rules-logic';
+import { compileRuleBlocks, RULE_LIMITS, ruleBlocksFor, ruleConditionSummary, validateRule } from '@/features/rules/rules-logic';
 import { ruleRepository } from './rule-repository';
 import { useRules } from './use-rules';
 import { RuleConditionFacts, RuleTreeBranches } from './rule-condition-tree';
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
 import { Panel } from '../../components/panel';
+import { csvDownloadEntry } from '../../components/query-controls';
+import { SectionDownloadHeading } from '../../components/section-download';
 import { ScreenActions } from '../../components/screen-actions';
 import '../../components/form-dropdown.css';
 import { Box, Heading, Text } from '@/components/layout-primitives';
@@ -204,7 +206,10 @@ function RuleDraft({ actionsHost, sourceRule, repository = ruleRepository }) {
           setFailure('');
         }} />
       <Box as="section" className="rule-draft-preview" aria-label="작성한 조건 미리 보기">
-        <Heading>작성한 조건 미리 보기</Heading>
+        <SectionDownloadHeading entries={blocks.length && !hasInvalidCondition
+          ? [csvDownloadEntry('작성한 조건', 'rule-draft', ['룰 이름', '목적과 근거', '조건'],
+            [[input.name.trim(), input.description.trim(), ruleConditionSummary(input)]])]
+          : []}>작성한 조건 미리 보기</SectionDownloadHeading>
         {input.name.trim() && <Heading level={3}>{input.name.trim()}</Heading>}
         {input.description.trim() && <Text>{input.description.trim()}</Text>}
         {!blocks.length ? <Text>조건 블록을 추가해 주세요.</Text> :

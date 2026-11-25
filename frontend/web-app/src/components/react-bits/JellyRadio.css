@@ -29,6 +29,7 @@
 }
 
 .jelly-radio__chip {
+  transform: var(--jelly-radio-chip-transform, none);
   position: relative;
   margin: 0;
   padding: 0;

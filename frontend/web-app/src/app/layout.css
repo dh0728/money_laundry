@@ -61,7 +61,7 @@
 }
 
 * { box-sizing: border-box }
-[hidden] { display: none !important }
+:root [hidden]:not(.sidebar) { display: none }
 html { background: var(--canvas-surface) }
 body {
   margin: 0;
@@ -123,12 +123,72 @@ body {
   flex-shrink: 0;
 }
 .icon-compact { --icon-size: var(--compact-icon-size) }
-/* AML RADAR symbol (lucide radar, ISC): the SVG file is the mask, currentColor is the theme color. */
+/* AML RADAR symbol based on the Lucide Radar icon (ISC). */
 .aml-radar-symbol {
-  display: inline-block;
-  background-color: currentColor;
-  -webkit-mask: url(/aml_radar_symbol_animated.svg) center / contain no-repeat;
-  mask: url(/aml_radar_symbol_animated.svg) center / contain no-repeat;
+  stroke-width: var(--aml-stroke-brand-symbol);
+}
+.aml-radar-symbol__outer {
+  stroke-dasharray: var(--aml-radar-symbol-outer-rest);
+  stroke-dashoffset: var(--aml-radar-symbol-outer-offset);
+}
+.aml-radar-symbol__inner {
+  stroke-dasharray: var(--aml-radar-symbol-inner-rest);
+  stroke-dashoffset: var(--aml-radar-symbol-inner-offset);
+}
+.aml-radar-symbol__sweep,
+.aml-radar-symbol__echo {
+  transform-box: view-box;
+  transform-origin: center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-reduced-motion="true"]) .aml-radar-symbol__sweep {
+    animation: aml-radar-symbol-sweep var(--aml-radar-symbol-sweep-duration) linear infinite;
+  }
+  :root:not([data-reduced-motion="true"]) .aml-radar-symbol__outer {
+    animation: aml-radar-symbol-outer var(--aml-radar-symbol-echo-duration) var(--aml-radar-symbol-echo-ease) infinite;
+  }
+  :root:not([data-reduced-motion="true"]) .aml-radar-symbol__inner {
+    animation: aml-radar-symbol-inner var(--aml-radar-symbol-echo-duration) var(--aml-radar-symbol-echo-ease) infinite;
+  }
+  :root:not([data-reduced-motion="true"]) .aml-radar-symbol__echo--outer {
+    animation: aml-radar-symbol-outer-echo var(--aml-radar-symbol-echo-duration) var(--aml-radar-symbol-echo-ease) infinite;
+  }
+  :root:not([data-reduced-motion="true"]) .aml-radar-symbol__echo--inner {
+    animation: aml-radar-symbol-inner-echo var(--aml-radar-symbol-echo-duration) var(--aml-radar-symbol-echo-ease) infinite;
+  }
+}
+@keyframes aml-radar-symbol-sweep {
+  to { rotate: var(--aml-radar-symbol-full-turn) }
+}
+@keyframes aml-radar-symbol-outer {
+  0%, 50%, 100% { stroke-dasharray: var(--aml-radar-symbol-outer-rest) }
+  15% { stroke-dasharray: var(--aml-radar-symbol-outer-first) }
+  35% { stroke-dasharray: var(--aml-radar-symbol-outer-second) }
+  70% { stroke-dasharray: var(--aml-radar-symbol-outer-third) }
+  85% { stroke-dasharray: var(--aml-radar-symbol-outer-fourth) }
+}
+@keyframes aml-radar-symbol-inner {
+  0%, 100% { stroke-dasharray: var(--aml-radar-symbol-inner-rest) }
+  10% { stroke-dasharray: var(--aml-radar-symbol-inner-first) }
+  30% { stroke-dasharray: var(--aml-radar-symbol-inner-second) }
+  45% { stroke-dasharray: var(--aml-radar-symbol-inner-third) }
+  60% { stroke-dasharray: var(--aml-radar-symbol-inner-fourth) }
+  80% { stroke-dasharray: var(--aml-radar-symbol-inner-fifth) }
+}
+@keyframes aml-radar-symbol-outer-echo {
+  0%, 50%, 100% { rotate: 0deg }
+  15% { rotate: var(--aml-radar-symbol-outer-echo-first) }
+  35% { rotate: var(--aml-radar-symbol-outer-echo-second) }
+  70% { rotate: var(--aml-radar-symbol-outer-echo-third) }
+  85% { rotate: var(--aml-radar-symbol-outer-echo-fourth) }
+}
+@keyframes aml-radar-symbol-inner-echo {
+  0%, 100% { rotate: 0deg }
+  10% { rotate: var(--aml-radar-symbol-inner-echo-first) }
+  30% { rotate: var(--aml-radar-symbol-inner-echo-second) }
+  45% { rotate: var(--aml-radar-symbol-inner-echo-third) }
+  60% { rotate: var(--aml-radar-symbol-inner-echo-fourth) }
+  80% { rotate: var(--aml-radar-symbol-inner-echo-fifth) }
 }
 /* 움직임 끄기 장치: 설정 > 모션 줄이기(기본은 OS prefers-reduced-motion)를 켜면 모든 CSS 움직임을 멈춘다.
    JS 움직임은 hooks/use-reduced-motion을 거친다. 디자인 규칙 token/important가 이 선택자만 허용한다. */
@@ -140,16 +200,6 @@ body {
   transition-duration: var(--aml-duration-reduced-motion) !important;
   transition-delay: 0s !important;
   scroll-behavior: auto !important;
-}
-[data-reduced-motion="true"] .aml-radar-symbol {
-  -webkit-mask-image: url(/aml_radar_symbol_static.svg);
-  mask-image: url(/aml_radar_symbol_static.svg);
-}
-@media (prefers-reduced-motion: reduce) {
-  .aml-radar-symbol {
-    -webkit-mask-image: url(/aml_radar_symbol_static.svg);
-    mask-image: url(/aml_radar_symbol_static.svg);
-  }
 }
 .icon-button {
   display: inline-grid;
@@ -985,7 +1035,6 @@ body:has(#footer-pagination > *) #workspace {
 #sidebar { --drawer-offset: var(--sidebar-hidden-offset) }
 #inbox { --drawer-offset: 100% }
 .sidebar[hidden] {
-  display: flex !important;
   visibility: hidden;
   pointer-events: none;
   translate: var(--drawer-offset);

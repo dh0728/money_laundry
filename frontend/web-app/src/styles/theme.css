@@ -215,6 +215,7 @@
   --layer-raised-content: 1;
   --layer-fullscreen-workspace: 40;
   --brand-wordmark-weight: 700;
+  --brand-radar-stroke: 1.8;
   --brand-wordmark-tracking: .075em;
   --agent-sidebar-default-width: 390px;
   --theme-switch-dark-offset: 200%;
@@ -583,6 +584,7 @@ button:not(:disabled), [role=button]:not([aria-disabled=true]), [role=tab], [rol
 .app-sidebar-surface > :not(.sidebar-indicator) { position:relative; z-index:var(--layer-raised-content); }
 .app-sidebar-surface [data-slot=sidebar-menu-button][data-active=true], .app-sidebar-surface [data-slot=sidebar-menu-button][data-active=true]:hover { background:transparent; color:var(--sidebar-primary-foreground); font-weight:var(--aml-type-body-strong-weight); }
 .brand-wordmark { font-weight:var(--brand-wordmark-weight); letter-spacing:var(--brand-wordmark-tracking); line-height:1; white-space:nowrap; }
+.brand-radar-mark { stroke-width: var(--brand-radar-stroke) }
 [data-slot=sidebar-menu-button][data-active=true] { background:var(--sidebar-primary); color:var(--sidebar-primary-foreground); font-weight:var(--aml-type-body-strong-weight); }
 .app-fullscreen-fallback [data-slot=sidebar-container] { display:none; }
 .app-fullscreen-fallback > [data-slot=sidebar-inset] { position:fixed; inset:0; z-index:var(--layer-fullscreen-workspace); height:100dvh; }

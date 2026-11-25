@@ -4,6 +4,7 @@ import type { Transition } from "motion/react";
 import { domAnimation, LazyMotion } from "motion/react";
 import {
   Children,
+  type CSSProperties,
   isValidElement,
   type ReactNode,
   useMemo,
@@ -25,6 +26,7 @@ import {
   resolveScatterJitterConfig,
   type ScatterJitter,
 } from "./scatter-jitter";
+import "../chart-utilities.css";
 
 export interface ScatterChartProps {
   /** Data array — each item should have a date field and numeric values */
@@ -196,9 +198,9 @@ export function ScatterChart({
   return (
     <LazyMotion features={domAnimation}>
       <div
-        className={cn("relative w-full", className)}
+        className={cn("chart-surface relative w-full", className)}
         ref={containerRef}
-        style={{ aspectRatio, touchAction: "none" }}
+        style={{ "--chart-surface-aspect-ratio": aspectRatio } as CSSProperties}
       >
         {width > 0 && height > 0 ? (
           <ChartInner

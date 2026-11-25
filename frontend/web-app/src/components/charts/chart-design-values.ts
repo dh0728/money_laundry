@@ -19,6 +19,13 @@ export function readChartDurationSeconds(token: string, fallback: number) {
   return Number.isFinite(duration) ? duration / (value.endsWith("ms") ? 1000 : 1) : fallback;
 }
 
+export function readSvgEffectRegion() {
+  const padding = readChartNumber("--chart-effect-padding-ratio", 1);
+  const start = `${-padding * 100}%`;
+  const size = `${(1 + padding * 2) * 100}%`;
+  return { x: start, y: start, width: size, height: size };
+}
+
 export function readCanvasColors(element: HTMLElement, sources: Record<string, string>) {
   const originalStyle = element.getAttribute("style");
   try {

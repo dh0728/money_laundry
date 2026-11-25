@@ -35,12 +35,14 @@ export function bindCardGlow(workspace) {
     return area;
   }
 
-  function tiltScale(bounds, area, rx, ry) {
+  function tiltScale(surface, bounds, area, rx, ry) {
     const halfWidth = bounds.width / 2;
     const halfHeight = bounds.height / 2;
     const centerX = bounds.left + halfWidth;
     const centerY = bounds.top + halfHeight;
-    const matrix = new DOMMatrix(`perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg)`);
+    const perspective = page.defaultView.getComputedStyle(surface).getPropertyValue('--record-card-tilt-perspective').trim();
+    if (!perspective) return 1;
+    const matrix = new DOMMatrix(`perspective(${perspective}) rotateX(${rx}deg) rotateY(${ry}deg)`);
     let scale = 1;
     for (const x of [-halfWidth, halfWidth]) for (const y of [-halfHeight, halfHeight]) {
       const point = matrix.transformPoint({ x, y });
@@ -97,7 +99,7 @@ export function bindCardGlow(workspace) {
       active.setAttribute('data-card-tilted', '');
       active.style.setProperty('--card-tilt-x', `${rx}deg`);
       active.style.setProperty('--card-tilt-y', `${ry}deg`);
-      active.style.setProperty('--card-tilt-scale', String(tiltScale(tiltBounds, clipping, rx, ry)));
+      active.style.setProperty('--card-tilt-scale', String(tiltScale(active, tiltBounds, clipping, rx, ry)));
     }
   }
   workspace.addEventListener('pointermove', move, { passive: true });

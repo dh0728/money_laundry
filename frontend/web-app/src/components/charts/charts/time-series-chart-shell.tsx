@@ -75,6 +75,7 @@ import {
 import { useStaticChartPreview } from "./static-chart-preview-context";
 import { useAnimatedYDomains } from "./use-animated-y-domains";
 import { useChartInteraction } from "./use-chart-interaction";
+import "../chart-utilities.css";
 import { useChartPhaseOrchestrator } from "./use-chart-phase-orchestrator";
 import {
   buildYScalesFromDomains,
@@ -601,7 +602,7 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
 
   // Hover lives in `hoverStore`, not state: pointer moves re-render only the
   // hover consumers below `ChartHoverStoreProvider`, not this shell.
-  const { hoverStore, interactionHandlers, interactionStyle } =
+  const { hoverStore, interactionHandlers } =
     useChartInteraction({
       bisectDate,
       canInteract,
@@ -867,7 +868,8 @@ export const TimeSeriesChartInner = memo(function TimeSeriesChartCore({
 
             <g
               {...interactionHandlers}
-              style={interactionStyle}
+              className="chart-interaction"
+              data-interactive={canInteract || undefined}
               transform={`translate(${margin.left},${margin.top})`}
             >
               <rect

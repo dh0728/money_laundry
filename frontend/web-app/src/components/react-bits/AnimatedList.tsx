@@ -3,6 +3,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import './AnimatedList.css';
 import { appReducedMotion } from '@/hooks/use-reduced-motion';
+import { ActionButton } from '../primary-button';
 
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
@@ -34,7 +35,6 @@ interface AnimatedListProps {
   items?: AnimatedListItem[];
   ariaLabel?: string;
   onItemSelect?: (item: AnimatedListItem, index: number) => void;
-  onItemSurfaceClick?: (event: MouseEvent<HTMLDivElement>, select: () => void) => void;
   renderItem?: (item: AnimatedListItem, index: number, isSelected: boolean) => ReactNode;
   renderItemHeader?: (item: AnimatedListItem, index: number) => ReactNode;
   trackDecoration?: ReactNode;
@@ -75,7 +75,6 @@ const AnimatedList = ({
   items = [],
   ariaLabel,
   onItemSelect,
-  onItemSurfaceClick,
   renderItem,
   renderItemHeader,
   trackDecoration,
@@ -500,16 +499,21 @@ const AnimatedList = ({
                 data-index={index}
                 data-selected={isSelected ? '' : undefined}
                 onPointerEnter={selectOnHover ? () => hover(index) : undefined}
-                onClick={onItemSurfaceClick ? event => onItemSurfaceClick(event, () => choose(item, index))
-                  : renderItemHeader ? undefined : () => choose(item, index)}
               >
+                <ActionButton className="animated-list__selection-hit" shape="corner" tabIndex={-1}
+                  aria-label={typeof entry.title === 'string' ? entry.title : `항목 ${index + 1} 선택`}
+                  onMouseDown={(event: MouseEvent<HTMLButtonElement>) => {
+                    if (event.button !== 0) return;
+                    event.preventDefault();
+                    viewportRef.current?.focus({ preventScroll: true });
+                  }}
+                  onClick={() => choose(item, index)} />
                 {renderItemHeader ? (
                   <>
                     <div className="animated-list__item-header" role="gridcell">
                       {renderItemHeader(item, index)}
                     </div>
-                    <div id={id} className="animated-list__item-content" role="gridcell"
-                      onClick={onItemSurfaceClick ? undefined : () => choose(item, index)}>
+                    <div id={id} className="animated-list__item-content" role="gridcell">
                       {itemContent}
                     </div>
                   </>

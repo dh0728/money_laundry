@@ -75,7 +75,7 @@ export function AccountTrailGraph({ comparison, focus }) {
     return { onPointerEnter: () => setSelection(target), onFocus: () => setSelection(target), onClick: () => setSelection(target) };
   };
 
-  return <Box className="account-trail-network">
+  return <Box className="account-trail-network" data-export-visualization="">
     <Box as="ul" className="account-trail-legend" aria-label="거래 소속">
       {scopes.map(scope => <Box as="li" key={scope} data-scope={scope}>
         <Text as="span">{scopeLabels[scope]}</Text>

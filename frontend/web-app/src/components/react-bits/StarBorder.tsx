@@ -75,8 +75,9 @@ const mix = (a: Rgb, b: Rgb, t: number): Rgb => [
   a[1] + (b[1] - a[1]) * t,
   a[2] + (b[2] - a[2]) * t
 ];
-const rgba = (rgb: Rgb, alpha: number) =>
-  `rgba(${Math.round(rgb[0])}, ${Math.round(rgb[1])}, ${Math.round(rgb[2])}, ${clamp(alpha, 0, 1).toFixed(3)})`;
+// Canvas gradients need resolved colors. The animation interpolates token colors in sRGB.
+const rgba = ([red, green, blue]: Rgb, alpha: number) =>
+  `color(srgb ${Math.round(red) / 255} ${Math.round(green) / 255} ${Math.round(blue) / 255} / ${clamp(alpha, 0, 1).toFixed(3)})`;
 
 let colorContext: CanvasRenderingContext2D | null = null;
 
@@ -257,6 +258,7 @@ const StarBorder = <T extends React.ElementType = 'button'>({
     const pulses: Pulse[] = [];
     const dust: Mote[] = [];
     const colors = { key: '', head: WHITE, tail: WHITE };
+    let highlight = WHITE;
     let raf = 0;
     let last = performance.now();
     let alive = true;
@@ -269,6 +271,8 @@ const StarBorder = <T extends React.ElementType = 'button'>({
       paintedRadius = Number.parseFloat(style.borderTopLeftRadius) || 0;
       if (style.borderTopLeftRadius.endsWith('%')) paintedRadius *= Math.min(state.width, state.height) / 100;
       resolvedColor = style.accentColor;
+      const highlightToken = style.getPropertyValue('--aml-white-100').trim();
+      if (highlightToken) highlight = toRgb(highlightToken);
       if (off || reduce) {
         state.velocity = 0;
         state.motion = 0;
@@ -336,7 +340,7 @@ const StarBorder = <T extends React.ElementType = 'button'>({
         const u = 1 - (i - 0.5) / steps;
         const fade = u * u * intensity;
         let tone = mix(colors.tail, colors.head, u);
-        if (!s.light) tone = mix(tone, WHITE, u ** 6 * 0.65);
+        if (!s.light) tone = mix(tone, highlight, u ** 6 * 0.65);
         ctx.lineCap = tip && i === 1 ? 'round' : 'butt';
         stroke(px, py, point.x, point.y, 2 + 6 * s.glow, rgba(tone, fade * (s.light ? 0.1 : 0.2) * s.glow));
         stroke(px, py, point.x, point.y, s.thickness, rgba(tone, fade));
@@ -361,8 +365,8 @@ const StarBorder = <T extends React.ElementType = 'button'>({
 
       const size = (1 + s.thickness * 0.6) * (s.light ? 0.85 : 1);
       const core = ctx.createRadialGradient(x, y, 0, x, y, size * 2.2);
-      core.addColorStop(0, rgba(s.light ? tone : WHITE, intensity));
-      core.addColorStop(s.light ? 0.3 : 0.4, rgba(s.light ? tone : mix(tone, WHITE, 0.5), intensity * 0.9));
+      core.addColorStop(0, rgba(s.light ? tone : highlight, intensity));
+      core.addColorStop(s.light ? 0.3 : 0.4, rgba(s.light ? tone : mix(tone, highlight, 0.5), intensity * 0.9));
       core.addColorStop(s.light ? 0.55 : 1, rgba(tone, s.light ? intensity * 0.12 : 0));
       core.addColorStop(1, rgba(tone, 0));
       ctx.fillStyle = core;
@@ -371,7 +375,7 @@ const StarBorder = <T extends React.ElementType = 'button'>({
       ctx.fill();
 
       const spike = (3 + 4 * s.glow + s.thickness * 1.5) * twinkle;
-      const center = s.light ? tone : WHITE;
+      const center = s.light ? tone : highlight;
       const horizontal = ctx.createLinearGradient(x - spike, y, x + spike, y);
       horizontal.addColorStop(0, rgba(tone, 0));
       horizontal.addColorStop(0.5, rgba(center, intensity * 0.95));
@@ -468,7 +472,7 @@ const StarBorder = <T extends React.ElementType = 'button'>({
         const shimmer = 0.45 + 0.55 * Math.sin(state.time * 20 + mote.seed);
         const alpha = left * shimmer * state.reveal * (s.light ? 0.35 : 0.9);
         if (alpha <= 0.01) return;
-        ctx.fillStyle = rgba(s.light ? colors.head : mix(colors.tail, WHITE, 0.6), alpha);
+        ctx.fillStyle = rgba(s.light ? colors.head : mix(colors.tail, highlight, 0.6), alpha);
         ctx.beginPath();
         ctx.arc(mote.x, mote.y, mote.size * (0.6 + 0.4 * left), 0, TAU);
         ctx.fill();

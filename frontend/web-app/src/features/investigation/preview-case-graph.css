@@ -82,7 +82,7 @@
   min-block-size: 0;
   pointer-events: none;
 }
-.preview-graph-settings, .preview-graph-metadata .button, .preview-graph-metadata [data-screen-query-tools] { pointer-events: auto }
+.preview-graph-settings, .preview-graph-metadata .button, .preview-graph-metadata .section-download-tools { pointer-events: auto }
 .preview-graph-metadata {
   display: flex;
   align-items: center;

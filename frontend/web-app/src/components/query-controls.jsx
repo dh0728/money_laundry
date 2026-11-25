@@ -29,36 +29,51 @@ const samplePatterns = ['Fan-out 82%', 'Cycle 74%', 'Gather-scatter 71%'];
 
 const queryTools = { filter: '필터', sort: '정렬', period: '기간', download: '다운로드' };
 const queryTriggerSelector = '[data-query-tool]:not([data-query-tool="download"])';
+const embeddedDownloads = new WeakMap();
+const pageDownloadLabel = '현재 페이지 전체 다운로드';
+
+function queryToolButton(tool, label, surface) {
+  return IconButton(Icon(tool), label,
+    `data-query-tool="${tool}" aria-haspopup="dialog" aria-expanded="false" hidden`, 'query-trigger', surface);
+}
 
 export function QueryToolbar() {
   const buttons = Object.entries(queryTools).map(([tool, label]) => `<div class="query-control">
-    ${IconButton(Icon(tool), label, `data-query-tool="${tool}" aria-haspopup="dialog" aria-expanded="false" hidden`,
-      'query-trigger', 'ghost')}
+    ${queryToolButton(tool, label, 'ghost')}
   </div>`).join('');
   return `<div class="context-query-tools" role="group" aria-label="조회 도구" hidden>${buttons}</div>`;
 }
 
+export function PageDownloadControl() {
+  return `<div id="page-download" class="query-control">${queryToolButton('download', pageDownloadLabel, 'floating')}</div>`;
+}
+
 const embeddedToolbar = { __html: QueryToolbar() };
 
-export function LocalQueryTools({ actions, relatedRows, onRelatedQuery }) {
+export function LocalQueryTools({ actions, relatedRows, onRelatedQuery, downloadSurface = 'ghost' }) {
   const host = useRef(null);
   const controller = useRef(null);
   useEffect(() => {
+    const element = host.current;
     const instance = setupQueryControls({
-      workspace: host.current, controls: host.current.firstElementChild, embedded: true,
+      workspace: element, controls: element.firstElementChild, embedded: true, downloadSurface,
       onChange: (_tool, query) => {
         onRelatedQuery?.(query);
         instance.refresh();
       },
     });
     controller.current = instance;
-    return () => instance.dispose();
-  }, [onRelatedQuery]);
+    embeddedDownloads.set(element, instance);
+    return () => {
+      embeddedDownloads.delete(element);
+      instance.dispose();
+    };
+  }, [onRelatedQuery, downloadSurface]);
   useEffect(() => {
     if (relatedRows) controller.current.setScreen('related-candidates', [], { rows: relatedRows });
-  }, [onRelatedQuery, relatedRows]);
-  useEffect(() => controller.current.registerTableTools(actions), [actions]);
-  return <div ref={host} dangerouslySetInnerHTML={embeddedToolbar} />;
+  }, [onRelatedQuery, relatedRows, downloadSurface]);
+  useEffect(() => controller.current.registerTableTools(actions), [actions, onRelatedQuery, downloadSurface]);
+  return <div ref={host} data-local-query-tools="" dangerouslySetInnerHTML={embeddedToolbar} />;
 }
 
 export { LocalQueryTools as TableQueryTools };
@@ -401,11 +416,16 @@ export function downloadCsv(file, headers, rows) {
   announceExport('CSV 다운로드', `${rows.length}건 다운로드를 요청했습니다.`);
 }
 
+export function csvDownloadEntry(label, file, headers, rows) {
+  return { label, format: 'CSV', count: rows.length, disabled: !rows.length,
+    download: () => downloadCsv(file, headers, rows) };
+}
+
 function announceExport(title, description, status = 'done') {
   document.dispatchEvent(new CustomEvent('aml:result', { detail: { title, description, status } }));
 }
 
-function DownloadOptions({ entries, onDone }) {
+function DownloadOptions({ entries, onDone, showLabels = false }) {
   const formats = Map.groupBy(entries, entry => entry.format);
   return <div className="query-popover-body query-download-options">
       {entries.map(({ format, label, count, download, disabled }) => <ActionButton
@@ -419,7 +439,7 @@ function DownloadOptions({ entries, onDone }) {
           }
         }}>
         <span>{format}</span>
-        {formats.get(format).length > 1 && <span className="query-menu-detail">
+        {(showLabels || formats.get(format).length > 1) && <span className="query-menu-detail">
           {label}{count ? ` · ${count}건` : ''}
         </span>}
       </ActionButton>)}
@@ -428,14 +448,16 @@ function DownloadOptions({ entries, onDone }) {
 
 let nextPopoverId = 0;
 
-export function setupQueryControls({ onChange, workspace, controls, embedded = false,
+export function setupQueryControls({ onChange, workspace, controls, embedded = false, pageDownload, downloadSurface = 'ghost',
   tooltip = document.getElementById('tooltip') }) {
   const events = new AbortController();
   const eventOptions = { signal: events.signal };
-  const buttons = [...controls.querySelectorAll('[data-query-tool]')];
-  const queryButtons = buttons.filter(button => button.matches(queryTriggerSelector));
-  const downloadButton = buttons.find(button => button.dataset.queryTool === 'download');
-  const sortControl = buttons.find(button => button.dataset.queryTool === 'sort')?.parentElement;
+  const toolbarButtons = [...controls.querySelectorAll('[data-query-tool]')];
+  const buttons = pageDownload ? [...toolbarButtons, pageDownload] : toolbarButtons;
+  const queryButtons = toolbarButtons.filter(button => button.matches(queryTriggerSelector));
+  const downloadButton = toolbarButtons.find(button => button.dataset.queryTool === 'download');
+  if (downloadButton) downloadButton.dataset.buttonSurface = downloadSurface;
+  const sortControl = toolbarButtons.find(button => button.dataset.queryTool === 'sort')?.parentElement;
   const sortSibling = sortControl?.nextElementSibling;
   const toolbarHome = controls.parentElement;
   const popover = document.createElement('div');
@@ -531,6 +553,12 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     if (previous?.matches('[data-table-tools]')) previous.hidden = true;
     target.append(controls);
   }
+  function visibleLocalDownloads() {
+    return [...workspace.querySelectorAll('[data-local-query-tools] [data-query-tool="download"]:not([hidden])')]
+      .filter(button => button.getClientRects().length > 0)
+      .map(button => embeddedDownloads.get(button.closest('[data-local-query-tools]')))
+      .filter(Boolean);
+  }
   function syncTools(hasVisibleVisuals = !localTable && hasVisualizations(workspace), workspaceReady = true) {
     const hasRows = Boolean(scope && rows.length);
     const tableSlot = embedded ? toolbarHome : localTable && workspaceReady
@@ -542,22 +570,22 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     if (sortControl && sortControl.parentElement !== sortHost) {
       sortHost.insertBefore(sortControl, dashboardSort ? null : sortSibling);
     }
+    const hasDownloadEntries = tableTools?.entries?.some(entry => !entry.disabled);
     const available = {
       filter: hasRows || Boolean(tableTools?.filter),
       sort: hasRows && !localTable,
       period: Boolean(tableTools?.period || scope && (hasRows || periodAnchor)),
-      download: hasRows || Boolean(tableTools?.entries?.length)
-        || (!localTable && hasVisibleVisuals),
+      download: (hasRows || hasDownloadEntries) && (embedded || localTable || !pageDownload),
     };
-    for (const button of buttons) {
+    for (const button of toolbarButtons) {
       const hidden = !available[button.dataset.queryTool];
       if (button.hidden !== hidden) button.hidden = hidden;
     }
-    if (downloadButton) {
-      const surface = screenSlot?.closest('.preview-graph-metadata') ? 'floating' : 'ghost';
-      if (downloadButton.dataset.buttonSurface !== surface) downloadButton.dataset.buttonSurface = surface;
+    if (pageDownload) {
+      const hidden = !screen || !(hasRows || hasDownloadEntries || hasVisibleVisuals || workspaceReady && visibleLocalDownloads().length);
+      if (pageDownload.hidden !== hidden) pageDownload.hidden = hidden;
     }
-    const hideToolbar = !target || buttons.every(button => button.hidden);
+    const hideToolbar = !target || toolbarButtons.every(button => button.hidden || !controls.contains(button));
     if (controls.hidden !== hideToolbar) controls.hidden = hideToolbar;
     if (tableSlot && tableSlot.hidden !== hideToolbar) tableSlot.hidden = hideToolbar;
     moveToolbar(target ?? toolbarHome);
@@ -646,12 +674,14 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     triggerOrigin = origin;
     const version = ++opening;
     trigger.setAttribute('aria-expanded', 'true');
-    const isDownload = button === downloadButton;
     const tool = button.dataset.queryTool;
+    const isDownload = tool === 'download';
+    const isPageDownload = button === pageDownload;
+    const label = isPageDownload ? pageDownloadLabel : queryTools[tool];
     popover.dataset.tool = tool;
-    popover.setAttribute('aria-label', queryTools[tool]);
+    popover.setAttribute('aria-label', label);
     triggerSlot.append(popover);
-    popoverLabel.textContent = queryTools[tool];
+    popoverLabel.textContent = label;
     const value = current();
     const asOf = periodAnchor ?? rows.reduce((latest, row) => row.date > latest ? row.date : latest, new Date(0));
     root ??= createRoot(queryContent);
@@ -659,7 +689,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     const tableFilter = tool === 'filter' ? tableTools?.filter : undefined;
     const tablePeriod = tool === 'period' ? tableTools?.period : undefined;
     const content = isDownload
-      ? <DownloadOptions entries={downloadEntries()} onDone={close} />
+      ? <DownloadOptions entries={downloadEntries(isPageDownload)} onDone={close} showLabels={isPageDownload} />
       : tableFilter ? <TableFilterPane filter={tableFilter} onApply={next => { close(); tableFilter.onChange(next); }} />
       : tablePeriod ? <PeriodPane value={{ range: tablePeriod.range }} asOf={tablePeriod.asOf}
         onApply={next => { close(); tablePeriod.onChange(next.range); }} onResize={position} />
@@ -670,7 +700,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     position();
     if (popover.matches(':popover-open')) focusOpenPopover();
   }
-  function downloadEntries() {
+  function downloadEntries(page = false) {
     const entries = [...(tableTools?.entries ?? [])];
     if (scope && rows.length) {
       const filtered = visibleCaseRows(rows, current());
@@ -682,7 +712,14 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
       if (visible.length !== rows.length) entries.push({ label: `전체 ${dataset}`, format: 'CSV', count: rows.length,
         download: () => exportCases(rows, scope) });
     }
-    if (!localTable && hasVisualizations(workspace)) {
+    if (page) {
+      const localEntries = visibleLocalDownloads().flatMap(instance => instance.downloadEntries())
+        .filter(entry => entry.format !== 'PNG' && entry.format !== 'SVG');
+      for (const entry of localEntries) {
+        if (!entries.some(existing => existing.label === entry.label && existing.format === entry.format)) entries.push(entry);
+      }
+    }
+    if ((page || !pageDownload && !localTable) && hasVisualizations(workspace)) {
       const segment = screen?.replaceAll('/', '-') ?? 'transaction';
       entries.push(...visualizationEntries({
         label: '현재 차트·그래프', filename: `aml-${segment}-visualizations`, readRoot: () => workspace,
@@ -751,6 +788,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     },
     hasQuery() { return Boolean(scope); },
     refresh() { syncTools(); },
+    downloadEntries,
     registerTableTools(options) {
       tableTools = options;
       syncTools();

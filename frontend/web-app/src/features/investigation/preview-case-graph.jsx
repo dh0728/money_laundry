@@ -14,7 +14,8 @@ import { SquishSwitchControl } from '../../components/squish-switch';
 import { RangeInput } from '../../components/ui/input';
 import { currencyColumn, SortableTableHead, tableCount,
   useTableSelection, useTableSort, WorkflowTable } from '../../components/workflow-table';
-import { dateFromCode, downloadCsv, inDateRange, LocalQueryTools, TableQueryTools, visibleCaseRows } from '../../components/query-controls';
+import { csvDownloadEntry, dateFromCode, downloadCsv, inDateRange, LocalQueryTools, TableQueryTools, visibleCaseRows } from '../../components/query-controls';
+import { ChartSectionDownload, SectionDownloadHeading } from '../../components/section-download';
 import { SankeyChart, SankeyLink, SankeyNode, SankeyTooltip } from '../../components/charts/charts/sankey';
 import { TooltipContent } from '../../components/charts/charts/tooltip/tooltip-content';
 import { caseSankeyGraph, caseSankeyLayers, layoutCaseSankey } from './case-sankey-data';
@@ -379,16 +380,18 @@ function AccountBreakdown({ rows, linkedSelection, selectionControl }) {
 }
 
 function ComparisonEvidence({ active, candidates }) {
+  const comparisons = candidates.map(candidate => ({ code: candidate.code, ...sharedCaseEvidence(active, candidate) }));
+  const downloads = comparisons.length ? [csvDownloadEntry('연결 근거', 'comparison-evidence',
+    ['기준 업무', '비교 업무', '공통 거래', '공통 계좌'], comparisons.map(({ code, transactions, accounts }) =>
+      [active.code, code, transactions.join(' · '), accounts.join(' · ')]))] : [];
   return <Panel className="preview-comparison-evidence">
-    <Heading>연결 근거</Heading>
-    {candidates.length ? candidates.map(candidate => {
-      const { transactions: sharedCodes, accounts: sharedAccounts } = sharedCaseEvidence(active, candidate);
-      return <Box as="section" key={candidate.code}>
-        <Heading level={3}><LinkTag code={candidate.code} /></Heading>
-        <Box as="dl"><Box><Box as="dt">공통 거래</Box><Box as="dd">{sharedCodes.join(', ') || '없음'}</Box></Box>
-          <Box><Box as="dt">공통 계좌</Box><Box as="dd">{sharedAccounts.join(', ') || '없음'}</Box></Box></Box>
-      </Box>;
-    }) : <Text>후보를 선택하면 공통 거래와 계좌가 표시됩니다.</Text>}
+    <SectionDownloadHeading entries={downloads}>연결 근거</SectionDownloadHeading>
+    {comparisons.length ? comparisons.map(({ code, transactions, accounts }) =>
+      <Box as="section" key={code}>
+        <Heading level={3}><LinkTag code={code} /></Heading>
+        <Box as="dl"><Box><Box as="dt">공통 거래</Box><Box as="dd">{transactions.join(', ') || '없음'}</Box></Box>
+          <Box><Box as="dt">공통 계좌</Box><Box as="dd">{accounts.join(', ') || '없음'}</Box></Box></Box>
+      </Box>) : <Text>후보를 선택하면 공통 거래와 계좌가 표시됩니다.</Text>}
   </Panel>;
 }
 
@@ -666,7 +669,8 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
                 </Box>}
                 {(selected || tablePicks.size > 0) &&
                   <GraphIconButton label="그래프 선택 해제" icon={X} onClick={clearSelection} />}
-                <Box data-screen-query-tools />
+                {network.nodes.length > 0 && <ChartSectionDownload label="거래 그래프" surface="floating"
+                  readRoot={host => host.closest('.preview-graph-center')} />}
               </Box>
             </Box>
             {!network.nodes.length ? <Box className="preview-evidence-canvas preview-graph-empty" role="status">

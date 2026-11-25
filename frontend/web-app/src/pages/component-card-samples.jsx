@@ -15,19 +15,14 @@ const alert = cases.find(row => row.kind === 'Alert' && row.open);
 
 export function CardSamples({ onEvent }) {
   const [checked, setChecked] = useState(false);
-  function reportAction(event) {
-    const button = event.target.closest('button[data-work-code]');
-    if (!button) return;
-    const { workCode } = button.dataset;
-    onEvent?.(button.hasAttribute('data-add-work-tab')
-      ? `${workCode} · 사이드바 탭으로 추가`
-      : `${workCode} · 상세 열기 요청`);
+  function reportAction(action, code) {
+    onEvent?.(action === 'add' ? `${code} · 사이드바 탭으로 추가` : `${code} · 상세 열기 요청`);
   }
 
-  return <Box className="catalogue-card-samples" onClick={reportAction}>
+  return <Box className="catalogue-card-samples">
     <Box>
       <Heading level={3}>선택 포함 · Episode</Heading>
-      <PreviewCaseCard row={episode}
+      <PreviewCaseCard row={episode} onAction={reportAction}
         selection={{ checked, onChange(next) {
           setChecked(next);
           onEvent?.(`${episode.code} · ${next ? '선택' : '선택 해제'}`);
@@ -35,11 +30,11 @@ export function CardSamples({ onEvent }) {
     </Box>
     <Box>
       <Heading level={3}>상세 열기만 · Alert</Heading>
-      <PreviewCaseCard row={alert} showAdd={false} />
+      <PreviewCaseCard row={alert} showAdd={false} onAction={reportAction} />
     </Box>
     <Box>
       <Heading level={3}>사이드바 탭 추가 · 거래</Heading>
-      <TransactionCard record={transactions[0]} />
+      <TransactionCard record={transactions[0]} onAction={reportAction} />
     </Box>
   </Box>;
 }

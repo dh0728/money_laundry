@@ -24,6 +24,19 @@
   cursor: pointer;
 }
 
+.ring-progress-layer {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.ring-progress-layer[data-glow] {
+  filter: drop-shadow(0 0 var(--aml-space-12) var(--ring-progress-glow-color));
+}
+
+.ring-progress-layer[data-entering] {
+  transform: scale(var(--ring-progress-enter-scale, 0));
+}
+
 .ring-grid-labels {
   fill: var(--ring-grid-label-color);
 }

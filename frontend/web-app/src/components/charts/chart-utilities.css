@@ -39,3 +39,49 @@
   transform-origin: left top;
 }
 .bklit-tooltip-series-dot { background-color: var(--chart-tooltip-series-color) }
+
+.chart-surface {
+  aspect-ratio: var(--chart-surface-aspect-ratio);
+  touch-action: var(--chart-surface-touch-action, none);
+}
+
+.chart-surface[data-fixed-height] { height: var(--chart-surface-height) }
+
+.chart-parent-size {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.chart-parent-size-content {
+  position: absolute;
+  inset: 0;
+}
+
+.chart-interaction { cursor: default; touch-action: none }
+.chart-interaction[data-interactive] { cursor: crosshair }
+
+.chart-marker-dimming {
+  filter: var(--chart-marker-dim-filter, none);
+  transition: opacity var(--aml-duration-highlight-fade) ease-in-out,
+    filter var(--aml-duration-highlight-fade) ease-in-out;
+}
+
+.chart-marker-entered { opacity: 1; filter: blur(0) }
+
+.chart-loading-label {
+  filter: blur(calc(var(--chart-loading-label-blur, 0) * var(--aml-space-1)));
+}
+
+.chart-shimmering-text {
+  --chart-shimmer-base: var(--color, var(--muted-text));
+  background-image: linear-gradient(to right, var(--chart-shimmer-base) 0%,
+    var(--chart-shimmer-base) var(--chart-shimmer-band-start), var(--shimmering-color, var(--text)) 50%,
+    var(--chart-shimmer-base) var(--chart-shimmer-band-end), var(--chart-shimmer-base) 100%);
+  background-size: var(--chart-shimmer-background-width) 100%;
+  background-repeat: no-repeat;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}

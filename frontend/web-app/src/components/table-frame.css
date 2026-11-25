@@ -265,7 +265,7 @@
     grid-template-rows: minmax(0, 1fr);
     min-block-size: 0;
   }
-  .ledger-tables { grid-template-rows: minmax(0, 1fr) auto }
+  .ledger-tables { grid-template-rows: minmax(var(--workspace-panel-min-height), 1fr) minmax(0, auto) }
 }
 .ledger-table-controls {
   display: grid;

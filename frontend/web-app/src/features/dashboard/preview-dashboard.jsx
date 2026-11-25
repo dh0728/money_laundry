@@ -11,10 +11,10 @@ import {
 import { ibmLaundering, ibmTotal } from '../investigation/ibm-hi-small-aggregate';
 import { benchmarkDashboardMetrics } from './benchmark-dashboard-metrics';
 import { ActionButton } from '../../components/primary-button';
-import { exportCases } from '../../components/query-controls';
+import { csvDownloadEntry, exportCases } from '../../components/query-controls';
 import { BoardSectionDownload, SectionDownloadHeading } from '../../components/section-download';
 import { Box, Heading, Stack, Text } from '../../components/layout-primitives';
-import { LinkTag, VerdictTag } from '../../components/semantic-tags';
+import { LinkTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
 import { AccountTrailGraph } from '../../components/charts/charts/account-trail-graph';
 import { StagedSankey } from '../../components/charts/charts/sankey/staged-sankey';
 import { previewJudgmentReason } from '../investigation/case-judgment-data';
@@ -68,9 +68,11 @@ function PersonalInvestigation({ data, reduced }) {
   </Panel>;
 }
 
-function WorkHistoryPanel({ title, entries, empty, renderEntry }) {
+function WorkHistoryPanel({ title, entries, empty, renderEntry, exportFile, exportColumns, exportRow }) {
+  const downloads = entries?.length ? [csvDownloadEntry(title, exportFile, ['시각 (KST)', '업무 ID', ...exportColumns],
+    entries.map(entry => [historyClock.format(new Date(entry.at)), entry.code, ...exportRow(entry)]))] : [];
   return <Panel as="section" className="dashboard-chart dashboard-personal-history">
-    <SectionDownloadHeading>{title}</SectionDownloadHeading>
+    <SectionDownloadHeading entries={downloads}>{title}</SectionDownloadHeading>
     {entries?.length ? <>
       <Text className="dashboard-note">한국 표준시</Text>
       <Box as="ol" className="dashboard-work-history" aria-label={title} tabIndex={0}>
@@ -132,8 +134,17 @@ function timeBetweenTransactions(trail) {
 }
 
 function DashboardSummary({ trail, reduced }) {
+  const downloads = trail ? [csvDownloadEntry('분석 추천 근거 거래', 'recommendation-evidence',
+    ['순서', '업무 ID', '거래 ID', '송금 계좌', '수취 계좌', '시각 (KST)', '금액', '통화'],
+    [trail.received, trail.sent].map(({ record, transaction }, index) => [
+      index + 1, record.code, transaction.code, transaction.from.code, transaction.to.code,
+      transaction.timestamp, transaction.amount, transaction.currency,
+    ]))] : [];
   return <AISummaryPanel as="section" reduced={reduced} className="dashboard-priority-panel">
-    <Heading className="dashboard-priority-heading"><Sparkles className="icon" aria-hidden="true" />분석 추천</Heading>
+    <SectionDownloadHeading headingClassName="dashboard-priority-heading" downloadLabel={trail ? '분석 추천' : undefined}
+      entries={downloads} readRoot={host => host.closest('.dashboard-priority-panel').querySelector('.account-trail-network')}>
+      <Sparkles className="icon" aria-hidden="true" />분석 추천
+    </SectionDownloadHeading>
     {trail ? <Stack as="figure" className="dashboard-account-trail">
       <Text as="figcaption" className="dashboard-trail-reason">
         공유 계좌 {trail.account}에서 수취 후 {timeBetweenTransactions(trail)} 만에
@@ -181,8 +192,12 @@ export function PreviewDashboard({ mine, data, appearance }) {
     {mine ? <PersonalDashboardOverview recommendation={summary}>
       <PersonalInvestigation data={data} reduced={appearance.reduced} />
       <WorkHistoryPanel title="내 담당 변경 기록" entries={data.workHistory?.assignments} empty="담당자가 바뀐 기록이 없습니다."
+        exportFile="assignment-history" exportColumns={['방향', '보낸 담당자', '받은 담당자']}
+        exportRow={entry => [entry.incoming ? '받음' : '넘김', workRequestUserName(entry.previous), workRequestUserName(entry.next)]}
         renderEntry={entry => <AssignmentHistoryEntry entry={entry} />} />
       <WorkHistoryPanel title="내 담당 판정 기록" entries={data.workHistory?.judgments} empty="기록된 판정이 없습니다."
+        exportFile="personal-judgment-history" exportColumns={['판정', '판정 사유']}
+        exportRow={entry => [verdictLabels[entry.verdict], entry.judgment?.reason ? previewJudgmentReason(entry.judgment) : '']}
         renderEntry={entry => <><LinkTag code={entry.code} /><VerdictTag verdict={entry.verdict} /></>} />
     </PersonalDashboardOverview> :
       <React.Suspense fallback={<DashboardAnalyticsSkeleton reduced={appearance.reduced} />}>
@@ -218,7 +233,11 @@ export function BenchmarkDashboard({ mine, dataset, range, appearance }) {
     </Panel>}
     <Box as="section" className="dashboard-top" aria-label="원본 거래 요약 및 주요 지표">
       <Panel as="article" className="dashboard-summary-card">
-        <Heading>원본 거래 요약</Heading>
+        <SectionDownloadHeading entries={totals.transactions ? [csvDownloadEntry('원본 거래 요약', 'ibm-hi-small-summary',
+          ['시작일', '종료일', '전체 거래 수', '세탁 라벨 거래 수', '최초 등장 계좌 수', '최초 등장 은행 코드 수', '세탁 라벨 최다 일자', '당일 건수'],
+          [[from, to, totals.transactions, totals.labeled, totals.newAccounts, totals.newBanks, peak?.date, peak?.labeled]])] : []}>
+          원본 거래 요약
+        </SectionDownloadHeading>
         <Text as="strong">{peak ? `${peak.date} · 세탁 라벨 ${count(peak.labeled)}`
           : (totals.transactions ? '조회 기간에 세탁 라벨 거래가 없습니다.' : '조회 기간에 거래가 없습니다.')}</Text>
         {peak && <Text>기간 내 최다 · 라벨 거래의 {peakShare}</Text>}

@@ -108,7 +108,7 @@ export function buildCaseGraph(transactions: LedgerTransaction[], lens: GraphLen
   }
   const owners = Array.isArray(ownershipLedger) ? indexCaseLedger(ownershipLedger).owners : ownershipLedger
   const nodes = new Map<string, GraphNode>()
-  const edges = new Map<string, GraphEdge>()
+  const edges = new Map<string, Omit<GraphEdge, 'width'>>()
   const allNodes = new Set<string>(), allEdges = new Set<string>()
   let omittedTransactions = 0
   const nodeFor = (accountId: number, abnormal: boolean) => {
@@ -132,14 +132,14 @@ export function buildCaseGraph(transactions: LedgerTransaction[], lens: GraphLen
     allEdges.add(id)
     if (!nodes.has(source) || !nodes.has(target) || (!edges.has(id) && edges.size >= caseGraphBudget.edges)) { omittedTransactions++; continue }
     const risk = tx.humanVerdict === 'abnormal' ? 'high' : riskBand(tx.score)
-    const edge = edges.get(id) ?? { id, source, target, count: 0, amountUsd: 0, risk, width: 1, transactionIds: [] }
+    const edge = edges.get(id) ?? { id, source, target, count: 0, amountUsd: 0, risk, transactionIds: [] }
     edge.count++; edge.amountUsd += tx.amountUsd; edge.transactionIds.push(tx.id)
     if (risk === 'high' || (risk === 'medium' && edge.risk === 'low')) edge.risk = risk
     edges.set(id, edge)
   }
   const max = Math.max(1, ...[...edges.values()].map(edge => edge.amountUsd))
-  for (const edge of edges.values()) edge.width = Math.min(8, 1 + 7 * Math.sqrt(edge.amountUsd / max))
-  return { status: 'ready', inputTransactions: transactions.length, nodes: [...nodes.values()], edges: [...edges.values()], omittedNodes: allNodes.size - nodes.size, omittedEdges: allEdges.size - edges.size, omittedTransactions }
+  const sizedEdges = [...edges.values()].map(edge => ({ ...edge, width: Math.min(8, 1 + 7 * Math.sqrt(edge.amountUsd / max)) }))
+  return { status: 'ready', inputTransactions: transactions.length, nodes: [...nodes.values()], edges: sizedEdges, omittedNodes: allNodes.size - nodes.size, omittedEdges: allEdges.size - edges.size, omittedTransactions }
 }
 
 export function downloadCaseCsv(filename: string, rows: (string | number | null)[][]) {

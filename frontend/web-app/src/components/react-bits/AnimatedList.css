@@ -86,6 +86,15 @@
   -webkit-user-select: none;
 }
 
+.animated-list__item .animated-list__selection-hit.button {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  border-radius: inherit;
+}
+.animated-list__item-header { position: relative; pointer-events: none }
+.animated-list__item-header :is(button, a, label, input) { pointer-events: auto }
+
 .animated-list[data-animated] .animated-list__item:not([data-state]) {
   opacity: 0;
 }

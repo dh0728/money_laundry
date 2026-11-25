@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { NativeSelect } from '@/components/ui/select';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,7 +9,9 @@ import { FooterPagination } from '../../components/footer-pagination';
 import { CardHeader } from '../../components/card-header';
 import { SearchField } from '../../components/search-field';
 import { StatusTag } from '../../components/semantic-tags';
-import { tableCount, TableFieldLabel } from '../../components/workflow-table';
+import { downloadCsv, TableQueryTools } from '../../components/query-controls';
+import { SectionDownload } from '../../components/section-download';
+import { tableCount, TableFieldLabel, WorkflowQueryHeading } from '../../components/workflow-table';
 import './ibm-ledger.css';
 import { Box, Heading, Text } from '@/components/layout-primitives';
 
@@ -18,6 +20,16 @@ const integer = new Intl.NumberFormat('ko-KR');
 const decimal = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 12 });
 const columns = ['거래 ID', '원본 거래 시각', '송금 은행 · 계좌', '수취 은행 · 계좌', '지급 금액', '수취 금액', '결제 수단', '원본 라벨'];
 const labelText = labeled => labeled ? '세탁 라벨 1' : '세탁 라벨 0';
+
+function ledgerEntry(label, file, records) {
+  const headers = ['거래 코드', '원본 시각', '송금 은행 코드', '송금 계좌', '수취 은행 코드', '수취 계좌',
+    '송금 금액', '송금 통화', '수취 금액', '수취 통화', '거래 방식', '원본 세탁 라벨'];
+  return { label, format: 'CSV', count: records.length,
+    download: () => downloadCsv(file, headers, records.map(row => [
+      row.code, row.timestamp, row.from.bank, row.from.account, row.to.bank, row.to.account,
+      row.paidAmount, row.paidCurrency, row.receivedAmount, row.receivedCurrency, row.method, Number(row.labeled),
+    ])) };
+}
 
 function dayKey(value) {
   if (!(value instanceof Date)) return value?.slice(0, 10) ?? '';
@@ -42,6 +54,7 @@ function Detail({ record, card = false }) {
     <Box as="header">
       {card ? <CardHeader code={record.code} /> : <Heading>선택 거래 <Text as="code">{record.code}</Text></Heading>}
       <StatusTag preset="neutral">{labelText(record.labeled)}</StatusTag>
+      {!card && <SectionDownload label="선택 거래" entries={[ledgerEntry('선택 거래', record.code, [record])]} />}
     </Box>
     <Box as="dl">
       <Box><Box as="dt">원본 거래 시각</Box><Box as="dd"><SourceTime timestamp={record.timestamp} /></Box></Box>
@@ -54,7 +67,7 @@ function Detail({ record, card = false }) {
   </Panel>;
 }
 
-export function BenchmarkLedger({ dataset, code = '', filters, tableView = true, paginationHost, onVisibleRecordsChange }) {
+export function BenchmarkLedger({ dataset, code = '', filters, tableView = true, paginationHost }) {
   const { source, period, totals, records } = dataset;
   const [lookup, setLookup] = useState('');
   const [selectedDay, setSelectedDay] = useState('');
@@ -85,7 +98,9 @@ export function BenchmarkLedger({ dataset, code = '', filters, tableView = true,
     results.current.scrollIntoView?.({ block: 'start', behavior: 'instant' });
   };
 
-  useEffect(() => { onVisibleRecordsChange?.(rows); }, [onVisibleRecordsChange, rows]);
+  const tools = rows.length > 0 && <TableQueryTools actions={{
+    entries: [ledgerEntry('조회된 원본 원장', 'ibm-hi-small-transactions', rows)],
+  }} />;
 
   return <Box className="benchmark-ledger">
     <Panel className="benchmark-scope" aria-label="거래 원장 데이터 범위">
@@ -118,7 +133,7 @@ export function BenchmarkLedger({ dataset, code = '', filters, tableView = true,
     {selected && tableView && <Detail record={selected} />}
     {code && !selected && <Text className="benchmark-empty" role="status">이 원장에 포함된 거래에서 <Text as="code">{code}</Text>을 찾을 수 없습니다.</Text>}
     <Box className="benchmark-ledger-results" ref={results}>
-      {tableView ? <CaseDataTable title="벤치마크 거래" summary={tableCount(rows.length)} className="benchmark-table" tools={false}>
+      {tableView ? <CaseDataTable title="벤치마크 거래" summary={tableCount(rows.length)} className="benchmark-table" tools={tools}>
         <TableHeader><TableRow>
           {columns.map(title => <TableHead key={title} scope="col">
             <TableFieldLabel column={title}>{title}</TableFieldLabel>
@@ -137,13 +152,16 @@ export function BenchmarkLedger({ dataset, code = '', filters, tableView = true,
           </TableRow>)}
           {!visible.length && <TableRow><TableCell colSpan={columns.length}>조건과 일치하는 거래가 없습니다.</TableCell></TableRow>}
         </TableBody>
-      </CaseDataTable> : <Box className="benchmark-ledger-cards" aria-label="벤치마크 거래 카드">
+      </CaseDataTable> : <>
+        <WorkflowQueryHeading title="벤치마크 거래" summary={tableCount(rows.length)} tools={tools} />
+        <Box className="benchmark-ledger-cards" aria-label="벤치마크 거래 카드">
         {!visible.length && <Text className="benchmark-empty" role="status">조건과 일치하는 거래가 없습니다.</Text>}
         {visible.map(row => <Detail key={row.code} record={row} card />)}
         {shownPage + 1 < pageCount && <ActionButton shape="pill" surface="floating" onClick={() => goToPage(shownPage + 1)}>
           더 보기
         </ActionButton>}
-      </Box>}
+        </Box>
+      </>}
     </Box>
     {tableView && <FooterPagination host={paginationHost} label="거래 원장 페이지" page={shownPage}
       pageCount={pageCount} total={rows.length} onPageChange={changePage} />}

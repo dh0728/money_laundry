@@ -16,6 +16,7 @@ import {
   motionValue,
   useTransform,
   type HTMLMotionProps,
+  type MotionStyle,
   type MotionValue,
 } from 'motion/react';
 import { useAppReducedMotion } from '@/hooks/use-reduced-motion';
@@ -83,7 +84,7 @@ const spring = (k: number, m: number, bounce: number) => ({
 const Chip = forwardRef<HTMLButtonElement, ChipProps>(function Chip({ mv, children, ...rest }, ref) {
   const transform = useTransform(() => `translateX(${mv.x.get()}px) scale(${mv.sx.get()}, ${mv.sy.get()})`);
   return (
-    <motion.button ref={ref} style={{ transform }} {...rest}>
+    <motion.button ref={ref} style={{ '--jelly-radio-chip-transform': transform } as MotionStyle} {...rest}>
       {children}
     </motion.button>
   );

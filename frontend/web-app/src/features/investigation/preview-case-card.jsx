@@ -9,6 +9,8 @@ import { CaseActorTag, CaseAgeTag, CountTag, ModelScoreTag, PatternTag, ReviewSt
 import { readWorkspaceGap } from '../dashboard/workspace-metrics';
 import './preview-case-card.css';
 import { Box, Heading, Text } from '../../components/layout-primitives';
+import { exportCases } from '../../components/query-controls';
+import { BoardSectionDownload } from '../../components/section-download';
 
 const amount = new Intl.NumberFormat('ko-KR');
 const formatDate = new Intl.DateTimeFormat('sv-SE', { year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -62,10 +64,14 @@ export function CaseProgressBoard({ rows, reduced, theme, orderRows, showAssigne
         const cards = orderRows ? orderRows(matching) : matching;
         const limit = limits[preset] ?? pageSize ?? cards.length;
         return <Panel className="case-progress-lane" data-review={preset} key={preset} aria-label={label}>
-          <Heading className="case-progress-heading">
-            <StatusTag preset={preset}>{label}</StatusTag>
-            <CountTag count={Math.min(limit, cards.length)} total={cards.length} />
-          </Heading>
+          <Box className="section-download-heading">
+            <Heading className="case-progress-heading">
+              <StatusTag preset={preset}>{label}</StatusTag>
+              <CountTag count={Math.min(limit, cards.length)} total={cards.length} />
+            </Heading>
+            {cards.length > 0 && <BoardSectionDownload records={cards} label={`${label} 업무`}
+              onDownload={entries => exportCases(entries, `work-board-${preset}`)} />}
+          </Box>
           {cards.length > 0 ? <MagicBento key={reduced} className="case-progress-cards preview-tilt-cards"
             items={cards.slice(0, limit).map(row => ({ id: row.code, content: <PreviewCaseCard
               row={row} showReviewStatus={false} showAssignee={showAssignee} /> }))}
@@ -89,7 +95,7 @@ export function EpisodeAlertSummary({ codes, complete = Boolean(codes) }) {
 }
 
 export function PreviewCaseCard({ row, selectedTransaction, className = '', selection, showAdd = true, sharedEvidence, drag,
-  showReviewStatus = true, showAssignee = true }) {
+  showReviewStatus = true, showAssignee = true, onAction }) {
   const { code, kind, score, status, pattern, assigned, elapsed, open, related } = row;
   const isEpisode = kind === 'Episode';
   const transaction = selectedTransaction ?? related[0];
@@ -104,7 +110,7 @@ export function PreviewCaseCard({ row, selectedTransaction, className = '', sele
   const verdict = row.verdict;
   return <RecordCard className={`case-glow preview-case-card ${className}`} label={code}
     selected={selection?.checked} verdict={verdict} drag={drag} opensRecord>
-    <CardHeader code={code} selection={selection} showAdd={showAdd} draggableCard={Boolean(drag)} />
+    <CardHeader code={code} selection={selection} showAdd={showAdd} draggableCard={Boolean(drag)} onAction={onAction} />
     <Box className="preview-case-card-body">
       <Box className="semantic-tag-group">
         <VerdictTag verdict={verdict} />
