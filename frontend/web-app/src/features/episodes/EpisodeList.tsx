@@ -40,7 +40,7 @@ const columns: ColumnDef<EpisodeListRow>[] = [
     id: 'episodeId', accessorKey: 'episodeId',
     header: ({ column }) => <DataTableColumnHeader column={column} label="ID / 구성" />,
     cell: ({ row }) => (
-      <Box className="min-w-0 max-w-[340px]">
+      <Box className="min-w-0 max-w-(--case-list-summary-max-width)">
         <Text className="font-mono text-sm" translate="no">{episodeCode(row.original.episodeId)}</Text>
         <Text className="mt-1 truncate text-xs text-muted-foreground">Alert {row.original.alertCount}건 · 유형 {row.original.primaryTypes.length}개</Text>
       </Box>
@@ -121,7 +121,7 @@ export default function EpisodeList({ rows, today, onOpen, remote }: { rows: Epi
   }
 
   return (
-    <Box className="max-w-[1320px] space-y-4">
+    <Box className="max-w-(--case-list-max-width) space-y-4">
       <Box className="flex flex-wrap items-center gap-2">
         <Box className="relative mr-1 w-64">
           <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
@@ -156,7 +156,7 @@ export default function EpisodeList({ rows, today, onOpen, remote }: { rows: Epi
         </Box>
       )}
       {result.length
-        ? <DataTable pagination={!remote} table={table} columnWidths={columnWidths} tableClassName="table-fixed min-w-[990px] [&_th]:px-2.5 [&_td]:px-2.5" onRowClick={onOpen} data-testid="episode-table" />
+        ? <DataTable pagination={!remote} table={table} columnWidths={columnWidths} tableClassName="table-fixed min-w-(--case-list-table-min-width) [&_th]:px-2.5 [&_td]:px-2.5" onRowClick={onOpen} data-testid="episode-table" />
         : (
           <Box className="glass-surface rounded-md border py-20 text-center">
             <Inbox className="mx-auto mb-4 size-7 text-muted-foreground" />

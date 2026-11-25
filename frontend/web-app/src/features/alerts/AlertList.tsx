@@ -34,7 +34,7 @@ const baseColumns: ColumnDef<AlertListRow>[] = [
     id: 'alertId', accessorKey: 'alertId',
     header: ({ column }) => <DataTableColumnHeader column={column} label="ID" />,
     cell: ({ row }) => (
-      <Box className="min-w-0 max-w-[340px]">
+      <Box className="min-w-0 max-w-(--case-list-summary-max-width)">
         <Text className="font-mono text-sm" translate="no">{alertCode(row.original.alertId)}</Text>
       </Box>
     ),
@@ -163,7 +163,7 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
   }
 
   return (
-    <Box className="max-w-[1320px] space-y-4">
+    <Box className="max-w-(--case-list-max-width) space-y-4">
       <Box className="flex flex-wrap items-center gap-2">
         <Box className="relative mr-1 w-64">
           <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
@@ -229,7 +229,7 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
       )}
 
       {result.length
-        ? <DataTable pagination={!remote} table={table} columnWidths={link.mode === 'link' ? linkColumnWidths : browseColumnWidths} tableClassName="table-fixed min-w-[990px] [&_th]:px-2.5 [&_td]:px-2.5" onRowClick={link.mode === 'link' ? row => canLink(row, currentUser) && dispatchLink({ type: 'toggle', id: row.alertId }) : onOpen} data-testid="alert-table" />
+        ? <DataTable pagination={!remote} table={table} columnWidths={link.mode === 'link' ? linkColumnWidths : browseColumnWidths} tableClassName="table-fixed min-w-(--case-list-table-min-width) [&_th]:px-2.5 [&_td]:px-2.5" onRowClick={link.mode === 'link' ? row => canLink(row, currentUser) && dispatchLink({ type: 'toggle', id: row.alertId }) : onOpen} data-testid="alert-table" />
         : (
           <Box className="glass-surface rounded-md border py-20 text-center">
             <Inbox className="mx-auto mb-4 size-7 text-muted-foreground" />
