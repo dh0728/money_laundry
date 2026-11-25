@@ -143,6 +143,7 @@
   --aml-layer-popover: 20;
   --aml-layer-dialog: 30;
   --aml-layer-toast: 40;
+  --aml-touch-target-min-size: 44px;
   --aml-space-0: 0px;
   --aml-space-2: 2px;
   --aml-space-4: 4px;
@@ -163,6 +164,18 @@
   --aml-radius-overlay: 12px;
   --aml-radius-full: 9999px;
   --aml-stroke-divider: 1px;
+  --card-header-check-ring-opacity: 0.5;
+  --footer-pagination-select-max-width: min(44vw, 15rem);
+  --form-dropdown-layer-offset: 1;
+  --disclosure-open-angle: 180deg;
+  --work-tab-verdict-hover-accent-share: 72%;
+  --case-judgment-notice-accent-share: 14%;
+  --case-transaction-edit-error-text-share: 42%;
+  --benchmark-search-max-width: 24rem;
+  --benchmark-detail-field-min-width: 12rem;
+  --benchmark-ledger-card-min-width: 24rem;
+  --case-card-label-max-share: 42%;
+  --catalogue-card-min-width: 220px;
   --table-column-divider-strength: 30%;
   --table-stripe-strength: 3%;
   --table-header-layer: 1;

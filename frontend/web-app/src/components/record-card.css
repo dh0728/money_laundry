@@ -85,7 +85,7 @@
   :root:not([data-reduced-motion="true"]) [data-card-spotlight] { z-index: var(--record-card-spotlight-layer) }
   :root:not([data-reduced-motion="true"]) [data-card-tilted] {
     transform: perspective(var(--record-card-tilt-perspective))
-      rotateX(var(--card-tilt-x, 0deg)) rotateY(var(--card-tilt-y, 0deg)) scale(var(--card-tilt-scale, 1));
+      rotateX(var(--card-tilt-x, var(--record-card-tilt-idle-angle))) rotateY(var(--card-tilt-y, var(--record-card-tilt-idle-angle))) scale(var(--card-tilt-scale, var(--record-card-tilt-idle-scale)));
   }
 }
 

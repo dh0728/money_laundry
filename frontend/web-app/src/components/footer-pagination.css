@@ -15,7 +15,7 @@
   min-block-size: var(--account-control-size, var(--aml-density-control-comfortable));
 }
 .footer-pagination select {
-  max-inline-size: min(44vw, 15rem);
+  max-inline-size: var(--footer-pagination-select-max-width);
   border: var(--aml-stroke-control) solid var(--divider);
   border-radius: var(--aml-radius-full);
   color: var(--text);

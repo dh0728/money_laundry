@@ -13,7 +13,7 @@
   "token/inline-style": 31,
   "token/arbitrary-class": 0,
   "token/important": 2,
-  "token/fixed-number": 31,
+  "token/fixed-number": 16,
   "token/palette-direct": 0,
   "chart/library-import": 0,
   "icon/local-svg": 6

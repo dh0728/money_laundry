@@ -34,5 +34,5 @@
   .panel-disclosure-trigger:hover { background-color: var(--hover) }
 }
 
-.panel-disclosure[open] > .panel-disclosure-trigger > .icon { rotate: 180deg }
+.panel-disclosure[open] > .panel-disclosure-trigger > .icon { rotate: var(--disclosure-open-angle) }
 .panel-disclosure-body { padding: 0 var(--panel-disclosure-inline-inset) var(--aml-space-8) }

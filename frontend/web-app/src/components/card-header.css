@@ -52,7 +52,7 @@
   background: transparent;
 }
 .card-header > .spring-check .spring-check__label { display: none }
-.card-header > .spring-check .spring-check__ring { opacity: .5 }
+.card-header > .spring-check .spring-check__ring { opacity: var(--card-header-check-ring-opacity) }
 .card-header > .work-tab-add .icon {
   inline-size: var(--card-action-icon);
   block-size: var(--card-action-icon);

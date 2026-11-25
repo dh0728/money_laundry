@@ -21,7 +21,7 @@
 }
 
 .form-dropdown-options {
-  z-index: calc(var(--layer-shell) + 1);
+  z-index: calc(var(--layer-shell) + var(--form-dropdown-layer-offset));
   min-inline-size: min(var(--radix-select-trigger-width), var(--radix-select-content-available-width));
   max-inline-size: var(--radix-select-content-available-width);
   max-block-size: var(--radix-select-content-available-height);

@@ -11,4 +11,6 @@
   --record-card-unjudged-dark-tint: 52%;
   --record-card-spotlight-layer: 1;
   --record-card-tilt-perspective: 900px;
+  --record-card-tilt-idle-angle: 0deg;
+  --record-card-tilt-idle-scale: 1;
 }

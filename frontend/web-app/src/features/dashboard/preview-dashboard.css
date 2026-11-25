@@ -460,7 +460,7 @@
 }
 @media (pointer: coarse) {
   .dashboard-summary-link, .dashboard-board .case-progress-lane > .button {
-    min-block-size: max(44px, var(--aml-panel-control-size));
+    min-block-size: max(var(--aml-touch-target-min-size), var(--aml-panel-control-size));
   }
 }
 .dashboard-board-heading {

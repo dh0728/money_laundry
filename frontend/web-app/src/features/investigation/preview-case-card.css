@@ -22,7 +22,7 @@
   display: grid;
   align-items: start;
   column-gap: var(--aml-space-8);
-  grid-template-columns: min(var(--aml-space-64), 42%) minmax(0, 1fr);
+  grid-template-columns: min(var(--aml-space-64), var(--case-card-label-max-share)) minmax(0, 1fr);
 }
 .preview-case-card dt { color: var(--muted-text); overflow-wrap: anywhere }
 .preview-case-card dd { margin: 0; min-width: 0; overflow-wrap: anywhere }
@@ -97,5 +97,5 @@
   .case-progress-lanes { grid-template-columns: repeat(2, minmax(0, 1fr)) }
 }
 @container case-progress-board (min-width: 1056px) {
-  .case-progress-lanes { grid-template-columns: repeat(var(--case-progress-columns, 4), minmax(0, 1fr)) }
+  .case-progress-lanes { grid-template-columns: repeat(var(--case-progress-columns), minmax(0, 1fr)) }
 }
