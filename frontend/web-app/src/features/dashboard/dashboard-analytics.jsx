@@ -177,8 +177,8 @@ const volumeDetail = [
 const relationTargets = [{ id: 'total', tone: 'neutral' }, { id: 'suspect', tone: 'suspect' }];
 const institutionRelationTargets = [...relationTargets, { id: 'new-entities', source: 'total', tone: 'total' }];
 const institutionMetricRoutes = [
-  { id: 'transactions', target: '.dashboard-transaction-flow [data-sankey-top-anchor="total"]' },
-  { id: 'suspicious', target: '.dashboard-transaction-flow [data-sankey-top-anchor="suspect"]' },
+  { id: 'transactions', target: '.dashboard-transaction-flow [data-sankey-anchor="total"]' },
+  { id: 'suspicious', target: '.dashboard-transaction-flow [data-sankey-anchor="suspect"]' },
   { id: 'created-alerts', target: '.dashboard-investigation-flow [data-sankey-top-anchor="alerts"]' },
   { id: 'open-alerts', target: '.dashboard-investigation-flow [data-sankey-top-anchor="individual"]', partial: true },
   { id: 'linked', target: '.dashboard-investigation-flow [data-sankey-top-anchor="alert-link"]' },
@@ -287,22 +287,25 @@ function RiskSegments({ data }) {
   return <ChartPanel title="모델 이상 거래의 위험 점수" note={count(scored) + ' 기준'}
     className="dashboard-flow-risk" data-sankey-detail="suspect" hasChart={scored > 0}>
     {scored ? <>
-      <Box className="dashboard-score-band">
-        <BarChart data={[point]} xDataKey="label" stacked orientation="horizontal" barGap={0}
-          margin={noMargin} horizontalValueDomain={[0, scored]}>
-          {rows.map(row => <Bar key={row.key} dataKey={row.key} fill={riskScoreColors[row.key]} lineCap="butt" animate={false} />)}
-          <ChartTooltip showDatePill={false} showDots={false} rows={() => rows.map(row => ({
-            label: row.label, color: riskScoreColors[row.key], value: count(row.count) + ' · ' + compactShare(row.count, scored),
-          }))} />
-        </BarChart>
+      <Box className="dashboard-score-breakdown">
+        <Box className="dashboard-score-band">
+          <BarChart data={[point]} xDataKey="label" stacked barGap={0} aspectRatio="auto" margin={noMargin}>
+            {rows.map(row => <Bar key={row.key} dataKey={row.key} fill={riskScoreColors[row.key]} lineCap="butt" animate={false} />)}
+            <ChartTooltip showDatePill={false} showDots={false} rows={() => rows.map(row => ({
+              label: row.label, color: riskScoreColors[row.key], value: count(row.count) + ' · ' + compactShare(row.count, scored),
+            }))} />
+          </BarChart>
+        </Box>
+        <Box as="ul" className="dashboard-score-legend">
+          {rows.map(row => <Box as="li" key={row.key}>
+            <Text className="dashboard-note dashboard-series-legend-item">
+              <Text as="i" aria-hidden="true" style={{ '--dashboard-series-swatch': riskScoreColors[row.key] }} />{row.label}
+            </Text>
+            <Text as="strong">{compactShare(row.count, scored)}</Text>
+            <Text className="dashboard-note">{count(row.count)}</Text>
+          </Box>)}
+        </Box>
       </Box>
-      <LayoutGrid columns={3} as="ul" className="dashboard-score-legend">
-        {rows.map(row => <Box as="li" key={row.key}>
-          <Text className="dashboard-note">{row.label}</Text>
-          <Text as="strong">{compactShare(row.count, scored)}</Text>
-          <Text className="dashboard-note">{count(row.count)}</Text>
-        </Box>)}
-      </LayoutGrid>
       {scored < data.suspicious.length && <Text className="dashboard-note">점수 미집계 {count(data.suspicious.length - scored)}</Text>}
     </> : <Text className="dashboard-note">표시할 점수 분포가 없습니다.</Text>}
   </ChartPanel>;
@@ -322,7 +325,6 @@ function TransactionDetails({ data, flow, reduced, summary, metrics }) {
   const badge = [flow.sample ? '은행별 건수는 예시' : null,
     scale > 1 ? '이상 띠 두께 ×' + scale + ' · 건수·비율 원본' : null].filter(Boolean).join(' · ');
   return <LayoutGrid columns={12} className="dashboard-flow-family dashboard-work-overview-grid">
-    {metrics}
     <ChartPanel title="거래 분류" note={badge} className="dashboard-transaction-flow" hasChart={flow.hasData}>
       {flow.hasData ? <StagedSankey data={flow} stages={transactionStages} label="거래 분류 흐름" reduced={reduced} />
         : <Text className="dashboard-note">조회 기간에 거래가 없습니다.</Text>}
@@ -335,6 +337,7 @@ function TransactionDetails({ data, flow, reduced, summary, metrics }) {
         <DailySeries rows={rows} series={series} detail={detail} reduced={reduced} label="기간별 거래량 추이" stacked={false} />
       </> : <Text className="dashboard-note">표시할 일별 거래량이 없습니다.</Text>}
     </ChartPanel>
+    {metrics}
     <RiskSegments data={data} />
     {summary}
   </LayoutGrid>;

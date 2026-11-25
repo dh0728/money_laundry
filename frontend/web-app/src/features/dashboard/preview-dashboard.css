@@ -59,7 +59,7 @@
   block-size: 100%;
 }
 .dashboard-priority-panel { display: grid; grid-template-rows: auto 1fr; align-items: stretch; gap: var(--aml-space-8) }
-.dashboard-work-overview-grid > :is(.dashboard-transaction-flow, [data-metric-group="transactions"]) { grid-column: span 8 }
+.dashboard-work-overview-grid > .dashboard-transaction-flow { grid-column: span 8 }
 .dashboard-work-overview-grid > .dashboard-priority-panel,
 .dashboard-personal-overview > .dashboard-priority-panel { grid-column: span 4 }
 .dashboard-personal-work { grid-column: span 8; grid-template-rows: auto 1fr; align-items: stretch }
@@ -169,9 +169,9 @@
   gap: var(--workspace-gap);
   min-inline-size: 0;
 }
-.dashboard-flow-family > .dashboard-priority-panel { grid-column: 9 / -1; grid-row: 1 / span 3 }
-.dashboard-flow-volume { grid-column: span 5 }
-.dashboard-flow-risk { grid-column: span 3 }
+.dashboard-flow-family > .dashboard-priority-panel { grid-column: 9 / -1; grid-row: 1 / span 2 }
+.dashboard-flow-volume { grid-column: span 4 }
+.dashboard-flow-family > :is(.dashboard-flow-risk, [data-metric-group="transactions"]) { grid-column: span 2 }
 .dashboard-flow-status { grid-column: span 6 }
 .dashboard-flow-status-grid { gap: var(--workspace-gap) }
 .dashboard-workflow-charts .dashboard-series-plot {
@@ -180,17 +180,25 @@
   min-block-size: 0;
 }
 .dashboard-status-legend-item { display: flex; align-items: center; gap: var(--aml-space-4) }
-.dashboard-score-band {
-  margin-block: var(--aml-space-12);
-  block-size: var(--aml-space-24);
-  border-radius: var(--aml-radius-card);
-  overflow: hidden;
+.dashboard-score-breakdown {
+  display: grid;
+  grid-template-columns: var(--aml-space-24) minmax(0, 1fr);
+  gap: var(--workspace-gap);
 }
-.dashboard-score-band > div { block-size: 100% }
+.dashboard-score-band { min-block-size: calc(var(--aml-space-64) * 2) }
+.dashboard-score-band > .bar-chart { block-size: 100% }
 .dashboard-score-legend {
+  display: grid;
+  gap: var(--aml-space-4);
   margin: 0;
   padding: 0;
   list-style: none;
+}
+.dashboard-score-legend strong, .dashboard-transaction-detection strong {
+  color: var(--text);
+  font-size: var(--aml-type-panel-title-size);
+  line-height: var(--aml-type-panel-title-lineHeight);
+  font-weight: var(--aml-type-panel-title-weight);
 }
 .dashboard-series-legend-item { display: inline-flex; align-items: center; gap: var(--aml-space-4) }
 .dashboard-series-legend-item i {
@@ -249,15 +257,16 @@
   .staged-sankey-relations { display: none }
 }
 @media (width < 68rem) {
-  .dashboard-work-overview-grid > :is(.dashboard-transaction-flow, .dashboard-priority-panel, [data-metric-group="transactions"]),
+  .dashboard-work-overview-grid > :is(.dashboard-transaction-flow, .dashboard-priority-panel),
   .dashboard-personal-overview > :is(.dashboard-personal-work, .dashboard-priority-panel) { grid-column: 1 / -1; grid-row: auto }
-  .dashboard-flow-volume { grid-column: span 7 }
-  .dashboard-flow-risk { grid-column: span 5 }
+  .dashboard-flow-volume { grid-column: span 6 }
+  .dashboard-flow-family > :is(.dashboard-flow-risk, [data-metric-group="transactions"]) { grid-column: span 3 }
   .staged-sankey-relations { display: none }
 }
 @media (width < 48rem) {
   .dashboard-personal-work { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto }
-  .dashboard-priority-metric, .dashboard-flow-volume, .dashboard-flow-risk, .dashboard-flow-status { grid-column: 1 / -1 }
+  .dashboard-priority-metric, .dashboard-flow-volume, .dashboard-flow-status,
+  .dashboard-flow-family > :is(.dashboard-flow-risk, [data-metric-group="transactions"]) { grid-column: 1 / -1 }
   .staged-sankey-relations { display: none }
 }
 .dashboard-note {

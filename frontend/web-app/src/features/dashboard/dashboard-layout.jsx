@@ -93,16 +93,18 @@ export function DashboardAnalyticsSkeleton({ reduced }) {
     <Text as="span" className="visually-hidden" role="status">대시보드 차트 불러오는 중</Text>
     <Box aria-hidden="true" className="dashboard-analytics">
       <Grid columns={12} className="dashboard-flow-family dashboard-work-overview-grid">
-        <LoadingInstitutionMetrics group="transactions" />
         <LoadingChart className="dashboard-transaction-flow" chartClass="staged-sankey-chart" />
         <LoadingSeries className="dashboard-flow-volume" />
+        <LoadingInstitutionMetrics group="transactions" />
         <LoadingChart className="dashboard-flow-risk">
-          <Skeleton className="dashboard-score-band" />
-          <Grid columns={3} className="dashboard-score-legend">
-            <Skeleton className="dashboard-loading-note" />
-            <Skeleton className="dashboard-loading-note" />
-            <Skeleton className="dashboard-loading-note" />
-          </Grid>
+          <Box className="dashboard-score-breakdown">
+            <Skeleton className="dashboard-score-band" />
+            <Stack className="dashboard-score-legend">
+              <Skeleton className="dashboard-loading-note" />
+              <Skeleton className="dashboard-loading-note" />
+              <Skeleton className="dashboard-loading-note" />
+            </Stack>
+          </Box>
         </LoadingChart>
         <LoadingRecommendation reduced={reduced} />
       </Grid>

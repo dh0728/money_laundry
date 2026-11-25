@@ -66,8 +66,9 @@ function institutionMetricCards(data, reduced) {
   const groups = {
     transactions: [{ label: '들어온 거래 수', value: total, unit: '건', overlap: transactionOverlap,
       relation: total > 0 ? 'transactions' : undefined, detail: institution ? undefined : '선택 업무의 근거 거래',
-      extra: <Text data-dashboard-metric-source={suspicious > 0 ? 'suspicious' : undefined}>
-        의심 거래 {count(suspicious)}{total > 0 && ` · ${compactShare(suspicious, total)}`}
+      extra: <Text className="dashboard-transaction-detection" data-dashboard-metric-source={suspicious > 0 ? 'suspicious' : undefined}>
+        의심 거래 <Text as="strong">{count(suspicious)}</Text>
+        {total > 0 && <> · <Text as="strong">{compactShare(suspicious, total)}</Text></>}
       </Text> }],
     investigation: [
       { label: '생성 Alert', value: alertCases.length, unit: '건',

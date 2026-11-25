@@ -129,7 +129,8 @@ function metricRelation(value, mark, origin, { id, partial }) {
   if (plot && (center < plot.left || center > plot.right)) return [];
 
   const startX = sourceBounds.left + sourceBounds.width / 2 - origin.left;
-  const startY = card.getBoundingClientRect().bottom - origin.top;
+  const cardBounds = card.getBoundingClientRect();
+  const startY = (targetBounds.bottom <= cardBounds.top ? cardBounds.top : cardBounds.bottom) - origin.top;
   const endX = center - origin.left;
   const endY = targetBounds.top + (plot ? targetBounds.height / 2 : 0) - origin.top;
   const turnY = startY + (endY - startY) / 2;
