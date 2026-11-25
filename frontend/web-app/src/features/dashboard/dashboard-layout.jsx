@@ -24,8 +24,7 @@ export function DashboardIndicatorsGrid({ children, ...props }) {
 
 const institutionMetricGroups = {
   transactions: { columns: 1, label: '거래 요약' },
-  investigation: { columns: 3, label: '조사 요약' },
-  status: { columns: 2, label: '업무 상태 요약' },
+  investigation: { columns: 4, label: '조사 요약' },
 };
 
 export function InstitutionMetricsGrid({ group, children, ...props }) {
@@ -96,21 +95,12 @@ export function DashboardAnalyticsSkeleton({ reduced }) {
         <LoadingChart className="dashboard-transaction-flow" chartClass="staged-sankey-chart" />
         <LoadingSeries className="dashboard-flow-volume" />
         <LoadingInstitutionMetrics group="transactions" />
-        <LoadingChart className="dashboard-flow-risk">
-          <Box className="dashboard-score-breakdown">
-            <Skeleton className="dashboard-score-band" />
-            <Stack className="dashboard-score-legend">
-              <Skeleton className="dashboard-loading-note" />
-              <Skeleton className="dashboard-loading-note" />
-              <Skeleton className="dashboard-loading-note" />
-            </Stack>
-          </Box>
-        </LoadingChart>
+        <LoadingChart className="dashboard-flow-risk" chartClass="dashboard-score-band" showNote={false} />
         <LoadingRecommendation reduced={reduced} />
       </Grid>
       <LoadingInstitutionMetrics group="investigation" />
       <LoadingChart className="dashboard-investigation-flow" chartClass="staged-sankey-chart" />
-      <LoadingInstitutionMetrics group="status" />
+      <LoadingChart className="dashboard-completion" />
       <Grid columns={12} className="dashboard-flow-status-grid">
         <LoadingSeries className="dashboard-flow-status" />
         <LoadingSeries className="dashboard-flow-status" />

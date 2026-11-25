@@ -49,8 +49,8 @@ function Labels() {
       const y = (node.y0 + node.y1) / 2;
       return <g key={node.index}>
         {node.anchor && <>
-          <circle data-sankey-anchor={node.anchor} cx={(node.x0 + node.x1) / 2} cy={node.y1} opacity={0} />
-          <circle data-sankey-top-anchor={node.anchor} cx={(node.x0 + node.x1) / 2} cy={node.y0} opacity={0} />
+          <circle data-sankey-anchor={node.anchor} data-sankey-color={node.color} cx={(node.x0 + node.x1) / 2} cy={node.y1} opacity={0} />
+          <circle data-sankey-top-anchor={node.anchor} data-sankey-color={node.color} cx={(node.x0 + node.x1) / 2} cy={node.y0} opacity={0} />
         </>}
         <text x={x} y={y} dy={node.detail ? offsets.labelWithDetail : offsets.label}>
           {node.name}
@@ -64,7 +64,8 @@ function Labels() {
       const y = (link.y0 + link.y1) / 2;
       return <g key={link.index}>
         <text textAnchor="end" x={x} y={y} dy={offsets.label}>{link.caption}</text>
-        {link.anchor && <circle data-sankey-top-anchor={link.anchor} data-sankey-anchor={link.anchor} cx={x} cy={y} opacity={0} />}
+        {link.anchor && <circle data-sankey-top-anchor={link.anchor} data-sankey-anchor={link.anchor}
+          data-sankey-color={link.color ?? link.target.color} cx={x} cy={y} opacity={0} />}
       </g>;
     })}
   </g>;
@@ -107,10 +108,25 @@ export function StagedSankey({ data, stages, label, reduced }) {
   </Box>;
 }
 
-function RelationPaths({ lines, metrics }) {
+function RelationPaths({ hostRef, lines, metrics }) {
+  const [hoveredCard, setHoveredCard] = useState(null);
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return undefined;
+    const hover = event => setHoveredCard(event.pointerType === 'touch' ? null : event.target.closest?.('article') ?? null);
+    const leave = () => setHoveredCard(null);
+    host.addEventListener('pointerover', hover, { passive: true });
+    host.addEventListener('pointerleave', leave, { passive: true });
+    return () => {
+      host.removeEventListener('pointerover', hover);
+      host.removeEventListener('pointerleave', leave);
+    };
+  }, [hostRef]);
+
   return <svg className="staged-sankey-relations" data-metric-relations={metrics || undefined} aria-hidden="true">
-    {lines.map(({ id, tone, partial, path, startX, startY, endX, endY }) =>
-      <g key={id} data-tone={tone} data-relation={id} data-partial={partial || undefined}>
+    {lines.map(({ id, color, partial, path, startX, startY, endX, endY, sourceCard, targetCard }) =>
+      <g key={id} data-relation={id} data-partial={partial || undefined} style={{ '--staged-sankey-relation-color': color }}
+        data-related-hover={Boolean(hoveredCard && (hoveredCard === sourceCard || hoveredCard === targetCard)) || undefined}>
         <path d={path} />
         {metrics && <circle cx={startX} cy={startY} />}
         <circle cx={endX} cy={endY} />
@@ -118,7 +134,7 @@ function RelationPaths({ lines, metrics }) {
   </svg>;
 }
 
-function metricRelation(value, mark, origin, { id, partial }) {
+function metricRelation(value, mark, origin, { id, partial, color }) {
   const card = value?.closest('article');
   if (!card || !mark) return [];
 
@@ -135,7 +151,8 @@ function metricRelation(value, mark, origin, { id, partial }) {
   const endY = targetBounds.top + (plot ? targetBounds.height / 2 : 0) - origin.top;
   const turnY = startY + (endY - startY) / 2;
   const path = `M ${startX} ${startY} C ${startX} ${turnY}, ${endX} ${turnY}, ${endX} ${endY}`;
-  return [{ id, partial, startX, startY, endX, endY, path }];
+  return [{ id, partial, color: color ?? mark.dataset.sankeyColor, startX, startY, endX, endY, path,
+    sourceCard: card, targetCard: mark.closest('article') }];
 }
 
 function MetricDetailsLinks({ hostRef, routes }) {
@@ -156,8 +173,11 @@ function MetricDetailsLinks({ hostRef, routes }) {
           if (mark) sizes.observe(mark.ownerSVGElement ?? mark);
           return metricRelation(value, mark, origin, route);
         });
-        setLines(previous => previous.length === next.length && previous.every((line, index) =>
-          line.id === next[index].id && line.path === next[index].path) ? previous : next);
+        setLines(previous => previous.length === next.length && previous.every((line, index) => {
+          const current = next[index];
+          return line.id === current.id && line.path === current.path && line.color === current.color
+            && line.sourceCard === current.sourceCard && line.targetCard === current.targetCard;
+        }) ? previous : next);
       });
     };
     const sizes = new ResizeObserver(schedule);
@@ -166,7 +186,8 @@ function MetricDetailsLinks({ hostRef, routes }) {
     });
     sizes.observe(host);
     marks.observe(host, { childList: true, characterData: true, subtree: true, attributes: true,
-      attributeFilter: ['cx', 'cy', 'width', 'height', 'viewBox', 'transform', 'data-dashboard-metric-source', 'data-dashboard-metric-target'] });
+      attributeFilter: ['cx', 'cy', 'width', 'height', 'viewBox', 'transform', 'data-sankey-color',
+        'data-dashboard-metric-source', 'data-dashboard-metric-target'] });
     host.addEventListener('scroll', schedule, { capture: true, passive: true });
     schedule();
     return () => {
@@ -176,7 +197,7 @@ function MetricDetailsLinks({ hostRef, routes }) {
       if (frame !== undefined) cancelAnimationFrame(frame);
     };
   }, [hostRef, routes]);
-  return <RelationPaths lines={lines} metrics />;
+  return <RelationPaths hostRef={hostRef} lines={lines} metrics />;
 }
 
 function ChartDetailsLinks({ hostRef, relations }) {
@@ -188,7 +209,7 @@ function ChartDetailsLinks({ hostRef, relations }) {
     const measure = () => {
       const origin = host.getBoundingClientRect();
       const chartBounds = chart.getBoundingClientRect();
-      const next = relations.flatMap(({ id, source = id, tone }) => {
+      const next = relations.flatMap(({ id, source = id, color }) => {
         const target = host.querySelector(`[data-sankey-detail="${id}"]`);
         if (!target) return [];
         const end = target.getBoundingClientRect();
@@ -201,7 +222,9 @@ function ChartDetailsLinks({ hostRef, relations }) {
         const endX = end.left + end.width / 2 - origin.left;
         const endY = (aboveChart ? end.bottom : end.top) - origin.top;
         const turnY = startY + (endY - startY) / (aboveChart ? 4 : 2);
-        return [{ id, tone, endX, endY, path: `M ${startX} ${startY} C ${startX} ${turnY}, ${endX} ${turnY}, ${endX} ${endY}` }];
+        return [{ id, color: color ?? anchor.dataset.sankeyColor, endX, endY,
+          sourceCard: chart.closest('article'), targetCard: target.closest('article'),
+          path: `M ${startX} ${startY} C ${startX} ${turnY}, ${endX} ${turnY}, ${endX} ${endY}` }];
       });
       setLines(next);
     };
@@ -218,7 +241,7 @@ function ChartDetailsLinks({ hostRef, relations }) {
       chart.removeEventListener('scroll', measure);
     };
   }, [hostRef, relations]);
-  return <RelationPaths lines={lines} />;
+  return <RelationPaths hostRef={hostRef} lines={lines} />;
 }
 
 export function SankeyDetailsLinks({ hostRef, relations, routes }) {

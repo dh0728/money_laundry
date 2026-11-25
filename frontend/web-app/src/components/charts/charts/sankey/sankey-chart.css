@@ -12,3 +12,10 @@
 .sankey-node-value { font-size: var(--chart-sankey-value-size) }
 .staged-sankey-labels [data-sankey-anchor] { r: var(--aml-stroke-divider) }
 .staged-sankey-relations circle { r: var(--chart-sankey-connector-radius) }
+.staged-sankey-relations [data-relation] {
+  color: var(--staged-sankey-relation-color, inherit);
+  opacity: var(--chart-sankey-link-opacity);
+}
+.staged-sankey-relations [data-relation] > path { pointer-events: stroke }
+.staged-sankey-relations [data-related-hover],
+.staged-sankey-relations [data-relation]:hover { opacity: 1 }

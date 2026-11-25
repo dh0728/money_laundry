@@ -1,7 +1,7 @@
 import { afterEach, expect, it } from 'vitest';
 import { cyclicSankeySampleCode, dashboardFixtures, dashboardFixtureResponse, dashboardFixtureBoardPage, dashboardRecordCodes } from './dashboard-fixtures';
 import { readPreviewRoute } from '../app/preview-route';
-import { investigationFlow } from '../features/dashboard/dashboard-flows';
+import { investigationFlow, reviewStatusTotals } from '../features/dashboard/dashboard-flows';
 import { previewAdmin, previewAnalysts, previewStaff } from '../features/auth/preview-session-user';
 import { changePreviewEpisode } from '../features/investigation/preview-episode-transfer';
 
@@ -61,6 +61,9 @@ it('connects each sample Episode to distinct Alerts and their source transaction
   expect(investigation.routes.episode.verdicts.suspicious).toBeGreaterThan(0);
   expect(data.unlinked).toBeGreaterThan(0);
   expect(investigationFlow(data).nodes).toContainEqual(expect.objectContaining({ name: 'Episode 편입', count: 84 }));
+  expect(reviewStatusTotals(data.dailyAlertStatus)).toMatchObject({ pending: 27, inProgress: 88, done: 36, unfinished: 115, total: 151 });
+  expect(reviewStatusTotals(data.dailyEpisodeStatus)).toMatchObject({ inProgress: 27, done: 10, unfinished: 27, total: 37 });
+  expect(reviewStatusTotals([investigation.routes.individual])).toMatchObject({ pending: 27, inProgress: 26, done: 14, total: 67 });
 });
 
 it('uses the same synthetic analyst roster for case assignment, filters and both workload cards', () => {

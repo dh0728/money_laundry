@@ -89,6 +89,8 @@ export interface BarChartProps {
   orientation?: BarOrientation;
   /** AML RADAR: exact horizontal scale for aligned proportion bands. */
   horizontalValueDomain?: [number, number];
+  /** Exact scale for a single-axis vertical proportion band. */
+  verticalValueDomain?: [number, number];
   /** Whether to stack bars instead of grouping them. Default: false */
   stacked?: boolean;
   /** Gap between stacked bar segments in pixels. Default: 0 */
@@ -181,6 +183,7 @@ interface ChartInnerProps {
   barWidthProp?: number;
   orientation: BarOrientation;
   horizontalValueDomain?: [number, number];
+  verticalValueDomain?: [number, number];
   stacked: boolean;
   stackGap: number;
   squareSnap?: { squareGap: number; groupGap?: number; fit?: boolean };
@@ -213,6 +216,7 @@ const ChartCore = memo(function ChartCore({
   barWidthProp,
   orientation,
   horizontalValueDomain,
+  verticalValueDomain,
   stacked,
   stackGap,
   squareSnap,
@@ -292,17 +296,18 @@ const ChartCore = memo(function ChartCore({
   // grow from the zero line in either direction.
   const valueScale = useMemo(() => {
     const range = isHorizontal ? [0, innerWidth] : [innerHeight, 0];
-    if (isHorizontal && horizontalValueDomain) {
-      return scaleLinear().domain(horizontalValueDomain).range(range);
+    const domain = isHorizontal ? horizontalValueDomain : verticalValueDomain;
+    if (domain) {
+      return scaleLinear().domain(domain).range(range);
     }
     return scaleLinear()
       .domain(resolveBarValueDomain(valueExtents))
       .nice()
       .range(range);
-  }, [innerWidth, innerHeight, valueExtents, isHorizontal, horizontalValueDomain]);
+  }, [innerWidth, innerHeight, valueExtents, isHorizontal, horizontalValueDomain, verticalValueDomain]);
 
   const yScales = useMemo(() => {
-    if (isHorizontal) {
+    if (isHorizontal || verticalValueDomain) {
       return wrapSingleYScale(valueScale);
     }
     return buildYScalesForLines({
@@ -312,7 +317,7 @@ const ChartCore = memo(function ChartCore({
       resolveDomain: (dataKeys) =>
         resolveBarValueDomain(collectBarValueExtents(data, dataKeys, stacked)),
     });
-  }, [data, innerHeight, isHorizontal, lines, stacked, valueScale]);
+  }, [data, innerHeight, isHorizontal, lines, stacked, valueScale, verticalValueDomain]);
 
   const primaryYScale = getPrimaryYScale(yScales, valueScale);
 
@@ -705,6 +710,7 @@ export function BarChart({
   barWidth,
   orientation = "vertical",
   horizontalValueDomain,
+  verticalValueDomain,
   stacked = false,
   stackGap = 0,
   squareSnap,
@@ -741,6 +747,7 @@ export function BarChart({
               onPhaseChange={onPhaseChange}
               orientation={orientation}
               horizontalValueDomain={horizontalValueDomain}
+              verticalValueDomain={verticalValueDomain}
               revealSignature={revealSignature}
               squareSnap={squareSnap}
               stacked={stacked}

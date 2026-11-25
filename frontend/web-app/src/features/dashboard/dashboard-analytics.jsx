@@ -13,7 +13,7 @@ import { SectionDownloadHeading } from '../../components/section-download';
 import { dashboardPattern } from '../../mocks/dashboard-patterns';
 import { Box, Grid as LayoutGrid, Text } from '../../components/layout-primitives';
 import { SankeyDetailsLinks, StagedSankey } from '@/components/charts/charts/sankey/staged-sankey';
-import { flowColors, investigationFlow, share as compactShare, statusLabels, transactionFlow } from './dashboard-flows';
+import { flowColors, investigationFlow, reviewStatusTotals, share as compactShare, statusLabels, transactionFlow } from './dashboard-flows';
 import { dataSeriesColors, transactionTotalColor } from '@/components/charts/charts/chart-context';
 import { DashboardIndicatorsGrid } from './dashboard-layout';
 
@@ -74,13 +74,13 @@ function ChartPanel({ title, note, children, className = '', hasChart = true, ..
   </Panel>;
 }
 
-function CompositionLegend({ segments, total, label }) {
+function CompositionLegend({ segments, total, label, formatShare = share }) {
   return <Box as="ul" className="dashboard-composition-legend" aria-label={label}>
     {segments.map(({ label, tone, value }) => <Box as="li" key={label} data-segment={tone}>
       <Text as="i" aria-hidden="true" />
       <Text as="span">{label}</Text>
       <Text as="strong">{count(value)}</Text>
-      <Text as="span">{share(value, total)}</Text>
+      <Text as="span">{formatShare(value, total)}</Text>
     </Box>)}
   </Box>;
 }
@@ -89,21 +89,23 @@ const segmentInk = tone => `var(--segment-${tone})`;
 const noMargin = { top: 0, right: 0, bottom: 0, left: 0 };
 const launderingBarScale = 500;
 
-function ProportionBar({ label, segments, total, orientation = 'horizontal' }) {
+function ProportionBar({ label, segments, total, orientation = 'horizontal', formatShare = share, separated = false }) {
   if (!total) return <Box className="dashboard-proportion-empty" aria-hidden="true" />;
 
   const horizontal = orientation === 'horizontal';
+  const gap = separated ? readChartNumber('--aml-space-2', 2) : 0;
+  const cap = separated ? readChartNumber('--aml-radius-small', 4) : 'round';
   const displayTotal = segments.reduce((sum, { value, visualScale = 1 }) => sum + value * visualScale, 0);
   const point = { label, ...Object.fromEntries(segments.map(({ tone, value, visualScale = 1 }) =>
     [tone, value * visualScale / (horizontal ? 1 : displayTotal)])) };
   return <BarChart className="dashboard-proportion-band" data={[point]} xDataKey="label"
     margin={noMargin} horizontalValueDomain={horizontal ? [0, displayTotal] : undefined}
-    orientation={orientation} stacked barGap={0} animationDuration={0}>
+    orientation={orientation} stacked stackGap={gap} barGap={0} animationDuration={0}>
     {segments.map(({ tone }) => <Bar key={tone} dataKey={tone} fill={segmentInk(tone)}
-      lineCap="round" animate={false} fadedOpacity={1} />)}
+      lineCap={cap} stackGap={gap} animate={false} fadedOpacity={1} />)}
     <ChartTooltip showDatePill={false} showDots={false} damping={0}
       rows={() => segments.map(({ tone, label, value }) => ({
-        label, value: `${count(value)} · ${share(value, total)}`, color: segmentInk(tone),
+        label, value: `${count(value)} · ${formatShare(value, total)}`, color: segmentInk(tone),
       }))} />
   </BarChart>;
 }
@@ -174,17 +176,18 @@ const volumeDetail = [
   { label: '세탁 라벨 거래', color: 'var(--chart-suspect)', value: row => count(row.labeled) },
   { label: '세탁 라벨 비율', color: 'var(--chart-suspect)', value: row => share(row.labeled, row.total) },
 ];
-const relationTargets = [{ id: 'total', tone: 'neutral' }, { id: 'suspect', tone: 'suspect' }];
-const institutionRelationTargets = [...relationTargets, { id: 'new-entities', source: 'total', tone: 'total' }];
+const relationTargets = [{ id: 'total', color: transactionTotalColor }, { id: 'suspect', color: flowColors.suspect }];
+const institutionRelationTargets = [...relationTargets, { id: 'new-entities', source: 'total', color: transactionTotalColor }];
 const institutionMetricRoutes = [
   { id: 'transactions', target: '.dashboard-transaction-flow [data-sankey-anchor="total"]' },
   { id: 'suspicious', target: '.dashboard-transaction-flow [data-sankey-anchor="suspect"]' },
-  { id: 'created-alerts', target: '.dashboard-investigation-flow [data-sankey-top-anchor="alerts"]' },
-  { id: 'open-alerts', target: '.dashboard-investigation-flow [data-sankey-top-anchor="individual"]', partial: true },
   { id: 'linked', target: '.dashboard-investigation-flow [data-sankey-top-anchor="alert-link"]' },
-  { id: 'completion', target: '[data-dashboard-metric-target="completion"]', partial: true },
-  { id: 'open-episodes', target: '[data-dashboard-metric-target="open-episodes"]' },
-].map(route => ({ ...route, source: `[data-dashboard-metric-source="${route.id}"]` }));
+  { id: 'episode-alerts', target: '.dashboard-investigation-flow [data-sankey-top-anchor="episode-alerts"]' },
+  { id: 'open-alerts-pending', source: 'open-alerts', target: '.dashboard-investigation-flow [data-sankey-top-anchor="pending"]', partial: true },
+  { id: 'open-alerts-in-progress', source: 'open-alerts', target: '.dashboard-investigation-flow [data-sankey-top-anchor="inProgress"]', partial: true },
+  { id: 'open-episodes', target: '[data-dashboard-metric-target="open-episodes"]', color: flowColors.inProgress },
+  { id: 'completion-episodes', source: 'completion', target: '[data-dashboard-metric-target="completed-episodes"]', color: flowColors.done, partial: true },
+].map(route => ({ ...route, source: `[data-dashboard-metric-source="${route.source ?? route.id}"]` }));
 const transactionStages = ['수신처', '전체 거래', '이진 분류', '패턴 분류'];
 const investigationStages = ['의심 거래', 'Alert 연결', '조사 경로', '현재 상태', '완료 판정'];
 const riskScoreColors = {
@@ -197,14 +200,14 @@ function SeriesLegend({ series }) {
   return <Box className="dashboard-legend">
     {series.map(item => <Text as="span" className="dashboard-series-legend-item" key={item.key}>
       <Text as="i" aria-hidden="true" style={{ '--dashboard-series-swatch': item.color }} />{item.label}
-      {item.total && <> <Text as="strong" className="dashboard-metric-value">{item.total}</Text></>}
+      {item.total && <> <Text as="strong" className="dashboard-metric-value" style={{ '--dashboard-metric-ink': item.totalInk }}>{item.total}</Text></>}
     </Text>)}
   </Box>;
 }
 
 const newEntitySeries = [
-  { key: 'newAccounts', label: '새 계좌', color: dataSeriesColors.teal, value: row => integer.format(row.newAccounts) + '개' },
-  { key: 'newOwners', label: '새 소유주', color: dataSeriesColors.pink, value: row => integer.format(row.newOwners) + '명' },
+  { key: 'newAccounts', label: '새 계좌', color: dataSeriesColors.teal, totalInk: 'var(--case-comparison-teal)', value: row => integer.format(row.newAccounts) + '개' },
+  { key: 'newOwners', label: '새 소유주', color: dataSeriesColors.pink, totalInk: 'var(--case-comparison-pink)', value: row => integer.format(row.newOwners) + '명' },
 ];
 
 function NewEntitiesMetric({ data, reduced }) {
@@ -283,28 +286,23 @@ function StaffWorkloadMetric({ workload, reduced, showAssignments }) {
 function RiskSegments({ data }) {
   const rows = data.flags.map(row => ({ ...row, label: row.label.split(' · ')[0] }));
   const scored = rows.reduce((sum, row) => sum + row.count, 0);
-  const point = { label: '모델 이상 거래', ...Object.fromEntries(rows.map(row => [row.key, row.count])) };
-  return <ChartPanel title="모델 이상 거래의 위험 점수" note={count(scored) + ' 기준'}
+  const gap = readChartNumber('--aml-space-2', 2);
+  const cap = readChartNumber('--aml-radius-small', 4);
+  const point = { label: '이상 거래', ...Object.fromEntries(rows.map(row => [row.key, row.count])) };
+  return <ChartPanel title="위험 점수"
     className="dashboard-flow-risk" data-sankey-detail="suspect" hasChart={scored > 0}>
     {scored ? <>
-      <Box className="dashboard-score-breakdown">
-        <Box className="dashboard-score-band">
-          <BarChart data={[point]} xDataKey="label" stacked barGap={0} aspectRatio="auto" margin={noMargin}>
-            {rows.map(row => <Bar key={row.key} dataKey={row.key} fill={riskScoreColors[row.key]} lineCap="butt" animate={false} />)}
-            <ChartTooltip showDatePill={false} showDots={false} rows={() => rows.map(row => ({
-              label: row.label, color: riskScoreColors[row.key], value: count(row.count) + ' · ' + compactShare(row.count, scored),
-            }))} />
-          </BarChart>
-        </Box>
-        <Box as="ul" className="dashboard-score-legend">
-          {rows.map(row => <Box as="li" key={row.key}>
-            <Text className="dashboard-note dashboard-series-legend-item">
-              <Text as="i" aria-hidden="true" style={{ '--dashboard-series-swatch': riskScoreColors[row.key] }} />{row.label}
-            </Text>
-            <Text as="strong">{compactShare(row.count, scored)}</Text>
-            <Text className="dashboard-note">{count(row.count)}</Text>
-          </Box>)}
-        </Box>
+      <BarChart className="dashboard-score-band" data={[point]} xDataKey="label" stacked stackGap={gap} barGap={0}
+        aspectRatio="auto" margin={noMargin} verticalValueDomain={[0, scored]} animationDuration={0}>
+        {rows.map(row => <Bar key={row.key} dataKey={row.key} fill={riskScoreColors[row.key]} lineCap={cap} stackGap={gap}
+          animate={false} showValue valueLabelOrientation="horizontal" valueLabelFormatter={() => `${row.label} · ${count(row.count)}`}
+          valueLabelColor={row.key === 'high' ? 'var(--status-accent-light-ink)' : 'var(--text)'} />)}
+        <ChartTooltip showDatePill={false} showDots={false} rows={() => rows.map(row => ({
+          label: row.label, color: riskScoreColors[row.key], value: count(row.count),
+        }))} />
+      </BarChart>
+      <Box as="ul" className="visually-hidden" aria-label="위험 점수 구간별 건수">
+        {rows.map(row => <Box as="li" key={row.key}>{row.label} · {count(row.count)}</Box>)}
       </Box>
       {scored < data.suspicious.length && <Text className="dashboard-note">점수 미집계 {count(data.suspicious.length - scored)}</Text>}
     </> : <Text className="dashboard-note">표시할 점수 분포가 없습니다.</Text>}
@@ -345,11 +343,11 @@ function TransactionDetails({ data, flow, reduced, summary, metrics }) {
 
 function InvestigationStatus({ data, episode = false, reduced }) {
   const keys = episode ? ['inProgress', 'done'] : ['pending', 'inProgress', 'done'];
-  const rows = (episode ? data.dailyEpisodeStatus : data.dailyAlertStatus)
-    .map(row => ({ ...row, label: row.date.slice(5).replace('-', '/') }));
+  const daily = episode ? data.dailyEpisodeStatus : data.dailyAlertStatus;
+  const rows = (daily ?? []).map(row => ({ ...row, label: row.date.slice(5).replace('-', '/') }));
   const series = keys.map(key => ({ key, label: statusLabels[key], color: flowColors[key] }));
-  const sums = Object.fromEntries(keys.map(key => [key, rows.reduce((sum, row) => sum + row[key], 0)]));
-  const total = Object.values(sums).reduce((sum, value) => sum + value, 0);
+  const sums = reviewStatusTotals(rows);
+  const { total } = sums;
   const title = episode ? '일별 Episode 처리 상태' : '일별 Alert 처리 상태';
   const note = total ? '생성일별 현재 상태 · ' + count(total) + ' · 완료 ' + compactShare(sums.done, total) : '생성일별 현재 상태 · KST';
   return <ChartPanel title={title} note={note} className="dashboard-flow-status" hasChart={total > 0}>
@@ -357,13 +355,38 @@ function InvestigationStatus({ data, episode = false, reduced }) {
       <Box className="dashboard-legend">
         {series.map(item => <Box className="dashboard-status-legend-item" key={item.key}>
           <ReviewStatusTag status={item.key === 'pending' ? '처리 전' : item.label} />
-          <Text as="strong" data-dashboard-metric-target={episode && item.key === 'inProgress' ? 'open-episodes' : undefined}>
+          <Text as="strong" data-dashboard-metric-target={episode ? (item.key === 'done' ? 'completed-episodes' : 'open-episodes') : undefined}>
             {count(sums[item.key])}
           </Text>
         </Box>)}
       </Box>
       <DailySeries rows={rows} series={series} reduced={reduced} label={title} separatedStack />
-    </> : <Text className="dashboard-note">조회 기간에 생성된 업무가 없습니다.</Text>}
+    </> : <Text className="dashboard-note">{daily ? '조회 기간에 생성된 업무가 없습니다.' : '처리 상태 집계 미제공'}</Text>}
+  </ChartPanel>;
+}
+
+function CaseCompletion({ data }) {
+  const individual = data.investigation?.routes?.individual;
+  const alerts = reviewStatusTotals(individual && [individual]);
+  const episodes = reviewStatusTotals(data.dailyEpisodeStatus);
+  const available = individual != null && data.dailyEpisodeStatus != null;
+  const total = available ? alerts.total + episodes.total : 0;
+  const done = alerts.done + episodes.done;
+  const segments = [
+    { label: statusLabels.pending, tone: 'pending', value: alerts.pending + episodes.pending },
+    { label: statusLabels.inProgress, tone: 'in-progress', value: alerts.inProgress + episodes.inProgress },
+    { label: statusLabels.done, tone: 'done', value: done },
+  ];
+  return <ChartPanel title="업무 처리율" className="dashboard-completion" hasChart={total > 0}
+    note="생성일별 현재 상태 · 개별 처리 Alert와 Episode를 건별로 집계">
+    {total ? <>
+      <Box className="dashboard-metric-reading dashboard-completion-reading">
+        <Text as="span">{count(total)} 중 {count(done)} 완료 · 개별 처리 Alert {count(alerts.total)} + Episode {count(episodes.total)}</Text>
+        <Text as="strong" className="dashboard-metric-value" data-dashboard-metric-source="completion">{compactShare(done, total)}</Text>
+      </Box>
+      <ProportionBar label="개별 처리 Alert·Episode 처리 상태" segments={segments} total={total} formatShare={compactShare} separated />
+      <CompositionLegend label="개별 처리 Alert·Episode 처리 상태별 건수와 비율" segments={segments} total={total} formatShare={compactShare} />
+    </> : <Text className="dashboard-note">{available ? '조회 기간에 생성된 Alert·Episode가 없습니다.' : 'Alert·Episode 처리 상태 집계 미제공'}</Text>}
   </ChartPanel>;
 }
 
@@ -389,8 +412,8 @@ export function Analytics({ data, reduced, summary, metrics }) {
       {investigation.hasData ? <StagedSankey data={investigation} stages={investigationStages} label="조사 처리 흐름" reduced={reduced} />
         : <Text className="dashboard-note">표시할 조사 처리 흐름이 없습니다.</Text>}
     </ChartPanel>
-    {metrics.status}
-    <LayoutGrid columns={12} className="dashboard-flow-status-grid" data-dashboard-metric-target="completion">
+    <CaseCompletion data={data} />
+    <LayoutGrid columns={12} className="dashboard-flow-status-grid">
       <InvestigationStatus data={data} reduced={reduced} />
       <InvestigationStatus data={data} reduced={reduced} episode />
     </LayoutGrid>

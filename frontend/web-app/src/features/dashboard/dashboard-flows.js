@@ -13,6 +13,16 @@ export const flowColors = {
 };
 
 export const statusLabels = { pending: '검토 대기', inProgress: '처리 중', done: '처리 완료' };
+export function reviewStatusTotals(rows) {
+  const totals = { pending: 0, inProgress: 0, done: 0 };
+  for (const row of rows ?? []) {
+    totals.pending += row.pending;
+    totals.inProgress += row.inProgress;
+    totals.done += row.done;
+  }
+  const unfinished = totals.pending + totals.inProgress;
+  return { ...totals, unfinished, total: unfinished + totals.done };
+}
 const verdictNodes = [
   { key: 'normal', label: '정상 판정', color: flowColors.normal },
   { key: 'suspicious', label: '이상 판정', color: flowColors.suspect },
@@ -74,7 +84,7 @@ export function transactionFlow(data) {
     flow.link(totalNode, otherNode, other);
   }
   if (suspicious > 0) {
-    const suspectNode = flow.node('모델 이상', 2, suspicious, flowColors.suspect,
+    const suspectNode = flow.node('이상', 2, suspicious, flowColors.suspect,
       { ratio: share(suspicious, total), anchor: 'suspect' });
     flow.link(totalNode, suspectNode, suspicious, { weight: suspicious * scale });
     const patterns = data.patterns.filter(row => row.count > 0).sort((a, b) => b.count - a.count);
@@ -95,11 +105,11 @@ export function transactionFlow(data) {
   return { ...flow, scale, sample, hasData: total > 0 };
 }
 
-function addStatusAndVerdicts(flow, routeNodes, stage, weight = 1) {
+function addStatusAndVerdicts(flow, routeNodes, stage, weight = 1, anchorStatuses = false) {
   for (const [key, label] of Object.entries(statusLabels)) {
     const total = routeNodes.reduce((sum, { route }) => sum + route[key], 0);
     if (total === 0) continue;
-    const state = flow.node(label, stage, total, flowColors[key]);
+    const state = flow.node(label, stage, total, flowColors[key], anchorStatuses && key !== 'done' ? { anchor: key } : undefined);
     for (const { id, route } of routeNodes) flow.link(id, state, route[key], { weight: route[key] * weight });
     if (key !== 'done') continue;
     for (const verdict of verdictNodes) {
@@ -146,7 +156,7 @@ export function investigationFlow(data) {
   const unlinked = data.unlinked;
   const weight = linked > 0 && status.totalAlerts > 0 ? linked / status.totalAlerts : 1;
   const alerts = status.totalAlerts > 0
-    ? flow.node('Alert', 1, status.totalAlerts, flowColors.suspect, { anchor: 'alerts' })
+    ? flow.node('Alert', 1, status.totalAlerts, flowColors.suspect)
     : null;
 
   if (suspicious > 0 && linked != null && unlinked != null) {
@@ -169,14 +179,14 @@ export function investigationFlow(data) {
   if (alerts == null) return { ...flow, hasData: flow.links.length > 0 };
 
   const routeNodes = [
-    { name: '개별 처리', route: status.routes.individual, value: status.individualAlerts, anchor: 'individual' },
+    { name: '개별 처리', route: status.routes.individual, value: status.individualAlerts },
     { name: 'Episode 편입', route: status.routes.episode, value: status.episodeAlerts,
-      detail: `Episode ${count(status.linkedEpisodes)}` },
+      detail: `Episode ${count(status.linkedEpisodes)}`, anchor: 'episode-alerts' },
   ].filter(item => item.value > 0).map(item => ({
     ...item, id: flow.node(item.name, 2, item.value, flowColors.suspect, { detail: item.detail, anchor: item.anchor }),
   }));
   routeNodes.forEach(route => flow.link(alerts, route.id, route.value, { weight: route.value * weight }));
 
-  addStatusAndVerdicts(flow, routeNodes, 3, weight);
+  addStatusAndVerdicts(flow, routeNodes, 3, weight, true);
   return { ...flow, hasData: true };
 }
