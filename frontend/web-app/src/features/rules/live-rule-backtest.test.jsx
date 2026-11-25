@@ -162,6 +162,57 @@ it('경로형 룰은 경로의 거래 수를 바꿔 본 결과와 측정값(가�
   expect(runButton('다시 실행')).toBeEnabled();
 });
 
+it('대상이 거래인 룰(단건 고액거래)은 사례를 거래 코드로 보여 주고 예상 새 Alert 를 빼고 보여 준다', async () => {
+  vi.mocked(fetchRule).mockImplementation(ruleId => Promise.resolve(ruleId === 4
+    ? { ...draftRuleFixture, template: 'LARGE_TX', templateName: '단건 고액거래' } : activeRuleFixture));
+  const largeRun = { ...completed, template: 'LARGE_TX', baseline: null, skippedBusySubjects: 0, expectedNewAlerts: 0,
+    kpis: { ...result.kpis, hits: 2, added: null, dropped: null, baseHits: null, basePrecision: null, baseJudged: null },
+    sweep: { metric: 'TX_USD', label: '건당 금액', unit: 'USD', rows: [
+      { value: 9000, current: false, hits: 3, txCount: 3, alertOverlap: 1, expectedNewAlerts: 0 },
+      { value: 10000, current: true, hits: 2, txCount: 2, alertOverlap: 1, expectedNewAlerts: 0 }] },
+    cases: [
+      { subjectType: 'TX', subject: '101', txId: 101, occurredAt: '2023-09-09T02:00:00Z', state: 'HIT', measured: { TX_USD: 11500 }, txCount: 1, alertId: 3001, judgement: null },
+      { subjectType: 'TX', subject: '205', txId: 205, occurredAt: '2023-09-09T16:30:00Z', state: 'HIT', measured: { TX_USD: 30000 }, txCount: 1, alertId: null, judgement: null }] };
+  vi.mocked(fetchBacktests).mockResolvedValue([largeRun]);
+  vi.mocked(fetchBacktest).mockResolvedValue(largeRun);
+  render(<LiveRuleBacktest initialRule="RULE-004" actionsHost={footer} />);
+
+  // 대상을 "거래 N건" 으로 센다
+  const kpis = within(await screen.findByLabelText('백테스트 결과'));
+  expect(kpis.getByText('적중 거래').closest('div')).toHaveTextContent('적중 거래2 건');
+  // 사례의 대상은 거래 코드다. 날짜는 한국 시각 기준이라 16:30Z 는 다음 날이다.
+  const cases = within(screen.getByRole('region', { name: '사례' }));
+  expect(cases.getByRole('columnheader', { name: /대상 거래/ })).toBeInTheDocument();
+  expect(within(cases.getByText('T-230909-00000101').closest('tr')).getByText('건당 금액 11,500 USD')).toBeInTheDocument();
+  expect(cases.getByText('T-230910-00000205')).toBeInTheDocument();
+  // 이 템플릿의 룰은 Alert 를 만들 수 없으므로 예상 새 Alert 를 보여 주지 않는다
+  const sweep = within(screen.getByRole('region', { name: '값을 바꾸면' }));
+  expect(sweep.getAllByRole('columnheader').map(cell => cell.textContent)).toEqual(['건당 금액', '적중 거래', '근거 거래', 'Alert 와 겹침']);
+  expect(sweep.getByRole('row', { name: /이번 값/ })).toHaveTextContent('10,000 USD');
+  const scope = within(screen.getByRole('region', { name: '검사 범위' }));
+  expect(scope.queryByText('예상 새 Alert')).not.toBeInTheDocument();
+  expect(scope.getByText('이 템플릿의 룰은 Alert 를 만들지 않고 근거로만 표시합니다.')).toBeInTheDocument();
+  expect(scope.getByText('이미 있는 Alert 와 겹침').closest('div')).toHaveTextContent('거래 2건');
+});
+
+it('방향을 고르는 템플릿은 돌릴 버전의 방향에 맞는 문구로 측정값을 읽는다', async () => {
+  // RULE-004 가 분할 입·출금 룰이고 방향이 입금일 때
+  vi.mocked(fetchRule).mockImplementation(ruleId => Promise.resolve(ruleId === 4
+    ? { ...draftRuleFixture, template: 'STRUCTURING', templateName: '분할 입·출금',
+      working: { ...draftRuleFixture.working, definition: { ...draftRuleFixture.working.definition, direction: 'IN' } } } : activeRuleFixture));
+  const splitRun = { ...completed, template: 'STRUCTURING', baseline: null, sweep: null,
+    kpis: { ...result.kpis, added: null, dropped: null, baseHits: null, basePrecision: null, baseJudged: null },
+    cases: [{ subjectType: 'ACCOUNT', subject: 'c41f3f2a', state: 'HIT', measured: { SUM_USD: 15000, TX_COUNT: 2, DISTINCT_COUNTERPARTIES: 2 }, txCount: 2, alertId: null, judgement: null }] };
+  vi.mocked(fetchBacktests).mockResolvedValue([splitRun]);
+  vi.mocked(fetchBacktest).mockResolvedValue(splitRun);
+  render(<LiveRuleBacktest initialRule="RULE-004" actionsHost={footer} />);
+
+  const cases = within(await screen.findByRole('region', { name: '사례' }));
+  expect(cases.getByRole('columnheader', { name: /대상 계좌/ })).toBeInTheDocument();
+  expect(within(cases.getByText('c41f3f2a').closest('tr')).getByText('거래 2건 · 송금 계좌 2개 · 받은 총액 15,000 USD')).toBeInTheDocument();
+  expect(within(screen.getByRole('region', { name: '검사 범위' })).getByText('예상 새 Alert')).toBeInTheDocument();
+});
+
 it('도는 중에는 취소할 수 있고, 실패하면 이유를 보여 준다', async () => {
   vi.mocked(fetchBacktests).mockResolvedValue([head('RUNNING', { progress: 20 })]);
   vi.mocked(fetchBacktest).mockResolvedValue(head('RUNNING', { progress: 20 }));
@@ -180,12 +231,13 @@ it('도는 중에는 취소할 수 있고, 실패하면 이유를 보여 준다'
 });
 
 it('평가기가 없는 템플릿은 실행을 막고, 서버가 접수를 거절하면 사유를 보여 준다', async () => {
-  // RULE-004 가 평가기가 아직 없는 템플릿(분할 입·출금)의 룰일 때
+  // 서버가 준 backtestTemplates 에 없는 템플릿의 룰일 때(지금 서버는 고를 수 있는 열 개를 모두 준다. 이 막는 문구는 옛 서버에 붙었을 때를 위한 것이다)
   vi.mocked(fetchRule).mockImplementation(ruleId => Promise.resolve(ruleId === 4
-    ? { ...draftRuleFixture, template: 'STRUCTURING', templateName: '분할 입·출금' } : activeRuleFixture));
+    ? { ...draftRuleFixture, template: 'DORMANT_ACTIVATION', templateName: '휴면계좌 활성화' } : activeRuleFixture));
   render(<LiveRuleBacktest initialRule="RULE-004" actionsHost={footer} />);
-  // 되는 템플릿은 서버가 준 backtestTemplates 에서 읽는다(카탈로그 픽스처에 있는 것은 FAN-OUT 과 RANDOM)
-  expect(await screen.findByText(/분할 입·출금 템플릿의 백테스트는 아직 제공하지 않습니다/)).toHaveTextContent('지금은 FAN-OUT · RANDOM 만 됩니다.');
+  // 되는 템플릿은 backtestTemplates 에서 읽는다(카탈로그 픽스처에 있는 것은 넷)
+  expect(await screen.findByText(/휴면계좌 활성화 템플릿의 백테스트는 아직 제공하지 않습니다/))
+    .toHaveTextContent('지금은 FAN-OUT · RANDOM · 단건 고액거래 · 분할 입·출금 만 됩니다.');
   expect(runButton('백테스트 실행')).toBeDisabled();
 
   // RULE-002(FAN-IN)는 운영 버전뿐이라 비교 없이 그 버전을 돌린다

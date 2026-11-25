@@ -64,8 +64,12 @@ export const catalogFixture = {
     "FAN_IN",
     "FAN_OUT",
     "GATHER_SCATTER",
+    "LARGE_TX",
+    "PASS_THROUGH",
     "RANDOM",
+    "SAME_AMOUNT",
     "SCATTER_GATHER",
+    "STRUCTURING",
   ],
 } as unknown as RuleCatalog
 

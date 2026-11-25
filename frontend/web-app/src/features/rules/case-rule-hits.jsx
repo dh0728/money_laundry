@@ -29,12 +29,15 @@ export function useCaseRuleHits(caseId) {
   return state.caseId === caseId ? state : { status: 'loading', hits: [] };
 }
 
-/** "서로 다른 수취 계좌 수 ≥ 6개 → 실제 6개" */
-function Condition({ condition }) {
+/**
+ * "서로 다른 수취 계좌 수 ≥ 6개 → 실제 6개"
+ * @param measuredLabel 실제 값 앞에 붙는 말. 거래 여러 건을 모은 카드는 그 가운데 가장 큰 값이라 "가장 큰 거래" 다
+ */
+function Condition({ condition, measuredLabel = '실제' }) {
   // 값이 없는 조건(같은 상대와 두 번 거래하지 않음 등)은 문구만 있다
   if (condition.cmp == null) return <li>{condition.label}</li>;
   return <li>{condition.label} {cmpSymbol[condition.cmp] ?? condition.cmp} {withUnit(condition.value, condition.unit)}
-    {' → '}<strong>실제 {withUnit(condition.measured, condition.unit)}</strong></li>;
+    {' → '}<strong>{measuredLabel} {withUnit(condition.measured, condition.unit)}</strong></li>;
 }
 
 // 한 역할의 계좌를 처음에 보여 주는 개수. 넘으면 "외 N개 더 보기" 로 접는다.
@@ -79,23 +82,28 @@ export function CaseRuleHits({ state, records = [], alertCode }) {
       {state.hits.map(hit => {
         const matched = hit.matchedTxIds.flatMap(txId => codes.get(txId) ?? []);
         const alert = alertCode?.(hit.alertId);
-        return <li key={`${hit.alertId}-${hit.versionId}-${hit.subject}`}>
+        // 대상이 거래인 룰(단건 고액거래): 걸린 거래를 한 장에 모은 카드다. 대상 계좌가 없고 걸린 거래가 곧 근거 거래다.
+        const transactions = hit.subjectType === 'TX';
+        return <li key={`${hit.alertId}-${hit.versionId}-${hit.subject ?? 'tx'}`}>
           <LinkTag href={`/rules?rule=${hit.code}`} code={hit.code} />
           <strong>v{hit.versionNo} · {hit.name}</strong>
           <PatternTag>{hit.templateName}</PatternTag>
           {/* 지금은 중지했거나 물러난 버전이 운영 중일 때 만든 적중 */}
           {hit.versionStatus !== 'ACTIVE' && <StatusTag preset={ruleStatusPresets[hit.versionStatus]}>지금은 {ruleStatusNames[hit.versionStatus]}</StatusTag>}
           <span className="overview-shared-target">
-            {alert && <><LinkTag code={alert} /> · </>}{hit.subjectLabel ?? '대상'} <code>{hit.subject}</code> · 적중 날짜 {hit.hitDates.join(', ')}
+            {alert && <><LinkTag code={alert} /> · </>}
+            {transactions ? `거래 ${hit.matchedTxIds.length}건` : <>{hit.subjectLabel ?? '대상'} <code>{hit.subject}</code></>} · 적중 날짜 {hit.hitDates.join(', ')}
           </span>
           <ul className="overview-shared-target case-rule-hit-conditions" aria-label="조건과 실제 값">
-            {hit.conditions.map((condition, index) => <Condition key={index} condition={condition} />)}
+            {hit.conditions.map((condition, index) => <Condition key={index} condition={condition}
+              measuredLabel={transactions && hit.matchedTxIds.length > 1 ? '가장 큰 거래' : '실제'} />)}
           </ul>
           {hit.roles?.length > 0 && <ul className="overview-shared-target case-rule-hit-roles" aria-label="함께 나온 계좌">
             {roleGroups(hit.roles).map(group => <RoleAccounts key={group.role} group={group} />)}
           </ul>}
           <span className="overview-shared-target overview-note">
-            이 사건의 거래 {hit.matchedTxIds.length}건이 이 적중의 근거 거래입니다(근거 거래 전체 {hit.evidenceTxCount}건).
+            {transactions ? `이 사건의 거래 ${hit.matchedTxIds.length}건이 이 룰에 걸렸습니다.`
+              : `이 사건의 거래 ${hit.matchedTxIds.length}건이 이 적중의 근거 거래입니다(근거 거래 전체 ${hit.evidenceTxCount}건).`}
           </span>
           {matched.length > 0 && <span className="overview-shared-target semantic-tag-group">
             {matched.map(code => <LinkTag key={code} code={code} />)}

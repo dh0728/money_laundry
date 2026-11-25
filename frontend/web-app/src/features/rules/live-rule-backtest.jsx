@@ -7,7 +7,8 @@ import { ScreenActions } from '../../components/screen-actions';
 import { StatusTag } from '../../components/semantic-tags';
 import { downloadCsv } from '../../components/query-controls';
 import { SortableTableHead, tableCount, useTableSort, WorkflowTable } from '../../components/workflow-table';
-import { sidedText, templateOf } from './rule-definition';
+import { sidedText, sideOf, templateOf } from './rule-definition';
+import { transactionCode } from '../investigation/live-data.js';
 import {
   codeToRuleId, loadRuleCatalog, problemText, refreshLiveRules, ruleStatusNames, ruleStatusPresets,
 } from './live-rule-store';
@@ -71,10 +72,20 @@ function measuredText(measured, catalog, side, order = [], templateKey = '') {
   const rank = key => (order.includes(key) ? order.indexOf(key) : order.length);
   return Object.entries(measured ?? {}).filter(([, value]) => value != null).sort(([a], [b]) => rank(a) - rank(b)).map(([key, value]) => {
     const hops = key === 'HOPS';
-    const spec = hops ? catalog?.path?.minHops : catalog?.metrics[key];
-    const label = (hops ? sidedText(spec?.label, templateKey) : sidedText(spec?.short ?? spec?.label, side)) || key;
+    // 대상이 거래인 룰(단건 고액거래)의 측정값은 그 거래의 금액이고, 문구는 세는 거래 항목 "건당 금액" 의 것이다
+    const amount = key === 'TX_USD';
+    const spec = hops ? catalog?.path?.minHops : amount ? catalog?.filterFields?.TX_USD : catalog?.metrics[key];
+    const label = (hops ? sidedText(spec?.label, templateKey) : amount ? sidedText(spec?.label, side) : sidedText(spec?.short ?? spec?.label, side)) || key;
     return `${label} ${decimalFormat.format(value)}${spec?.unit ? (spec.unit.length > 1 ? ` ${spec.unit}` : spec.unit) : ''}`;
   }).join(' · ');
+}
+
+// 대상이 계좌인 룰과 거래인 룰(단건 고액거래)은 세는 말이 다르다: "대상 3개" / "거래 3건"
+const subjectNouns = { ACCOUNT: { name: '대상', unit: '개' }, TX: { name: '거래', unit: '건' } };
+
+/** 사례의 대상을 화면에 적는 글자. 계좌는 가명 ID 앞 8자리, 거래는 화면의 거래 코드(T-yymmdd-00000000)다. */
+function subjectText(item) {
+  return item.subjectType === 'TX' && item.txId != null && item.occurredAt ? transactionCode(item) : item.subject;
 }
 
 function Notices({ run, wholePath }) {
@@ -90,54 +101,57 @@ function Notices({ run, wholePath }) {
   </ul>;
 }
 
-function Kpis({ run }) {
+function Kpis({ run, noun }) {
   const { kpis } = run;
   const compared = run.baseline != null;
   return <dl className="backtest-grid backtest-comparison" aria-label="백테스트 결과">
-    <Metric label="적중 대상" value={count(kpis.hits)} unit="개"
-      note={compared ? `운영 v${run.baseline.versionNo} 은 ${count(kpis.baseHits)}개` : `대상 × 날짜로는 ${count(run.hitDays)}건`} />
-    <Metric label="새로 걸림" value={compared ? count(kpis.added) : '—'} unit={compared ? '개' : undefined}
-      note={compared ? '운영 버전에는 없던 대상' : '비교할 운영 버전이 없습니다'} />
-    <Metric label="빠짐" value={compared ? count(kpis.dropped) : '—'} unit={compared ? '개' : undefined}
-      note={compared ? '운영 버전에만 있던 대상' : undefined} />
+    <Metric label={`적중 ${noun.name}`} value={count(kpis.hits)} unit={noun.unit}
+      note={compared ? `운영 v${run.baseline.versionNo} 은 ${count(kpis.baseHits)}${noun.unit}`
+        : noun.name === '대상' ? `대상 × 날짜로는 ${count(run.hitDays)}건` : undefined} />
+    <Metric label="새로 걸림" value={compared ? count(kpis.added) : '—'} unit={compared ? noun.unit : undefined}
+      note={compared ? `운영 버전에는 없던 ${noun.name}` : '비교할 운영 버전이 없습니다'} />
+    <Metric label="빠짐" value={compared ? count(kpis.dropped) : '—'} unit={compared ? noun.unit : undefined}
+      note={compared ? `운영 버전에만 있던 ${noun.name}` : undefined} />
     <Metric label="사람 판정 기준 정확도" value={percent(kpis.precision)}
       note={kpis.judged ? `판정 ${count(kpis.judged)}건 기준${compared && kpis.baseJudged ? ` · 운영 v${run.baseline.versionNo} 은 ${percent(kpis.basePrecision)}` : ''}`
-        : '적중 대상과 겹치는 Alert 가운데 사람이 종결한 것이 없습니다'} />
+        : `적중 ${noun.name}와 겹치는 Alert 가운데 사람이 종결한 것이 없습니다`} />
   </dl>;
 }
 
-function Sweep({ sweep }) {
+/** @param noAlert 이 템플릿의 룰은 Alert 를 만들 수 없다(카탈로그의 alert.allowed). "예상 새 Alert" 를 보여 주지 않는다. */
+function Sweep({ sweep, noun, noAlert }) {
   return <Panel className="rule-backtest-sweep" aria-label="값을 바꾸면">
     <h2>값을 바꾸면</h2>
     <p className="workflow-rule-note">{sweep.label}만 바꿔 같은 기간에 다시 돌린 결과입니다.</p>
     <table className="rule-backtest-table">
       <thead><tr>
-        <th scope="col">{sweep.label}</th><th scope="col">적중 대상</th><th scope="col">근거 거래</th>
-        <th scope="col">Alert 와 겹침</th><th scope="col">예상 새 Alert</th>
+        <th scope="col">{sweep.label}</th><th scope="col">적중 {noun.name}</th><th scope="col">근거 거래</th>
+        <th scope="col">Alert 와 겹침</th>{!noAlert && <th scope="col">예상 새 Alert</th>}
       </tr></thead>
       <tbody>{sweep.rows.map(row => <tr key={row.value} data-current={row.current || undefined}>
-        <th scope="row">{decimalFormat.format(row.value)}{sweep.unit}{row.current && <span className="rule-backtest-current"> 이번 값</span>}</th>
-        <td>{count(row.hits)}</td><td>{count(row.txCount)}</td><td>{count(row.alertOverlap)}</td><td>{count(row.expectedNewAlerts)}</td>
+        <th scope="row">{decimalFormat.format(row.value)}{sweep.unit?.length > 1 ? ` ${sweep.unit}` : sweep.unit}{row.current && <span className="rule-backtest-current"> 이번 값</span>}</th>
+        <td>{count(row.hits)}</td><td>{count(row.txCount)}</td><td>{count(row.alertOverlap)}</td>{!noAlert && <td>{count(row.expectedNewAlerts)}</td>}
       </tr>)}</tbody>
     </table>
   </Panel>;
 }
 
-function Scope({ run }) {
+function Scope({ run, noun, noAlert }) {
   return <Panel className="rule-backtest-scope" aria-label="검사 범위">
     <h2>검사 범위</h2>
     <dl className="rule-condition-facts rule-backtest-facts">
       <div><dt>기간</dt><dd>{run.period.from} ~ {run.period.to} ({count(run.period.days)}일)</dd></div>
       <div><dt>검사한 거래</dt><dd>{count(run.txCount)}건</dd></div>
       <div><dt>근거 거래</dt><dd>{count(run.evidenceTxCount)}건 · 검사한 거래의 {percent(run.evidenceShare)}</dd></div>
-      <div><dt>이미 있는 Alert 와 겹침</dt><dd>대상 {count(run.alertOverlap)}개</dd></div>
-      <div><dt>예상 새 Alert</dt><dd>대상 {count(run.expectedNewAlerts)}개 <span className="workflow-rule-note">추정</span></dd></div>
+      <div><dt>이미 있는 Alert 와 겹침</dt><dd>{noun.name} {count(run.alertOverlap)}{noun.unit}</dd></div>
+      {!noAlert && <div><dt>예상 새 Alert</dt><dd>대상 {count(run.expectedNewAlerts)}개 <span className="workflow-rule-note">추정</span></dd></div>}
     </dl>
-    <p className="workflow-rule-note">예상 새 Alert 는 어느 Alert 와도 겹치지 않고 근거 거래가 2건 이상인 대상 수입니다. 실제로 몇 개로 묶일지는 Alert 생성을 돌려야 압니다.</p>
+    <p className="workflow-rule-note">{noAlert ? '이 템플릿의 룰은 Alert 를 만들지 않고 근거로만 표시합니다.'
+      : '예상 새 Alert 는 어느 Alert 와도 겹치지 않고 근거 거래가 2건 이상인 대상 수입니다. 실제로 몇 개로 묶일지는 Alert 생성을 돌려야 압니다.'}</p>
   </Panel>;
 }
 
-function Cases({ run, catalog, side, order, templateKey, registerTableTools }) {
+function Cases({ run, catalog, side, order, templateKey, noun, registerTableTools }) {
   const measuredOf = item => measuredText(item.measured, catalog, side, order, templateKey);
   const sorting = useTableSort(run.cases);
   const [shown, setShown] = useState(CASE_PAGE);
@@ -145,13 +159,13 @@ function Cases({ run, catalog, side, order, templateKey, registerTableTools }) {
   useEffect(() => registerTableTools?.({
     entries: [{ label: '백테스트 사례', format: 'CSV', count: sorting.rows.length,
       download: () => downloadCsv('rule-backtest-cases', ['대상', '구분', '근거 거래', '측정값', '연결 Alert', '사람 판정'],
-        sorting.rows.map(item => [item.subject, caseStates[item.state].label, item.txCount, measuredOf(item),
+        sorting.rows.map(item => [subjectText(item), caseStates[item.state].label, item.txCount, measuredOf(item),
           item.alertId ?? '', judgements[item.judgement] ?? ''])) }],
   }));
   return <Panel className="rule-backtest-cases" aria-label="사례">
-    <WorkflowTable label="사례" summary={tableCount(Math.min(shown, run.cases.length), total, '개')}>
+    <WorkflowTable label="사례" summary={tableCount(Math.min(shown, run.cases.length), total, noun.unit)}>
       <TableHeader><TableRow>
-        <SortableTableHead sorting={sorting} column="account" value={item => item.subject}>대상 계좌</SortableTableHead>
+        <SortableTableHead sorting={sorting} column="account" value={subjectText}>{noun.name === '거래' ? '대상 거래' : '대상 계좌'}</SortableTableHead>
         <SortableTableHead sorting={sorting} column="status" value={item => caseStates[item.state].label}>구분</SortableTableHead>
         <SortableTableHead sorting={sorting} column="거래 건수" value={item => item.txCount}>근거 거래</SortableTableHead>
         <SortableTableHead sorting={sorting} column="value" value={measuredOf}>측정값</SortableTableHead>
@@ -159,20 +173,20 @@ function Cases({ run, catalog, side, order, templateKey, registerTableTools }) {
         <SortableTableHead sorting={sorting} column="verdict" value={item => judgements[item.judgement] ?? ''}>사람 판정</SortableTableHead>
       </TableRow></TableHeader>
       <TableBody>{sorting.rows.slice(0, shown).map(item => <TableRow key={`${item.subjectType}-${item.subject}`}>
-        <th scope="row"><code>{item.subject}</code></th>
+        <th scope="row"><code>{subjectText(item)}</code></th>
         <TableCell><StatusTag preset={caseStates[item.state].preset}>{caseStates[item.state].label}</StatusTag></TableCell>
         <TableCell>{count(item.txCount)}건</TableCell>
         <TableCell className="workflow-rule-summary">{measuredOf(item)}</TableCell>
         <TableCell>{item.alertId ?? '—'}</TableCell>
         <TableCell>{judgements[item.judgement] ?? '—'}</TableCell>
       </TableRow>)}
-        {!run.cases.length && <TableRow><TableCell colSpan={6}>이 기간에 걸린 대상이 없습니다.</TableCell></TableRow>}
+        {!run.cases.length && <TableRow><TableCell colSpan={6}>이 기간에 걸린 {noun.name}{noun.name === '거래' ? '가' : '이'} 없습니다.</TableCell></TableRow>}
       </TableBody>
     </WorkflowTable>
     {shown < run.cases.length && <ActionButton className="rule-backtest-more" shape="pill" surface="floating"
-      onClick={() => setShown(value => value + CASE_PAGE)}>더 보기 ({count(run.cases.length - shown)}개 남음)</ActionButton>}
+      onClick={() => setShown(value => value + CASE_PAGE)}>더 보기 ({count(run.cases.length - shown)}{noun.unit} 남음)</ActionButton>}
     {run.cases.length < total
-      && <p className="workflow-rule-note">서버는 새로 걸린 대상, 빠진 대상, 근거 거래가 많은 대상 순으로 {count(run.cases.length)}개까지만 보냅니다.</p>}
+      && <p className="workflow-rule-note">서버는 새로 걸린 {noun.name}, 빠진 {noun.name}, 근거 거래가 많은 {noun.name} 순으로 {count(run.cases.length)}{noun.unit}까지만 보냅니다.</p>}
   </Panel>;
 }
 
@@ -271,7 +285,10 @@ export function LiveRuleBacktest({ initialRule, registerTableTools, actionsHost 
   const target = detail?.working ?? detail?.operating ?? null;
   const baseline = detail?.working && detail?.operating ? detail.operating : null;
   const template = detail ? templateOf(catalog, detail.template) : null;
-  const side = template?.side ?? 'FROM';
+  // 방향을 고르는 템플릿(분할 입·출금, 같은 금액 반복)은 돌릴 버전의 방향을 따른다
+  const side = template && target?.definition ? sideOf(template, target.definition) : template?.side ?? 'FROM';
+  const noun = subjectNouns[template?.subject] ?? subjectNouns.ACCOUNT;
+  const noAlert = template?.alert?.allowed === false;
   const supported = detail ? (catalog.backtestTemplates ?? []).includes(detail.template) : false;
   // 되는 템플릿은 서버가 알려 준다(backtestTemplates). 이름의 앞부분("FAN-OUT · 분산 송금" → "FAN-OUT")만 카탈로그 순서로 늘어놓는다.
   const supportedNames = catalog.templates.filter(item => (catalog.backtestTemplates ?? []).includes(item.key))
@@ -342,12 +359,12 @@ export function LiveRuleBacktest({ initialRule, registerTableTools, actionsHost 
     {message && <p role="alert" data-rule-block-error>{message}</p>}
     {done && <>
       <Notices run={done} wholePath={template?.evaluator === 'TWO_HOP' || template?.evaluator === 'PATH'} />
-      <Kpis run={done} />
+      <Kpis run={done} noun={noun} />
       <div className="screen-row rule-backtest-detail">
-        {done.sweep && <Sweep sweep={done.sweep} />}
-        <Scope run={done} />
+        {done.sweep && <Sweep sweep={done.sweep} noun={noun} noAlert={noAlert} />}
+        <Scope run={done} noun={noun} noAlert={noAlert} />
       </div>
-      <Cases run={done} catalog={catalog} side={side} order={template?.metrics} templateKey={done.template} registerTableTools={registerTableTools} />
+      <Cases run={done} catalog={catalog} side={side} order={template?.metrics} templateKey={done.template} noun={noun} registerTableTools={registerTableTools} />
     </>}
     <History rows={history} selectedId={run?.backtestId} onOpen={open} />
     <ScreenActions host={actionsHost} stackOnNarrow>

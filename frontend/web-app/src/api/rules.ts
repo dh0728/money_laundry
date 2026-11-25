@@ -258,8 +258,11 @@ export type BacktestKpis = {
 export type BacktestSweepRow = { value: number; current: boolean; hits: number; txCount: number; alertOverlap: number; expectedNewAlerts: number }
 export type BacktestCase = {
   subjectType: 'ACCOUNT' | 'TX'
-  /** 가명 계좌 ID 앞 8자리 */
+  /** 계좌면 가명 계좌 ID 앞 8자리, 거래면(단건 고액거래) 거래 ID */
   subject: string
+  /** 대상이 거래일 때만 온다. 화면의 거래 코드를 만드는 데 쓴다 */
+  txId?: number
+  occurredAt?: IsoDateTime
   /** HIT: 비교 기준 없음. ADDED: 새로 걸림. DROPPED: 빠짐. KEPT: 그대로 */
   state: 'HIT' | 'ADDED' | 'DROPPED' | 'KEPT'
   measured: Record<string, number>
@@ -338,8 +341,8 @@ export type RuleHitCard = {
   summary: string
   subjectType: 'ACCOUNT' | 'TX'
   subjectLabel: string | null
-  /** 가명 계좌 ID 앞 8자리 */
-  subject: string
+  /** 가명 계좌 ID 앞 8자리. 대상이 거래인 룰(단건 고액거래)은 Alert × 룰 버전으로 한 장에 모으므로 null 이고 걸린 거래는 matchedTxIds 에 있다 */
+  subject: string | null
   /** 걸린 거래 기준일들 */
   hitDates: IsoDate[]
   windowMinutes: number | null

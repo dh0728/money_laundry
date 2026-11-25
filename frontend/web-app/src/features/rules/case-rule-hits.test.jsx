@@ -86,6 +86,28 @@ it('경로형 · 2홉형 적중은 조건 한 줄과 함께 나온 계좌(출발
   expect(within(plain).queryByRole('list', { name: '함께 나온 계좌' })).not.toBeInTheDocument();
 });
 
+it('대상이 거래인 룰(단건 고액거래)은 걸린 거래를 한 장에 모아 보여 준다', async () => {
+  const large = { ...hit, ruleId: 8, code: 'RULE-008', name: '고액 거래 감시', template: 'LARGE_TX', templateName: '단건 고액거래', pattern: null,
+    subjectType: 'TX', subjectLabel: '거래 1건', subject: null, hitDates: ['2023-09-09', '2023-09-10'], windowMinutes: null, measured: { TX_USD: 50000 },
+    conditions: [{ metric: 'TX_USD', label: '건당 금액', cmp: 'GTE', value: 10000, unit: 'USD', measured: 50000 }],
+    roles: [], matchedTxIds: [101, 102], evidenceTxCount: 2 };
+  vi.mocked(fetchCaseRuleHits).mockResolvedValue([large, { ...large, alertId: 13, matchedTxIds: [103], hitDates: ['2023-09-09'], measured: { TX_USD: 12000 },
+    conditions: [{ ...large.conditions[0], measured: 12000 }], evidenceTxCount: 1 }]);
+  render(<Screen caseId={41} />);
+  const [many, one] = within(await screen.findByRole('list', { name: '룰 적중' })).getAllByRole('listitem').filter(item => item.parentElement.classList.contains('case-rule-hits'));
+
+  // 대상 계좌 대신 걸린 거래 수를 적는다
+  expect(many).toHaveTextContent('거래 2건 · 적중 날짜 2023-09-09, 2023-09-10');
+  expect(many).not.toHaveTextContent('거래 1건');
+  // 여러 건을 모은 카드의 실제 값은 그 가운데 가장 큰 금액이다
+  expect(within(many).getByRole('list', { name: '조건과 실제 값' })).toHaveTextContent('건당 금액 ≥ 10,000 USD → 가장 큰 거래 50,000 USD');
+  expect(many).toHaveTextContent('이 사건의 거래 2건이 이 룰에 걸렸습니다.');
+  expect(within(many).getAllByRole('button').map(button => button.textContent)).toEqual(['T-230909-00000101', 'T-230909-00000102']);
+  // 한 건이면 그냥 실제 값이다
+  expect(one).toHaveTextContent('거래 1건 · 적중 날짜 2023-09-09');
+  expect(within(one).getByRole('list', { name: '조건과 실제 값' })).toHaveTextContent('건당 금액 ≥ 10,000 USD → 실제 12,000 USD');
+});
+
 it('Episode 에서는 카드가 어느 Alert 의 것인지 보여 준다', async () => {
   vi.mocked(fetchCaseRuleHits).mockResolvedValue([hit]);
   render(<Screen caseId={50} alertCode={id => (id === 12 ? 'A-230912-000012' : undefined)} />);
