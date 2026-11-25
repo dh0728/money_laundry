@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { LocalQueryTools, visualizationEntries } from './query-controls';
+import { caseCsvDownloadEntry, LocalQueryTools, visualizationEntries } from './query-controls';
 import './section-download.css';
 
 export function SectionDownload({ label, entries, host, surface }) {
@@ -26,11 +26,10 @@ export function SectionDownloadHeading({ as: Heading = 'h2', id, className = '',
 }
 
 export function boardDownloadEntry(records, label, onDownload) {
-  return {
-    label, format: 'CSV', count: records.length, disabled: !records.length, download: () => onDownload(records),
-  };
+  return { label, format: 'CSV', count: records.length, disabled: !records.length, download: () => onDownload(records) };
 }
 
-export function BoardSectionDownload({ records, label, onDownload }) {
-  return <SectionDownload label={label} entries={[boardDownloadEntry(records, label, onDownload)]} />;
+export function BoardSectionDownload({ records, label, file, onDownload }) {
+  const entry = file ? caseCsvDownloadEntry(label, file, records) : boardDownloadEntry(records, label, onDownload);
+  return <SectionDownload label={label} entries={[entry]} />;
 }

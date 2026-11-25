@@ -14,7 +14,7 @@ import { SquishSwitchControl } from '../../components/squish-switch';
 import { RangeInput } from '../../components/ui/input';
 import { currencyColumn, SortableTableHead, tableCount,
   useTableSelection, useTableSort, WorkflowTable } from '../../components/workflow-table';
-import { csvDownloadEntry, dateFromCode, downloadCsv, inDateRange, LocalQueryTools, TableQueryTools, visibleCaseRows } from '../../components/query-controls';
+import { csvDownloadEntry, dateFromCode, inDateRange, LocalQueryTools, TableQueryTools, visibleCaseRows } from '../../components/query-controls';
 import { ChartSectionDownload, SectionDownloadHeading } from '../../components/section-download';
 import { SankeyChart, SankeyLink, SankeyNode, SankeyTooltip } from '../../components/charts/charts/sankey';
 import { TooltipContent } from '../../components/charts/charts/tooltip/tooltip-content';
@@ -349,12 +349,10 @@ function AccountBreakdown({ rows, linkedSelection, selectionControl }) {
     filter: owners.length > 1 ? { label: '소유주', value: activeOwner, onChange: setOwner,
       options: ['전체', ...owners].map((label, index) => ({ label, value: index ? label : 'all' })) } : undefined,
     period: lastCode ? { asOf: dateFromCode(lastCode), range, onChange: setRange } : undefined,
-    entries: sorting.rows.length ? [{
-      label: '표시 중인 연결 계좌', format: 'CSV', count: sorting.rows.length,
-      download: () => downloadCsv('linked-accounts', ['계좌', '소유주', '수취 건수', '수취 합계', '송금 건수', '송금 합계', '순유입'],
-        sorting.rows.map(account => [account.code, account.owner, account.receivedCount, money(account.received),
-          account.sentCount, money(account.sent), money(account.net)])),
-    }] : [],
+    entries: sorting.rows.length ? [csvDownloadEntry('표시 중인 연결 계좌', 'linked-accounts',
+      ['계좌', '소유주', '수취 건수', '수취 합계', '송금 건수', '송금 합계', '순유입'],
+      sorting.rows.map(account => [account.code, account.owner, account.receivedCount, money(account.received),
+        account.sentCount, money(account.sent), money(account.net)]))] : [],
   };
   const totalAccounts = new Set(rows.flatMap(row => [row.from.code, row.to.code])).size;
   return <WorkflowTable label="연결 계좌" selection={selection} summary={tableCount(accounts.size, totalAccounts, '개', selection.selectedCount)}

@@ -12,7 +12,7 @@ import { Panel } from '../components/panel';
 import { ScreenActions } from '../components/screen-actions';
 import { SectionDownloadHeading } from '../components/section-download';
 import { CountTag, LinkTag, PatternTag, StatusTag, VerdictTag, verdictLabels } from '../components/semantic-tags';
-import { downloadCsv, inDateRange, LocalQueryTools } from '../components/query-controls';
+import { csvDownloadEntry, inDateRange, LocalQueryTools } from '../components/query-controls';
 import { LiveRuleBacktest } from '../features/rules/live-rule-backtest';
 import { LiveRuleList } from '../features/rules/live-rule-list';
 import { liveActiveRules, liveRules, refreshLiveRules } from '../features/rules/live-rule-store';
@@ -241,15 +241,13 @@ function Report({ view, data, registerTableTools, documentId, actionsHost }) {
       announce({ status: 'failed', title: 'PDF 생성 실패', description: error.message });
     }
   }
-  const csvEntry = (label, file, rows) => ({
-    label, format: 'CSV', count: rows.length,
-    download: () => downloadCsv(file, ['판정 ID', '대상 ID', '구분', '유형', '판정 결과', '판정자', '판정 시각 (KST)',
+  const csvEntry = (label, file, rows) => csvDownloadEntry(label, file,
+    ['판정 ID', '대상 ID', '구분', '유형', '판정 결과', '판정자', '판정 시각 (KST)',
       '사유 분류', '판정 사유', '검토 근거', '관찰 내용'], rows.map(row => [
-        row.id, row.targets.map(({ code }) => code).join(' · '), row.kind, row.patterns.join(' · '),
-        verdictLabels[row.verdict], row.reviewer || '', reportTimestamp(row.at), reasonCategoryLabel(row.reasonCategory) || '',
-        row.reason || '', row.evidence || '', row.observations || '',
-      ])),
-  });
+      row.id, row.targets.map(({ code }) => code).join(' · '), row.kind, row.patterns.join(' · '),
+      verdictLabels[row.verdict], row.reviewer || '', reportTimestamp(row.at), reasonCategoryLabel(row.reasonCategory) || '',
+      row.reason || '', row.evidence || '', row.observations || '',
+    ]));
   const actions = {
     filter: tableView ? { label: '판정 결과', options: verdictChoices, value: filter, onChange: changeFilter } : undefined,
     sort: tableView ? undefined : { options: reportSortOptions, value: order, defaultValue: 'recent', onChange: changeOrder },

@@ -8,7 +8,7 @@ import { Panel } from '../../components/panel';
 import { Progress } from '../../components/progress';
 import { ScreenActions } from '../../components/screen-actions';
 import { StatusTag } from '../../components/semantic-tags';
-import { downloadCsv } from '../../components/query-controls';
+import { csvDownloadEntry } from '../../components/query-controls';
 import { SortableTableHead, tableCount, useTableSort, WorkflowTable } from '../../components/workflow-table';
 import { sidedText, sideOf, templateOf } from './rule-definition';
 import { transactionCode } from '../investigation/live-data.js';
@@ -161,10 +161,9 @@ function Cases({ run, catalog, side, order, templateKey, noun, registerTableTool
   const total = run.kpis.hits + (run.kpis.dropped ?? 0);
   useEffect(() => registerTableTools?.({
     panelDownload: false,
-    entries: [{ label: '백테스트 사례', format: 'CSV', count: sorting.rows.length,
-      download: () => downloadCsv('rule-backtest-cases', ['대상', '구분', '근거 거래', '측정값', '연결 Alert', '사람 판정'],
-        sorting.rows.map(item => [subjectText(item), caseStates[item.state].label, item.txCount, measuredOf(item),
-          item.alertId ?? '', judgements[item.judgement] ?? ''])) }],
+    entries: [csvDownloadEntry('백테스트 사례', 'rule-backtest-cases', ['대상', '구분', '근거 거래', '측정값', '연결 Alert', '사람 판정'],
+      sorting.rows.map(item => [subjectText(item), caseStates[item.state].label, item.txCount, measuredOf(item),
+        item.alertId ?? '', judgements[item.judgement] ?? '']))],
   }));
   return <Box as="section" className="rule-backtest-cases" aria-label="사례">
     <WorkflowTable label="사례" summary={tableCount(Math.min(shown, run.cases.length), total, noun.unit)}>

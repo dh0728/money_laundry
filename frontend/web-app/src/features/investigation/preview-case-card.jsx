@@ -9,8 +9,8 @@ import { CaseActorTag, CaseAgeTag, CountTag, ModelScoreTag, PatternTag, ReviewSt
 import { readWorkspaceGap } from '../dashboard/workspace-metrics';
 import './preview-case-card.css';
 import { Box, Heading, Text } from '../../components/layout-primitives';
-import { exportCases } from '../../components/query-controls';
-import { boardDownloadEntry, SectionDownloadHeading } from '../../components/section-download';
+import { caseCsvDownloadEntry } from '../../components/query-controls';
+import { SectionDownloadHeading } from '../../components/section-download';
 
 const amount = new Intl.NumberFormat('ko-KR');
 const formatDate = new Intl.DateTimeFormat('sv-SE', { year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -65,8 +65,7 @@ export function CaseProgressBoard({ rows, reduced, theme, orderRows, showAssigne
         const matching = rows.filter(row => (statusByCode?.[row.code] ?? row.status) === value);
         const cards = orderRows ? orderRows(matching) : matching;
         const limit = limits[preset] ?? pageSize ?? cards.length;
-        const downloads = cards.length ? [boardDownloadEntry(cards, label + ' 업무',
-          entries => exportCases(entries, 'work-board-' + preset))] : [];
+        const downloads = cards.length ? [caseCsvDownloadEntry(label + ' 업무', 'work-board-' + preset, cards)] : [];
         return <Panel className="case-progress-lane" data-review={preset} key={preset} aria-label={label}>
           <SectionDownloadHeading as={Heading} className="case-progress-lane-header"
             headingClassName="case-progress-heading" entries={downloads}>

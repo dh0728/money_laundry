@@ -287,3 +287,13 @@
 .rule-backtest-table :is(th, td):not(:first-child) { text-align: end }
 .rule-backtest-table tr[data-current] { background: var(--brand-accent-tint) }
 .rule-backtest-table tr[data-current] th { font-weight: var(--aml-type-body-strong-weight) }
+
+@media print {
+  #workspace[data-page-print] [data-slot="table-container"],
+  #workspace[data-page-print] [data-slot="table"] { min-inline-size: 0 }
+
+  #workspace[data-page-print] :is([data-slot="table-head"], [data-slot="table-row-head"], [data-slot="table-cell"]) {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}

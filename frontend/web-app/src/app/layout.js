@@ -11,7 +11,7 @@ import { bindCardGlow } from '../components/card-glow.js';
 import { ConfirmHoldButton, PrimaryButton } from '../components/primary-button.jsx';
 import { DialogClose, DialogFooter, DialogHeader } from '../components/dialog-parts.jsx';
 import { SearchField } from '../components/search-field.jsx';
-import { downloadCsv, inDateRange, PageDownloadControl, QueryRadio, QueryToolbar, setupQueryControls } from '../components/query-controls.jsx';
+import { csvDownloadEntry, inDateRange, PageDownloadControl, QueryRadio, QueryToolbar, setupQueryControls } from '../components/query-controls.jsx';
 import { dashboardFixtureBoardPage, dashboardFixtureResponse, dashboardFixtures, dashboardPeriodEnd, dashboardRecordCodes } from '../mocks/dashboard-fixtures.js';
 import { personalWorkHistory } from '../features/dashboard/personal-work-history.js';
 import { liveCodes, liveSource, liveSourceLoaded, loadLiveSource, rebuildLiveSource, resetLiveSource } from '../features/investigation/live-data.js';
@@ -642,10 +642,7 @@ function loadBenchmarkSummary() {
 }
 
 function registerBenchmarkExport(file, label, headers, rows) {
-  queryControls.registerTableTools({ entries: [{
-    label, format: 'CSV', count: rows.length, disabled: !rows.length,
-    download: () => downloadCsv(file, headers, rows),
-  }] });
+  queryControls.registerTableTools({ entries: [csvDownloadEntry(label, file, headers, rows)] });
 }
 
 function showBenchmarkWorkspace(path, code, navigationMode, params) {

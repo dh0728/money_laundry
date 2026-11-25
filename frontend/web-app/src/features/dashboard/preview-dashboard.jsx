@@ -11,7 +11,7 @@ import {
 import { ibmLaundering, ibmTotal } from '../investigation/ibm-hi-small-aggregate';
 import { benchmarkDashboardMetrics } from './benchmark-dashboard-metrics';
 import { ActionButton } from '../../components/primary-button';
-import { csvDownloadEntry, exportCases } from '../../components/query-controls';
+import { csvDownloadEntry } from '../../components/query-controls';
 import { BoardSectionDownload, SectionDownloadHeading } from '../../components/section-download';
 import { Box, Heading, Stack, Text } from '../../components/layout-primitives';
 import { LinkTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
@@ -180,7 +180,7 @@ function WorkBoard({ records, mine, sort, appearance, statusByCode }) {
       <Box data-dashboard-sort-tags></Box>
       <Box className="dashboard-board-actions">
         <Box data-dashboard-sort></Box>
-        <BoardSectionDownload records={rows} label={title} onDownload={entries => exportCases(entries, 'work-board')} />
+        <BoardSectionDownload records={rows} label={title} file="work-board" />
       </Box>
     </Box>
     <Box className="dashboard-board-scroll">

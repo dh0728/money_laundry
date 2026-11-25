@@ -5,17 +5,19 @@ import { createRoot } from 'react-dom/client';
 import { DayPicker } from 'react-day-picker';
 import { ko } from 'react-day-picker/locale';
 import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
-import { downloadCsv as saveCsv } from '@/lib/report-io';
+import { createCsv, downloadBlob, downloadCsv as saveCsv } from '@/lib/report-io';
 import { Icon, IconButton, bindTooltip, hideTooltip } from './components.js';
 import { ActionButton } from './primary-button';
 import { FilterTag, reviewStates, reviewStatusLabel, VerdictTag, verdictLabels } from './semantic-tags';
 import { modelRiskBand, modelRiskLabels } from '../features/settings/model-risk-settings';
+import { createPageCsvZip, printWorkspace } from '../lib/page-export';
 import { downloadVisualizations, hasVisualizations } from '../lib/preview-visual-export.js';
 import JellyRadio from './react-bits/JellyRadio';
 import { QueryCheck } from './selection-check';
 import { readWorkspaceGap } from '../features/dashboard/workspace-metrics.js';
 import { sortSavedTableRows, tableSortFields } from './workflow-table';
 import 'react-day-picker/style.css';
+import '../styles/page-export-print.css';
 import './query-controls.css';
 
 const statuses = reviewStates.map(({ value }) => value);
@@ -408,7 +410,11 @@ const firstQueryControl = {
 };
 
 export function exportCases(rows, scope) {
-  downloadCsv(scope, ['코드', '탐지일', '처리 상태', '담당 범위'], rows.map(row =>
+  caseCsvDownloadEntry('', scope, rows).download();
+}
+
+export function caseCsvDownloadEntry(label, file, rows) {
+  return csvDownloadEntry(label, file, ['코드', '탐지일', '처리 상태', '담당 범위'], rows.map(row =>
     [row.code, formatDate(row.date), reviewStatusLabel(row.status), row.assigned ? '내 담당' : '다른 담당']));
 }
 
@@ -419,6 +425,7 @@ export function downloadCsv(file, headers, rows) {
 
 export function csvDownloadEntry(label, file, headers, rows) {
   return { label, format: 'CSV', count: rows.length, disabled: !rows.length,
+    csv: { filename: `aml-${file}.csv`, headers, rows },
     download: () => downloadCsv(file, headers, rows) };
 }
 
@@ -426,12 +433,12 @@ function announceExport(title, description, status = 'done') {
   document.dispatchEvent(new CustomEvent('aml:result', { detail: { title, description, status } }));
 }
 
-function DownloadOptions({ entries, onDone, showLabels = false }) {
+function DownloadOptions({ entries, onDone }) {
   const formats = Map.groupBy(entries, entry => entry.format);
   return <div className="query-popover-body query-download-options">
       {entries.map(({ format, label, count, download, disabled }) => <ActionButton
         key={`${label}-${format}`} className="query-menu-row" disabled={disabled}
-        aria-label={`${format} · ${label}${count ? ` · ${count}건` : ''}`} onClick={async () => {
+        aria-label={label ? `${format} · ${label}${count ? ` · ${count}건` : ''}` : format} onClick={async () => {
           onDone();
           try {
             await download();
@@ -440,7 +447,7 @@ function DownloadOptions({ entries, onDone, showLabels = false }) {
           }
         }}>
         <span>{format}</span>
-        {(showLabels || formats.get(format).length > 1) && <span className="query-menu-detail">
+        {formats.get(format).length > 1 && <span className="query-menu-detail">
           {label}{count ? ` · ${count}건` : ''}
         </span>}
       </ActionButton>)}
@@ -564,7 +571,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
       .map(element => embeddedDownloads.get(element))
       .filter(Boolean);
   }
-  function syncTools(hasVisibleVisuals = !localTable && hasVisualizations(workspace), workspaceReady = true) {
+  function syncTools(workspaceReady = true) {
     const hasRows = Boolean(scope && rows.length);
     const tableSlot = embedded ? toolbarHome : localTable && workspaceReady
       ? workspace.querySelector('[data-table-tools]') : null;
@@ -588,7 +595,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
       if (button.hidden !== hidden) button.hidden = hidden;
     }
     if (pageDownload) {
-      const hidden = !screen || !(hasRows || hasDownloadEntries || hasVisibleVisuals || workspaceReady && visibleLocalDownloads().length);
+      const hidden = !screen || !workspaceReady;
       if (pageDownload.hidden !== hidden) pageDownload.hidden = hidden;
     }
     const hideToolbar = !target || toolbarButtons.every(button => button.hidden || !controls.contains(button));
@@ -696,7 +703,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     const tablePeriod = tool === 'period' ? tableTools?.period : undefined;
     const tableSort = tool === 'sort' ? tableTools?.sort : undefined;
     const content = isDownload
-      ? <DownloadOptions entries={downloadEntries(isPageDownload)} onDone={close} showLabels={isPageDownload} />
+      ? <DownloadOptions entries={isPageDownload ? pageDownloadEntries() : downloadEntries()} onDone={close} />
       : tableFilter ? <TableFilterPane filter={tableFilter} onApply={next => { close(); tableFilter.onChange(next); }} />
       : tableSort ? <SortPane value={{ sort: tableSort.value }} sorts={tableSort.options}
         onApply={({ sort }) => { close(); tableSort.onChange(sort); }} />
@@ -709,26 +716,31 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     position();
     if (popover.matches(':popover-open')) focusOpenPopover();
   }
-  function downloadEntries(page = false) {
+  function pageDownloadEntries() {
+    const formats = [{ format: 'PDF로 저장', download: () => printWorkspace(workspace) }];
+    const datasets = [...downloadEntries(), ...visibleLocalDownloads().flatMap(instance => instance.downloadEntries())]
+      .filter(entry => entry.format === 'CSV' && !entry.disabled);
+    if (datasets.length && datasets.every(entry => entry.csv)) {
+      formats.push({ format: 'CSV 묶음 (.zip)', download: () => {
+        const files = datasets.map(({ csv }) => ({ filename: csv.filename, content: createCsv(csv.headers, csv.rows) }));
+        downloadBlob(`aml-${screen.replaceAll('/', '-')}-csv.zip`, createPageCsvZip(files));
+        announceExport('CSV 묶음 다운로드', '현재 페이지의 CSV 묶음 다운로드를 요청했습니다.');
+      } });
+    }
+    return formats;
+  }
+
+  function downloadEntries() {
     const entries = [...(tableTools?.entries ?? [])];
     if (scope && rows.length) {
       const filtered = visibleCaseRows(rows, current());
       const visible = localTable ? sortSavedTableRows(filtered, scope) : filtered;
       const dataset = scope === 'related-candidates' ? '연관 후보'
         : scope.startsWith('dashboard-') ? 'Alert·Episode' : scope === 'alerts' ? 'Alert' : 'Episode';
-      entries.push({ label: `조회된 ${dataset}`, format: 'CSV', count: visible.length, disabled: !visible.length,
-        download: () => exportCases(visible, scope) });
-      if (visible.length !== rows.length) entries.push({ label: `전체 ${dataset}`, format: 'CSV', count: rows.length,
-        download: () => exportCases(rows, scope) });
+      entries.push(caseCsvDownloadEntry(`조회된 ${dataset}`, scope, visible));
+      if (visible.length !== rows.length) entries.push(caseCsvDownloadEntry(`전체 ${dataset}`, scope, rows));
     }
-    if (page) {
-      const localEntries = visibleLocalDownloads().flatMap(instance => instance.downloadEntries())
-        .filter(entry => entry.format !== 'PNG' && entry.format !== 'SVG');
-      for (const entry of localEntries) {
-        if (!entries.some(existing => existing.label === entry.label && existing.format === entry.format)) entries.push(entry);
-      }
-    }
-    if ((page || !pageDownload && !localTable) && hasVisualizations(workspace)) {
+    if (!pageDownload && !localTable && hasVisualizations(workspace)) {
       const segment = screen?.replaceAll('/', '-') ?? 'transaction';
       entries.push(...visualizationEntries({
         label: '현재 차트·그래프', filename: `aml-${segment}-visualizations`, readRoot: () => workspace,
@@ -857,7 +869,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
       }
       periodAnchor = data?.asOf;
       for (const button of queryButtons) button.removeAttribute('data-query-applied');
-      syncTools(false, false);
+      syncTools(false);
       return scope && !data?.dashboard ? visibleCaseRows(rows, current()).map(row => row.code) : codes;
     },
   };

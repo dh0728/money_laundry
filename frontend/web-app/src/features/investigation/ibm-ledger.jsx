@@ -9,7 +9,7 @@ import { FooterPagination } from '../../components/footer-pagination';
 import { CardHeader } from '../../components/card-header';
 import { SearchField } from '../../components/search-field';
 import { StatusTag } from '../../components/semantic-tags';
-import { downloadCsv, TableQueryTools } from '../../components/query-controls';
+import { csvDownloadEntry, TableQueryTools } from '../../components/query-controls';
 import { SectionDownload } from '../../components/section-download';
 import { tableCount, TableFieldLabel, WorkflowQueryHeading } from '../../components/workflow-table';
 import './ibm-ledger.css';
@@ -24,11 +24,10 @@ const labelText = labeled => labeled ? '세탁 라벨 1' : '세탁 라벨 0';
 function ledgerEntry(label, file, records) {
   const headers = ['거래 코드', '원본 시각', '송금 은행 코드', '송금 계좌', '수취 은행 코드', '수취 계좌',
     '송금 금액', '송금 통화', '수취 금액', '수취 통화', '거래 방식', '원본 세탁 라벨'];
-  return { label, format: 'CSV', count: records.length,
-    download: () => downloadCsv(file, headers, records.map(row => [
-      row.code, row.timestamp, row.from.bank, row.from.account, row.to.bank, row.to.account,
-      row.paidAmount, row.paidCurrency, row.receivedAmount, row.receivedCurrency, row.method, Number(row.labeled),
-    ])) };
+  return csvDownloadEntry(label, file, headers, records.map(row => [
+    row.code, row.timestamp, row.from.bank, row.from.account, row.to.bank, row.to.account,
+    row.paidAmount, row.paidCurrency, row.receivedAmount, row.receivedCurrency, row.method, Number(row.labeled),
+  ]));
 }
 
 function dayKey(value) {
@@ -98,9 +97,10 @@ export function BenchmarkLedger({ dataset, code = '', filters, tableView = true,
     results.current.scrollIntoView?.({ block: 'start', behavior: 'instant' });
   };
 
-  const tools = rows.length > 0 && <TableQueryTools actions={{
+  const download = useMemo(() => rows.length ? ledgerEntry('조회된 원본 원장', 'ibm-hi-small-transactions', rows) : null, [rows]);
+  const tools = download && <TableQueryTools actions={{
     panelDownload: false,
-    entries: [ledgerEntry('조회된 원본 원장', 'ibm-hi-small-transactions', rows)],
+    entries: [download],
   }} />;
 
   return <Box className="benchmark-ledger">

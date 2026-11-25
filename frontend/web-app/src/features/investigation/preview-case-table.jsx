@@ -5,7 +5,7 @@ import { CaseDataTable, RecordIdCell } from './case-table-components';
 import { ModelScoreTag, ReviewStatusTag, reviewStatusLabel, VerdictTag, verdictLabels } from '../../components/semantic-tags';
 import { currencyColumn, SortableTableHead, tableCount,
   useTableSelection, useTableSort } from '../../components/workflow-table';
-import { dateFromCode, downloadCsv, inDateRange, TableQueryTools } from '../../components/query-controls';
+import { csvDownloadEntry, dateFromCode, inDateRange, TableQueryTools } from '../../components/query-controls';
 import { Box, Text } from '@/components/layout-primitives';
 
 const columns = [
@@ -43,17 +43,14 @@ export function TransactionEvidenceTable({ title, transactions = [], showScore =
     filter: methods.length > 1 ? { label: '결제 수단', value: activeMethod, onChange: setMethod,
       options: ['전체', ...methods].map((label, index) => ({ label, value: index ? label : 'all' })) } : undefined,
     period: lastCode ? { asOf: dateFromCode(lastCode), range, onChange: setRange } : undefined,
-    entries: sorting.rows.length ? [{
-      label: '표시 중인 근거 거래', format: 'CSV', count: sorting.rows.length,
-      download: () => downloadCsv('evidence-transactions', [
-        '거래', ...(scoresVisible ? ['모델 점수'] : []), '시각', '송금 계좌', ...(analysis ? ['송금 소유주'] : []),
-        '수취 계좌', ...(analysis ? ['수취 소유주'] : []), '금액', '통화', '결제 수단', '판정', '조사 상태',
-      ], sorting.rows.map(row => [
-        row.code, ...(scoresVisible ? [row.score ?? ''] : []), row.timestamp, row.from.code, ...(analysis ? [row.from.owner ?? ''] : []),
-        row.to.code, ...(analysis ? [row.to.owner ?? ''] : []),
-        row.amount, row.currency, row.method, analysis ? verdictLabels[row.verdict] : row.verdict, reviewStatusLabel(row.status),
-      ])),
-    }] : [],
+    entries: sorting.rows.length ? [csvDownloadEntry('표시 중인 근거 거래', 'evidence-transactions', [
+      '거래', ...(scoresVisible ? ['모델 점수'] : []), '시각', '송금 계좌', ...(analysis ? ['송금 소유주'] : []),
+      '수취 계좌', ...(analysis ? ['수취 소유주'] : []), '금액', '통화', '결제 수단', '판정', '조사 상태',
+    ], sorting.rows.map(row => [
+      row.code, ...(scoresVisible ? [row.score ?? ''] : []), row.timestamp, row.from.code, ...(analysis ? [row.from.owner ?? ''] : []),
+      row.to.code, ...(analysis ? [row.to.owner ?? ''] : []),
+      row.amount, row.currency, row.method, analysis ? verdictLabels[row.verdict] : row.verdict, reviewStatusLabel(row.status),
+    ]))] : [],
   };
   return <Box as="section" className="screen-section screen-table case-evidence-table">
     <CaseDataTable title={title} summary={tableCount(sorting.rows.length, transactions.length, '건', selection.selectedCount)}
