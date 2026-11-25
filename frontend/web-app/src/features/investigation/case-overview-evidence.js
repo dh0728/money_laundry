@@ -48,3 +48,27 @@ export function relatedJudgments(history, currentCode, { accounts, records }) {
     return targets.length ? [{ ...judgment, targets }] : [];
   });
 }
+
+export function episodeAlertEvidence(episode, records, cases = []) {
+  const codes = episode.linkedAlertCodes ?? [];
+  const members = new Set(codes.filter(Boolean));
+  const unresolved = codes.filter(code => !code).length;
+  const complete = episode.linkedAlertCodesComplete === true;
+  const alerts = cases.filter(row => row.kind === 'Alert');
+  const candidates = episode.overlappingAlerts ?? alerts;
+  const alertsByCode = new Map([...candidates, ...alerts].map(alert => [alert.code, alert]));
+  const transactionCodes = new Set(records.map(record => record.code));
+  const count = alert => alert?.related ? new Set(alert.related.flatMap(record =>
+    transactionCodes.has(record.code) ? [record.code] : [])).size : null;
+  const related = [...new Set(candidates.map(alert => alert.code))]
+    .filter(code => !members.has(code))
+    .map(code => ({ code, value: count(alertsByCode.get(code)) }))
+    .filter(({ value }) => value > 0)
+    .sort((a, b) => b.value - a.value || byCode(a, b));
+  return {
+    complete,
+    unresolved,
+    members: [...members].map(code => ({ code, value: count(alertsByCode.get(code)) })),
+    related,
+  };
+}

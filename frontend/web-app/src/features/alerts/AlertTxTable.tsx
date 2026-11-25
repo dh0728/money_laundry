@@ -10,9 +10,11 @@ import { DataTable } from '@/components/data-table/data-table'
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { NativeCheckbox } from '@/components/ui/checkbox'
 import type { TxRelabel } from '@/features/graph/relabel'
 import { formatMoney, type TransactionTarget } from '@/features/transactions/transactionIndex'
 import { useTransactionTarget } from '@/features/transactions/transactionTarget'
+import { Box, Text, TextLink } from '@/components/layout-primitives'
 
 // Episode 거래는 어느 Alert에서 왔는지(alertId)를 함께 가진다
 export type TxRow = Pick<AlertTransaction, 'txId' | 'txAt' | 'amountPaid' | 'paymentCurrency' | 'paymentFormat' | 'fromAccount' | 'toAccount' | 'fromOwnerName' | 'toOwnerName'> & { role: string; launderingScore: number | null; alertId?: number; relabel?: TxRelabel; reviewLabel?: string }
@@ -28,34 +30,34 @@ function Shortcut({ label, target, onOpen, mono = false }: { label: string; targ
   return (
     <Button type="button" variant="ghost" size="sm" title={`거래 내역에서 ${kind} ${label} 보기`} aria-label={`${label} ${kind} 거래 내역에서 보기`}
       className={`h-8 w-full min-w-0 justify-start gap-1 px-1 font-normal hover:[&>svg]:text-foreground ${mono ? "font-mono" : ""}`} onClick={event => { event.stopPropagation(); onOpen(target) }}>
-      <span className="min-w-0 truncate">{label}</span>
+      <Text as="span" className="min-w-0 truncate">{label}</Text>
       <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
     </Button>
   )
 }
 
 const columnsFor = (onOpen: Open, remote: boolean, onOpenTransaction?: (txId: number) => void): ColumnDef<TxRow>[] => [
-  { accessorKey: 'txId', size: 116, header: ({ column }) => header(column, '거래 ID'), cell: ({ row }) => remote ? onOpenTransaction ? <Shortcut label={`T-${row.original.txId}`} target={{ type: 'transaction', transactionId: String(row.original.txId) }} onOpen={() => onOpenTransaction(row.original.txId)} mono /> : <span className="px-1 font-mono">T-{row.original.txId}</span> : <Shortcut label={String(row.original.txId)} target={{ type: 'transaction', transactionId: String(row.original.txId) }} onOpen={onOpen} mono /> },
-  { accessorKey: 'txAt', size: 118, header: ({ column }) => header(column, '일시'), cell: ({ row }) => <span className="px-1 text-sm tabular-nums">{row.original.txAt.slice(5, 16).replace('T', ' ')}</span> },
-  { accessorKey: 'amountPaid', size: 110, header: ({ column }) => header(column, '금액'), cell: ({ row }) => <div className="truncate px-1 text-right text-sm tabular-nums">{formatMoney(row.original.amountPaid, row.original.paymentCurrency)}</div> },
-  { accessorKey: 'paymentFormat', size: 92, header: ({ column }) => header(column, '결제 수단'), cell: ({ row }) => <span className="px-1">{tag(row.original.paymentFormat)}</span> },
+  { accessorKey: 'txId', size: 116, header: ({ column }) => header(column, '거래 ID'), cell: ({ row }) => remote ? onOpenTransaction ? <Shortcut label={`T-${row.original.txId}`} target={{ type: 'transaction', transactionId: String(row.original.txId) }} onOpen={() => onOpenTransaction(row.original.txId)} mono /> : <Text as="span" className="px-1 font-mono">T-{row.original.txId}</Text> : <Shortcut label={String(row.original.txId)} target={{ type: 'transaction', transactionId: String(row.original.txId) }} onOpen={onOpen} mono /> },
+  { accessorKey: 'txAt', size: 118, header: ({ column }) => header(column, '일시'), cell: ({ row }) => <Text as="span" className="px-1 text-sm tabular-nums">{row.original.txAt.slice(5, 16).replace('T', ' ')}</Text> },
+  { accessorKey: 'amountPaid', size: 110, header: ({ column }) => header(column, '금액'), cell: ({ row }) => <Box className="truncate px-1 text-right text-sm tabular-nums">{formatMoney(row.original.amountPaid, row.original.paymentCurrency)}</Box> },
+  { accessorKey: 'paymentFormat', size: 92, header: ({ column }) => header(column, '결제 수단'), cell: ({ row }) => <Text as="span" className="px-1">{tag(row.original.paymentFormat)}</Text> },
   { accessorKey: 'fromOwnerName', size: 118, header: ({ column }) => header(column, '송금 소유주'), cell: ({ row }) => row.original.fromOwnerName ? <Shortcut label={row.original.fromOwnerName} target={{ type: 'owner', owner: row.original.fromOwnerName }} onOpen={onOpen} /> : '—' },
-  { accessorKey: 'fromAccount', size: 118, header: ({ column }) => header(column, '송금 계좌'), cell: ({ row }) => remote ? <span title={row.original.fromAccount} className="block truncate px-1 font-mono">{row.original.fromAccount}</span> : <Shortcut label={row.original.fromAccount} target={{ type: 'account', account: row.original.fromAccount }} onOpen={onOpen} mono /> },
+  { accessorKey: 'fromAccount', size: 118, header: ({ column }) => header(column, '송금 계좌'), cell: ({ row }) => remote ? <Text as="span" title={row.original.fromAccount} className="block truncate px-1 font-mono">{row.original.fromAccount}</Text> : <Shortcut label={row.original.fromAccount} target={{ type: 'account', account: row.original.fromAccount }} onOpen={onOpen} mono /> },
   { accessorKey: 'toOwnerName', size: 118, header: ({ column }) => header(column, '수취 소유주'), cell: ({ row }) => row.original.toOwnerName ? <Shortcut label={row.original.toOwnerName} target={{ type: 'owner', owner: row.original.toOwnerName }} onOpen={onOpen} /> : '—' },
-  { accessorKey: 'toAccount', size: 118, header: ({ column }) => header(column, '수취 계좌'), cell: ({ row }) => remote ? <span title={row.original.toAccount} className="block truncate px-1 font-mono">{row.original.toAccount}</span> : <Shortcut label={row.original.toAccount} target={{ type: 'account', account: row.original.toAccount }} onOpen={onOpen} mono /> },
+  { accessorKey: 'toAccount', size: 118, header: ({ column }) => header(column, '수취 계좌'), cell: ({ row }) => remote ? <Text as="span" title={row.original.toAccount} className="block truncate px-1 font-mono">{row.original.toAccount}</Text> : <Shortcut label={row.original.toAccount} target={{ type: 'account', account: row.original.toAccount }} onOpen={onOpen} mono /> },
   {
     accessorKey: 'launderingScore', size: 128, header: ({ column }) => header(column, '점수'),
     // 사람이 판정을 바꾼 거래에는 "사람 판정" 태그와 사유 툴팁을 단다
     cell: ({ row }) => (
-      <span className="flex items-center gap-1.5 px-1">
+      <Text as="span" className="flex items-center gap-1.5 px-1">
         {row.original.launderingScore == null ? '—' : <RiskBadge score={row.original.launderingScore} />}
         {row.original.relabel && <Badge variant="outline" className="semantic-metadata-badge font-normal" title={`${row.original.relabel.actor} · ${row.original.relabel.reason}`}>사람 판정</Badge>}
-      </span>
+      </Text>
     ),
   },
   {
     accessorKey: 'role', size: 96, header: ({ column }) => header(column, '편입 역할'),
-    cell: ({ row }) => <span className="px-1">{row.original.role === 'SEED' ? <Badge className="font-normal">{roleLabels.SEED}</Badge> : tag(roleLabels[row.original.role] ?? row.original.role)}</span>,
+    cell: ({ row }) => <Text as="span" className="px-1">{row.original.role === 'SEED' ? <Badge className="font-normal">{roleLabels.SEED}</Badge> : tag(roleLabels[row.original.role] ?? row.original.role)}</Text>,
   },
 ]
 
@@ -63,7 +65,7 @@ const sourceColumn: ColumnDef<TxRow> = {
   accessorKey: 'alertId', size: 96, header: ({ column }) => header(column, '출처 Alert'),
   cell: ({ row }) => (
     <Button asChild variant="ghost" size="sm" className="h-8 w-full justify-start gap-1 px-1 font-mono font-normal">
-      <a href={hrefFor('alerts', row.original.alertId)} title={`A-${row.original.alertId} 상세 보기`}>A-{row.original.alertId}<ExternalLink className="size-3 text-muted-foreground" /></a>
+      <TextLink href={hrefFor('alerts', row.original.alertId)} title={`A-${row.original.alertId} 상세 보기`}>A-{row.original.alertId}<ExternalLink className="size-3 text-muted-foreground" /></TextLink>
     </Button>
   ),
 }
@@ -82,13 +84,12 @@ export default function AlertTxTable({ rows, selection, remote = false, onOpenTr
     const visible = withSource ? [sourceColumn, ...base] : base
     return selection ? [{
       id: 'select', size: 40,
-      header: () => <span className="sr-only">거래 선택</span>,
-      cell: ({ row }) => <span className="flex w-full justify-center"><input type="checkbox" aria-label={`거래 T-${row.original.txId} 선택`}
+      header: () => <Text as="span" className="sr-only">거래 선택</Text>,
+      cell: ({ row }) => <Text as="span" className="flex w-full justify-center"><NativeCheckbox aria-label={`거래 T-${row.original.txId} 선택`}
         disabled={selection.disabled?.(row.original.txId)} checked={selection.ids.includes(row.original.txId)} onClick={event => event.stopPropagation()}
-        onChange={() => selection.onToggle(row.original.txId)} /></span>,
+        onChange={() => selection.onToggle(row.original.txId)} /></Text>,
     } as ColumnDef<TxRow>, ...visible] : visible
   }, [withSource, setTarget, selection, remote, onOpenTransaction])
-  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table은 React Compiler 최적화 대상이 아니다
   const table = useReactTable({
     data, columns, getRowId: row => String(row.txId),
     state: { sorting, rowSelection: Object.fromEntries((selection?.ids ?? []).map(id => [String(id), true])) },

@@ -1,4 +1,4 @@
-// Standalone preview copy of the JPEG PDF writer in src/next/features/report-io.ts.
+// Standalone preview copy of the JPEG PDF writer in src/lib/report-io.ts.
 /** JPEG-backed A4 pages; byte offsets include the binary image streams. */
 export function buildImagePdf(pages) {
   if (!pages.length || pages.some(page => !Number.isInteger(page.width) || !Number.isInteger(page.height) || page.width <= 0 || page.height <= 0 || !page.jpeg.length)) throw new Error('PDF 페이지가 없습니다.')

@@ -1,20 +1,267 @@
-@import "../next/styles/tokens.css";
-@import "../next/styles/semantic-tokens.css";
-@import "../next/styles/fonts.css";
+@import "./tokens.css";
+@import "./semantic-tokens.css";
+@import "./fonts.css";
 @import "./figma-colors.css";
+@import "./chart-palette.css";
+@import "./status-colors.css";
 
 /* Map the standalone workspace's existing component tokens to the shared design system. */
 :root {
   --aml-layout-max-width: 1440px;
-  --aml-font-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --catalogue-workspace-list-height: 340px;
+  --catalogue-padding-fluid: 4vw;
+  --catalogue-heading-fluid-size: 5vw;
+  --catalogue-scroll-sample-height: 98px;
+  --catalogue-glass-sample-height: 96px;
+  --catalogue-glass-sample-angle: 120deg;
+  --catalogue-stack-sample-height: 170px;
+  --catalogue-stack-card-height: 54px;
+  --scroll-stack-inline-inset-min: 1rem;
+  --scroll-stack-inline-inset-fluid: 6%;
+  --scroll-stack-inline-inset-max: 5rem;
+  --scroll-stack-card-height: 20rem;
+  --scroll-stack-card-inset: 2.5rem;
+  --scroll-stack-card-radius: 28px;
+  --scroll-stack-card-dark-surface: #18181b;
+  --scroll-stack-card-outline: light-dark(rgb(0 0 0 / 0.06), rgb(255 255 255 / 0.08));
+  --scroll-stack-card-shadow: rgb(0 0 0 / 0.35);
+  --scroll-stack-card-perspective: 1200px;
+  --catalogue-list-sample-height: 195px;
+  --catalogue-ledger-max-height: 600px;
+  --catalogue-ledger-viewport-share: 72dvh;
+  --ledger-column-gutter-fluid: 3vw;
+  --ledger-owner-column-min-width: 136px;
+  --ledger-account-column-min-width: 152px;
+  --ledger-transaction-column-min-width: 290px;
+  --ledger-related-column-min-width: 365px;
+  --ledger-wide-owner-column-share: 11%;
+  --ledger-wide-account-column-share: 12%;
+  --ledger-medium-relationship-column-share: 18%;
+  --ledger-case-column-min-width: 14rem;
+  --ledger-transaction-line-height: 1.3;
+  --ledger-list-hover-ink-weight: 9%;
+  --ledger-list-pressed-ink-weight: 15%;
+  --ledger-list-loading-opacity: .5;
+  --ledger-filter-layer: 2;
+  --ledger-more-touch-height: 44px;
+  --catalogue-count-sample-size: 2em;
+  --catalogue-shell-max-height: 720px;
+  --catalogue-shell-viewport-share: 80dvh;
+  --aml-shell-compact-max-width: 680px;
+  --aml-workspace-laptop-max-width: 1919px;
+  --layer-local-overlay: 1;
+  --query-apply-hover-ink-weight: 8%;
+  --query-apply-pressed-ink-weight: 14%;
+  --query-apply-face-weight: 94%;
+  --query-section-open-rotation: .25turn;
+  --query-radio-center-stop: 32%;
+  --query-radio-edge-stop: 37%;
+  --query-calendar-width-share: 100cqi;
+  --query-calendar-day-viewport-size: 8dvh;
+  --backtest-card-min-width: 15rem;
+  --backtest-threshold-width: 10ch;
+  --backtest-result-ring-size: 88px;
+  --report-audit-cell-min-width: 14rem;
+  --report-audit-text-max-width: 22rem;
+  --report-audit-label-width: 5.5em;
+  --notice-duration: 5000ms;
+  --notice-motion: 260ms;
+  --notice-max-width: 28rem;
+  --notice-glass-opacity: 96%;
+  --notice-error-accent: color-mix(in srgb, var(--status-danger-accent) 88%, var(--status-accent-dark-ink));
+  --notice-fuse-opacity: .62;
+  --notice-fuse-discrete-ease: steps(5, end);
+  --notice-offscreen-offset: 135%;
+  --notice-enter-overshoot: -18%;
+  --notice-exit-overshoot: -14%;
+  --notice-enter-ease: cubic-bezier(.14, .82, .26, 1);
+  --notice-settle-ease: cubic-bezier(.32, 0, .52, 1);
+  --notice-exit-ease: cubic-bezier(.6, 0, .88, .42);
+  --sidebar-hidden-offset: -100%;
+  --sidebar-group-collapsed-rotation: -.25turn;
+  --workspace-panel-min-height: 12rem;
+  --workspace-panel-max-height: 24rem;
+  --workspace-tall-panel-max-height: 25rem;
+  --workspace-overlay-width: 480px;
+  --workspace-overlay-min-height: 145px;
+  --workspace-rule-editor-list-share: 16%;
+  --workspace-rule-editor-details-share: 21%;
+  --workspace-related-list-share: 27%;
+  --workspace-entry-card-min-width: 155px;
+  --workspace-entry-card-height: 70px;
+  --list-item-entry-scale: .985;
+  --aml-font-mono: Pretendard;
   --aml-size-icon-mini: var(--aml-space-12);
   --aml-size-icon-large: var(--aml-space-24);
   --aml-stroke-icon: 1.6;
+  --aml-stroke-brand-symbol: 2;
+  --aml-radar-symbol-sweep-duration: 4s;
+  --aml-radar-symbol-echo-duration: 8s;
+  --aml-radar-symbol-echo-ease: cubic-bezier(.45, 0, .55, 1);
+  --aml-radar-symbol-full-turn: 1turn;
+  --aml-radar-symbol-outer-offset: 3.74;
+  --aml-radar-symbol-inner-offset: .34;
+  --aml-radar-symbol-outer-rest: 37.56 8.06 13.09 4.12;
+  --aml-radar-symbol-outer-first: 30.58 8.06 20.07 4.12;
+  --aml-radar-symbol-outer-second: 42.8 8.06 7.85 4.12;
+  --aml-radar-symbol-outer-third: 33.2 8.06 17.45 4.12;
+  --aml-radar-symbol-outer-fourth: 43.67 8.06 6.98 4.12;
+  --aml-radar-symbol-inner-rest: 5.69 8.15 19.49 4.38;
+  --aml-radar-symbol-inner-first: 10.92 8.15 14.25 4.38;
+  --aml-radar-symbol-inner-second: 2.02 8.15 23.15 4.38;
+  --aml-radar-symbol-inner-third: 7.78 8.15 17.39 4.38;
+  --aml-radar-symbol-inner-fourth: 2.54 8.15 22.63 4.38;
+  --aml-radar-symbol-inner-fifth: 10.4 8.15 14.78 4.38;
+  --aml-radar-symbol-outer-echo-first: -40deg;
+  --aml-radar-symbol-outer-echo-second: 30deg;
+  --aml-radar-symbol-outer-echo-third: -25deg;
+  --aml-radar-symbol-outer-echo-fourth: 35deg;
+  --aml-radar-symbol-inner-echo-first: 50deg;
+  --aml-radar-symbol-inner-echo-second: -35deg;
+  --aml-radar-symbol-inner-echo-third: 20deg;
+  --aml-radar-symbol-inner-echo-fourth: -30deg;
+  --aml-radar-symbol-inner-echo-fifth: 45deg;
+  --glass-refraction-map-opacity: .92;
+  --glass-refraction-map-blur: var(--aml-space-6);
   --aml-motion-drawer-duration: 260ms;
   --aml-motion-drawer-ease: cubic-bezier(.16, 1, .3, 1);
   --aml-motion-switch-duration: 320ms;
   --aml-motion-switch-ease: cubic-bezier(.2, .75, .25, 1.13);
+  --aml-motion-workspace-enter-origin: 50% 44vh;
+  --aml-motion-workspace-enter-perspective: 900px;
+  --aml-motion-workspace-enter-depth: 145px;
+  --aml-motion-workspace-enter-opacity: .16;
   --aml-opacity-disabled: .5;
+  --aml-space-3: 3px;
+  --aml-focus-outline-offset: var(--aml-space-3);
+  --aml-duration-control-transition: 160ms;
+  --aml-duration-reduced-motion: .01ms;
+  --aml-duration-feedback-transition: 200ms;
+  --aml-duration-confirmation-pulse: 600ms;
+  --aml-ease-decelerate: cubic-bezier(0.23, 1, 0.32, 1);
+  --aml-control-hover-base-weight: 92%;
+  --aml-opacity-feedback-glow: 70%;
+  --aml-opacity-feedback-ring: 55%;
+  --aml-type-control-tracking: 0.01em;
+  --aml-motion-press-scale: 0.97;
+  --aml-type-switch-label-size: 12.5px;
+  --aml-control-compact-inline-inset: 15px;
+  --aml-size-feedback-icon: 14px;
+  --aml-opacity-control-hover: 6%;
+  --aml-duration-badge-reveal: 280ms;
+  --aml-ease-badge-reveal: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --aml-motion-badge-entry-scale: 0.6;
+  --aml-motion-badge-entry-offset: 5px;
+  --aml-size-switch-label-line: 18px;
+  --aml-type-badge-count-size: 9.5px;
+  --aml-space-1: 1px;
+  --aml-space-10: 10px;
+  --aml-size-select-trigger-compact: 28px;
+  --aml-size-select-trigger: 32px;
+  --aml-size-select-trigger-comfortable: 44px;
+  --aml-size-select-option-compact: 26px;
+  --aml-size-select-option: 30px;
+  --aml-size-select-option-comfortable: 40px;
+  --aml-type-select-compact: 12px;
+  --aml-type-select: 13px;
+  --aml-type-select-comfortable: 14px;
+  --aml-radius-select-menu: 10px;
+  --aml-size-select-menu: 176px;
+  --aml-opacity-select-highlight: 60%;
+  --aml-opacity-secondary-label: .6;
+  --aml-content-muted-strength: 55%;
+  --aml-shadow-select-menu: 0 var(--aml-space-4) var(--aml-space-16) color-mix(in srgb, var(--aml-black-100) 22%, transparent);
+  --aml-motion-overlay-enter-scale: .95;
+  --aml-duration-control-hover: 100ms;
+  --aml-duration-highlight-fade: 150ms;
+  --aml-duration-selection-highlight: 220ms;
+  --aml-rotation-flip: .5turn;
+  --primary-action-face-weight: 96%;
+  --primary-action-edge-shade: 24%;
+  --positive-action-edge-shade: 12%;
+  --negative-action-edge-shade: 22%;
+  --action-pressed-fill-progress: 1;
+  --action-pressed-fill-duration: var(--aml-duration-highlight-fade);
+  --rule-block-hover-ink-weight: 8%;
+  --rule-block-disabled-opacity: .45;
+  --rule-block-drag-opacity: .58;
+  --rule-block-icon-size: 1em;
+  --rule-block-number-input-width: 8ch;
+  --rule-condition-fact-min-width: 10rem;
+  --rule-review-dialog-max-width: 28rem;
+  --rule-list-name-min-width: 8rem;
+  --rule-list-name-viewport-width: 46vw;
+  --rule-list-name-max-width: 27rem;
+  --rule-list-touch-target-height: 44px;
+  --rule-tree-branch-width: var(--aml-space-20);
+  --rule-tree-trunk-offset: var(--aml-space-5);
+  --rule-tree-branch-radius: var(--aml-space-6);
+  --rule-tree-line-weight: 1.5;
+  --rule-tree-line-ink-weight: 65%;
+  --rule-tree-root-size: var(--aml-space-10);
+  --aml-stroke-status-icon: 2;
+  --aml-type-status-label-size: 14px;
+  --aml-type-status-line-height: 1.25;
+  --aml-duration-status-reveal: 240ms;
+  --aml-duration-status-strike: 280ms;
+  --aml-opacity-status-fill: .06;
+  --aml-opacity-progress-track: .2;
+  --aml-opacity-status-label: .65;
+  --aml-path-length-unit: 1;
+  --aml-space-5: 5px;
+  --aml-space-7: 7px;
+  --aml-layer-tooltip: 9999;
+  --login-scene-background:
+    radial-gradient(ellipse at 16% 22%, light-dark(#b6dce9, #143b53), transparent 48%),
+    radial-gradient(ellipse at 86% 27%, light-dark(#d8d9f1, #25284c), transparent 46%),
+    radial-gradient(ellipse at 62% 87%, light-dark(#c7e6e3, #113b40), transparent 53%),
+    radial-gradient(ellipse at center, light-dark(#f7fcff, #172335), light-dark(#e6edf6, #09111f));
+  --login-scene-background-layer: -1;
+  --login-card-optical-softness: .85px;
+  --login-card-backdrop: blur(var(--aml-space-2)) saturate(1.28);
+  --login-card-glass-face:
+    linear-gradient(150deg, light-dark(#ffffff83, #9ccbf45c), transparent 38%),
+    linear-gradient(335deg, light-dark(#ffffff52, #67c5c942), transparent 41%),
+    light-dark(#edf8ff68, #10233864);
+  --login-card-glass-edge: light-dark(#ffffffe6, #c4e6fc77);
+  --login-card-glass-shadow:
+    inset 0 var(--aml-stroke-divider) var(--aml-stroke-divider) light-dark(#fff, #dfedffc4),
+    inset 0 calc(-1 * var(--aml-stroke-divider)) var(--aml-stroke-divider) light-dark(#fffc, #9ff2fa75),
+    inset 0 0 var(--aml-space-16) light-dark(#ffffff85, #9cc9f44d),
+    0 var(--aml-space-24) 66px light-dark(#244e7030, #0008),
+    0 var(--aml-space-2) var(--aml-space-8) light-dark(#244e7026, #030a144f);
+  --login-card-glass-fallback: light-dark(#eef8f999, #15253da8);
+  --login-field-glass-face: light-dark(#f7fbffe0, #081420da);
+  --login-field-glass-edge: light-dark(#647b913b, #a4cbfc49);
+  --login-travel-duration: 480ms;
+  --login-travel-ease: cubic-bezier(.28, .12, .58, 1);
+  --login-travel-card-mid-opacity: .86;
+  --login-travel-card-exit-scale: 1.12;
+  --login-travel-particle-exit-scale: 1.24;
+  --login-scene-particle-colors: #257799, #605fa0, #237e80;
+  --login-scene-particle-opacity: 0.43;
+  --login-scene-network-ink: #376f8a;
+  --login-scene-network-highlight: #426e9b;
+  --login-scene-radar-trail-mask: #00000008, #00000020, #00000050, #0000009a, #000000db, #000;
+  --aml-type-tooltip-compact: 11.5px;
+  --aml-type-tooltip: 12.5px;
+  --aml-type-tooltip-comfortable: 13.5px;
+  --aml-type-tooltip-line-height: 1.2;
+  --aml-type-tooltip-tracking: -.01em;
+  --aml-type-keycap-size: .86em;
+  --aml-type-keycap-tracking: .02em;
+  --aml-size-keycap-height: 1.55em;
+  --aml-space-keycap-inline: .45em;
+  --aml-radius-keycap: .4em;
+  --aml-opacity-keycap-face: 9%;
+  --aml-opacity-keycap-edge: 12%;
+  --aml-opacity-keycap-ink: 72%;
+  --aml-shadow-tooltip: 0 var(--aml-space-1) var(--aml-space-2) color-mix(in srgb, var(--aml-black-100) 12%, transparent),
+    0 var(--aml-space-8) var(--aml-space-24) calc(-1 * var(--aml-space-8)) color-mix(in srgb, var(--aml-black-100) 45%, transparent);
+  --aml-opacity-tooltip-outline: 40%;
+  --aml-duration-tooltip-reset: 125ms;
+  --aml-duration-tooltip-fuse: 80ms;
+  --aml-rotation-tooltip-arrow: .125turn;
   --brand-accent: var(--selection-surface);
   --brand-color: var(--brand-accent);
   --brand-control-surface: var(--selection-surface);
@@ -28,6 +275,127 @@
   --switch-thumb-ink: var(--aml-white-100);
   --chart-tooltip-background: var(--information-panel-surface);
   --workspace-kpi-value-size: clamp(2rem, 3.1vw, 3rem);
+  --chart-series-height: clamp(10rem, 16vw, 14rem);
+  --chart-detail-sparkline-height: 96px;
+  --chart-hover-fade-duration: 400ms;
+  --chart-sparkline-dot-outline: 1.5px;
+  --chart-bar-value-label-size: 12px;
+  --chart-axis-label-inset: 28px;
+  --chart-axis-detail-inset: 42px;
+  --chart-single-category-gap-ratio: .94;
+  --chart-pattern-bar-gap-ratio: .28;
+  --chart-staff-bar-gap-ratio: .24;
+  --chart-dashboard-enter-duration: 340ms;
+  --overview-score-axis-inset: 34px;
+  --overview-score-long-label-gap: 82px;
+  --overview-score-short-label-gap: 44px;
+  --overview-score-time-label-offset: 18px;
+  --overview-score-value-label-offset: 0.35em;
+  --overview-score-point-jitter: 0.2;
+  --overview-score-point-radius: 5px;
+  --overview-score-enter-duration: 320ms;
+  --overview-score-plot-min-height: 13rem;
+  --overview-score-compact-height: clamp(9rem, 42cqi, 14rem);
+  --overview-score-grid-ink-strength: 14%;
+  --overview-score-threshold-ink-strength: 25%;
+  --overview-amount-chart-min-width: 180px;
+  --overview-evidence-sparkline-height: 40px;
+  --overview-evidence-bar-radius: var(--aml-space-2);
+  --overview-donut-size: clamp(13rem, 37dvh, 24rem);
+  --overview-donut-inner-radius-ratio: .34;
+  --overview-donut-corner-radius: var(--aml-space-8);
+  --overview-donut-segment-gap: .045;
+  --overview-horizontal-label-min-width: 6rem;
+  --overview-horizontal-row-height: 28px;
+  --overview-horizontal-bar-gap: .3;
+  --overview-horizontal-tooltip-damping: 25;
+  --overview-kpi-responsive-size: 20cqi;
+  --overview-kpi-line-height: 1.08;
+  --overview-flow-summary-min-width: 10rem;
+  --chart-sankey-highlight-duration: 180ms;
+  --chart-sankey-name-size: 13px;
+  --chart-sankey-value-size: 11px;
+  --chart-sankey-unassigned-link-color: gray;
+  --chart-sankey-connector-radius: 2.5px;
+  --chart-sankey-stage-node-gap: 15px;
+  --chart-sankey-stage-label-reserve: 174px;
+  --chart-sankey-link-caption-inset: 9px;
+  --chart-sankey-label-offset: .34;
+  --chart-sankey-label-with-detail-offset: -.15;
+  --chart-sankey-detail-offset: 1.15;
+  --chart-sankey-link-opacity: .3;
+  --chart-sankey-return-bend: 16;
+  --case-graph-sankey-link-opacity: .68;
+  --case-graph-sankey-min-width: 28rem;
+  --case-graph-sankey-column-width: 10rem;
+  --case-graph-sankey-max-width: 62rem;
+  --case-graph-sankey-min-height: 6rem;
+  --case-graph-sankey-max-height: 21rem;
+  --case-graph-candidate-share: 27%;
+  --case-graph-controls-layer: 1;
+  --case-graph-drop-target-layer: 3;
+  --case-graph-min-height: 240px;
+  --case-graph-time-axis-inset: 28px;
+  --case-graph-time-label-latin-width: 7px;
+  --case-graph-time-label-wide-width: 11px;
+  --case-graph-time-pill-top: 5px;
+  --case-graph-time-pill-height: 18px;
+  --case-graph-time-pill-radius: 9px;
+  --case-graph-time-pill-baseline: 17px;
+  --case-graph-time-pill-font-size: 11px;
+  --case-graph-layout-node-width: 192px;
+  --case-graph-layout-node-height: 80px;
+  --case-graph-viewport-height: 48vh;
+  --case-graph-max-height: 480px;
+  --case-graph-settings-max-width: 22rem;
+  --case-graph-settings-share: 58%;
+  --case-graph-playback-slider-min-width: 60px;
+  --case-graph-dimmed-ink-share: 52%;
+  --case-graph-owner-boundary-stroke: 1.5px;
+  --case-graph-owner-port-stroke: 1.25px;
+  --case-graph-owner-muted-opacity: .25;
+  --graph-flow-travel-duration: 560ms;
+  --graph-flow-reveal-duration: 480ms;
+  --graph-flow-ambient-duration: 8s;
+  --graph-flow-pulse-length: .16px;
+  --graph-flow-path-length: 1px;
+  --graph-flow-travel-length: calc(var(--graph-flow-path-length) + var(--graph-flow-pulse-length));
+  --graph-flow-ambient-opacity: .85;
+  --graph-flow-stroke-opacity: .9;
+  --graph-flow-mask-width: 36px;
+  --graph-flow-stroke-width: var(--aml-space-4);
+  --graph-flow-highlight-width: var(--aml-space-2);
+  --graph-flow-highlight: var(--aml-white-100);
+  --graph-flow-canvas-width: 5px;
+  --graph-flow-canvas-fade-share: .12;
+  --owner-flow-period-stroke: var(--aml-space-4);
+  --owner-flow-period-marker-radius: 3px;
+  --owner-flow-membership-opacity: .24;
+  --owner-flow-membership-base-width: var(--aml-space-8);
+  --owner-flow-membership-step-width: 5px;
+  --owner-flow-edge-stroke: 2.5px;
+  --owner-flow-edge-selected-stroke: var(--aml-space-4);
+  --owner-flow-edge-target-width: 18px;
+  --owner-flow-lane-radius: var(--aml-space-10);
+  --owner-flow-lane-header-radius: var(--aml-space-8);
+  --owner-flow-account-radius: var(--aml-space-4);
+  --owner-flow-account-port-radius: var(--aml-space-4);
+  --hierarchy-table-min-width: 72rem;
+  --flow-connection-opacity: .55;
+  --transaction-arrow-head-width: 20px;
+  --transaction-arrow-head-inset: 18px;
+  --transaction-arrow-height: 23px;
+  --chart-axis-label-line-height: 1.2;
+  --metric-value-size-min: 1.5rem;
+  --metric-value-size: clamp(var(--metric-value-size-min), 30cqi, var(--workspace-kpi-value-size));
+  --metric-wide-value-size: clamp(var(--metric-value-size-min), 20cqi, var(--workspace-kpi-value-size));
+  --metric-composite-value-size: clamp(var(--metric-value-size-min), 18cqi, var(--workspace-kpi-value-size));
+  --metric-value-line-height: 1.1;
+  --loading-placeholder-title-width: min(60%, calc(2 * var(--aml-space-64)));
+  --loading-placeholder-value-width: min(45%, var(--aml-space-64));
+  --loading-placeholder-note-width: min(75%, calc(3 * var(--aml-space-64)));
+  --loading-pulse-duration: 1.4s;
+  --loading-pulse-opacity: .5;
   --canvas-surface: var(--aml-figma-surface-neutral-background-primary);
   --workspace-surface: var(--canvas-surface);
   --information-panel-surface: var(--aml-figma-surface-neutral-background-secondary);
@@ -35,6 +403,17 @@
   --panel-glass-opacity: 90%;
   --text: var(--aml-figma-contents-neutral-primary);
   --muted-text: var(--aml-figma-contents-neutral-secondary);
+  --chart-neutral-composition-fill: light-dark(
+    color-mix(in srgb, var(--text) 10%, var(--information-panel-surface)),
+    color-mix(in srgb, var(--text) 16%, var(--information-panel-surface)));
+  --chart-suspect-annotation-color: color-mix(in srgb, var(--risk-high), var(--text) 35%);
+  --chart-subtle-grid-color: color-mix(in srgb, var(--text) 8%, transparent);
+  --chart-grid-fade-start: .1;
+  --chart-grid-fade-end: .9;
+  --chart-grid-shimmer-ink-weight: 68%;
+  --chart-grid-shimmer-ink: color-mix(in oklch, var(--text) var(--chart-grid-shimmer-ink-weight), transparent);
+  --chart-grid-shimmer-width: 140px;
+  --chart-grid-shimmer-shoulder-opacity: .45;
   --disabled-text: var(--aml-figma-contents-disabled);
   --divider: var(--aml-figma-border-neutral-subtle-default);
   --focus-ring: var(--aml-figma-border-neutral-accent-default);
@@ -45,17 +424,19 @@
   --glass-edge: color-mix(in srgb, var(--text) 17%, transparent);
   --glass-border-strength: 0%;
   --glass-surface-edge: color-mix(in srgb, var(--glass-edge) var(--glass-border-strength), transparent);
-  --glass-material-frost: color-mix(in srgb, var(--information-panel-surface) 88%, transparent);
+  --glass-material-frost: color-mix(in srgb, var(--information-panel-surface) 80%, transparent);
   --glass-surface: color-mix(in srgb, var(--information-panel-surface) 44%, transparent);
-  --glass-elevated: color-mix(in srgb, var(--text) 9%, var(--glass-material-frost));
-  --glass-strong: color-mix(in srgb, var(--text) 15%, var(--glass-material-frost));
+  --glass-hover-tint: 9%;
+  --glass-press-tint: 15%;
+  --glass-elevated: color-mix(in srgb, var(--text) var(--glass-hover-tint), var(--glass-material-frost));
+  --glass-strong: color-mix(in srgb, var(--text) var(--glass-press-tint), var(--glass-material-frost));
   --glass-shadow: light-dark(var(--aml-black-010), var(--aml-black-030));
   --glass-control-solid: light-dark(var(--aml-gray-095), var(--aml-gray-030));
-  --glass-control-face: color-mix(in srgb, var(--glass-control-solid) 76%, transparent);
+  --glass-control-face: color-mix(in srgb, var(--glass-control-solid) 64%, transparent);
   --glass-control-edge: color-mix(in srgb, light-dark(var(--aml-black-020), var(--aml-white-030)) var(--glass-border-strength), transparent);
   --floating-panel-face: light-dark(var(--information-panel-surface),
     color-mix(in srgb, var(--information-panel-surface), var(--aml-white-100) 5%));
-  --glass-shell-face: color-mix(in srgb, var(--floating-panel-face) 78%, transparent);
+  --glass-shell-face: color-mix(in srgb, var(--floating-panel-face) 66%, transparent);
   --glass-shell-edge: light-dark(var(--aml-black-010), var(--aml-white-020));
   --glass-shell-highlight: light-dark(var(--aml-white-080), var(--aml-white-020));
   --glass-shell-shadow: light-dark(rgb(28 47 69 / 18%), var(--aml-black-040));
@@ -63,6 +444,23 @@
   --glass-shell-scrim: light-dark(var(--aml-black-010), var(--aml-black-020));
   --shadow-floating: 0 var(--aml-space-4) var(--aml-space-12) var(--glass-shadow);
   --shadow-overlay: 0 var(--aml-space-16) var(--aml-space-48) var(--glass-shadow);
+  --floating-shadow: var(--shadow-floating), inset 0 0 0 transparent;
+  --floating-shadow-raised: 0 var(--aml-space-8) var(--aml-space-16) var(--glass-shadow), inset 0 0 0 transparent;
+  --floating-shadow-pressed: 0 var(--aml-stroke-divider) var(--aml-space-2) var(--glass-shadow), inset 0 var(--aml-space-2) var(--aml-space-4) var(--glass-shadow);
+  --floating-sheen: linear-gradient(155deg, light-dark(var(--aml-white-080), var(--aml-white-020)), transparent 57%);
+  --floating-rim:
+    inset 0 var(--aml-stroke-control) var(--aml-space-4) light-dark(var(--aml-white-100), var(--aml-white-030)),
+    inset 0 calc(-1 * var(--aml-stroke-control)) var(--aml-space-4) light-dark(var(--aml-black-010), var(--aml-black-040));
+  --floating-color-transition-duration: 120ms;
+  --floating-press-transition-duration: 70ms;
+  --panel-sunken-shadow-base: var(--aml-black-100);
+  --panel-sunken-shadow-tint: 28%;
+  --panel-sunken-edge-opacity: 22%;
+  --panel-sunken-falloff-opacity: 16%;
+  --panel-sunken-dark-edge: var(--aml-black-080);
+  --panel-sunken-dark-falloff: var(--aml-black-060);
+  --panel-sunken-overlay-layer: 2;
+  --panel-surface-glass-opacity: 78%;
   --backdrop: light-dark(var(--aml-black-020), var(--aml-black-040));
   --inverse-surface: var(--aml-figma-surface-neutral-accent-default);
   --inverse-text: var(--aml-figma-contents-neutral-inverse);
@@ -70,6 +468,8 @@
   --selection-ink: var(--inverse-text);
   --selection-muted: color-mix(in srgb, var(--selection-ink) 75%, var(--selection-surface));
   --selection-divider: color-mix(in srgb, var(--selection-ink) 28%, var(--selection-surface));
+  --selection-hover: color-mix(in srgb, var(--selection-ink) 9%, transparent);
+  --selection-press: color-mix(in srgb, var(--selection-ink) 15%, transparent);
   --ai-summary-tint: 15%;
   --ai-summary-start: color-mix(in srgb, var(--information-panel-surface), var(--aml-figma-surface-status-pending-accent-default) var(--ai-summary-tint));
   --ai-summary-end: color-mix(in srgb, var(--information-panel-surface), var(--aml-figma-surface-neutral-accent-default) var(--ai-summary-tint));
@@ -79,39 +479,58 @@
   --risk-low: var(--status-positive-accent);
   --risk-medium: var(--status-caution-accent);
   --risk-high: var(--status-danger-accent);
-  --status-positive-accent: color-mix(in srgb,
-    color-mix(in srgb, var(--aml-figma-surface-status-positive-accent-default), var(--aml-figma-dark-surface-status-positive-accent-default) 45%),
-    var(--aml-black-100) 8%);
-  --status-caution-accent: color-mix(in srgb, var(--aml-figma-surface-status-caution-accent-default), #ffc83d 60%);
-  --status-danger-accent: light-dark(
-    color-mix(in srgb, var(--aml-figma-light-surface-status-danger-accent-default), var(--aml-black-100) 2%),
-    color-mix(in srgb,
-      color-mix(in srgb, var(--aml-figma-dark-surface-status-danger-accent-default) 15%, var(--aml-figma-light-surface-status-danger-accent-default)),
-      var(--aml-black-100) 5%));
-  --status-pending-accent: light-dark(
-    var(--aml-figma-light-surface-status-pending-accent-default),
-    color-mix(in srgb,
-      color-mix(in srgb, var(--aml-figma-dark-surface-status-pending-accent-default), var(--aml-figma-light-surface-status-pending-accent-default)),
-      var(--aml-black-100) 7%));
-  --status-info-accent: light-dark(
-    var(--aml-figma-light-surface-status-info-accent-default),
-    color-mix(in srgb,
-      color-mix(in srgb, var(--aml-figma-dark-surface-status-info-accent-default), var(--aml-figma-light-surface-status-info-accent-default)),
-      var(--aml-black-100) 11%));
+  --risk-readout-low-stroke: .75px light-dark(var(--aml-black-100), transparent);
+  --model-risk-settings-dial-max-width: 15rem;
+  --model-risk-dial-units: 240;
+  --risk-dial-units: 200;
+  --risk-dial-radius: 78;
+  --risk-dial-band-stroke: 9;
+  --model-risk-dial-start-angle: 150;
+  --model-risk-dial-sweep-angle: 240;
+  --model-risk-dial-band-radius: 91;
+  --model-risk-dial-band-half-width: 4;
+  --model-risk-thumb-close-range: 7;
+  --model-risk-thumb-separated-inset: var(--aml-space-20);
+  --model-risk-sphere-size: 64%;
+  --model-risk-sphere-inset: calc((100% - var(--model-risk-sphere-size)) / 2);
+  --model-risk-sphere-resolution: 256;
+  --model-risk-sphere-draw-scale: .83;
+  --model-risk-sphere-link-stroke: 1.3;
   --review-status-unread-accent: var(--status-danger-accent);
   --review-status-pending-accent: var(--status-pending-accent);
   --review-status-inProgress-accent: var(--status-info-accent);
   --review-status-done-accent: var(--status-positive-accent);
   --review-tag-base: light-dark(var(--canvas-surface), var(--aml-gray-060));
   --review-tag-strength: 22%;
-  --status-accent-light-ink: var(--aml-white-100);
-  --status-accent-dark-ink: var(--aml-black-100);
+  --tag-selected-pattern-ink-strength: 18%;
+  --tag-status-dot-ink-strength: 70%;
+  --tag-filter-border-ink-strength: 26%;
+  --tag-filter-hover-ink-strength: 7%;
+  --tag-filter-press-ink-strength: 12%;
   --status-surface-secondary-ink: color-mix(in srgb, var(--text) 36%, var(--muted-text));
   --record-verdict-tint: 24%;
   --record-verdict-glow-strength: 94%;
   --record-verdict-edge-strength: 16%;
+  --record-verdict-hover-strength: 8%;
+  --record-verdict-press-strength: 14%;
   --record-verdict-divider-strength: 12%;
+  --record-glow-rest-angle: 45deg;
+  --record-glow-edge-maximum: 100;
+  --record-glow-edge-sensitivity: 30;
+  --record-glow-cone-core: 10%;
+  --record-glow-cone-falloff: 32%;
+  --record-glow-layer: 1;
+  --record-glow-fade-in: 250ms;
+  --record-glow-fade-out: 750ms;
+  --record-glow-inner-strength: 88%;
+  --record-glow-outer-strength: 58%;
   --review-lane-tint: 14%;
+}
+
+:root[data-theme="dark"] {
+  --login-scene-particle-colors: #77ddf4, #a5a6fa, #61e1d1;
+  --login-scene-network-ink: #75cde4;
+  --login-scene-network-highlight: #bdeaff;
 }
 
 :root[data-theme="light"] {
@@ -133,10 +552,8 @@
   --panel-light-color: light-dark(
     color-mix(in srgb, var(--panel-light-source) 21%, var(--aml-white-100)),
     color-mix(in srgb, var(--panel-light-source) 72%, var(--aml-white-100)));
-  --panel-edge-depth:
-    inset 0 0 0 var(--aml-stroke-divider) var(--glass-shell-edge),
-    inset 0 calc(-1 * var(--aml-space-2)) var(--aml-space-8)
-      light-dark(color-mix(in srgb, var(--panel-edge-light) 72%, transparent), transparent);
+  --panel-edge-depth: inset 0 0 var(--aml-space-8)
+    light-dark(color-mix(in srgb, var(--panel-edge-light) 72%, transparent), color-mix(in srgb, var(--panel-light-color), transparent));
   --information-panel-shadow:
     inset 0 var(--aml-stroke-divider) var(--aml-space-2) color-mix(in srgb, var(--panel-light-color) 46%, transparent),
     inset 0 var(--aml-space-4) var(--aml-space-12) color-mix(in srgb, var(--panel-light-color) 24%, transparent);

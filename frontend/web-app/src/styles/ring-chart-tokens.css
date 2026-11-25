@@ -1,0 +1,4 @@
+:root {
+  --completion-ring-default-size: 72px;
+  --completion-ring-min-value-size: 9px;
+}

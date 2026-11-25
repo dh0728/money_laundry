@@ -1,0 +1,112 @@
+.animated-list {
+  --al-radius: var(--al-radius-override, 14px);
+  --al-gap: var(--aml-space-8);
+  --al-width: 420px;
+  --animated-list-maximum-height: 440px;
+  --animated-list-focus-offset: 3px;
+  --animated-list-frame-filter: blur(20px) saturate(1.6);
+  --al-frame: rgba(38, 35, 46, 0.66);
+  --al-frame-edge: rgba(255, 255, 255, 0.08);
+  --al-frame-highlight: rgba(255, 255, 255, 0.07);
+  --al-frame-shadow: 0 22px 44px -20px var(--aml-black-080), 0 6px 16px -8px var(--aml-black-050);
+  --al-tile: linear-gradient(180deg, #3a3644 0%, #27242f 100%);
+  --al-tile-edge: var(--al-frame-highlight);
+  --al-tile-highlight: rgba(255, 255, 255, 0.12);
+  --al-tile-shadow: 0 4px 10px -4px rgba(0, 0, 0, 0.7);
+  --al-well: var(--al-frame-edge);
+  --al-ink: #f4f4f5;
+  --al-muted: rgba(244, 244, 245, 0.55);
+  --al-accent: var(--al-accent-override, var(--al-ink));
+  --al-ring: var(--al-accent-override, var(--al-base-ring));
+  --al-ring-fill: var(--al-base-ring-fill);
+  --al-base-ring: rgba(244, 244, 245, 0.3);
+  --al-base-ring-fill: rgba(244, 244, 245, 0.05);
+  --al-hover: brightness(1.12);
+  --al-press: brightness(0.85);
+  --al-active: brightness(1.16);
+  --animated-list-item-padding: 10px 14px 10px 10px;
+  --animated-list-lead-size: 36px;
+  --animated-list-title-size: 14.5px;
+  --animated-list-title-leading: 1.3;
+  --animated-list-title-tracking: -0.01em;
+  --animated-list-description-size: 13px;
+  --animated-list-description-leading: 1.35;
+  --animated-list-metadata-size: 12.5px;
+  --animated-list-indicator-fade: 200ms;
+  --animated-list-indicator-layer: 2;
+  --animated-list-rim-layer: 3;
+  --animated-list-enter-duration: 620ms;
+  --animated-list-enter-ease: cubic-bezier(.34, 1.4, .64, 1);
+  --animated-list-opacity-duration: 300ms;
+  --animated-list-opacity-ease: cubic-bezier(.22, 1, .36, 1);
+  --animated-list-filter-duration: 200ms;
+  --animated-list-slide-offset: 28px;
+  --animated-list-pop-scale: .8;
+  --animated-list-slide-scale: .98;
+  --animated-list-fade-scale: 1;
+  --animated-list-accent-fill-strength: 8%;
+}
+
+.animated-list[data-list-theme="light"] {
+  --al-frame: rgba(240, 240, 243, 0.8);
+  --al-frame-edge: rgba(24, 24, 27, 0.07);
+  --al-frame-highlight: rgba(255, 255, 255, 0.95);
+  --al-frame-shadow: 0 22px 44px -22px rgba(24, 24, 27, 0.3), 0 6px 16px -10px rgba(24, 24, 27, 0.16);
+  --al-tile: linear-gradient(180deg, var(--aml-white-100) 0%, #f6f6f8 100%);
+  --al-tile-edge: rgba(24, 24, 27, 0.08);
+  --al-tile-highlight: var(--aml-white-100);
+  --al-tile-shadow: 0 4px 10px -5px rgba(24, 24, 27, 0.25);
+  --al-well: rgba(24, 24, 27, 0.05);
+  --al-ink: #27272a;
+  --al-muted: rgba(39, 39, 42, 0.55);
+  --al-base-ring: rgba(24, 24, 27, 0.28);
+  --al-base-ring-fill: transparent;
+  --al-hover: brightness(0.97);
+  --al-press: brightness(0.92);
+  --al-active: none;
+}
+
+@supports (transition-timing-function: linear(0, 1)) {
+  .animated-list {
+    --animated-list-enter-ease: linear(0, .0603, .2033, .3821, .5633, .7258, .8584, .9574, 1.0242, 1.0634, 1.0809, 1.0828, 1.0747, 1.0613, 1.046, 1.0313, 1.0186, 1.0085, 1.0012, .9965, .994, .9931, .9933, .9941, .9953, .9966, .9978, .9988, 1);
+  }
+}
+
+.animated-list[data-list-accent] {
+  --al-ring-fill: color-mix(in srgb, var(--al-accent) var(--animated-list-accent-fill-strength), transparent);
+}
+
+.animated-list[data-list-surface="workspace"],
+.animated-list[data-list-surface="ledger"] {
+  --al-ink: var(--text);
+  --al-ring: var(--selected);
+}
+.animated-list[data-list-surface="workspace"] { --al-tile: var(--workspace-surface) }
+.animated-list[data-list-surface="ledger"] {
+  --al-radius: var(--aml-radius-card);
+  --al-muted: var(--muted-text);
+  --al-tile: var(--information-panel-surface);
+  --al-tile-edge: var(--divider);
+  --al-tile-shadow: none;
+}
+
+.animated-list__viewport {
+  /* Samples from a smootherstep curve, reflected on both scroll edges. */
+  --animated-list-fade-mask: linear-gradient(to bottom,
+    transparent 0,
+    color-mix(in srgb, var(--aml-black-100) 2.7%, transparent) calc(var(--al-fade-top) * .15),
+    color-mix(in srgb, var(--aml-black-100) 16.3%, transparent) calc(var(--al-fade-top) * .30),
+    color-mix(in srgb, var(--aml-black-100) 40.7%, transparent) calc(var(--al-fade-top) * .45),
+    color-mix(in srgb, var(--aml-black-100) 68.3%, transparent) calc(var(--al-fade-top) * .60),
+    color-mix(in srgb, var(--aml-black-100) 89.6%, transparent) calc(var(--al-fade-top) * .75),
+    color-mix(in srgb, var(--aml-black-100) 99.1%, transparent) calc(var(--al-fade-top) * .90),
+    var(--aml-black-100) var(--al-fade-top),
+    var(--aml-black-100) calc(100% - var(--al-fade-bottom)),
+    color-mix(in srgb, var(--aml-black-100) 99.1%, transparent) calc(100% - var(--al-fade-bottom) * .90),
+    color-mix(in srgb, var(--aml-black-100) 89.6%, transparent) calc(100% - var(--al-fade-bottom) * .75),
+    color-mix(in srgb, var(--aml-black-100) 68.3%, transparent) calc(100% - var(--al-fade-bottom) * .60),
+    color-mix(in srgb, var(--aml-black-100) 40.7%, transparent) calc(100% - var(--al-fade-bottom) * .45),
+    color-mix(in srgb, var(--aml-black-100) 16.3%, transparent) calc(100% - var(--al-fade-bottom) * .30),
+    color-mix(in srgb, var(--aml-black-100) 2.7%, transparent) calc(100% - var(--al-fade-bottom) * .15),
+    transparent 100%);
+}

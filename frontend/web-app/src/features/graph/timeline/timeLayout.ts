@@ -78,7 +78,7 @@ export type OwnerBox = { group: OwnerGroup; top: number; height: number }
 export type LanePlan = { groups: OwnerGroup[]; yOf: (account: string, lane: number) => number; boxes: (lane: number) => OwnerBox[] }
 
 /** 계좌 보기: 번호대로 한 줄씩. 소유주 보기: 소유주가 처음 나온 순서대로 상자, 상자 안은 계좌 번호순 */
-export function lanePlan(g: Pick<Timeline, 'tx' | 'numbers'>, view: LaneView): LanePlan {
+export function lanePlan(g: Pick<Timeline, 'tx' | 'numbers'>, view: LaneView, nodeSize = NODE_SIZE, ownerHeading = OWNER_HEAD): LanePlan {
   if (view === 'account') return { groups: [], yOf: (acc, lane) => laneY(g.numbers.get(acc)!, lane), boxes: () => [] }
   const ownerOf = new Map<string, string>()
   for (const t of g.tx) { if (t.fromOwnerName) ownerOf.set(t.fromAccount, t.fromOwnerName); if (t.toOwnerName) ownerOf.set(t.toAccount, t.toOwnerName) }
@@ -92,17 +92,16 @@ export function lanePlan(g: Pick<Timeline, 'tx' | 'numbers'>, view: LaneView): L
   const cache = new Map<number, OwnerBox[]>()
   const boxes = (lane: number) => {
     let hit = cache.get(lane)
-    if (!hit) { let top = 0; hit = groups.map(group => { const height = OWNER_HEAD + OWNER_PAD * 2 + (group.accounts.length - 1) * lane + NODE_SIZE; const box = { group, top, height }; top += height + OWNER_GAP; return box }); cache.set(lane, hit) }
+    if (!hit) { let top = 0; hit = groups.map(group => { const height = ownerHeading + OWNER_PAD * 2 + (group.accounts.length - 1) * lane + nodeSize; const box = { group, top, height }; top += height + OWNER_GAP; return box }); cache.set(lane, hit) }
     return hit
   }
-  return { groups, boxes, yOf: (acc, lane) => { const w = where.get(acc)!; return boxes(lane)[w.gi].top + OWNER_HEAD + OWNER_PAD + w.k * lane } }
+  return { groups, boxes, yOf: (acc, lane) => { const w = where.get(acc)!; return boxes(lane)[w.gi].top + ownerHeading + OWNER_PAD + w.k * lane } }
 }
 type Pt = [number, number]
 type Pos = { x: number; y: number }
 // @xyflow/system getBezierPath와 같은 제어점(curvature 0.25)
 const offset = (d: number) => d >= 0 ? 0.5 * d : 0.25 * 25 * Math.sqrt(-d)
-export function edgeCurve(s: Pos, t: Pos, vertical: boolean): [Pt, Pt, Pt, Pt] {
-  const N = NODE_SIZE
+export function edgeCurve(s: Pos, t: Pos, vertical: boolean, N = NODE_SIZE): [Pt, Pt, Pt, Pt] {
   if (!vertical) {
     const sx = s.x + N, sy = s.y + N / 2, tx = t.x, ty = t.y + N / 2
     return [[sx, sy], [sx + offset(tx - sx), sy], [tx - offset(tx - sx), ty], [tx, ty]]
@@ -121,21 +120,20 @@ const SAMPLES = 32, CLOSE = 14, RUN = 4, LABEL_W = 100, LABEL_H = 24
 export type Spacing = { timeWidth: number; lane: number; positions: Map<string, Pos>; conflicts: number }
 
 /** 같은 입력이면 같은 간격. 충돌 0이 되는 가장 작은 간격, 끝까지 안 되면 가장 넓은 간격과 남은 충돌 수 */
-export function chooseSpacing(g: Pick<Timeline, 'apps' | 'bundles' | 'gaps'>, steps = 10, yOf?: LanePlan['yOf']): Spacing {
+export function chooseSpacing(g: Pick<Timeline, 'apps' | 'bundles' | 'gaps'>, steps = 10, yOf?: LanePlan['yOf'], nodeSize = NODE_SIZE): Spacing {
   let last: Spacing | null = null
   for (let k = 0; k <= steps; k++) {
     const timeWidth = 190 + 24 * k, lane = 76 + 12 * k
     const positions = new Map(g.apps.map(a => [a.id, { x: columnX(a.col, g.gaps, timeWidth), y: yOf ? yOf(a.account, lane) : laneY(a.n, lane) }]))
-    last = { timeWidth, lane, positions, conflicts: countConflicts(g.bundles, positions) }
+    last = { timeWidth, lane, positions, conflicts: countConflicts(g.bundles, positions, nodeSize) }
     if (last.conflicts === 0) return last
   }
   return last!
 }
 
-export function countConflicts(bundles: Bundle[], positions: Map<string, Pos>) {
-  const N = NODE_SIZE
+export function countConflicts(bundles: Bundle[], positions: Map<string, Pos>, N = NODE_SIZE) {
   const edges = bundles.filter(b => b.source !== b.target).map(b => {
-    const curve = edgeCurve(positions.get(b.source)!, positions.get(b.target)!, b.sameTime)
+    const curve = edgeCurve(positions.get(b.source)!, positions.get(b.target)!, b.sameTime, N)
     const pts = Array.from({ length: SAMPLES + 1 }, (_, i) => at(curve, i / SAMPLES))
     const [lx, ly] = at(curve, 0.5)
     return { b, pts, label: { l: lx - LABEL_W / 2, r: lx + LABEL_W / 2, t: ly - LABEL_H / 2, bt: ly + LABEL_H / 2 } }

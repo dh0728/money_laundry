@@ -1,0 +1,25 @@
+.bar-chart { aspect-ratio: var(--bar-chart-aspect-ratio, auto) }
+.bar-chart-interaction[data-interactive] { cursor: crosshair }
+.bar-chart-interaction { cursor: default }
+
+.bar-chart-axis-label {
+  position: absolute;
+  left: var(--bar-chart-axis-position);
+  bottom: var(--aml-space-12);
+  inline-size: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.bar-chart-opacity-transition {
+  transition: opacity var(--aml-duration-highlight-fade) ease-in-out;
+}
+
+.bar-chart-static-mark { cursor: default }
+
+:where(.bar-chart-value-label) {
+  font-size: var(--chart-bar-value-label-size);
+  font-weight: var(--aml-type-body-strong-weight);
+}
+
+.bar-chart-hatch-stripe { stroke-width: var(--aml-stroke-focus) }

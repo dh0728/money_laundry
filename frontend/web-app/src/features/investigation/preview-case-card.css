@@ -22,7 +22,7 @@
   display: grid;
   align-items: start;
   column-gap: var(--aml-space-8);
-  grid-template-columns: min(var(--aml-space-64), 42%) minmax(0, 1fr);
+  grid-template-columns: min(var(--aml-space-64), var(--case-card-label-max-share)) minmax(0, 1fr);
 }
 .preview-case-card dt { color: var(--muted-text); overflow-wrap: anywhere }
 .preview-case-card dd { margin: 0; min-width: 0; overflow-wrap: anywhere }
@@ -39,16 +39,16 @@
   flex: 1;
   min-block-size: 0;
   max-block-size: var(--workspace-list-limit);
-  overflow: auto;
+  overflow-y: auto;
   padding-block: var(--record-card-shadow-gutter);
-  padding-inline: 0;
+  padding-block-end: max(var(--record-card-shadow-gutter), var(--workspace-footer-inset));
   scrollbar-gutter: auto;
 }
 @media (max-width: 768px), (max-height: 480px) {
   .case-list-panel > .case-progress-board {
     max-block-size: none;
     overflow: visible;
-    padding-block-end: max(var(--record-card-shadow-gutter), var(--account-footer-reserve));
+    padding-block-end: var(--record-card-shadow-gutter);
   }
 }
 .case-progress-lanes {
@@ -71,7 +71,7 @@
   --muted-text: var(--status-surface-secondary-ink);
 }
 .case-progress-lane.screen-panel {
-  padding: var(--aml-panel-inset);
+  --panel-content-padding: var(--aml-panel-inset);
 }
 .case-progress-lane .case-progress-heading {
   display: flex;
@@ -83,6 +83,10 @@
   font-size: var(--aml-type-caption-size);
   line-height: var(--aml-type-label-lineHeight);
 }
+.case-progress-cards {
+  align-self: start;
+  align-content: start;
+}
 .case-progress-empty {
   margin: 0;
   color: var(--muted-text);
@@ -93,5 +97,5 @@
   .case-progress-lanes { grid-template-columns: repeat(2, minmax(0, 1fr)) }
 }
 @container case-progress-board (min-width: 1056px) {
-  .case-progress-lanes { grid-template-columns: repeat(var(--case-progress-columns, 4), minmax(0, 1fr)) }
+  .case-progress-lanes { grid-template-columns: repeat(var(--case-progress-columns), minmax(0, 1fr)) }
 }

@@ -7,6 +7,7 @@ import type {
 import { m, useTransform } from "motion/react";
 import { Fragment, type ReactNode, useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useMountProgress } from "../use-mount-progress";
+import { readChartDurationSeconds } from "../../chart-design-values";
 import {
   type SankeyLinkDatum,
   type SankeyNodeDatum,
@@ -36,10 +37,10 @@ function getNodeObject(
 
 // Default node color palette using CSS variables
 const defaultColors = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
+  "var(--aml-sky-050)",
+  "var(--aml-pink-050)",
+  "var(--aml-lime-050)",
+  "var(--palette-teal-500, var(--aml-sky-070))",
   "var(--chart-5)",
 ];
 
@@ -47,7 +48,7 @@ function getDefaultNodeColor(
   node: SankeyNodeType<SankeyNodeDatum, SankeyLinkDatum>
 ): string {
   const index = node.index ?? 0;
-  return defaultColors[index % defaultColors.length] ?? "var(--chart-1)";
+  return defaultColors[index % defaultColors.length] ?? "var(--aml-sky-050)";
 }
 
 export interface SankeyLinkProps {
@@ -121,6 +122,7 @@ function AnimatedLink({
   const { enterTransition, revealEpoch } = useSankey();
   const pathRef = useRef<SVGPathElement>(null);
   const [pathLength, setPathLength] = useState(0);
+  const [highlightDuration] = useState(() => readChartDurationSeconds("--chart-sankey-highlight-duration", 0.18));
 
   // Links animate during the last 80% of total duration, starting at 20%
   const linkStartDelay = animationDuration * 0.2;
@@ -164,6 +166,7 @@ function AnimatedLink({
   return (
     <m.path
       animate={{ opacity: animatedOpacity }}
+      className="sankey-interactive-mark"
       data-sankey-highlighted={isHighlighted || undefined}
       d={path}
       fill="none"
@@ -183,12 +186,9 @@ function AnimatedLink({
       ref={pathRef}
       stroke={stroke}
       strokeDasharray={reveal ? dashArray : undefined}
+      strokeDashoffset={reveal ? strokeDashoffset : undefined}
       strokeWidth={Math.max(1, width)}
-      style={{
-        cursor: "pointer",
-        strokeDashoffset: reveal ? strokeDashoffset : undefined,
-      }}
-      transition={{ duration: 0.18, ease: "easeOut" }}
+      transition={{ duration: highlightDuration, ease: "easeOut" }}
     />
   );
 }
@@ -235,7 +235,7 @@ export function SankeyLink({
       if (getLinkColor) {
         return getLinkColor(link, index);
       }
-      return stroke || "var(--chart-line-primary)";
+      return stroke || "var(--aml-sky-050)";
     },
     [getLinkColor, stroke]
   );
@@ -257,10 +257,10 @@ export function SankeyLink({
       // Use fallback colors if nodes can't be resolved
       const sourceColor = sourceNode
         ? getNodeColorFn(sourceNode)
-        : "var(--chart-1)";
+        : "var(--aml-sky-050)";
       const targetColor = targetNode
         ? getNodeColorFn(targetNode)
-        : "var(--chart-1)";
+        : "var(--aml-sky-050)";
       const gradientId = `${gradientPrefix}-link-gradient-${index}`;
 
       // Get absolute x positions for gradient

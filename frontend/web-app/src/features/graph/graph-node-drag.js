@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { appReducedMotion } from '@/hooks/use-reduced-motion';
 
 const zeroOffset = { x: 0, y: 0 };
 const dragThreshold = 5;
@@ -25,8 +26,7 @@ export function useSpringNodeDrag(scale = 1) {
   function returnToOrigin() {
     const from = point.current;
     if (!from) return;
-    const reduced = document.documentElement.dataset.reducedMotion === 'true' ||
-      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const reduced = appReducedMotion();
     if (reduced) {
       place(null);
       return;

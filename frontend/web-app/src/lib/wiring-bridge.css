@@ -1,0 +1,8 @@
+body.aml-wiring-select:not(.aml-wiring-dragging) [data-wiring-id][data-wiring-selectable] {
+  cursor: pointer;
+}
+
+body.aml-wiring-select.aml-wiring-dragging,
+body.aml-wiring-select.aml-wiring-dragging :is(*, [data-wiring-selectable]) {
+  cursor: grabbing;
+}

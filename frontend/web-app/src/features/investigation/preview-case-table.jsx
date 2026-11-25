@@ -6,6 +6,7 @@ import { ModelScoreTag, ReviewStatusTag, reviewStatusLabel, VerdictTag, verdictL
 import { currencyColumn, SortableTableHead, tableCount,
   useTableSelection, useTableSort } from '../../components/workflow-table';
 import { dateFromCode, downloadCsv, inDateRange, TableQueryTools } from '../../components/query-controls';
+import { Box, Text } from '@/components/layout-primitives';
 
 const columns = [
   { name: '거래', value: row => row.code },
@@ -54,40 +55,41 @@ export function TransactionEvidenceTable({ title, transactions = [], showScore =
       ])),
     }] : [],
   };
-  return <section className="screen-section screen-table case-evidence-table">
+  return <Box as="section" className="screen-section screen-table case-evidence-table">
     <CaseDataTable title={title} summary={tableCount(sorting.rows.length, transactions.length, '건', selection.selectedCount)}
       className="screen-table-scroll" selection={selection} tools={lastCode ? <TableQueryTools actions={actions} /> : false}>
       <TableHeader><TableRow>
-        {headers.map(({ name, ...options }) => <SortableTableHead key={name} sorting={sorting} column={name} {...options}
-          className={name === '금액' ? 'case-table-numeric' : undefined}>{name}</SortableTableHead>)}
+        {headers.map(({ name, ...options }) => <SortableTableHead key={name} sorting={sorting} column={name} {...options}>
+          {name}
+        </SortableTableHead>)}
       </TableRow></TableHeader>
       <TableBody>
         {sorting.rows.map(({ code, timestamp, from, to, amount, currency, method, status, verdict, score }) =>
           <TableRow key={code} data-verdict={verdict} data-selected={selection.has(code) || undefined}
-            data-graph-linked={highlightedCodes?.has(code) || undefined}>
+            related={highlightedCodes?.has(code)}>
             <RecordIdCell code={code} />
             {scoresVisible && <TableCell>{Number.isFinite(score)
               ? <ModelScoreTag score={score} /> : '—'}</TableCell>}
-            <TableCell><time dateTime={timestamp.replace(' ', 'T') + '+09:00'}>{timestamp}</time></TableCell>
-            <TableCell><code>{from.code}</code></TableCell>
+            <TableCell><Text as="time" dateTime={timestamp.replace(' ', 'T') + '+09:00'}>{timestamp}</Text></TableCell>
+            <TableCell><Text as="code">{from.code}</Text></TableCell>
             {analysis && <TableCell>{from.owner || '—'}</TableCell>}
-            <TableCell><code>{to.code}</code></TableCell>
+            <TableCell><Text as="code">{to.code}</Text></TableCell>
             {analysis && <TableCell>{to.owner || '—'}</TableCell>}
-            <TableCell className="case-table-numeric">{formatAmount.format(amount)} {currency}</TableCell>
+            <TableCell numeric>{formatAmount.format(amount)} {currency}</TableCell>
             <TableCell>{method}</TableCell>
             {analysis ? <>
               <TableCell><VerdictTag verdict={verdict} /></TableCell>
               <TableCell><ReviewStatusTag status={status} /></TableCell>
-            </> : <TableCell><div className="semantic-tag-group">
+            </> : <TableCell><Box className="semantic-tag-group">
               <VerdictTag verdict={verdict} /><ReviewStatusTag status={status} />
-            </div></TableCell>}
+            </Box></TableCell>}
           </TableRow>)}
         {!sorting.rows.length && <TableRow><TableCell colSpan={headers.length}>
           {transactions.length ? '조회 조건과 일치하는 거래가 없습니다.' : '연결된 거래가 없습니다.'}
         </TableCell></TableRow>}
       </TableBody>
     </CaseDataTable>
-  </section>;
+  </Box>;
 }
 
 export function mountTransactionEvidenceTable(host, transactions) {

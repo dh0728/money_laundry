@@ -8,35 +8,36 @@ import { canJudgePreviewCase, canStartPreviewReview, judgmentReasonLabels, judgm
 import { enableBackdropDismissal } from '../../lib/overlay-dismissal.js';
 import { CountTag, ModelScoreTag, PatternTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
 import './case-judgment.css';
+import { Box, LineBreak, Text } from '../../components/layout-primitives';
 
 function JudgmentTarget({ row, showVerdict = false }) {
-  return <li className="semantic-tag-group">
-    <code>{row.code}</code>
+  return <Box as="li" className="semantic-tag-group">
+    <Text as="code">{row.code}</Text>
     {row.pattern && <PatternTag>{row.pattern}</PatternTag>}
     {Number.isFinite(row.score) && <ModelScoreTag score={row.score} />}
     {showVerdict && row.verdict && <VerdictTag verdict={row.verdict} />}
-  </li>;
+  </Box>;
 }
 
 function JudgmentTargets({ row }) {
   const related = row.kind === 'Episode' ? row.overlappingAlerts ?? [] : [];
-  return <div className="case-judgment-target-group">
-    <ul className="case-judgment-targets" aria-label="판정 대상"><JudgmentTarget row={row} /></ul>
+  return <Box className="case-judgment-target-group">
+    <Box as="ul" className="case-judgment-targets" aria-label="판정 대상"><JudgmentTarget row={row} /></Box>
     {related.length > 0 && <>
-      <p className="case-judgment-target-label semantic-tag-group">거래가 겹치는 Alert <CountTag count={related.length} /></p>
-      <ul className="case-judgment-targets" aria-label="거래가 겹치는 Alert">
+      <Text className="case-judgment-target-label semantic-tag-group">거래가 겹치는 Alert <CountTag count={related.length} /></Text>
+      <Box as="ul" className="case-judgment-targets" aria-label="거래가 겹치는 Alert">
         {related.map(target => <JudgmentTarget key={target.code} row={target} showVerdict />)}
-      </ul>
+      </Box>
     </>}
-  </div>;
+  </Box>;
 }
 
 function JudgmentDetails({ evidence, observations, reason }) {
-  return <dl className="case-judgment-details">
-    {evidence && <div><dt>확인한 근거 자료</dt><dd>{evidence}</dd></div>}
-    {observations && <div><dt>관찰한 사실</dt><dd>{observations}</dd></div>}
-    <div><dt>판정 사유</dt><dd>{reason}</dd></div>
-  </dl>;
+  return <Box as="dl" className="case-judgment-details">
+    {evidence && <Box><Box as="dt">확인한 근거 자료</Box><Box as="dd">{evidence}</Box></Box>}
+    {observations && <Box><Box as="dt">관찰한 사실</Box><Box as="dd">{observations}</Box></Box>}
+    <Box><Box as="dt">판정 사유</Box><Box as="dd">{reason}</Box></Box>
+  </Box>;
 }
 
 export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onReport, onBundle, onTransfer, bundleBlocked, onRelationRequest }) {
@@ -138,25 +139,25 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
               : <PrimaryButton type="submit" tone="brand" disabled={!valid}>내용 확인</PrimaryButton>}
           </>}
       </>}>
-      <div className="case-judgment-body">
+      <Box className="case-judgment-body">
         {bundleBlocked && <Callout className="case-judgment-bundle-notice">
-          <strong>Episode 편입 전 확인</strong><br />
+          <Text as="strong">Episode 편입 전 확인</Text><LineBreak />
           {bundleBlocked}
         </Callout>}
-        {requestSent && <p role="status">관리자에게 연관 업무 검토 요청을 보냈습니다.</p>}
+        {requestSent && <Text role="status">관리자에게 연관 업무 검토 요청을 보냈습니다.</Text>}
         <JudgmentTargets row={row} />
-        {result ? <div className="case-judgment-summary">
-          <p role="status"><code>{result.id}</code>에 판정이 저장되었습니다.</p>
-          <p><VerdictTag verdict={result.verdict} /></p>
-          <p><strong>{reasonLabel}</strong></p>
+        {result ? <Box className="case-judgment-summary">
+          <Text role="status"><Text as="code">{result.id}</Text>에 판정이 저장되었습니다.</Text>
+          <Text><VerdictTag verdict={result.verdict} /></Text>
+          <Text><Text as="strong">{reasonLabel}</Text></Text>
           <JudgmentDetails {...result} />
-        </div> : confirm ? <div className="case-judgment-summary">
-          <p><VerdictTag verdict={verdict} /></p>
-          <p><strong>{reasonLabel}</strong></p>
+        </Box> : confirm ? <Box className="case-judgment-summary">
+          <Text><VerdictTag verdict={verdict} /></Text>
+          <Text><Text as="strong">{reasonLabel}</Text></Text>
           <JudgmentDetails reason={rationale.trim()} />
-          <p className="case-judgment-note">저장하면 이 업무가 처리 완료로 이동합니다.</p>
-        </div> : eligible && <>
-          <div className="case-judgment-dropdowns">
+          <Text className="case-judgment-note">저장하면 이 업무가 처리 완료로 이동합니다.</Text>
+        </Box> : eligible && <>
+          <Box className="case-judgment-dropdowns">
             <GlideSelect ariaLabel="처리 방식" placeholder="처리 방식 선택" value={verdict}
               options={[
                 { value: 'normal', label: row.kind === 'Alert' ? '정상 종결' : '정상' },
@@ -174,16 +175,16 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
             <GlideSelect ariaLabel="판정 사유 유형" placeholder="판정 사유 유형 선택"
               value={reasonCategory} onChange={setReasonCategory}
               options={Object.entries(judgmentReasonLabels).map(([value, label]) => ({ value, label }))} />
-          </div>
-          <label className="case-judgment-field">
-            <span>판정 사유</span>
+          </Box>
+          <Box as="label" className="case-judgment-field">
+            <Text as="span">판정 사유</Text>
             <Textarea rows={3} maxLength={judgmentTextLimit} required value={rationale}
               placeholder="판정 이유를 입력해 주세요"
               onChange={event => setRationale(event.target.value)} />
-          </label>
+          </Box>
         </>}
-        {error && <p role="alert">{error}</p>}
-      </div>
+        {error && <Text role="alert">{error}</Text>}
+      </Box>
     </DialogFrame>
   </>;
 }

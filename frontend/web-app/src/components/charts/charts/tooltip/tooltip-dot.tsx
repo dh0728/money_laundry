@@ -1,7 +1,8 @@
 "use client";
 
 import { m, useSpring, useTransform } from "motion/react";
-import { useId } from "react";
+import { useId, useState } from "react";
+import { readSvgEffectRegion } from "../../chart-design-values";
 import { type SpringConfig, useChartConfig } from "../chart-config-context";
 import { chartCssVars } from "../chart-context";
 
@@ -124,6 +125,7 @@ export function TooltipDot({
   const animatedX = useSpring(x, effectiveSpring);
   const animatedY = useSpring(y, effectiveSpring);
   const haloFilterId = `tooltip-dot-halo-${useId()}`;
+  const [haloFilterRegion] = useState(readSvgEffectRegion);
 
   const isRing = variant === "ring";
 
@@ -184,7 +186,7 @@ export function TooltipDot({
   // falloff without cropping it into a square.
   const haloFilterDefs = blurHalo ? (
     <defs>
-      <filter height="300%" id={haloFilterId} width="300%" x="-100%" y="-100%">
+      <filter {...haloFilterRegion} id={haloFilterId}>
         <feGaussianBlur stdDeviation={haloBlur} />
       </filter>
     </defs>

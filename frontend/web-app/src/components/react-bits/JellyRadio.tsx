@@ -3,6 +3,7 @@
 import React, {
   forwardRef,
   useEffect,
+  useEffectEvent,
   useLayoutEffect,
   useRef,
   useState,
@@ -13,11 +14,12 @@ import {
   animate,
   motion,
   motionValue,
-  useReducedMotion,
   useTransform,
   type HTMLMotionProps,
-  type MotionValue
+  type MotionStyle,
+  type MotionValue,
 } from 'motion/react';
+import { useAppReducedMotion } from '@/hooks/use-reduced-motion';
 
 import './JellyRadio.css';
 
@@ -33,8 +35,8 @@ export interface JellyRadioProps {
   textColor?: string;
   activeTextColor?: string;
   size?: 'sm' | 'md' | 'lg';
-  gap?: number;
-  radius?: number;
+  gap?: number | string;
+  radius?: number | string;
   swell?: number;
   barge?: number;
   shrink?: number;
@@ -82,7 +84,7 @@ const spring = (k: number, m: number, bounce: number) => ({
 const Chip = forwardRef<HTMLButtonElement, ChipProps>(function Chip({ mv, children, ...rest }, ref) {
   const transform = useTransform(() => `translateX(${mv.x.get()}px) scale(${mv.sx.get()}, ${mv.sy.get()})`);
   return (
-    <motion.button ref={ref} style={{ transform }} {...rest}>
+    <motion.button ref={ref} style={{ '--jelly-radio-chip-transform': transform } as MotionStyle} {...rest}>
       {children}
     </motion.button>
   );
@@ -93,10 +95,10 @@ const JellyRadio: React.FC<JellyRadioProps> = ({
   value,
   defaultValue,
   onChange,
-  chipColor = '#27272a',
-  activeColor = '#f5f5f5',
-  textColor = '#f5f5f5',
-  activeTextColor = '#18181b',
+  chipColor,
+  activeColor,
+  textColor,
+  activeTextColor,
   size = 'md',
   gap = 8,
   radius = 18,
@@ -118,7 +120,7 @@ const JellyRadio: React.FC<JellyRadioProps> = ({
     0,
     list.findIndex(it => it.value === current)
   );
-  const systemReduced = useReducedMotion();
+  const systemReduced = useAppReducedMotion();
   const reduce = systemReduced || document.documentElement.dataset.reducedMotion === 'true';
   const groupRef = useRef<HTMLDivElement>(null);
   const chipRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -181,7 +183,7 @@ const JellyRadio: React.FC<JellyRadioProps> = ({
     group.style.setProperty('--jr-pad-x', `${Math.ceil((maxW * swell * 1.3) / 2 + barge) + 2}px`);
     group.style.setProperty('--jr-pad-y', `${Math.ceil((chipH * swell) / 2) + 2}px`);
   };
-  useLayoutEffect(() => {
+  const settleLayout = useEffectEvent(() => {
     const settle = () => {
       measure();
       apply(applied.current, true);
@@ -191,8 +193,8 @@ const JellyRadio: React.FC<JellyRadioProps> = ({
     if (groupRef.current) observer.observe(groupRef.current);
     document.fonts?.ready.then(settle);
     return () => observer.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemsKey, size, gap, swell, barge, shrink]);
+  });
+  useLayoutEffect(() => settleLayout(), [itemsKey, size, gap, swell, barge, shrink]);
   useEffect(() => {
     if (applied.current === at) return;
     applied.current = at;
@@ -250,8 +252,8 @@ const JellyRadio: React.FC<JellyRadioProps> = ({
           '--jr-active': activeColor,
           '--jr-text': textColor,
           '--jr-active-text': activeTextColor,
-          '--jr-gap': `${gap}px`,
-          '--jr-radius': `${radius}px`,
+          '--jr-gap': typeof gap === 'number' ? `${gap}px` : gap,
+          '--jr-radius': typeof radius === 'number' ? `${radius}px` : radius,
           '--jr-h': `${h}px`,
           '--jr-font': `${font}px`,
           '--jr-px': `${px}px`

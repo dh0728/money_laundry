@@ -1,13 +1,18 @@
 .ledger-components {
-  --ledger-relationship-gutter: clamp(var(--aml-space-24), 3vw, var(--aml-space-48));
+  --ledger-relationship-gutter: clamp(var(--aml-space-24), var(--ledger-column-gutter-fluid), var(--aml-space-48));
+  --ledger-card-panel-gap: calc(2 * var(--record-card-shadow-gutter) + var(--workspace-panel-gap));
   position: relative;
   display: grid;
-  grid-template-columns: minmax(110px, 9.5%) var(--ledger-relationship-gutter)
-    minmax(116px, 10%) var(--ledger-relationship-gutter)
-    minmax(290px, 1fr) var(--workspace-gap) minmax(365px, 1.25fr);
-  grid-template-areas: "owners . accounts . transactions . related";
+  grid-template-columns: minmax(var(--ledger-owner-column-min-width), var(--ledger-wide-owner-column-share))
+    var(--ledger-relationship-gutter)
+    minmax(var(--ledger-account-column-min-width), var(--ledger-wide-account-column-share))
+    var(--ledger-relationship-gutter)
+    minmax(var(--ledger-transaction-column-min-width), 1fr)
+    var(--ledger-card-panel-gap) minmax(var(--ledger-related-column-min-width), 1.25fr);
+  grid-template-areas: "search search search search search search search"
+    "owners . accounts . transactions . related";
   align-items: start;
-  row-gap: var(--workspace-gap);
+  row-gap: var(--workspace-panel-gap);
 }
 .ledger-pane { min-width: 0 }
 .ledger-pane h2 {
@@ -20,71 +25,18 @@
 .ledger-accounts { grid-area: accounts }
 .ledger-transactions { grid-area: transactions }
 .ledger-related { grid-area: related }
-.ledger-tables {
-  display: grid;
-  min-inline-size: 0;
-  align-content: start;
-  gap: var(--workspace-gap);
-}
 .ledger-hierarchy { min-inline-size: 0 }
-.ledger-hierarchy-scroll > [data-slot="table-container"] { min-inline-size: 72rem }
-.ledger-hierarchy-table { table-layout: fixed }
-.ledger-hierarchy-table tr[data-ledger-depth="transaction"] {
-  scroll-margin-block: var(--header-height) var(--app-footer-height, var(--account-footer-reserve));
-}
-.ledger-hierarchy-scroll tbody tr[data-ledger-depth="owner"] {
-  background: var(--information-panel-surface);
-}
-.ledger-hierarchy-scroll tbody tr[data-ledger-depth] > :is(th, td) {
-  padding-block: var(--aml-space-4);
-}
-.ledger-hierarchy-scroll th[scope="rowgroup"] { text-align: start }
-.ledger-hierarchy-scroll tbody tr[data-ledger-depth="account"] > th,
-.ledger-hierarchy-scroll tbody tr[data-ledger-depth="transaction"] > th {
-  border-inline-start: var(--aml-stroke-divider) solid var(--aml-data-grid);
-}
-.ledger-branch-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--aml-space-4);
-  padding: 0;
-  min-block-size: var(--aml-size-control-compact);
-  font-weight: inherit;
-  white-space: nowrap;
-}
-.ledger-branch-toggle .icon {
-  inline-size: var(--aml-size-icon-mini);
-  block-size: var(--aml-size-icon-mini);
-}
-.ledger-branch-toggle[aria-expanded="true"] .icon { rotate: 90deg }
-.ledger-table-record-id {
-  display: grid;
-  grid-template-columns: var(--aml-size-control) minmax(0, max-content);
-  align-items: center;
-  min-block-size: var(--aml-size-control);
-  gap: var(--aml-space-4);
-}
-.ledger-table-select { grid-column: 2; justify-self: start; padding: 0 }
-.ledger-table-select code { font-weight: var(--aml-type-body-strong-weight) }
-.ledger-table-amount { text-align: end; font-variant-numeric: tabular-nums }
-.ledger-connections {
-  position: absolute;
-  inset: 0;
-  inline-size: 100%;
-  block-size: 100%;
-  pointer-events: none;
-  fill: none;
-  stroke: var(--muted-text);
-  stroke-width: var(--aml-stroke-divider);
-}
-.ledger-connections path { opacity: .55 }
-.ledger-connections path[data-active] { stroke: var(--text); stroke-width: var(--aml-stroke-focus); opacity: 1 }
 .ledger-components .animated-list { margin-block-start: var(--workspace-gap) }
 .ledger-panel-heading, .ledger-source {
   display: flex;
   align-items: center;
   gap: var(--aml-space-6);
 }
+.ledger-panel-heading {
+  --query-control-size: var(--aml-panel-control-size);
+  flex-wrap: wrap;
+}
+.ledger-panel-heading h2 { white-space: nowrap }
 .ledger-source {
   justify-content: flex-start;
   flex-wrap: wrap;
@@ -93,12 +45,14 @@
   overflow-wrap: anywhere;
 }
 .ledger-empty { margin-block: var(--workspace-gap); color: var(--muted-text); font-size: var(--aml-type-caption-size) }
+:is(.ledger-owners, .ledger-accounts) .animated-list__viewport {
+  padding-inline: 0;
+}
 .ledger-components .animated-list__viewport {
-  padding-inline: var(--aml-space-4);
-  scrollbar-gutter: stable;
+  scrollbar-gutter: auto;
 }
 .ledger-transaction-list .animated-list__viewport {
-  padding: var(--record-card-shadow-gutter);
+  padding-block: var(--record-card-shadow-gutter);
   border-radius: 0;
 }
 .ledger-components .animated-list__item {
@@ -112,11 +66,11 @@
 }
 @media (hover: hover) {
   :is(.ledger-owners, .ledger-accounts) .animated-list__item:hover:not([data-selected]) {
-    background-color: color-mix(in srgb, var(--al-tile), var(--text) 9%);
+    background-color: color-mix(in srgb, var(--al-tile), var(--text) var(--ledger-list-hover-ink-weight));
   }
 }
 :is(.ledger-owners, .ledger-accounts) .animated-list__item:active:not([data-selected]) {
-  background-color: color-mix(in srgb, var(--al-tile), var(--text) 15%);
+  background-color: color-mix(in srgb, var(--al-tile), var(--text) var(--ledger-list-pressed-ink-weight));
 }
 :is(.ledger-transaction-list .animated-list__item, .ledger-transaction-card) {
   display: block;
@@ -141,19 +95,10 @@
   align-items: stretch;
   padding: var(--aml-space-12);
   color: inherit;
-  font-family: var(--aml-font-mono, monospace);
+  font-family: var(--aml-font-mono);
   font-size: var(--ui-font-size);
-  line-height: 1.3;
+  line-height: var(--ledger-transaction-line-height);
 }
-.ledger-transaction-flow [data-account-verdict] {
-  --transaction-endpoint-fill: var(--status-caution-accent);
-  --transaction-endpoint-ink: var(--status-accent-dark-ink);
-}
-.ledger-transaction-flow [data-account-verdict="abnormal"] {
-  --transaction-endpoint-fill: var(--status-danger-accent);
-  --transaction-endpoint-ink: var(--status-accent-light-ink);
-}
-.ledger-transaction-flow [data-account-verdict="normal"] { --transaction-endpoint-fill: var(--status-positive-accent) }
 .ledger-party {
   display: grid;
   align-content: center;
@@ -171,18 +116,13 @@
 }
 .ledger-transaction-details {
   display: grid;
-  grid-template-rows: 1fr 23px 1fr;
+  grid-template-rows: 1fr var(--transaction-arrow-height) 1fr;
   min-width: 0;
   justify-items: center;
   align-items: center;
   text-align: center;
   overflow-wrap: anywhere;
 }
-.ledger-transaction-arrow {
-  inline-size: 100%;
-  block-size: 100%;
-}
-.ledger-arrow-shaft { width: calc(100% - 18px) }
 .ledger-transaction-details :is(time, span) { padding-inline: var(--aml-space-4) }
 .ledger-transaction-details strong { font-weight: inherit }
 @container (max-width: 360px) {
@@ -196,14 +136,14 @@
 }
 .ledger-case-groups {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
-  gap: var(--workspace-gap);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--ledger-case-column-min-width)), 1fr));
+  gap: var(--workspace-panel-gap);
 }
 .ledger-case-groups > section { min-width: 0 }
 .ledger-case-groups h3 { margin: 0; font-size: var(--aml-type-body-strong-size); line-height: var(--aml-type-body-strong-lineHeight) }
 .ledger-case-groups .case-list {
-  padding: var(--record-card-shadow-gutter);
-  scrollbar-gutter: stable;
+  padding-block: var(--record-card-shadow-gutter);
+  scrollbar-gutter: auto;
 }
 .ledger-case-groups .card-header > .card-header-main,
 .ledger-case-groups .card-header .card-header-main > code {
@@ -219,9 +159,10 @@
   overflow-wrap: anywhere;
 }
 @media (min-width: 1121px) and (min-height: 481px) {
+  .screen-layout:has(> [data-investigation-component="ledger"] > .ledger-components) { padding-block-end: 0 }
   .ledger-components {
-    block-size: var(--workspace-available-block);
-    grid-template-rows: minmax(0, 1fr);
+    block-size: var(--workspace-full-block);
+    grid-template-rows: auto minmax(0, 1fr);
     align-items: stretch;
   }
   .ledger-pane, .ledger-scroll-shell, .ledger-components .animated-list,
@@ -235,44 +176,45 @@
     flex: 1;
     min-block-size: 0;
   }
-  .screen-layout:has(> [data-investigation-component="ledger"] > .ledger-tables) {
-    display: flex;
-    flex-direction: column;
-    block-size: calc(100dvh - var(--header-height));
-    padding-block-end: max(var(--workspace-inset), var(--app-footer-height, var(--account-footer-reserve)));
-  }
-  .screen-layout:has(> [data-investigation-component="ledger"] > .ledger-tables)
-    > [data-investigation-component="ledger"] {
-    display: grid;
-    flex: 1;
-    grid-template-rows: minmax(0, 1fr);
-    min-block-size: 0;
-  }
-  .ledger-tables { grid-template-rows: minmax(0, 1fr) auto }
   .ledger-hierarchy {
     display: flex;
     flex-direction: column;
     min-block-size: 0;
   }
-  .ledger-hierarchy :is(.data-table-frame, .data-table-content, .ledger-hierarchy-scroll) { flex: 1 }
+  .ledger-components :is(.animated-list__viewport, .case-list) {
+    padding-block-end: var(--workspace-footer-inset);
+  }
+  .ledger-transaction-list .record-card-scroll {
+    --record-card-scroll-start: var(--record-card-shadow-gutter);
+    --record-card-scroll-end: var(--record-card-shadow-gutter);
+  }
+  .ledger-case-groups .record-card-scroll {
+    --record-card-scroll-start: var(--record-card-shadow-gutter);
+    padding-inline-end: var(--record-card-shadow-gutter);
+  }
+  .ledger-case-groups { column-gap: var(--ledger-card-panel-gap) }
 }
 @media (max-width: 1120px) {
   .ledger-components {
-    grid-template-columns: minmax(110px, 16%) var(--ledger-relationship-gutter)
-      minmax(116px, 16%) var(--ledger-relationship-gutter) minmax(0, 1fr);
-    grid-template-areas: "owners . accounts . transactions" "related related related related related";
+    grid-template-columns: minmax(var(--ledger-owner-column-min-width), var(--ledger-medium-relationship-column-share))
+      var(--ledger-relationship-gutter)
+      minmax(var(--ledger-account-column-min-width), var(--ledger-medium-relationship-column-share))
+      var(--ledger-relationship-gutter) minmax(0, 1fr);
+    grid-template-areas: "search search search search search"
+      "owners . accounts . transactions" "related related related related related";
   }
 }
 @media (max-width: 650px) {
   .ledger-components {
     --ledger-relationship-gutter: var(--aml-space-16);
     grid-template-columns: minmax(0, 1fr) var(--ledger-relationship-gutter) minmax(0, 1fr);
-    grid-template-areas: "owners . accounts" "transactions transactions transactions" "related related related";
+    grid-template-areas: "search search search" "owners . accounts"
+      "transactions transactions transactions" "related related related";
   }
 }
 @media (max-width: 1120px), (max-height: 480px) {
   .screen-layout:has(> [data-investigation-component="ledger"]) {
-    padding-block-end: max(var(--workspace-inset), var(--app-footer-height, var(--account-footer-reserve)));
+    padding-block-end: max(var(--workspace-inset), var(--workspace-footer-inset));
   }
   .ledger-components { --ledger-list-limit: none }
   .ledger-components .animated-list__viewport,
@@ -282,7 +224,7 @@
     scrollbar-gutter: auto;
   }
   .ledger-components .animated-list__item {
-    scroll-margin-block: var(--header-height) var(--app-footer-height, var(--account-footer-reserve));
+    scroll-margin-block-start: var(--header-height);
   }
 }
 
@@ -297,13 +239,21 @@
   .screen-layout:has(> [data-investigation-component="ledger"] > [data-ledger-view="cards"]):not(:has(.screen-data-source))
     > .screen-query-area {
     place-self: start end;
-    z-index: 2;
+    z-index: var(--ledger-filter-layer);
   }
   [data-ledger-view="cards"] #ledger-related-title { padding-inline-end: var(--header-control-size) }
 }
 
-/* 원장 목록 검색·더 보기: 세 목록이 각자 20건씩 조회한다. 검색은 상단 작업 코드 검색과 같은 pill(.search-field). */
-.ledger-search { margin-block-start: var(--aml-space-8) }
+.ledger-search-bar {
+  grid-area: search;
+  display: flex;
+  align-items: center;
+  justify-self: start;
+  gap: var(--workspace-gap);
+  inline-size: min(100%, calc(2 * var(--table-ledger-filter-min-width)));
+}
+.ledger-search-bar .search-field { flex: 1; min-inline-size: 0 }
+.ledger-hierarchy > .ledger-search-bar { margin-block-end: var(--workspace-panel-gap) }
 .ledger-more {
   display: grid;
   gap: var(--aml-space-8);
@@ -312,14 +262,14 @@
 /* 대시보드 업무 레인의 더 보기와 같은 크기: 패널 폭을 채우는 pill. */
 .ledger-more > .button { inline-size: 100%; min-block-size: var(--aml-panel-control-size) }
 @media (pointer: coarse) {
-  .ledger-more > .button { min-block-size: max(44px, var(--aml-panel-control-size)) }
+  .ledger-more > .button { min-block-size: max(var(--ledger-more-touch-height), var(--aml-panel-control-size)) }
 }
 .ledger-status {
   margin-block: var(--aml-space-8) 0;
   color: var(--muted-text);
   font-size: var(--aml-type-caption-size);
 }
-.ledger-pane[aria-busy="true"] .animated-list { opacity: .5 }
+.ledger-pane[aria-busy="true"] .animated-list { opacity: var(--ledger-list-loading-opacity) }
 .ledger-linked-ids {
   display: flex;
   flex-wrap: wrap;
@@ -333,16 +283,7 @@
   border-radius: var(--aml-radius-full);
   background: var(--information-panel-surface);
 }
-.ledger-table-controls {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
-  gap: var(--aml-space-8) var(--workspace-gap);
-  margin-block-end: var(--workspace-gap);
-}
-.ledger-table-controls .ledger-search { margin-block-start: 0 }
-.ledger-hierarchy-scroll tr[data-ledger-more] > td { padding-block: var(--aml-space-4) }
-.ledger-hierarchy-scroll tr[data-ledger-more] .ledger-more { margin: 0 }
-/* 하단 공통 도구(계정·페이지)와 목록 끝 더 보기가 겹치지 않게 비워 둔다. */
-@media (min-width: 1121px) and (min-height: 481px) {
-  .ledger-components { padding-block-end: var(--aml-space-48) }
+.ledger-hierarchy .ledger-more { margin: 0 }
+@media (1120px < width < 1920px) and (min-height: 481px) {
+  :is(.ledger-owners, .ledger-accounts) > .ledger-more { margin-block-end: var(--workspace-footer-inset) }
 }

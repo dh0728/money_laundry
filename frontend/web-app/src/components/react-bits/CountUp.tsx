@@ -2,6 +2,8 @@
 
 import { animate, cubicBezier, useInView } from 'motion/react';
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { appReducedMotion } from '@/hooks/use-reduced-motion';
+import './count-up.css';
 
 type Easing = 'easeOut' | 'linear' | 'expo' | 'spring';
 
@@ -12,7 +14,6 @@ interface CountUpProps {
   delay?: number;
   duration?: number;
   className?: string;
-  style?: CSSProperties;
   startWhen?: boolean;
   separator?: string;
   prefix?: string;
@@ -53,30 +54,27 @@ type Live = {
   model: Roll | null;
   mode: 'count' | 'roll';
   easing: Easing;
-  duration: number;
+  duration?: number;
   delay: number;
 };
 
-const CELL = 1.2;
-const STAGGER = 0.07;
 const UNITS: [number, string][] = [
   [1e12, 'T'],
   [1e9, 'B'],
   [1e6, 'M'],
   [1e3, 'K']
 ];
-const SLOT_STYLE: CSSProperties = { display: 'inline-block', height: `${CELL}em`, lineHeight: `${CELL}em` };
-const SR_ONLY: CSSProperties = {
-  position: 'absolute',
-  width: 1,
-  height: 1,
-  padding: 0,
-  margin: -1,
-  overflow: 'hidden',
-  clip: 'rect(0, 0, 0, 0)',
-  whiteSpace: 'nowrap',
-  border: 0
-};
+function readFilterBounds() {
+  const styles = typeof document === 'undefined' ? null : getComputedStyle(document.documentElement);
+  const percent = (part: string, fallback: number) =>
+    styles?.getPropertyValue(`--count-up-blur-${part}`).trim() || `${fallback}%`;
+  return {
+    x: percent('x', -20),
+    y: percent('y', -50),
+    width: percent('width', 140),
+    height: percent('height', 200),
+  };
+}
 
 const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
@@ -195,9 +193,8 @@ export default function CountUp({
   from = 0,
   direction = 'up',
   delay = 0,
-  duration = 2,
+  duration,
   className = '',
-  style,
   startWhen = true,
   separator = '',
   prefix = '',
@@ -222,10 +219,11 @@ export default function CountUp({
   const startedRef = useRef(false);
   const runningRef = useRef(false);
   const [play, setPlay] = useState<Play | null>(null);
-  const isInView = useInView(ref, { once: true, margin: '0px' });
+  const isInView = useInView(ref, { once: true });
   const active = trigger === 'load' || isInView;
   const compact = format === 'compact';
   const places = decimals ?? Math.max(getDecimalPlaces(from), getDecimalPlaces(to));
+  const filterBounds = useMemo(() => mode === 'roll' ? readFilterBounds() : null, [mode]);
 
   const formatValue = useCallback(
     (latest: number) => {
@@ -255,7 +253,7 @@ export default function CountUp({
       model,
       mode,
       easing,
-      duration: Math.max(0, duration),
+      duration,
       delay
     };
   });
@@ -281,17 +279,22 @@ export default function CountUp({
 
   useEffect(() => {
     const live = latestRef.current;
-    if (!play || !live) return undefined;
+    if (!play || !live || !ref.current) return undefined;
     const ease = EASINGS[live.easing] || EASINGS.easeOut;
-    const total = live.duration;
+    const styles = getComputedStyle(ref.current);
+    const durationToken = styles.getPropertyValue('--count-up-duration').trim();
+    const durationSeconds = parseFloat(durationToken) / (durationToken.endsWith('ms') ? 1000 : 1);
+    const total = Math.max(0, live.duration ?? (Number.isFinite(durationSeconds) ? durationSeconds : 2));
     const progress = (t: number) => (total > 0 ? clamp01(t / total) : 1);
     let render: (t: number) => void;
 
-    if (live.mode === 'roll' && live.model && ref.current) {
+    if (live.mode === 'roll' && live.model) {
       const { columns: layout, slots } = live.model;
-      const fontSize = parseFloat(getComputedStyle(ref.current).fontSize) || 16;
-      const cell = CELL * fontSize;
-      const stagger = layout.length > 1 ? Math.min(STAGGER, (total * 0.4) / (layout.length - 1)) : 0;
+      const fontSize = parseFloat(styles.fontSize) || 16;
+      const cellEm = parseFloat(styles.getPropertyValue('--count-up-cell-height')) || 1.2;
+      const cell = cellEm * fontSize;
+      const step = parseFloat(styles.getPropertyValue('--count-up-stagger-seconds')) || 0.07;
+      const stagger = layout.length > 1 ? Math.min(step, (total * 0.4) / (layout.length - 1)) : 0;
       const span = Math.max(0.001, total - stagger * (layout.length - 1));
       const columns = layout.map(column => {
         const box = slotRefs.current[column.slot];
@@ -322,8 +325,13 @@ export default function CountUp({
 
       const fade = (node: HTMLSpanElement | null | undefined, width: number, presence: number, settled: boolean) => {
         if (!node) return;
-        node.style.width = settled ? '' : `${(presence * width).toFixed(2)}px`;
-        node.style.opacity = settled ? '' : presence.toFixed(3);
+        if (settled) {
+          node.style.removeProperty('--count-up-slot-width');
+          node.style.removeProperty('--count-up-slot-opacity');
+          return;
+        }
+        node.style.setProperty('--count-up-slot-width', `${(presence * width).toFixed(2)}px`);
+        node.style.setProperty('--count-up-slot-opacity', presence.toFixed(3));
       };
 
       render = (t: number) => {
@@ -338,7 +346,7 @@ export default function CountUp({
               if (node) node.nodeValue = String(mod10(base + offset - 1));
             });
           }
-          column.strip.style.transform = `translateY(${(-(1 + pos - base) * CELL).toFixed(4)}em)`;
+          column.strip.style.setProperty('--count-up-strip-offset', `${(-(1 + pos - base) * cellEm).toFixed(4)}em`);
 
           const u0 = Math.max(0, u - 0.004);
           const u1 = Math.min(1, u + 0.004);
@@ -349,9 +357,9 @@ export default function CountUp({
             column.sigma = sigma;
             if (sigma > 0.2 && column.blur) {
               column.blur.setAttribute('stdDeviation', `0 ${sigma.toFixed(2)}`);
-              column.strip.style.filter = `url(#${uid}-${index})`;
+              column.strip.style.setProperty('--count-up-strip-blur', `url(#${uid}-${index})`);
             } else {
-              column.strip.style.filter = '';
+              column.strip.style.removeProperty('--count-up-strip-blur');
             }
           }
 
@@ -393,7 +401,7 @@ export default function CountUp({
       latestRef.current?.onEnd?.();
     };
 
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    if (appReducedMotion()) {
       finish();
       return undefined;
     }
@@ -425,9 +433,8 @@ export default function CountUp({
 
   return (
     <span
-      className={className}
+      className={`count-up ${className}`}
       ref={ref}
-      style={{ fontVariantNumeric: 'tabular-nums', ...style }}
       onPointerEnter={replayOnHover ? replay : undefined}
     >
       {model ? (
@@ -435,66 +442,48 @@ export default function CountUp({
           <span
             key={`roll-${play?.id || 0}`}
             aria-hidden="true"
-            style={{ display: 'inline-flex', whiteSpace: 'pre', userSelect: 'none' }}
+            className="count-up-roll"
           >
-            {prefix && <span style={SLOT_STYLE}>{prefix}</span>}
+            {prefix && <span className="count-up-slot">{prefix}</span>}
             {model.slots.map((slot, index) => {
-              const hidden =
-                'char' in slot
-                  ? slot.enter || (slot.follow !== undefined && model.columns[slot.follow].enter)
-                  : slot.enter;
-              const collapsed = hidden ? { width: 0, opacity: 0 } : null;
-              if ('char' in slot) {
-                return (
-                  <span
-                    key={index}
-                    ref={node => {
-                      slotRefs.current[index] = node;
-                    }}
-                    style={{ ...SLOT_STYLE, overflow: 'hidden', ...collapsed }}
-                  >
-                    {slot.char}
-                  </span>
-                );
-              }
+              const isMark = 'char' in slot;
+              const hidden = slot.enter || (isMark && slot.follow !== undefined && model.columns[slot.follow].enter);
               return (
                 <span
                   key={index}
                   ref={node => {
                     slotRefs.current[index] = node;
                   }}
-                  style={{ ...SLOT_STYLE, position: 'relative', overflow: 'hidden', ...collapsed }}
+                  className={`count-up-slot count-up-overflow ${isMark ? '' : 'count-up-column'}`}
+                  style={hidden ? {
+                    '--count-up-slot-width': 'var(--aml-space-0)',
+                    '--count-up-slot-opacity': 'var(--count-up-hidden-opacity)',
+                  } as CSSProperties : undefined}
                 >
-                  <span
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      transform: `translateY(${-CELL}em)`
-                    }}
-                  >
-                    {[-1, 0, 1, 2].map(offset => (
-                      <span key={offset} style={{ height: `${CELL}em` }}>
-                        {mod10(slot.from + offset)}
-                      </span>
-                    ))}
-                  </span>
+                  {isMark ? slot.char : (
+                    <span className="count-up-strip">
+                      {[-1, 0, 1, 2].map(offset => (
+                        <span key={offset} className="count-up-digit">{mod10(slot.from + offset)}</span>
+                      ))}
+                    </span>
+                  )}
                 </span>
               );
             })}
-            {model.label && <span style={SLOT_STYLE}>{model.label}</span>}
-            {suffix && <span style={SLOT_STYLE}>{suffix}</span>}
+            {model.label && <span className="count-up-slot">{model.label}</span>}
+            {suffix && <span className="count-up-slot">{suffix}</span>}
           </span>
-          <span style={SR_ONLY}>{finalText}</span>
-          <svg aria-hidden="true" width="0" height="0" style={{ position: 'absolute' }}>
+          <span className="visually-hidden sr-only">{finalText}</span>
+          {filterBounds && <svg aria-hidden="true" width="0" height="0" className="count-up-blur">
             <defs>
               {model.columns.map(column => (
                 <filter
                   key={column.index}
                   id={`${uid}-${column.index}`}
-                  x="-20%"
-                  y="-50%"
-                  width="140%"
-                  height="200%"
+                  x={filterBounds.x}
+                  y={filterBounds.y}
+                  width={filterBounds.width}
+                  height={filterBounds.height}
                   colorInterpolationFilters="sRGB"
                 >
                   <feGaussianBlur
@@ -506,7 +495,7 @@ export default function CountUp({
                 </filter>
               ))}
             </defs>
-          </svg>
+          </svg>}
         </>
       ) : (
         <span key="count" ref={textRef}>

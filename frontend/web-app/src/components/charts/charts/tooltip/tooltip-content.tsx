@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { intFmt } from "../chart-formatters";
 
@@ -12,7 +12,7 @@ export interface TooltipRow {
 
 export interface TooltipContentProps {
   title?: string;
-  rows: TooltipRow[];
+  rows?: TooltipRow[];
   /** Optional additional content (e.g., markers) */
   children?: ReactNode;
 }
@@ -41,7 +41,7 @@ export function TooltipHeader({ children, className }: TooltipHeaderProps) {
 
 TooltipHeader.displayName = "TooltipHeader";
 
-export function TooltipContent({ title, rows, children }: TooltipContentProps) {
+export function TooltipContent({ title, rows = [], children }: TooltipContentProps) {
   const hasBody = rows.length > 0 || Boolean(children);
   return (
     <div>
@@ -57,8 +57,8 @@ export function TooltipContent({ title, rows, children }: TooltipContentProps) {
                 >
                   <div className="flex min-w-0 items-center gap-2">
                     <span
-                      className="size-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: row.color }}
+                      className="bklit-tooltip-series-dot size-2 shrink-0 rounded-full"
+                      style={{ "--chart-tooltip-series-color": row.color } as CSSProperties}
                     />
                     <span className="truncate text-chart-tooltip-muted text-sm">
                       {row.label}

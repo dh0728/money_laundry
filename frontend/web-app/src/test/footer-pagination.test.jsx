@@ -26,10 +26,13 @@ it('paginates the ledger table and loads more ledger cards without a footer', ()
   const paginationHost = document.createElement('div');
   const { container, rerender, unmount } = render(<BenchmarkLedger dataset={dataset} paginationHost={paginationHost} />);
   const footer = within(paginationHost);
-  const prev = footer.getByRole('button', { name: '이전' });
-  const next = footer.getByRole('button', { name: '다음' });
+  const first = footer.getByRole('button', { name: '처음으로 가기' });
+  const prev = footer.getByRole('button', { name: '이전으로 가기' });
+  const next = footer.getByRole('button', { name: '다음으로 가기' });
+  const last = footer.getByRole('button', { name: '마지막으로 가기' });
   const scrollRegion = container.querySelector('.data-table-scroll');
   expect(container.querySelector('.footer-pagination')).toBeNull();
+  expect(first.disabled).toBe(true);
   expect(prev.disabled).toBe(true);
   expect(footer.getByText('1 / 3 페이지')).toBeTruthy();
 
@@ -39,6 +42,15 @@ it('paginates the ledger table and loads more ledger cards without a footer', ()
   expect(scrollRegion.scrollTop).toBe(0);
   expect(screen.getByRole('button', { name: 'TEST-TRANSACTION-31 상세 열기' })).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'TEST-TRANSACTION-1 상세 열기' })).toBeNull();
+
+  fireEvent.click(last);
+  expect(footer.getByText('3 / 3 페이지')).toBeTruthy();
+  expect(next.disabled).toBe(true);
+  expect(last.disabled).toBe(true);
+  expect(screen.getByRole('button', { name: 'TEST-TRANSACTION-65 상세 열기' })).toBeTruthy();
+  fireEvent.click(first);
+  expect(footer.getByText('1 / 3 페이지')).toBeTruthy();
+  fireEvent.click(next);
 
   rerender(<BenchmarkLedger dataset={dataset} tableView={false} paginationHost={paginationHost} />);
   expect(footer.queryByRole('navigation')).toBeNull();

@@ -1,5 +1,7 @@
+import { Hourglass, TriangleAlert, UserRound, UserRoundCheck, X } from 'lucide-react';
 import React from 'react';
 import { modelRiskBand } from '../features/settings/model-risk-settings';
+import { cautionAgeDays, isOverdueCaseAge } from '../features/investigation/case-age';
 import { ActionButton } from './primary-button';
 import './semantic-tags.css';
 
@@ -8,14 +10,13 @@ const statusTones = {
   unread: 'danger',
   high: 'danger',
   riskHigh: 'danger',
-  elapsedOver1w: 'danger',
+  elapsedOverdue: 'danger',
   failed: 'danger',
   normal: 'positive',
   done: 'positive',
   low: 'positive',
   riskLow: 'positive',
   elapsed: 'caution',
-  elapsedUnder1w: 'caution',
   caution: 'caution',
   medium: 'caution',
   riskMedium: 'caution',
@@ -45,8 +46,15 @@ const strongReviewPresets = new Set(reviewStates.map(state => state.preset));
 
 export function StatusTag({ preset, className = '', emphasis = 'solid', children }) {
   const style = strongReviewPresets.has(preset) ? 'solid' : emphasis;
+  const Icon = className.includes('semantic-tag--human-verdict') ? UserRoundCheck
+    : preset?.startsWith('elapsed') ? Hourglass : preset?.startsWith('risk') ? TriangleAlert : undefined;
   return <span className={`semantic-tag ${className}`.trim()} data-tag="status" data-emphasis={style} data-preset={preset}
-    data-tone={statusTones[preset] ?? 'neutral'}>{children}</span>;
+    data-tone={statusTones[preset] ?? 'neutral'}>{Icon && <Icon className="semantic-tag-icon" aria-hidden="true" />}{children}</span>;
+}
+
+export function CaseAgeTag({ days }) {
+  if (!(days >= cautionAgeDays)) return null;
+  return <StatusTag preset={isOverdueCaseAge(days) ? 'elapsedOverdue' : 'elapsed'}>{days}일 경과</StatusTag>;
 }
 
 const countFormat = new Intl.NumberFormat('ko-KR');
@@ -85,7 +93,7 @@ export function PatternTag({ emphasis = 'solid', children }) {
 
 export function ModelScoreTag({ score, band = modelRiskBand(score) }) {
   return <span className="semantic-tag" data-tag="model-score" data-tone={statusTones[band]} data-emphasis="solid">
-    <span>모델</span><span>{score}점</span>
+    <TriangleAlert className="semantic-tag-icon" aria-hidden="true" /><span>모델</span><span>{score}점</span>
   </span>;
 }
 
@@ -98,7 +106,7 @@ export function LinkTag({ code, href, children, className = '', ...props }) {
 }
 
 export function CaseActorTag({ children }) {
-  return <span className="semantic-tag" data-tag="case-actor">{children}</span>;
+  return <span className="semantic-tag" data-tag="case-actor"><UserRound className="semantic-tag-icon" aria-hidden="true" />{children}</span>;
 }
 
 const reviewState = status => reviewStates.find(state => state.value === status);
@@ -115,6 +123,6 @@ export function FilterTag({ children, onEdit, onRemove, autoFocus, popupId }) {
         aria-label={`${children} 수정`} aria-haspopup={popupId ? 'dialog' : undefined} aria-controls={popupId}>{children}</ActionButton>
       : <span className="filter-tag-label">{children}</span>}
     <ActionButton className="filter-tag-remove" onClick={onRemove} autoFocus={!onEdit && autoFocus}
-      aria-label={`${children} 조건 제거`} />
+      aria-label={`${children} 조건 제거`}><X className="semantic-tag-icon" aria-hidden="true" /></ActionButton>
   </span>;
 }

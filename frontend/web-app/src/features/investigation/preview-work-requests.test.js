@@ -34,8 +34,8 @@ test('종결 판정은 관리자 승인 시에만 재검토로 열리고 이전 
 test('업무 재배정은 새 담당자에게 즉시 적용되고 받은 담당자만 처리 결과를 보낸다', () => {
   expect(sendPreviewWorkRequest({ actor: previewAdmin, cases, typeKey: 'assign',
     code: open.code, recipient: alternatePreviewStaff.username, reason: '담당 변경' }).ok).toBe(true);
-  expect(previewWorkRequestEffects().get(open.code)).toEqual({ assignee: alternatePreviewStaff.username });
   const [item] = previewWorkRequests(alternatePreviewStaff);
+  expect(previewWorkRequestEffects().get(open.code)).toEqual({ assignee: alternatePreviewStaff.username, assignedAt: item.appliedAt });
   expect(previewWorkRequests(previewStaff)[0]).toMatchObject({ id: item.id,
     unreadFor: [alternatePreviewStaff.username, previewStaff.username] });
   expect(resolvePreviewWorkRequest({ actor: previewStaff, cases, id: item.id,

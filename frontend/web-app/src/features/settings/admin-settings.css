@@ -6,10 +6,13 @@
   border-block-start: var(--aml-stroke-divider) solid var(--glass-edge);
 }
 
-.admin-model-settings { padding-block: var(--aml-space-4); }
+.admin-model-risk-layout { align-items: center }
+.admin-model-risk-labels { padding-inline-start: var(--aml-space-8) }
+.model-risk-result:empty { position: absolute; }
+.admin-model-settings > .accent-action > .hold-button { inline-size: 100% }
 .model-risk-dial {
   position: relative;
-  inline-size: min(100%, 15rem);
+  inline-size: min(100%, var(--model-risk-settings-dial-max-width));
   aspect-ratio: 1;
   margin-inline: auto;
 }
@@ -22,13 +25,16 @@
 }
 .model-graph-sphere {
   position: absolute;
-  inline-size: 64%;
-  block-size: 64%;
-  inset: 18%;
+  inline-size: var(--model-risk-sphere-size);
+  block-size: var(--model-risk-sphere-size);
+  inset: var(--model-risk-sphere-inset);
 }
+.model-graph-sphere-color { color: var(--model-risk-sphere-color, inherit) }
 
 .model-risk-slider-thumb {
   position: absolute;
+  left: var(--model-risk-thumb-x);
+  top: var(--model-risk-thumb-y);
   display: block;
   inline-size: var(--aml-space-20);
   block-size: var(--aml-space-20);
@@ -40,15 +46,8 @@
   touch-action: none;
 }
 .model-risk-slider-thumb:active { cursor: grabbing; }
-.model-risk-slider-thumb:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.model-risk-slider-thumb:focus-visible { outline: var(--aml-stroke-focus) solid var(--focus-ring); outline-offset: var(--aml-space-2); }
 .model-risk-slider-thumb[aria-disabled="true"] { cursor: default; }
-.model-risk-legend {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--aml-space-8);
-}
 .model-risk-legend { list-style: none; margin: 0; padding: 0; font-size: var(--aml-type-caption-size); }
 .model-risk-legend li::before {
   content: '';
@@ -62,4 +61,3 @@
 .model-risk-legend [data-band="low"] { --band-color: var(--risk-low); }
 .model-risk-legend [data-band="medium"] { --band-color: var(--risk-medium); }
 .model-risk-legend [data-band="high"] { --band-color: var(--risk-high); }
-.model-graph-note { font-size: var(--aml-type-caption-size); }

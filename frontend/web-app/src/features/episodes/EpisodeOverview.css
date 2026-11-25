@@ -1,0 +1,10 @@
+.episode-interval-fill {
+  left: var(--episode-interval-start);
+  width: max(var(--aml-space-4), calc(var(--episode-interval-end) - var(--episode-interval-start)));
+  background-color: var(--episode-timeline-span-accent);
+}
+
+.episode-decision-fill {
+  width: var(--episode-decision-share);
+  background-color: var(--status-positive-accent);
+}

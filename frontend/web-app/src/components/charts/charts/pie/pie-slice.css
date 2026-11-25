@@ -1,0 +1,10 @@
+.pie-slice {
+  --pie-slice-glow-radius: var(--aml-space-12);
+  cursor: pointer;
+}
+
+.pie-slice-visual { filter: none }
+
+.pie-slice[data-pie-slice-glow] > .pie-slice-visual {
+  filter: drop-shadow(0 0 var(--pie-slice-glow-radius) var(--pie-slice-glow-color));
+}

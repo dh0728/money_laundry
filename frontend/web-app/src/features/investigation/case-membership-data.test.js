@@ -50,7 +50,7 @@ it('moves existing evidence once and recalculates both Alerts and Episode links'
     const overlap = after.cases.filter(row => row.kind === 'Alert' &&
       transactionCodes(row).some(code => transactionCodes(episode).includes(code)));
     expect(episode.overlappingAlerts).toEqual(overlap);
-    expect(episode.linkedAlerts).toBe(overlap.length);
+    expect(episode.linkedAlerts).toBe(episode.linkedAlertCodes.length);
   }
   expect(editPreviewAlertTransactions(request).ok).toBe(false);
   expect(fixture()).toEqual(after);

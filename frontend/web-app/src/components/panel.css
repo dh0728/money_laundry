@@ -1,14 +1,13 @@
-.panel-inset {
-  --panel-material-solid: light-dark(var(--information-panel-surface), var(--aml-gray-020));
-  --panel-material-depth: 0 0 0 transparent;
+.panel-disclosure {
+  --panel-disclosure-radius: var(--aml-radius-card);
+  --panel-disclosure-inline-inset: var(--aml-panel-text-inset);
   min-inline-size: 0;
-  border-radius: var(--aml-radius-card);
+  border-radius: var(--panel-disclosure-radius);
 }
 
-:root:not([data-glassmorphism="false"]) .panel-inset {
-  --panel-material-depth:
-    inset 0 var(--aml-stroke-control) var(--aml-space-4) var(--glass-shell-highlight),
-    inset 0 0 var(--aml-space-12) light-dark(var(--aml-white-060), var(--aml-white-010));
+.panel-disclosure[data-disclosure-inset="control"] {
+  --panel-disclosure-inline-inset: var(--aml-space-8);
+  --panel-disclosure-radius: calc(var(--account-control-size) / 2 + var(--panel-disclosure-inline-inset));
 }
 
 .panel-disclosure-trigger {
@@ -18,7 +17,7 @@
   gap: var(--workspace-gap);
   min-block-size: var(--account-control-size);
   padding: var(--aml-space-8) var(--aml-panel-text-inset);
-  border-radius: inherit;
+  border-radius: var(--panel-disclosure-radius);
   list-style: none;
   cursor: pointer;
   font-weight: var(--aml-type-body-strong-weight);
@@ -35,5 +34,5 @@
   .panel-disclosure-trigger:hover { background-color: var(--hover) }
 }
 
-.panel-disclosure[open] > .panel-disclosure-trigger > .icon { rotate: 180deg }
-.panel-disclosure-body { padding: 0 var(--aml-panel-text-inset) var(--aml-space-8) }
+.panel-disclosure[open] > .panel-disclosure-trigger > .icon { rotate: var(--disclosure-open-angle) }
+.panel-disclosure-body { padding: 0 var(--panel-disclosure-inline-inset) var(--aml-space-8) }

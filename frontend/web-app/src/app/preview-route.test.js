@@ -20,3 +20,14 @@ it('keeps historical benchmark codes out of investigation and accepts them in th
   expect(route.code).toBe(code);
   expect(previewUrl(route, source.searchParams)).toBe(source.pathname + source.search);
 });
+
+it('opens and restores real transaction codes outside the sample dates in service mode', () => {
+  const code = 'T-230908-00000021';
+  const direct = new URL(`http://localhost/transactions/${code}`);
+  const ledger = new URL(`http://localhost/investigate/ledger?transaction=${code}`);
+  const route = readPreviewRoute(direct, { serviceMode: true });
+  expect(route.code).toBe(code);
+  expect(readPreviewRoute(ledger, { serviceMode: true })).toEqual(route);
+  expect(previewUrl({ ...route, serviceMode: true })).toBe(ledger.pathname + ledger.search);
+  expect(readPreviewRoute(ledger).code).toBe('');
+});

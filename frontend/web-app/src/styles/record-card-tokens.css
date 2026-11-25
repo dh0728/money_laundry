@@ -1,0 +1,16 @@
+:root {
+  --record-card-depth-accent-strength: 88%;
+  --record-card-shadow-strength: 20%;
+  --record-card-inner-shadow-strength: 28%;
+  --record-card-solid-shadow-strength: 26%;
+  --record-card-hover-strength: 22%;
+  --record-card-press-strength: 34%;
+  --record-card-selection-hover-strength: 48%;
+  --record-card-selection-press-strength: 66%;
+  --record-card-unjudged-light-shade: 34%;
+  --record-card-unjudged-dark-tint: 52%;
+  --record-card-spotlight-layer: 1;
+  --record-card-tilt-perspective: 900px;
+  --record-card-tilt-idle-angle: 0deg;
+  --record-card-tilt-idle-scale: 1;
+}

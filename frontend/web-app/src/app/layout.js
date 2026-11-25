@@ -1,4 +1,4 @@
-import { isRuleId } from '@/next/features/rules-logic';
+import { isRuleId } from '@/features/rules/rules-logic';
 import { createElement } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
@@ -11,8 +11,9 @@ import { bindCardGlow } from '../components/card-glow.js';
 import { ConfirmHoldButton, PrimaryButton } from '../components/primary-button.jsx';
 import { DialogClose, DialogFooter, DialogHeader } from '../components/dialog-parts.jsx';
 import { SearchField } from '../components/search-field.jsx';
-import { downloadCsv, inDateRange, QueryRadio, QueryToolbar, setupQueryControls } from '../components/query-controls.jsx';
+import { downloadCsv, inDateRange, PageDownloadControl, QueryRadio, QueryToolbar, setupQueryControls } from '../components/query-controls.jsx';
 import { dashboardFixtureBoardPage, dashboardFixtureResponse, dashboardFixtures, dashboardPeriodEnd, dashboardRecordCodes } from '../mocks/dashboard-fixtures.js';
+import { personalWorkHistory } from '../features/dashboard/personal-work-history.js';
 import { liveCodes, liveSource, liveSourceLoaded, loadLiveSource, rebuildLiveSource, resetLiveSource } from '../features/investigation/live-data.js';
 import { changeLiveEpisode, editLiveTransactions, markLiveRead, saveLiveJudgment, startLiveReview } from '../features/investigation/live-actions.js';
 import { liveWorkRequests, liveWorkRequestsReady, loadLiveWorkRequests, readLiveWorkRequests, resetLiveWorkRequests, resolveLiveWorkRequest,
@@ -30,8 +31,10 @@ import { markPreviewCaseRead, resetPreviewCaseRead } from '../features/investiga
 import { mountTransactionEvidenceTable } from '../features/investigation/preview-case-table.jsx';
 import { mountWorkflows, mountWorkflowNotifications } from '../pages/workflow-components.jsx';
 import { renderScreenNav, refreshScreenNav } from './screen-navigation.jsx';
-import { ScreenLayout, ScreenNavigation, sections } from './screen-layouts.js';
-import { BrandSymbol, Button, Divider, GlassDialog, Icon, IconButton, ScrollArea, Sidebar, Tooltip, bindTooltip, hideTooltip } from '../components/components.js';
+import { caseRoute, frameLabel, screenFrame, ScreenLayout, ScreenNavigation, sections } from './screen-layouts.js';
+import { BoxHTML, BrandSymbol, Button, DecorativeCanvasHTML, Divider, GlassDialog, HeadingHTML, HTMLFragment, HTMLNode,
+  Icon, IconButton, InputHTML, ProfileAvatarHTML, ScrollArea, Sidebar, TextHTML, Tooltip, bindTooltip, hideTooltip } from '../components/components.js';
+import { Text } from '../components/layout-primitives.jsx';
 import { setupGlassMaterial } from '../components/glass-material.js';
 import { mountLoginScene } from '../features/auth/preview-login-scene.js';
 import { uiSizeOptions } from '../config/appearance-options.js';
@@ -41,6 +44,7 @@ import { mountNotificationPreference, receivesSampleNotifications } from '../fea
 import { loadLiveModelRiskThresholds } from '../features/settings/model-risk-settings.js';
 import { restoreWorkTabCodes, setWorkTabCodes } from './work-tab-state.js';
 import { benchmarkLedgerPath, dashboardRoute, initialDetail, isBenchmarkTransactionCode, isLedgerScreen, ledgerTableScreen, loginRoute, previewUrl, readPreviewRoute, validWorkCode } from './preview-route.js';
+import { appMotionPreference, appReducedMotion, systemReducedMotion } from '@/hooks/use-reduced-motion';
 
 const tabGroups = [
   { name: 'Transactions', prefix: 'T', digits: 8 },
@@ -48,15 +52,16 @@ const tabGroups = [
   { name: 'Episode', prefix: 'E', digits: 6 },
 ];
 const serviceMode = import.meta.env.VITE_API_MODE === 'live';
+const localBenchmark = import.meta.env.DEV && !serviceMode;
 const pendingEntry = location.pathname === '/login' ? history.state?.previewNext : undefined;
 const entryPath = typeof pendingEntry === 'string' && pendingEntry.startsWith('/')
   ? new URL(pendingEntry, location.origin).pathname : location.pathname;
-const benchmarkLedgerRoute = !serviceMode && entryPath.replace(/\/$/, '') === benchmarkLedgerPath;
+const benchmarkLedgerRoute = localBenchmark && entryPath.replace(/\/$/, '') === benchmarkLedgerPath;
 function readDataMode() {
   if (serviceMode) return;
   if (benchmarkLedgerRoute) return 'ibm';
   const requested = new URLSearchParams(location.search).get('data');
-  return requested === 'sample' || requested === 'ibm' ? requested : undefined;
+  return requested === 'sample' || (localBenchmark && requested === 'ibm') ? requested : undefined;
 }
 
 const dataMode = readDataMode();
@@ -71,7 +76,7 @@ try {
 }
 const defaultTabs = tabGroups.flatMap(group => tabCodes(group).slice(0, 2));
 const initialWorkTabs = restoreWorkTabCodes(storedWorkTabs, defaultTabs, tabGroups.flatMap(tabCodes))
-  .filter(code => benchmarkLedgerRoute || !isBenchmarkTransactionCode(code));
+  .filter(code => serviceMode || benchmarkLedgerRoute || !isBenchmarkTransactionCode(code));
 let benchmarkDataset;
 let benchmarkSummaryLoading;
 let benchmarkLoading;
@@ -105,48 +110,46 @@ const dateFormat = new Intl.DateTimeFormat('ko-KR', {
 });
 
 function DrawerChromeRow(className, primary, accessory, attributes = '') {
-  return `<div class="drawer-chrome ${className}" ${attributes}>
-    <div class="drawer-chrome__primary">${primary}</div>
-    <div class="drawer-chrome__accessory">${accessory}</div>
-  </div>`;
+  return BoxHTML(
+    BoxHTML(primary, 'class="drawer-chrome__primary"') +
+    BoxHTML(accessory, 'class="drawer-chrome__accessory"'),
+    `class="drawer-chrome ${className}" ${attributes}`,
+  );
 }
 
 function Header() {
-  return `<header class="app-header" aria-label="헤더">
-    <div class="header-frame header-frame--left">
-      ${DrawerChromeRow('brand-header sidebar-chrome',
-        IconButton(BrandSymbol('idle-icon') + Icon('left', 'alternate-icon') + '<span class="brand">AML RADAR</span>', '사이드바 열기',
-          'id="sidebar-toggle" aria-expanded="false" aria-controls="sidebar" data-drawer-button', 'brand-pill', 'floating', 'pill'),
-        IconButton(Icon('search'), '검색',
-          'id="search-toggle" aria-haspopup="dialog" aria-controls="search-dialog" data-drawer-button', '', 'floating'),
-        'data-drawer-controls')}
-    </div>
-    <div class="header-frame header-frame--center">
-      <div class="contextual-header">
-        <div id="screen-navigation" class="header-frame screen-navigation" hidden></div>
-      </div>
-    </div>
-    <div class="header-frame header-frame--right header-right">
-      <div class="header-view-controls" role="group" aria-label="화면 보기">
-        ${IconButton(Icon('fullscreen'), '전체화면 보기', 'id="fullscreen-toggle" aria-pressed="false"')}
-        ${IconButton(Icon('wide'), '넓게 보기', 'id="workspace-width-toggle" aria-pressed="false"')}
-      </div>
-      ${DrawerChromeRow('inbox-header',
-        IconButton(Icon('check'), '현재 페이지 모두 읽음', 'id="mark-all-read"', '', '') +
-          SquishSwitch('unread-only', '읽지 않은 항목만 표시'),
-        IconButton(Icon('archive', 'idle-icon') + Icon('right', 'alternate-icon') +
-          '<span id="inbox-count" class="inbox-count unread-dot"></span>', '보관함 열기',
-          'id="inbox-toggle" aria-expanded="false" aria-controls="inbox" aria-describedby="inbox-count" data-drawer-button', 'inbox-pill', 'floating'),
-        'data-drawer-controls')}
-    </div>
-  </header>`;
+  const brand = BoxHTML(DrawerChromeRow('brand-header sidebar-chrome',
+    IconButton(BrandSymbol('idle-icon') + Icon('left', 'alternate-icon') + TextHTML('AML RADAR', 'class="brand"'),
+      '사이드바 열기', 'id="sidebar-toggle" aria-expanded="false" aria-controls="sidebar" data-drawer-button', 'brand-pill', 'floating', 'pill'),
+    IconButton(Icon('search'), '검색',
+      'id="search-toggle" aria-haspopup="dialog" aria-controls="search-dialog" data-drawer-button', '', 'floating'),
+    'data-drawer-controls'), 'class="header-frame header-frame--left"');
+  const navigation = BoxHTML(BoxHTML(
+    BoxHTML('', 'id="screen-navigation" class="header-frame screen-navigation" hidden') + PageDownloadControl(),
+    'class="contextual-header"',
+  ), 'class="header-frame header-frame--center"');
+  const viewControls = BoxHTML(
+    IconButton(Icon('fullscreen'), '전체화면 보기', 'id="fullscreen-toggle" aria-pressed="false"') +
+    IconButton(Icon('wide'), '넓게 보기', 'id="workspace-width-toggle" aria-pressed="false"'),
+    'class="header-view-controls" role="group" aria-label="화면 보기"',
+  );
+  const inbox = DrawerChromeRow('inbox-header',
+    IconButton(Icon('check'), '현재 페이지 모두 읽음', 'id="mark-all-read"', '', '') +
+      SquishSwitch('unread-only', '읽지 않은 항목만 표시'),
+    IconButton(Icon('archive', 'idle-icon') + Icon('right', 'alternate-icon') +
+      TextHTML('', 'id="inbox-count" class="inbox-count unread-dot"'), '보관함 열기',
+      'id="inbox-toggle" aria-expanded="false" aria-controls="inbox" aria-describedby="inbox-count" data-drawer-button', 'inbox-pill', 'floating'),
+    'data-drawer-controls');
+  const controls = BoxHTML(viewControls + inbox, 'class="header-frame header-frame--right header-right"');
+  return BoxHTML(brand + navigation + controls, 'class="app-header" aria-label="헤더"', 'header');
 }
 
 function WorkTab(code) {
-  return `<div class="work-tab">
-    ${Button(`<code>${code}</code>`, { variant: 'work-tab-open', attributes: `data-work-code="${code}"` })}
-    ${IconButton(Icon('close', 'icon-compact'), `${code} 닫기`, 'data-close-tab', '', '')}
-  </div>`;
+  return BoxHTML(
+    Button(TextHTML(code, '', 'code'), { variant: 'work-tab-open', attributes: `data-work-code="${code}"` }) +
+    IconButton(Icon('close', 'icon-compact'), `${code} 닫기`, 'data-close-tab', '', ''),
+    'class="work-tab"',
+  );
 }
 
 // 서비스 모드는 서버에서 받은 사건을, 프리뷰는 샘플을 화면 데이터로 쓴다.
@@ -162,59 +165,57 @@ function TabGroup(group) {
   const { name, prefix } = group;
   const tabs = initialWorkTabs.filter(code => code.startsWith(`${prefix}-`)).map(WorkTab);
   const id = `group-${prefix}`;
-  return `<section>
-    <div class="group-row">
-      ${Button(`${Icon('chevron', 'icon-compact')}${name}`, {
-        variant: 'group-toggle', attributes: `aria-expanded="true" aria-controls="${id}"`,
-      })}
-      ${IconButton(Icon('add', 'icon-compact'), `조사 · ${name} 목록 열기`, `data-investigation="${prefix}"`, '', '')}
-    </div>
-    <div id="${id}" class="group-content">${tabs.join('')}</div>
-  </section>`;
+  const header = BoxHTML(
+    Button(Icon('chevron', 'icon-compact') + name, {
+      variant: 'group-toggle', attributes: `aria-expanded="true" aria-controls="${id}"`,
+    }) +
+    IconButton(Icon('add', 'icon-compact'), `조사 · ${name} 목록 열기`, `data-investigation="${prefix}"`, '', ''),
+    'class="group-row"',
+  );
+  return BoxHTML(header + BoxHTML(tabs.join(''), `id="${id}" class="group-content"`), '', 'section');
 }
 
 function AccountControls() {
-  const account = `<img class="avatar" data-profile-image src="${avatarUrl}" alt="" width="32" height="32">
-    <span id="profile-context" class="account-text"><span id="profile-display-name" data-preview-user-name>${profileName}</span><span aria-hidden="true">·</span><span data-preview-user-role>${profileRole}</span></span>`;
-  return `<div class="account-footer">${Divider()}
-    ${DrawerChromeRow('account-controls sidebar-chrome',
-      Button(account, { variant: 'account', surface: 'floating', shape: 'pill', attributes: 'id="account-toggle" aria-label="계정" aria-describedby="profile-context" aria-haspopup="dialog" aria-controls="account-dialog"' }),
-      IconButton(Icon('settings'), '설정', 'id="settings-toggle" aria-haspopup="dialog" aria-controls="settings-dialog"', '', 'floating'))}
-  </div>`;
+  const context = TextHTML(
+    TextHTML(profileName, 'id="profile-display-name" data-preview-user-name') +
+    TextHTML('·', 'aria-hidden="true"') +
+    TextHTML(profileRole, 'data-preview-user-role'),
+    'id="profile-context" class="account-text"',
+  );
+  const account = ProfileAvatarHTML(avatarUrl, '') + '\n    ' + context;
+  return BoxHTML(DrawerChromeRow('account-controls sidebar-chrome',
+    Button(account, { variant: 'account', surface: 'floating', shape: 'pill', attributes: 'id="account-toggle" aria-label="계정" aria-describedby="profile-context" aria-haspopup="dialog" aria-controls="account-dialog"' }),
+    IconButton(Icon('settings'), '설정', 'id="settings-toggle" aria-haspopup="dialog" aria-controls="settings-dialog"', '', 'floating')),
+  'class="account-footer"');
 }
 
 function Footer() {
-  return `<footer class="app-footer" aria-label="공통 하단 도구">
-    ${AccountControls()}
-    <div id="workflow-notifications"></div>
-    <div id="footer-pagination"></div>
-    <div id="footer-actions"></div>
-  </footer>`;
+  return BoxHTML(AccountControls() +
+    BoxHTML('', 'id="workflow-notifications"') +
+    BoxHTML('', 'id="footer-pagination"') +
+    BoxHTML('', 'id="footer-actions"'),
+  'class="app-footer" aria-label="공통 하단 도구"', 'footer');
 }
 
 function NavigationSidebar() {
-  const workTabs = ScrollArea(`<nav class="work-tabs" aria-label="작업 탭">${tabGroups.map(TabGroup).join('')}</nav>`);
+  const workTabs = ScrollArea(BoxHTML(tabGroups.map(TabGroup).join(''), 'class="work-tabs" aria-label="작업 탭"', 'nav'));
   return Sidebar(Divider() + workTabs, 'id="sidebar" aria-label="사이드바" hidden inert');
 }
 
 function Notification() {
   let item;
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'button notification';
-  button.setAttribute('aria-haspopup', 'dialog');
-  const heading = document.createElement('strong');
-  heading.className = 'notification-title';
-  const marker = document.createElement('span');
-  marker.className = 'notification-marker';
-  marker.setAttribute('aria-hidden', 'true');
+  const headingHTML = TextHTML(
+    TextHTML('', 'class="notification-marker" aria-hidden="true"') +
+    TextHTML('읽지 않음', 'class="visually-hidden"'),
+    'class="notification-title"', 'strong',
+  );
+  const button = HTMLNode(Button(headingHTML + TextHTML('', '', 'time'), {
+    variant: 'notification', attributes: 'aria-haspopup="dialog"',
+  }));
+  const [heading, timestamp] = button.children;
+  const [marker, status] = heading.children;
   const title = document.createTextNode('');
-  const status = document.createElement('span');
-  status.className = 'visually-hidden';
-  status.textContent = '읽지 않음';
-  heading.append(marker, title, status);
-  const timestamp = document.createElement('time');
-  button.append(heading, timestamp);
+  heading.insertBefore(title, status);
   button.addEventListener('click', () => openNotification(item));
   return {
     button,
@@ -235,115 +236,120 @@ function Notification() {
 }
 
 function Inbox() {
-  return Sidebar(Divider() + ScrollArea('', 'id="notifications"') +
-    '<div class="inbox-pages" id="inbox-pages" hidden>' +
+  const pagination = BoxHTML(
     Button('이전', { attributes: 'id="inbox-previous"' }) +
-    '<span id="inbox-page-status" aria-live="polite"></span>' +
-    Button('다음', { attributes: 'id="inbox-next"' }) + '</div>' +
-    '<footer class="inbox-request-footer" id="inbox-request-footer"></footer>',
-    'id="inbox" aria-label="보관함" hidden inert');
+    TextHTML('', 'id="inbox-page-status" aria-live="polite"') +
+    Button('다음', { attributes: 'id="inbox-next"' }),
+    'class="inbox-pages" id="inbox-pages" hidden',
+  );
+  return Sidebar(Divider() + ScrollArea('', 'id="notifications"') + pagination +
+    BoxHTML('', 'class="inbox-request-footer" id="inbox-request-footer"', 'footer'),
+  'id="inbox" aria-label="보관함" hidden inert');
 }
 
 function SearchDialog() {
-  return GlassDialog(`
-    <div class="search-heading" id="search-field-host"></div>
-    <p id="search-status" class="visually-hidden" role="status"></p>
-    ${ScrollArea('', 'id="search-results"')}
-  `, { id: 'search-dialog', variant: 'search-dialog', attributes: 'aria-label="검색"' });
+  return GlassDialog(
+    BoxHTML('', 'class="search-heading" id="search-field-host"') +
+    TextHTML('', 'id="search-status" class="visually-hidden" role="status"', 'p') +
+    ScrollArea('', 'id="search-results"'),
+    { id: 'search-dialog', variant: 'search-dialog', attributes: 'aria-label="검색"' },
+  );
 }
 
 function PreferenceDialog(id, title, content, { wrapContent = true, footer = '' } = {}) {
-  return GlassDialog(`
-    <div class="dialog-part-host" data-dialog-heading="${id}" data-dialog-title="${title}"></div>
-    ${wrapContent ? `<div class="settings-content scroll-area">${content}</div>` : content}
-    ${footer}
-  `, { id: `${id}-dialog`, variant: 'settings-dialog', attributes: `aria-labelledby="${id}-title"` });
+  return GlassDialog(
+    BoxHTML('', `class="dialog-part-host" data-dialog-heading="${id}" data-dialog-title="${title}"`) +
+    (wrapContent ? BoxHTML(content, 'class="settings-content scroll-area"') : content) +
+    footer,
+    { id: `${id}-dialog`, variant: 'settings-dialog', attributes: `aria-labelledby="${id}-title"` },
+  );
+}
+
+function PreferenceSection(titleId, title, content) {
+  return BoxHTML(HeadingHTML(title, `id="${titleId}"`, 3) + content, `aria-labelledby="${titleId}"`, 'section');
 }
 
 function SettingsDialog() {
-  const row = (id, label) => `<div class="settings-row"><label for="${id}">${label}</label>${SquishSwitch(id, label)}</div>`;
-  return PreferenceDialog('settings', '설정', `
-      <section aria-labelledby="appearance-title">
-        <h3 id="appearance-title">화면 및 접근성</h3>
-        <div class="settings-row">
-          <span>화면 모드</span>
-          <div id="theme-setting"></div>
-        </div>
-        ${row('reduce-motion', '모션 줄이기')}
-        ${row('glass-mode', '리퀴드 글래스')}
-        <div class="settings-row">
-          <span>UI 크기</span>
-          <div id="ui-size-setting"></div>
-        </div>
-      </section>
-      <section aria-labelledby="notification-preferences-title">
-        <h3 id="notification-preferences-title">알림</h3>
-        <div class="settings-row">
-          <span>보관함 알림</span>
-          <div id="notification-preference"></div>
-        </div>
-      </section>
-      <div id="admin-settings-content"></div>
-  `);
+  const row = (label, control) => BoxHTML(label + control, 'class="settings-row"');
+  const switchRow = (id, label) => row(TextHTML(label, `for="${id}"`, 'label'), SquishSwitch(id, label));
+  return PreferenceDialog('settings', '설정',
+    PreferenceSection('appearance-title', '화면 및 접근성',
+      row(TextHTML('화면 모드'), BoxHTML('', 'id="theme-setting"')) +
+      switchRow('reduce-motion', '모션 줄이기') +
+      switchRow('glass-mode', '리퀴드 글래스') +
+      row(TextHTML('UI 크기'), BoxHTML('', 'id="ui-size-setting"'))) +
+    PreferenceSection('notification-preferences-title', '알림',
+      row(TextHTML('보관함 알림'), BoxHTML('', 'id="notification-preference"'))) +
+    BoxHTML('', 'id="admin-settings-content"'),
+  );
 }
 
 function AccountDialog() {
-  return PreferenceDialog('account', '계정', `
-    <section aria-labelledby="profile-title">
-      <h3 id="profile-title">계정 정보</h3>
-      <div class="settings-row profile-image-row">
-        <img class="avatar" data-profile-image src="${avatarUrl}" alt="프로필 이미지" width="32" height="32">
-        <input id="profile-picture" class="visually-hidden" type="file" tabindex="-1" accept="image/png,image/jpeg,image/webp">
-        ${Button('사진 변경', { variant: 'row', shape: 'pill', surface: 'floating', attributes: 'id="profile-picture-change"' })}
-      </div>
-      <div class="settings-row"><span>이름</span><strong data-preview-user-name>${profileName}</strong></div>
-      <div class="settings-row"><span>역할</span><strong data-preview-user-role>${profileRole}</strong></div>
-      <p id="profile-status" role="status"></p>
-    </section>
-    <section aria-labelledby="permissions-title">
-      <h3 id="permissions-title">상세 권한</h3>
-      <ul class="profile-list">
-        <li>거래, Alert, Episode 및 판정 보고서 열람</li>
-        <li>내 담당 미판정 업무의 검토 시작 및 판정 저장</li>
-      </ul>
-    </section>
-    <section aria-labelledby="login-history-title">
-      <h3 id="login-history-title">세션별 로그인 기록</h3>
-      <p>이 탭에서 로그인한 프리뷰 세션</p>
-      <p id="login-history-empty">기록된 로그인이 없습니다.</p>
-      <ol id="login-history" class="profile-list"></ol>
-    </section>
-  `, { footer: '<div class="dialog-part-host" id="preview-sign-out"></div>' });
+  const profileImage = BoxHTML(
+    ProfileAvatarHTML(avatarUrl, '프로필 이미지') +
+    InputHTML('id="profile-picture" class="visually-hidden" type="file" tabindex="-1" accept="image/png,image/jpeg,image/webp"') +
+    Button('사진 변경', { variant: 'row', shape: 'pill', surface: 'floating', attributes: 'id="profile-picture-change"' }),
+    'class="settings-row profile-image-row"',
+  );
+  return PreferenceDialog('account', '계정',
+    PreferenceSection('profile-title', '계정 정보',
+      profileImage +
+      BoxHTML(TextHTML('이름') + TextHTML(profileName, 'data-preview-user-name', 'strong'), 'class="settings-row"') +
+      BoxHTML(TextHTML('역할') + TextHTML(profileRole, 'data-preview-user-role', 'strong'), 'class="settings-row"') +
+      TextHTML('', 'id="profile-status" role="status"', 'p')) +
+    PreferenceSection('permissions-title', '상세 권한',
+      BoxHTML(
+        BoxHTML('거래, Alert, Episode 및 판정 보고서 열람', '', 'li') +
+        BoxHTML('내 담당 미판정 업무의 검토 시작 및 판정 저장', '', 'li'),
+        'class="profile-list"', 'ul',
+      )) +
+    PreferenceSection('login-history-title', '세션별 로그인 기록',
+      TextHTML('이 탭에서 로그인한 프리뷰 세션', '', 'p') +
+      TextHTML('기록된 로그인이 없습니다.', 'id="login-history-empty"', 'p') +
+      BoxHTML('', 'id="login-history" class="profile-list"', 'ol')),
+    { footer: BoxHTML('', 'class="dialog-part-host" id="preview-sign-out"') },
+  );
 }
 
-document.body.innerHTML = Header() + NavigationSidebar() +
-  '<main id="workspace" aria-label="콘텐츠"></main>' + Footer() +
-  Inbox() + SearchDialog() + AccountDialog() + SettingsDialog() + PreferenceDialog('notification', '알림 상세', `
-    <h3 id="notification-detail-title"></h3>
-    <p><time id="notification-detail-time"></time></p>
-    <p id="notification-detail-description"></p>
-    <div id="notification-detail-cases" hidden></div>
-  `) + PreferenceDialog('work-request', '업무 요청', '<div id="work-request-content"></div>', { wrapContent: false }) + Tooltip() +
-  `<main id="preview-login" aria-label="로그인" hidden>
-    <canvas class="login-scene" aria-hidden="true"></canvas>
-    <section class="glass login-card">
-      <div class="login-brand"><span class="login-brand-mark">${BrandSymbol()}</span><span>AML RADAR</span></div>
-      <form id="preview-login-form" class="login-form" aria-label="로그인" novalidate>
-        <label for="preview-login-id">아이디</label>
-        <input id="preview-login-id" name="id" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="아이디 입력" required>
-        <label for="preview-login-password">비밀번호</label>
-        <div class="login-password-field">
-          <input id="preview-login-password" name="password" type="password" autocomplete="current-password" placeholder="비밀번호 입력" required>
-          ${Button('', { variant: 'icon-button login-password-toggle', shape: 'circle', attributes: 'id="login-password-toggle" aria-label="비밀번호 표시" aria-pressed="false" aria-controls="preview-login-password"' })}
-        </div>
-        <div class="login-error" id="preview-login-error" role="alert" aria-atomic="true"></div>
-        <div id="preview-login-action"></div>
-        <div id="preview-login-help-actions" class="login-help"></div>
-      </form>
-      ${serviceMode ? '' : '<div id="preview-login-sample-actions" class="login-sample"></div>'}
-    </section>
-    ${PreferenceDialog('login-help', '계정 찾기', '<p id="login-help-instructions"></p>')}
-  </main>`;
+function LoginScreen() {
+  const passwordField = BoxHTML(
+    InputHTML('id="preview-login-password" name="password" type="password" autocomplete="current-password" placeholder="비밀번호 입력" required') +
+    Button('', { variant: 'icon-button login-password-toggle', shape: 'circle', attributes: 'id="login-password-toggle" aria-label="비밀번호 표시" aria-pressed="false" aria-controls="preview-login-password"' }),
+    'class="login-password-field"',
+  );
+  const form = BoxHTML(
+    TextHTML('아이디', 'for="preview-login-id"', 'label') +
+    InputHTML('id="preview-login-id" name="id" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="아이디 입력" required') +
+    TextHTML('비밀번호', 'for="preview-login-password"', 'label') +
+    passwordField +
+    BoxHTML('', 'class="login-error" id="preview-login-error" role="alert" aria-atomic="true"') +
+    BoxHTML('', 'id="preview-login-action"') +
+    BoxHTML('', 'id="preview-login-help-actions" class="login-help"'),
+    'id="preview-login-form" class="login-form" aria-label="로그인" novalidate', 'form',
+  );
+  const card = BoxHTML(
+    BoxHTML(TextHTML(BrandSymbol(), 'class="login-brand-mark"') + TextHTML('AML RADAR'), 'class="login-brand"') +
+    form +
+    (serviceMode ? '' : BoxHTML('', 'id="preview-login-sample-actions" class="login-sample"')),
+    'class="glass login-card"', 'section',
+  );
+  return BoxHTML(
+    BoxHTML('', 'class="login-particle-layer" aria-hidden="true"') + DecorativeCanvasHTML('class="login-scene"') +
+    card +
+    PreferenceDialog('login-help', '계정 찾기', TextHTML('', 'id="login-help-instructions"', 'p')),
+    'id="preview-login" aria-label="로그인" hidden', 'main',
+  );
+}
+
+document.body.replaceChildren(HTMLFragment(Header() + NavigationSidebar() +
+  BoxHTML('', 'id="workspace" aria-label="콘텐츠"', 'main') + Footer() +
+  Inbox() + SearchDialog() + AccountDialog() + SettingsDialog() + PreferenceDialog('notification', '알림 상세',
+    HeadingHTML('', 'id="notification-detail-title"', 3) +
+    TextHTML(TextHTML('', 'id="notification-detail-time"', 'time'), '', 'p') +
+    TextHTML('', 'id="notification-detail-description"', 'p') +
+    BoxHTML('', 'id="notification-detail-cases" hidden'),
+  ) + PreferenceDialog('work-request', '업무 요청', BoxHTML('', 'id="work-request-content"'), { wrapContent: false }) +
+  Tooltip() + LoginScreen()));
 
 function observeChromeHeight(element, onResize) {
   let frame;
@@ -387,7 +393,13 @@ const sidebarButton = byId('sidebar-toggle');
 const inboxButton = byId('inbox-toggle');
 const fullscreenButton = byId('fullscreen-toggle');
 const widthButton = byId('workspace-width-toggle');
-const narrowShell = matchMedia('(max-width: 680px)');
+
+function viewportUpTo(widthToken) {
+  const width = getComputedStyle(document.documentElement).getPropertyValue(widthToken).trim();
+  return matchMedia(`(max-width: ${width})`);
+}
+
+const narrowShell = viewportUpTo('--aml-shell-compact-max-width');
 
 const dismissals = setupOverlayDismissal([
   { button: sidebarButton, surfaces: [byId('sidebar'), sidebarButton.closest('.brand-header'), document.querySelector('.account-footer')],
@@ -408,7 +420,7 @@ document.addEventListener('fullscreenchange', () => {
   const active = Boolean(document.fullscreenElement);
   fullscreenButton.setAttribute('aria-pressed', String(active));
   fullscreenButton.setAttribute('aria-label', active ? '전체화면 취소' : '전체화면 보기');
-  fullscreenButton.innerHTML = Icon(active ? 'fullscreenExit' : 'fullscreen');
+  fullscreenButton.replaceChildren(HTMLFragment(Icon(active ? 'fullscreenExit' : 'fullscreen')));
 });
 fullscreenButton.addEventListener('click', async () => {
   try {
@@ -436,10 +448,9 @@ byId('settings-toggle').addEventListener('click', () => {
   void refreshPreviewSessionUser();
 });
 
-const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 const systemTheme = matchMedia('(prefers-color-scheme: dark)');
 // 직접 고르기 전 기본값: 노트북 폭(1920px 미만)은 넓게 보기, 데스크탑 모니터 폭은 좁게 보기.
-const laptopViewport = matchMedia('(max-width: 1919px)');
+const laptopViewport = viewportUpTo('--aml-workspace-laptop-max-width');
 const workspaceIsWide = () => typeof appearance.wideWorkspace === 'boolean' ? appearance.wideWorkspace : laptopViewport.matches;
 const preferenceKey = 'aml-live-layout-appearance';
 let appearance = {};
@@ -476,7 +487,7 @@ function syncAppearance() {
   const theme = themeOptions.find(option => option.value === appearance.theme)?.value
     ?? (typeof appearance.dark === 'boolean' ? (appearance.dark ? 'dark' : 'light') : 'system');
   const dark = theme === 'dark' || (theme === 'system' && systemTheme.matches);
-  const { reduceMotion = motionPreference.matches, glassmorphism = true } = appearance;
+  const { reduceMotion = systemReducedMotion?.matches ?? false, glassmorphism = true } = appearance;
   const settings = { reduceMotion, glassmorphism };
   const { dataset } = document.documentElement;
   dataset.theme = dark ? 'dark' : 'light';
@@ -488,7 +499,7 @@ function syncAppearance() {
   dataset.workspaceWidth = wide ? 'wide' : 'narrow';
   widthButton.setAttribute('aria-pressed', String(wide));
   widthButton.setAttribute('aria-label', wide ? '좁게 보기' : '넓게 보기');
-  widthButton.innerHTML = Icon(wide ? 'narrow' : 'wide');
+  widthButton.replaceChildren(HTMLFragment(Icon(wide ? 'narrow' : 'wide')));
   themeSetting.render(createElement(QueryRadio, {
     label: '화면 모드', items: themeOptions, value: theme,
     onChange: value => setAppearancePreference('theme', value),
@@ -512,7 +523,7 @@ function syncAppearance() {
 for (const [button, key] of appearanceSwitches) {
   bindSquishSwitch(button, checked => setAppearancePreference(key, checked));
 }
-motionPreference.addEventListener('change', syncAppearance);
+systemReducedMotion?.addEventListener('change', syncAppearance);
 systemTheme.addEventListener('change', syncAppearance);
 laptopViewport.addEventListener('change', syncAppearance);
 syncAppearance();
@@ -532,8 +543,7 @@ let caseListPage = { key: '', page: 0 };
 let navigationFrame;
 let headerPath;
 let headerCode;
-const queryToolStorage = document.createElement('div');
-queryToolStorage.innerHTML = QueryToolbar();
+const queryToolStorage = HTMLNode(BoxHTML(QueryToolbar()));
 const queryControls = setupQueryControls({
   onChange: tool => {
     if (tool === 'sort' && activePath?.startsWith('dashboard/')) {
@@ -548,6 +558,7 @@ const queryControls = setupQueryControls({
   },
   workspace: byId('workspace'),
   controls: queryToolStorage.firstElementChild,
+  pageDownload: byId('page-download').firstElementChild,
 });
 mountWorkflowNotifications(byId('workflow-notifications'));
 mountNotificationPreference(byId('notification-preference'));
@@ -598,14 +609,15 @@ function updateWorkspaceAddress(path, code, navigationMode, urlParams, { scroll 
   if (scroll) window.scrollTo(0, 0);
   if (navigationMode === 'none' || !path || /\/judge(?:-|\/|$)/.test(path)) return;
   if (dataMode) urlParams.set('data', dataMode);
-  const url = previewUrl({ screen: path, code, benchmarkLedger: benchmarkLedgerRoute }, urlParams);
+  const url = previewUrl({ screen: path, code, benchmarkLedger: benchmarkLedgerRoute, serviceMode }, urlParams);
   if (url === location.pathname + location.search) return;
   if (navigationMode === 'replace') history.replaceState(history.state, '', url);
   else history.pushState(null, '', url);
 }
 
 function loadBenchmarkDataset() {
-  benchmarkLoading ??= fetch(new URL('../mocks/ibm-hi-small-data.json', import.meta.url)).then(response => {
+  // Read from the development server without emitting the dataset as a build asset.
+  benchmarkLoading ??= fetch(import.meta.env.BASE_URL + 'src/mocks/ibm-hi-small-data.json').then(response => {
     if (!response.ok) throw new Error(`Benchmark data request failed (${response.status})`);
     return response.json();
   }).then(dataset => {
@@ -619,7 +631,7 @@ function loadBenchmarkDataset() {
 }
 
 function loadBenchmarkSummary() {
-  benchmarkSummaryLoading ??= fetch(new URL('../mocks/ibm-hi-small-summary.json', import.meta.url)).then(response => {
+  benchmarkSummaryLoading ??= fetch(import.meta.env.BASE_URL + 'src/mocks/ibm-hi-small-summary.json').then(response => {
     if (!response.ok) throw new Error(`Benchmark summary request failed (${response.status})`);
     return response.json();
   }).catch(error => {
@@ -652,10 +664,10 @@ function showBenchmarkWorkspace(path, code, navigationMode, params) {
   queryControls.setScreen(dashboard || ledger ? path : undefined, [], { rows: [], dashboard }, params);
   const workflow = `benchmark-dashboard-${path.endsWith('/mine') ? 'mine' : 'all'}`;
   const content = ledger
-    ? '<div data-benchmark-content><p role="status">IBM AMLworld 거래를 불러오는 중입니다.</p></div>'
-    : `<div data-benchmark-content data-workflow="${workflow}"></div>`;
+    ? BoxHTML(TextHTML('IBM AMLworld 거래를 불러오는 중입니다.', 'role="status"', 'p'), 'data-benchmark-content')
+    : BoxHTML('', `data-benchmark-content data-workflow="${workflow}"`);
   const workspace = byId('workspace');
-  workspace.innerHTML = ScreenLayout(path, { code, hasQuery: dashboard, content });
+  workspace.replaceChildren(HTMLFragment(ScreenLayout(path, { code, hasQuery: dashboard, content })));
   updateWorkspaceAddress(path, code, navigationMode, queryControls.params(path));
 
   const host = workspace.querySelector('[data-benchmark-content]');
@@ -672,13 +684,7 @@ function showBenchmarkWorkspace(path, code, navigationMode, params) {
       }
       benchmarkLedgerView = mountBenchmarkLedger(host, {
         paginationHost: byId('footer-pagination'),
-        dataset, code, tableView: path === ledgerTableScreen, onVisibleRecordsChange: records => {
-          if (!host.isConnected) return;
-          registerBenchmarkExport('ibm-hi-small-transactions', '조회된 원본 원장',
-            ['거래 코드', '원본 시각', '송금 은행 코드', '송금 계좌', '수취 은행 코드', '수취 계좌', '송금 금액', '송금 통화', '수취 금액', '수취 통화', '거래 방식', '원본 세탁 라벨'],
-            records.map(row => [row.code, row.timestamp, row.from.bank, row.from.account, row.to.bank, row.to.account,
-              row.paidAmount, row.paidCurrency, row.receivedAmount, row.receivedCurrency, row.method, Number(row.labeled)]));
-        },
+        dataset, code, tableView: path === ledgerTableScreen,
       });
       return;
     }
@@ -713,6 +719,13 @@ function loadPreviewDashboard(mounted, source, query) {
       if (mountedWorkflows !== mounted) return;
       const show = summary => {
         if (mountedWorkflows !== mounted) return;
+        if (query.mine) {
+          const username = serviceMode ? currentPreviewUser()?.username : source.staff;
+          const requests = serviceMode
+            ? (liveWorkRequestsReady() ? liveWorkRequests() : undefined)
+            : [...source.assignmentChanges, ...previewWorkRequests({ source: 'fixture', username })];
+          summary = { ...summary, workHistory: personalWorkHistory(source.cases, requests, username, query.range) };
+        }
         mounted.updateDashboard(summary);
         afterWorkspacePaint(() => {
           if (mountedWorkflows !== mounted) return;
@@ -742,14 +755,33 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     tab.removeAttribute('aria-current');
   }
   const selectedPath = override || (code ? initialDetail(code) : sections[prefix]);
-  if (!benchmarkLedgerRoute && isBenchmarkTransactionCode(code)) code = '';
+  if (!serviceMode && !benchmarkLedgerRoute && isBenchmarkTransactionCode(code)) code = '';
   const sameCode = activeWorkCode === code;
   const previousPath = activePath;
   activeWorkCode = code;
   const path = !override && code.startsWith('T-') && previousPath === ledgerTableScreen ? previousPath : selectedPath;
   showWorkspaceNavigation(path, code);
+  if (sameCode && path !== previousPath) {
+    const previousCase = caseRoute(previousPath);
+    const nextCase = caseRoute(path);
+    if (nextCase && previousCase?.family === nextCase.family && previousCase.detail === nextCase.detail &&
+      previousCase.readOnly === nextCase.readOnly && previousCase.lens !== nextCase.lens &&
+      ['analysis', 'related'].includes(nextCase.detail)) {
+      const screen = byId('workspace').querySelector('.screen-layout');
+      const graph = screen?.querySelector('[data-case-flow]');
+      if (graph) {
+        activePath = path;
+        graph.dataset.lens = nextCase.lens;
+        unmountCaseGraph?.render();
+        screen.dataset.figmaFrame = screenFrame(path);
+        screen.querySelector('h1').textContent = `${code} · ${frameLabel(path)}`;
+        updateWorkspaceAddress(path, code, navigationMode, params ?? new URLSearchParams(location.search), { scroll: false });
+        return;
+      }
+    }
+  }
   const benchmarkLedger = isLedgerScreen(path) && benchmarkLedgerRoute && (!code || isBenchmarkTransactionCode(code));
-  if (!sampleData && !benchmarkFailed && (benchmarkLedger || path === 'dashboard/all' && dataMode === 'ibm')) {
+  if (localBenchmark && !sampleData && !benchmarkFailed && (benchmarkLedger || path === 'dashboard/all' && dataMode === 'ibm')) {
     showBenchmarkWorkspace(path, code, navigationMode, params);
     return;
   }
@@ -804,10 +836,11 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
   }
   const evidenceSelection = activeEvidence?.selection;
   const workspace = byId('workspace');
-  workspace.innerHTML = path ? ScreenLayout(path, {
+  const screen = path ? ScreenLayout(path, {
     code, hasQuery: queryControls.hasQuery() || isReport, showCaseJudgment: Boolean(selectedCase) && !readOnly,
     source: benchmarkFailed ? '원본 데이터를 불러올 수 없습니다.' : undefined,
   }) : '';
+  workspace.replaceChildren(HTMLFragment(screen));
   queryControls.renderTags(workspace.querySelector('[data-query-tags]'));
   mountedWorkflows = mountWorkflows(workspace, undefined, {
     actionsHost: byId('footer-actions'),
@@ -823,7 +856,9 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
       if (result.ok) dashboardSource = dashboardFixtures(groups);
       return result;
     },
-    refreshEpisode: () => showWorkspace('', code, path, 'none', new URLSearchParams(location.search)),
+    refreshEpisode: () => {
+      if (activeWorkCode === code) showWorkspace('', code, activePath, 'none', new URLSearchParams(location.search));
+    },
     reportDocument, evidenceSelection,
     editTransactions: ({ codes: transactionCodes, targetCode, reason }) => {
       if (!evidenceSelection || activeWorkCode !== code || activeEvidence?.selection !== evidenceSelection) {
@@ -888,7 +923,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
       return result;
     },
     onJudgmentClose: () => {
-      showWorkspace('', code, path, 'none', new URLSearchParams(location.search));
+      showWorkspace('', code, activePath, 'none', new URLSearchParams(location.search));
       workspace.querySelector('h1')?.focus({ preventScroll: true });
     },
     onJudgmentReport: id => {
@@ -936,6 +971,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
         code,
         groups,
         cases: serviceMode ? liveSource().cases : undefined,
+        targetTransaction: serviceMode ? liveSource().transactions.find(row => row.code === code) : undefined,
         label: component.dataset.label,
         tableView: path === ledgerTableScreen,
         ...caseListPaging,
@@ -964,16 +1000,17 @@ function persistWorkTabs() {
   }
 }
 
-function addWorkTab(code, position = 'beforeend') {
+function addWorkTab(code, prepend = false) {
   if (!validWorkCode(code)) return;
-  if (isBenchmarkTransactionCode(code) && (!benchmarkLedgerRoute ||
+  if (!serviceMode && isBenchmarkTransactionCode(code) && (!benchmarkLedgerRoute ||
     !benchmarkDataset?.records.some(record => record.code === code))) return;
   const group = byId(`group-${code[0]}`);
   if (!group) return;
   const selector = `[data-work-code="${code}"]`;
   const existing = group.querySelector(selector);
   if (!existing) {
-    group.insertAdjacentHTML(position, WorkTab(code));
+    const tab = HTMLNode(WorkTab(code));
+    group.insertBefore(tab, prepend ? group.firstChild : null);
     persistWorkTabs();
   }
   return { group, tab: existing ?? group.querySelector(selector), added: !existing };
@@ -984,7 +1021,7 @@ function addWorkTabFromCard(button, code) {
   const verdict = button.closest('[data-verdict]')?.dataset.verdict;
   const from = source.getBoundingClientRect();
   const transferFocus = button.matches(':focus-visible');
-  const destination = addWorkTab(code, 'afterbegin');
+  const destination = addWorkTab(code, true);
   if (!destination?.tab) return;
   const { group, tab, added } = destination;
   const sidebar = byId('sidebar');
@@ -1016,16 +1053,14 @@ function addWorkTabFromCard(button, code) {
   }
   const to = target.getBoundingClientRect();
   const arrival = closed || !added ? undefined : tab.closest('.work-tab').animate([
-    { opacity: 0, transform: 'translateX(12px) scale(.97)' },
+    { opacity: 0, transform: 'translateX(var(--aml-space-12)) scale(.97)' },
     { opacity: 1, transform: 'none' },
   ], { duration: 140, delay: 390, fill: 'backwards', easing: 'ease-out' });
-  const flying = document.createElement('code');
-  flying.className = 'work-tab-flight';
+  const flying = HTMLNode(TextHTML('', 'class="work-tab-flight" aria-hidden="true"', 'code'));
   if (verdict) flying.dataset.verdict = verdict;
-  flying.setAttribute('aria-hidden', 'true');
   flying.textContent = code;
-  flying.style.left = `${from.left}px`;
-  flying.style.top = `${from.top + from.height / 2}px`;
+  flying.style.setProperty('--work-tab-flight-left', `${from.left}px`);
+  flying.style.setProperty('--work-tab-flight-top', `${from.top + from.height / 2}px`);
   document.body.append(flying);
   const x = to.left + to.width / 2 - from.left - flying.offsetWidth / 2;
   const y = to.top + to.height / 2 - from.top - from.height / 2;
@@ -1087,10 +1122,10 @@ const searchQuery = byId('search-query');
 const searchResults = byId('search-results');
 
 function SearchResult(code) {
-  const row = document.createElement('li');
-  row.className = 'list-item-enter';
-  row.innerHTML = Button(`<code>${code}</code>`, { variant: 'row search-result', attributes: `data-search-code="${code}"` });
-  return row;
+  return HTMLNode(BoxHTML(
+    Button(TextHTML(code, '', 'code'), { variant: 'row search-result', attributes: `data-search-code="${code}"` }),
+    'class="list-item-enter"', 'li',
+  ));
 }
 
 function renderSearchResults() {
@@ -1101,8 +1136,7 @@ function renderSearchResults() {
   if (matches.length) {
     let list = searchResults.querySelector('ul');
     if (!list) {
-      list = document.createElement('ul');
-      list.setAttribute('aria-label', '검색 결과');
+      list = HTMLNode(BoxHTML('', 'aria-label="검색 결과"', 'ul'));
       searchResults.replaceChildren(list);
     }
     const visible = matches.slice(0, 30);
@@ -1115,7 +1149,7 @@ function renderSearchResults() {
       if (row !== current) list.insertBefore(row, current ?? null);
     });
   } else {
-    searchResults.innerHTML = '<p>검색 결과가 없습니다.</p>';
+    searchResults.replaceChildren(HTMLFragment(TextHTML('검색 결과가 없습니다.', '', 'p')));
   }
   if (focused && document.activeElement !== focused) {
     (focused.isConnected ? focused : searchQuery).focus({ preventScroll: true });
@@ -1163,8 +1197,7 @@ const inboxRequestFooter = byId('inbox-request-footer');
 const inboxRequestRoot = createRoot(inboxRequestFooter);
 let workRequestOrigin;
 const notificationRows = new Map();
-const emptyNotifications = document.createElement('p');
-emptyNotifications.className = 'inbox-empty';
+const emptyNotifications = HTMLNode(TextHTML('', 'class="inbox-empty"', 'p'));
 let openedNotificationId;
 
 function openNotification(item) {
@@ -1308,7 +1341,7 @@ function renderNotifications(arrivalIds) {
     if (!emptyNotifications.isConnected) list.append(emptyNotifications);
   }
   const animate = arrivalIds instanceof Set && !byId('inbox').hidden && list.scrollTop === 0
-    && document.documentElement.dataset.reducedMotion !== 'true' && !motionPreference.matches;
+    && !appReducedMotion();
   let nextButton = list.firstChild;
   let stagger = 0;
   for (const [key, item] of visible) {
@@ -1324,7 +1357,7 @@ function renderNotifications(arrivalIds) {
     nextButton = button.nextSibling;
     if (animate && created && arrivalIds.has(item.id)) {
       button.animate?.([
-        { opacity: 0, translate: '0 -12px', scale: '0.88 0.55', transformOrigin: 'left top' },
+        { opacity: 0, translate: '0 calc(-1 * var(--aml-space-12))', scale: '0.88 0.55', transformOrigin: 'left top' },
         { opacity: 1, translate: '0 0', scale: '1 1.02', transformOrigin: 'left top', offset: 0.72 },
         { opacity: 1, translate: '0 0', scale: '1', transformOrigin: 'left top' },
       ], { duration: 520, delay: Math.min(stagger++, 4) * 55, fill: 'backwards', easing: 'cubic-bezier(.16, 1, .3, 1)' });
@@ -1387,9 +1420,9 @@ async function loadNotificationCases(item, host) {
   try {
     const result = await fetchNotificationCases(item.id, 0);
     if (!notificationDialog.open || openedNotificationId !== item.id) return;
-    const list = document.createElement('ul');
+    const list = HTMLNode(BoxHTML('', '', 'ul'));
     for (const record of result.content) {
-      const row = document.createElement('li');
+      const row = HTMLNode(BoxHTML('', '', 'li'));
       row.textContent = record.kind === 'ALERT' ? `Alert ${record.alertId ?? record.caseId}` : `Episode ${record.caseId}`;
       list.append(row);
     }
@@ -1491,11 +1524,10 @@ async function refreshPreviewSessionUser() {
 function renderLoginHistory() {
   byId('login-history-empty').hidden = loginHistory.length > 0;
   byId('login-history').replaceChildren(...loginHistory.map((timestamp, index) => {
-    const entry = document.createElement('li');
-    const time = document.createElement('time');
+    const entry = HTMLNode(BoxHTML(TextHTML('', '', 'time'), '', 'li'));
+    const time = entry.firstElementChild;
     time.dateTime = timestamp;
     time.textContent = `${loginTime.format(new Date(timestamp))} KST`;
-    entry.append(time);
     if (index === 0 && signedIn) entry.append(' · 현재 세션');
     return entry;
   }));
@@ -1628,7 +1660,7 @@ function showLoadedRoute(route, params, navigationMode) {
 function restoreLocation() {
   closeTransientViews();
   const url = new URL(location.href);
-  const route = readPreviewRoute(url);
+  const route = readPreviewRoute(url, { serviceMode });
   if (!signedIn || route.screen === loginRoute.screen) {
     if (route.screen !== loginRoute.screen) {
       history.replaceState({ previewNext: url.pathname + url.search }, '',
@@ -1641,7 +1673,7 @@ function restoreLocation() {
 }
 
 const loginForm = byId('preview-login-form');
-const loginScene = mountLoginScene(byId('preview-login'), motionPreference);
+const loginScene = mountLoginScene(byId('preview-login'), appMotionPreference);
 const loginId = byId('preview-login-id');
 const loginPassword = byId('preview-login-password');
 const passwordToggle = byId('login-password-toggle');
@@ -1762,7 +1794,7 @@ if (!serviceMode) {
     ...(sampleData ? [['preview-alt-staff-login', '분석가 2로 간편 로그인', alternatePreviewStaff]] : []),
   ];
   createRoot(byId('preview-login-sample-actions')).render([
-    createElement('p', { key: 'notice' }, '테스트 전용 간편 로그인 · 검수 종료 즉시 제거'),
+    createElement(Text, { key: 'notice' }, '테스트 전용 간편 로그인 · 검수 종료 즉시 제거'),
     ...actors.map(([id, label, actor]) => loginButton(label, { key: id, id, onClick: () => enterPreview(actor.username) })),
   ]);
 }
@@ -1816,13 +1848,16 @@ function enterWorkspace(actor, animated, user) {
   void refreshPreviewSessionUser().then(() => refreshLiveInbox());
   const next = history.state?.previewNext;
   const previous = typeof next === 'string' && /^\/(?!\/)/.test(next) ? new URL(next, location.origin) : undefined;
-  const route = previous ? readPreviewRoute(previous) : dashboardRoute;
+  const route = previous ? readPreviewRoute(previous, { serviceMode }) : dashboardRoute;
   showRoute(route, previous?.searchParams, 'push');
   const workspace = byId('workspace');
   if (animated && route.screen.startsWith('dashboard/')) {
+    const transformOrigin = 'var(--aml-motion-workspace-enter-origin)';
+    const perspective = 'perspective(var(--aml-motion-workspace-enter-perspective))';
     workspace.querySelector('.screen-layout')?.animate([
-      { transformOrigin: '50% 44vh', transform: 'perspective(900px) translate3d(0, 12px, -145px)', opacity: 0.16 },
-      { transformOrigin: '50% 44vh', transform: 'perspective(900px) translate3d(0, 0, 0)', opacity: 1 },
+      { transformOrigin, transform: `${perspective} translate3d(0, var(--aml-space-12), calc(-1 * var(--aml-motion-workspace-enter-depth)))`,
+        opacity: 'var(--aml-motion-workspace-enter-opacity)' },
+      { transformOrigin, transform: `${perspective} translate3d(0, 0, 0)`, opacity: 1 },
     ], { duration: 460, easing: 'cubic-bezier(.16, 1, .3, 1)' });
   }
   workspace.querySelector('h1')?.focus({ preventScroll: true });

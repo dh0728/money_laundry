@@ -2,12 +2,14 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { ActionButton, ConfirmHoldButton } from '../../components/primary-button';
 import { DialogFrame } from '../../components/dialog-parts';
 import GlideSelect from '../../components/react-bits/GlideSelect';
+import { NativeRadio } from '../../components/ui/radio-group';
 import { Textarea } from '../../components/ui/textarea';
 import { enableBackdropDismissal } from '../../lib/overlay-dismissal';
 import { CountTag } from '../../components/semantic-tags';
 import { membershipReasonLimit } from './case-membership-data';
 import './case-judgment.css';
 import './case-transaction-edit.css';
+import { Box, Text } from '../../components/layout-primitives';
 
 const formatCount = new Intl.NumberFormat('ko-KR');
 
@@ -88,44 +90,44 @@ export function CaseTransactionEdit({ row, selected = [], destinations = [], can
           disabled={!valid} doneLabel="적용 완료" resetAfter={250}
           onHold={apply}>{operation === 'exclude' ? '길게 눌러 적용' : '적용'}</ConfirmHoldButton>}
       </>}>
-      <div className="case-judgment-body">
-        <div className="case-judgment-target-group">
-          <p className="case-judgment-target-label semantic-tag-group"><code>{row.code}</code> · 선택 거래
-            <CountTag count={codes.length} /></p>
-          <ul className="case-judgment-targets case-transaction-edit-targets" aria-label="선택 거래 ID">
-            {codes.map(code => <li key={code}><code>{code}</code></li>)}
-          </ul>
-        </div>
+      <Box className="case-judgment-body">
+        <Box className="case-judgment-target-group">
+          <Text className="case-judgment-target-label semantic-tag-group"><Text as="code">{row.code}</Text> · 선택 거래
+            <CountTag count={codes.length} /></Text>
+          <Box as="ul" className="case-judgment-targets case-transaction-edit-targets" aria-label="선택 거래 ID">
+            {codes.map(code => <Box as="li" key={code}><Text as="code">{code}</Text></Box>)}
+          </Box>
+        </Box>
         {canEdit ? <>
-          <fieldset className="case-judgment-verdict">
-            <legend>편집 방식</legend>
-            <label>
-              <input type="radio" name={`${id}-operation`} value="exclude" checked={operation === 'exclude'}
+          <Box as="fieldset" className="case-judgment-verdict">
+            <Box as="legend">편집 방식</Box>
+            <Box as="label">
+              <NativeRadio name={`${id}-operation`} value="exclude" checked={operation === 'exclude'}
                 onChange={() => { setOperation('exclude'); setError(''); }} />
               이 Alert에서 제외
-            </label>
-            <label>
-              <input type="radio" name={`${id}-operation`} value="transfer" checked={operation === 'transfer'}
+            </Box>
+            <Box as="label">
+              <NativeRadio name={`${id}-operation`} value="transfer" checked={operation === 'transfer'}
                 disabled={!targets.length} onChange={() => { setOperation('transfer'); setError(''); }} />
               다른 Alert로 이동
-            </label>
-            {!targets.length && <p className="case-judgment-note">이동할 수 있는 Alert가 없습니다.</p>}
-          </fieldset>
-          {operation === 'transfer' && <div className="case-judgment-dropdowns">
-            <span>이동할 Alert</span>
+            </Box>
+            {!targets.length && <Text className="case-judgment-note">이동할 수 있는 Alert가 없습니다.</Text>}
+          </Box>
+          {operation === 'transfer' && <Box className="case-judgment-dropdowns">
+            <Text as="span">이동할 Alert</Text>
             <GlideSelect ariaLabel="이동할 Alert" placeholder="Alert 선택" value={destination}
               options={targets.map(({ code, pattern }) => ({ value: code, label: pattern ? `${code} · ${pattern}` : code }))}
               onChange={value => { setDestination(value); setError(''); }} />
-          </div>}
-          <label className="case-judgment-field">
-            <span>변경 사유</span>
+          </Box>}
+          <Box as="label" className="case-judgment-field">
+            <Text as="span">변경 사유</Text>
             <Textarea rows={3} maxLength={membershipReasonLimit} required value={reason}
               placeholder="이 거래들을 제외하거나 이동하는 이유를 입력하세요"
               onChange={event => { setReason(event.target.value); setError(''); }} />
-          </label>
-          {error && <p className="case-transaction-edit-error" role="alert">{error}</p>}
-        </> : <p className="case-judgment-note">{blockedReason ?? editBlockedMessage(row)}</p>}
-      </div>
+          </Box>
+          {error && <Text className="case-transaction-edit-error" role="alert">{error}</Text>}
+        </> : <Text className="case-judgment-note">{blockedReason ?? editBlockedMessage(row)}</Text>}
+      </Box>
     </DialogFrame>
   </>;
 }

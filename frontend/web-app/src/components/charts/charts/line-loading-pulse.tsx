@@ -165,7 +165,8 @@ export function LineLoadingPulseStroke({
         <clipPath id={clipPathId}>
           <m.rect
             height={clipHeight}
-            style={{ width: clipWidth, x: clipX }}
+            width={clipWidth}
+            x={clipX}
             y={-CLIP_PADDING}
           />
         </clipPath>

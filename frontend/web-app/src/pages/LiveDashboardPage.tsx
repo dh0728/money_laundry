@@ -8,7 +8,7 @@ import { useCurrentUser } from '@/app/session'
 import { Card, CardContent } from '@/components/ui/card'
 import { SectionTitle } from '@/components/page'
 import { AlertStatusChart } from '@/features/dashboard/AlertFlowChart'
-import { TransactionPatternHierarchy } from '@/features/dashboard/PatternRelation'
+import { TransactionPatternHierarchy } from '@/components/charts/charts/pattern-relation'
 import { UnderTabs } from '@/components/UnderTabs'
 import { isoDate } from '@/lib/format'
 import { useSharedPeriod, useViewState } from '@/lib/workspaceState'
@@ -18,6 +18,7 @@ import { EmptyBlock, ErrorBlock, LoadingBlock } from '@/components/states'
 import { SectionCards } from '@/components/SectionCards'
 import { useAsync } from '@/lib/useAsync'
 import { useDashboardPolling } from '@/lib/useDashboardPolling'
+import { Box, Text } from '@/components/layout-primitives'
 
 const businessTimeFormat = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
 
@@ -29,7 +30,7 @@ function LiveAiDailyReport({ data }: { data: LiveDashboard }) {
   const change = yesterday > 0 ? today === yesterday ? ' · 전일과 동일' : ` · ${Math.abs((today - yesterday) / yesterday * 100).toFixed(1)}% ${today > yesterday ? '증가' : '감소'}` : ''
   return <DailyReportView generatedAt={data.businessAt} changeSummary={`신규 Alert ${count(today)}건 · 전일 ${count(yesterday)}건${change}`}
     operation={`3일 이상 미처리 Alert ${count(data.openAlertsAgedOver3Days)}건. ${data.pendingReports ? `미완료 보고 ${count(data.pendingReports)}건으로 탐지 집계 확인 필요.` : `오늘 수신 거래 ${count(data.detection.received)}건.`}`}
-    focus={<p className="mt-2 text-sm leading-6 text-muted-foreground">선택 기간의 유형별 건수는 왼쪽 분포에서 확인하세요. 서로 다른 사건이 같은 시나리오라는 판정은 아닙니다.</p>}
+    focus={<Text className="mt-2 text-sm leading-6 text-muted-foreground">선택 기간의 유형별 건수는 왼쪽 분포에서 확인하세요. 서로 다른 사건이 같은 시나리오라는 판정은 아닙니다.</Text>}
     />
 
 }
@@ -67,14 +68,14 @@ export default function LiveDashboardPage(_props: { onOpen: (kind: 'ALERT' | 'EP
         { label: '선택 기간 내 종결', value: count(data.personal.closed), trend: '본인 담당', note: '최종 판정 완료' },
       ]
 
-  return <div className="space-y-6">
-    {dashboard.refreshError && <div role="alert" className="text-xs">최신 조회 실패 · 이전 데이터를 표시합니다. {dashboard.refreshError}</div>}
-    <div className="flex flex-wrap items-center justify-between gap-3"><UnderTabs value={scope} onChange={setScope} items={[{ value: 'institution', label: '기관 전체' }, { value: 'personal', label: '내 담당' }]} /><span className="text-xs text-muted-foreground">업무 기준 {kstDate(data.businessAt)} {businessTimeFormat.format(new Date(data.businessAt))} (KST)</span></div>
+  return <Box className="space-y-6">
+    {dashboard.refreshError && <Box role="alert" className="text-xs">최신 조회 실패 · 이전 데이터를 표시합니다. {dashboard.refreshError}</Box>}
+    <Box className="flex flex-wrap items-center justify-between gap-3"><UnderTabs value={scope} onChange={setScope} items={[{ value: 'institution', label: '기관 전체' }, { value: 'personal', label: '내 담당' }]} /><Text as="span" className="text-xs text-muted-foreground">업무 기준 {kstDate(data.businessAt)} {businessTimeFormat.format(new Date(data.businessAt))} (KST)</Text></Box>
     {scope === 'institution' ? <InstitutionView today={new Date(`${businessDate}T00:00:00`)} remote={{
       cards: <SectionCards items={kpis} />,
       range: { from: new Date(`${from}T00:00:00`), to: new Date(`${to}T00:00:00`) },
       onRange: range => setPeriod({ from: range?.from ? isoDate(range.from) : daysBefore(businessDate,29), to: range?.to ? isoDate(range.to) : businessDate }),
-      charts: <><div className="shrink-0"><AlertStatusChart data={data.dailyAlertStatus ?? []} unavailable={data.dailyAlertStatus == null} /></div><Card className="min-w-0 max-w-full shrink-0 gap-4 py-4 shadow-none" data-testid="transaction-pattern-hierarchy"><CardContent className="flex min-h-0 flex-1 flex-col px-4"><SectionTitle title="의심 거래 구성과 패턴 분포" description={`전체 분석 거래 ${count(agreementTotal)}건의 모델 조합 · 의심 거래 유형별 건수`} />{agreementTotal ? <div className="min-h-0 flex-1"><TransactionPatternHierarchy linked={false} unit="거래" composition={agreementComposition(data.agreements)} distribution={data.types.map(row => ({ pattern: typeDisplay(row.type as TypeCode)?.key ?? String(row.type), alerts: row.count, fill: 'var(--foreground)' }))} /></div> : <EmptyBlock>모델 조합 데이터가 없습니다.</EmptyBlock>}</CardContent></Card></>,
+      charts: <><Box className="shrink-0"><AlertStatusChart data={data.dailyAlertStatus ?? []} unavailable={data.dailyAlertStatus == null} /></Box><Card className="min-w-0 max-w-full shrink-0 gap-4 py-4 shadow-none" data-testid="transaction-pattern-hierarchy"><CardContent className="flex min-h-0 flex-1 flex-col px-4"><SectionTitle title="의심 거래 구성과 패턴 분포" description={`전체 분석 거래 ${count(agreementTotal)}건의 모델 조합 · 의심 거래 유형별 건수`} />{agreementTotal ? <Box className="min-h-0 flex-1"><TransactionPatternHierarchy linked={false} unit="거래" composition={agreementComposition(data.agreements)} distribution={data.types.map(row => ({ pattern: typeDisplay(row.type as TypeCode)?.key ?? String(row.type), alerts: row.count, fill: 'var(--foreground)' }))} /></Box> : <EmptyBlock>모델 조합 데이터가 없습니다.</EmptyBlock>}</CardContent></Card></>,
       report: <LiveAiDailyReport data={data} />,
       queue: <LiveWorkQueue personal={false} />,
     }} /> : <PersonalView remote={{
@@ -82,9 +83,9 @@ export default function LiveDashboardPage(_props: { onOpen: (kind: 'ALERT' | 'EP
         { label: '위험 점수 0.80 이상', value: highRisk.state.status === 'success' ? count(highRisk.state.data.totalElements) : '—', trend: '처리 전 Alert', note: '본인 담당 고위험 건' },
         { label: '3일 이상 경과', value: count(data.personal.aged), trend: 'Alert · Episode', note: '본인 담당 배정 후 72시간 이상' },
       ],
-      summary: <PersonalSummaryView><p className="mt-2 text-sm leading-6 text-muted-foreground">담당 사건의 유형과 반복 계좌를 아래 업무 현황에서 확인하세요. LLM 요약은 아직 연결되지 않았습니다.</p></PersonalSummaryView>,
+      summary: <PersonalSummaryView><Text className="mt-2 text-sm leading-6 text-muted-foreground">담당 사건의 유형과 반복 계좌를 아래 업무 현황에서 확인하세요. LLM 요약은 아직 연결되지 않았습니다.</Text></PersonalSummaryView>,
       queue: <LiveWorkQueue />,
     }} />}
     {scope === 'personal' && highRisk.state.status === 'error' && <ErrorBlock message={highRisk.state.message} onRetry={highRisk.retry} />}
-  </div>
+  </Box>
 }

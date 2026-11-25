@@ -1,17 +1,17 @@
 :root {
   --primary-action-blue: var(--aml-figma-light-surface-status-info-accent-default);
   --primary-action-ink: var(--aml-white-100);
-  --primary-action-face: color-mix(in srgb, var(--primary-action-blue) 96%, transparent);
-  --primary-action-edge: color-mix(in srgb, var(--primary-action-blue), var(--aml-black-100) 24%);
+  --primary-action-face: color-mix(in srgb, var(--primary-action-blue) var(--primary-action-face-weight), transparent);
+  --primary-action-edge: color-mix(in srgb, var(--primary-action-blue), var(--aml-black-100) var(--primary-action-edge-shade));
   --action-brand-face: var(--primary-action-face);
   --action-brand-ink: var(--primary-action-ink);
   --action-brand-edge: var(--primary-action-edge);
   --action-positive-face: var(--status-positive-accent);
   --action-positive-ink: var(--status-accent-dark-ink);
-  --action-positive-edge: color-mix(in srgb, var(--action-positive-face), var(--aml-black-100) 12%);
+  --action-positive-edge: color-mix(in srgb, var(--action-positive-face), var(--aml-black-100) var(--positive-action-edge-shade));
   --action-negative-face: var(--status-danger-accent);
   --action-negative-ink: var(--status-accent-light-ink);
-  --action-negative-edge: color-mix(in srgb, var(--action-negative-face), var(--aml-black-100) 22%);
+  --action-negative-edge: color-mix(in srgb, var(--action-negative-face), var(--aml-black-100) var(--negative-action-edge-shade));
 }
 
 .hold-button.screen-primary {
@@ -53,12 +53,12 @@
   pointer-events: auto;
 }
 .accent-action > .hold-button:focus-visible { outline: none }
-.accent-action > .star-border__light { z-index: 1 }
+.accent-action > .star-border__light { z-index: var(--layer-local-overlay) }
 .accent-action[aria-disabled="true"] { pointer-events: none }
 :root[data-reduced-motion="true"] .accent-action { --star-border-motion: still }
 .accent-action .hold-button[aria-disabled="true"] { opacity: var(--aml-opacity-disabled) }
-.hold-button[data-activation="press"]:active:not(:disabled, [aria-disabled="true"]) { --hb-p: 1 }
-.hold-button[data-activation="press"] .hold-button__fill { transition: clip-path 150ms ease-out }
+.hold-button[data-activation="press"]:active:not(:disabled, [aria-disabled="true"]) { --hb-p: var(--action-pressed-fill-progress) }
+.hold-button[data-activation="press"] .hold-button__fill { transition: clip-path var(--action-pressed-fill-duration) ease-out }
 [data-reduced-motion="true"] .hold-button[data-activation="press"] .hold-button__fill { transition: none }
 @media (prefers-reduced-motion: reduce) {
   .hold-button[data-activation="press"] .hold-button__fill { transition: none }

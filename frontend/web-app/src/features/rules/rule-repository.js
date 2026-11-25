@@ -1,5 +1,5 @@
-import { createWorkspaceState, saveWorkspaceRule, transitionWorkspaceRule } from '@/next/workspace-data';
-import { isRuleId, RULE_LIMITS, ruleActionState, ruleReasonProblem, ruleTransitionActions, runBacktest } from '@/next/features/rules-logic';
+import { createWorkspaceState, saveWorkspaceRule, transitionWorkspaceRule } from '@/features/rules/workspace-data';
+import { isRuleId, RULE_LIMITS, ruleActionState, ruleReasonProblem, ruleTransitionActions, runBacktest } from '@/features/rules/rules-logic';
 import { currentPreviewUser } from '../auth/preview-session-user.js';
 import { deleteLiveRule, fetchLiveRules, liveBacktestScope, liveRules, reviewLiveRule, runLiveBacktest, saveLiveRule } from './live-rules.js';
 

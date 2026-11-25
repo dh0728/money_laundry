@@ -1,5 +1,8 @@
 import { getJson } from '@/api/common';
+import { fetchReviewUsers } from '@/api/liveReview';
 import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings.js';
+import { isOverdueCaseAge } from '../investigation/case-age.js';
+import { alertEvidenceCodes, dashboardDateKey as dateKey, investigationDashboard } from './dashboard-investigation.js';
 
 // 서비스 모드 대시보드 숫자. 화면이 읽는 모양은 mocks/dashboard-fixtures.js의 dashboardFixtureResponse와 같다.
 // 업무 지표는 서버에서 받은 Alert·Episode로 계산한다. 전체 거래 수·의심 거래 수·유형별 수는 서버 집계를 읽고,
@@ -8,8 +11,6 @@ const defaultDays = 8; // 샘플 화면의 기본 조회 폭과 같다.
 const bandNames = { high: '위험', medium: '주의', low: '낮음' };
 const kpiHours = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00'];
 const kstDate = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' });
-const dateKey = date => [date.getFullYear(), date.getMonth() + 1, date.getDate()]
-  .map(value => String(value).padStart(2, '0')).join('-');
 const sum = (rows, key) => rows.reduce((total, row) => total + row[key], 0);
 
 export const liveDashboardAsOf = source => new Date(`${kstDate.format(new Date(source.businessAt))}T00:00:00`);
@@ -31,17 +32,20 @@ export async function liveDashboardResponse(source, { mine, rows, population, ra
   const evidence = new Set(cases.flatMap(row => row.related.map(transaction => transaction.code)));
   const members = source.transactions.filter(row => includesDate(row) && evidence.has(row.code));
   const flagged = members.filter(row => row.suspicious);
-  const ledger = partial ? undefined : await getJson(`/api/v1/dashboard/transaction-days?from=${from}&to=${to}`);
+  const coveredEvidence = partial ? alertEvidenceCodes(population ?? rows ?? scopeCases) : undefined;
+  const [ledger, roster] = await Promise.all([
+    partial ? undefined : getJson(`/api/v1/dashboard/transaction-days?from=${from}&to=${to}`),
+    mine ? undefined : fetchReviewUsers().then(users => Array.isArray(users)
+      ? users.filter(user => user.role === 'STAFF') : undefined).catch(() => undefined),
+  ]);
   const ledgerDays = new Map(ledger?.days.map(day => [day.date, day]));
   const ledgerHours = new Map(ledger?.hours.map(hour => [hour.hour, hour]));
 
   const alertCases = cases.filter(row => row.kind === 'Alert');
-  const linked = new Set(alertCases.flatMap(row => row.related.map(transaction => transaction.code)));
   const byDay = Map.groupBy(cases, row => dateKey(row.date));
   const membersByDay = Map.groupBy(members, row => dateKey(row.date));
   const completions = Map.groupBy(completedPopulation.filter(row => row.kind === 'Alert' && row.completedAt),
     row => kstDate.format(new Date(row.completedAt)));
-  const dailyAlertStatus = [];
   const operationalDaily = [];
   const daily = [];
   for (const day = new Date(start); day <= end; day.setDate(day.getDate() + 1)) {
@@ -49,19 +53,19 @@ export async function liveDashboardResponse(source, { mine, rows, population, ra
     const dayCases = byDay.get(date) ?? [];
     const alerts = dayCases.filter(row => row.kind === 'Alert');
     const transfers = membersByDay.get(date) ?? [];
-    const suspicious = transfers.filter(row => row.suspicious);
+    const suspiciousEvidence = transfers.filter(row => row.suspicious);
     const counted = ledgerDays.get(date);
-    dailyAlertStatus.push({
-      date,
-      pending: alerts.filter(row => row.status === '처리 전').length,
-      inProgress: alerts.filter(row => row.status === '처리 중').length,
-      done: alerts.filter(row => row.status === '처리 완료').length,
-    });
+    const suspicious = counted?.suspicious ?? suspiciousEvidence.length;
+    const linkedSuspicious = Number.isSafeInteger(counted?.linkedSuspicious)
+      && counted.linkedSuspicious >= 0 && counted.linkedSuspicious <= counted.suspicious ? counted.linkedSuspicious : null;
+    const linked = partial
+      ? suspiciousEvidence.filter(row => coveredEvidence.has(row.code)).length
+      : linkedSuspicious;
     daily.push({ day: date, incoming: alerts.length, completed: completions.get(date)?.length ?? 0 });
     operationalDaily.push({
       date, label: `${day.getMonth() + 1}/${day.getDate()}`,
       total: counted?.total ?? transfers.length,
-      suspicious: counted?.suspicious ?? suspicious.length,
+      suspicious,
       alerts: alerts.length,
       openAlerts: alerts.filter(row => row.open).length,
       openEpisodes: dayCases.filter(row => row.kind === 'Episode' && row.open).length,
@@ -69,14 +73,15 @@ export async function liveDashboardResponse(source, { mine, rows, population, ra
       newAccounts: counted?.newAccounts ?? 0, newOwners: counted?.newOwners ?? 0,
       settled: dayCases.filter(row => !row.open).length,
       totalCases: dayCases.length,
-      linked: suspicious.filter(row => linked.has(row.code)).length,
+      linked,
+      unlinked: linked === null ? null : suspicious - linked,
     });
   }
 
   const owned = cases.filter(row => row.assigned);
   const unfinished = owned.filter(row => row.open);
   const highRiskAlerts = unfinished.filter(row => row.kind === 'Alert' && modelRiskBand(row.score) === 'high');
-  const overdueCases = unfinished.filter(row => row.elapsed >= 3);
+  const overdueCases = unfinished.filter(row => isOverdueCaseAge(row.elapsed));
   const patternCounts = new Map();
   if (ledger) {
     for (const { type, count } of ledger.types) patternCounts.set(type === 'NON_PATTERN' ? '미분류' : type, count);
@@ -93,8 +98,11 @@ export async function liveDashboardResponse(source, { mine, rows, population, ra
     }
   }
   const labels = modelRiskLabels();
+  const linked = operationalDaily.some(day => day.linked === null) ? null : sum(operationalDaily, 'linked');
+  const unlinked = linked === null ? null : sum(operationalDaily, 'unlinked');
   return {
     scope: mine ? 'mine' : 'all',
+    dataSource: 'live',
     businessAt: source.businessAt,
     period: { from, to },
     cases, mine: owned, alertCases,
@@ -110,12 +118,17 @@ export async function liveDashboardResponse(source, { mine, rows, population, ra
     ownedAlerts: owned.filter(row => row.kind === 'Alert').length,
     highRisk: highRiskAlerts.length,
     overdue: overdueCases.length,
+    overdueAlerts: overdueCases.filter(row => row.kind === 'Alert').length,
+    overdueEpisodes: overdueCases.filter(row => row.kind === 'Episode').length,
     unfinished: unfinished.length,
-    urgent: highRiskAlerts.filter(row => row.elapsed >= 3).length,
+    urgent: highRiskAlerts.filter(row => isOverdueCaseAge(row.elapsed)).length,
     newAccounts: sum(operationalDaily, 'newAccounts'), newOwners: sum(operationalDaily, 'newOwners'),
-    linked: flagged.filter(row => linked.has(row.code)).length,
+    linked, unlinked, coverageScope: partial ? 'case-evidence' : 'institution',
     patterns: [...patternCounts].map(([label, count]) => ({ label, count })),
-    daily, dailyAlertStatus, operationalDaily,
+    daily, operationalDaily,
+    ...investigationDashboard(source.cases, cases, operationalDaily.map(day => day.date), {
+      assignmentRows: completedPopulation, roster,
+    }),
     hourly: kpiHours.map((label, i) => ({
       label,
       // 전체를 볼 때는 서버가 센 시간대별 거래 수를 쓴다(09시가 첫 칸). 일부 사건만 볼 때는 근거 거래로 센다.

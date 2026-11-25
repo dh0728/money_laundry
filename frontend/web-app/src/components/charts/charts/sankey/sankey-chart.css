@@ -1,0 +1,14 @@
+.sankey-chart { aspect-ratio: var(--sankey-chart-aspect-ratio, auto) }
+.sankey-interactive-mark { cursor: pointer }
+.sankey-interactive-mark[data-sankey-draggable] { cursor: grab }
+.sankey-interactive-mark[data-sankey-dragging] { cursor: grabbing }
+
+.sankey-node-mark {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.sankey-node-name { font-size: var(--chart-sankey-name-size) }
+.sankey-node-value { font-size: var(--chart-sankey-value-size) }
+.staged-sankey-labels [data-sankey-anchor] { r: var(--aml-stroke-divider) }
+.staged-sankey-relations circle { r: var(--chart-sankey-connector-radius) }

@@ -5,6 +5,7 @@ import { ActionButton } from '../../components/primary-button';
 import GlideSelect from '../../components/react-bits/GlideSelect';
 import { StatusTag } from '../../components/semantic-tags';
 import './admin-team-settings.css';
+import { Box, Heading, Text } from '../../components/layout-primitives';
 
 const roles = { ADMIN: '관리자', STAFF: '분석가' };
 const roleOptions = Object.entries(roles).map(([value, label]) => ({ value, label }));
@@ -15,19 +16,19 @@ const sampleMembers = [
 ];
 
 function MemberList({ members, onRoleChange }) {
-  if (!members.length) return <p role="status">표시할 팀원이 없습니다.</p>;
-  return <ul className="admin-team-list" aria-label="팀원">
-    {members.map(member => <li key={member.id} className="settings-row">
-      <span className="admin-team-member">
-        <strong>{member.name}</strong>
-        {member.self && <small>현재 계정</small>}
-      </span>
+  if (!members.length) return <Text role="status">표시할 팀원이 없습니다.</Text>;
+  return <Box as="ul" className="admin-team-list" aria-label="팀원">
+    {members.map(member => <Box as="li" key={member.id} className="settings-row">
+      <Text as="span" className="admin-team-member">
+        <Text as="strong">{member.name}</Text>
+        {member.self && <Text as="small">현재 계정</Text>}
+      </Text>
       {onRoleChange && !member.self
         ? <GlideSelect ariaLabel={`${member.name} 권한`} options={roleOptions} value={member.role}
           align="right" onChange={role => onRoleChange(member, role)} />
         : <StatusTag preset={member.role === 'ADMIN' ? 'inProgress' : 'neutral'}>{roles[member.role]}</StatusTag>}
-    </li>)}
-  </ul>;
+    </Box>)}
+  </Box>;
 }
 
 function PreviewMembers({ sessionUser }) {
@@ -42,9 +43,9 @@ function PreviewMembers({ sessionUser }) {
     setNotice(`${member.name}의 권한을 ${roles[role]}로 변경했습니다.`);
   }
   return <>
-    <p>미리보기 팀원입니다. 여기서 바꾼 권한은 예제 팀에만 적용됩니다.</p>
+    <Text>미리보기 팀원입니다. 여기서 바꾼 권한은 예제 팀에만 적용됩니다.</Text>
     <MemberList members={members} onRoleChange={changeRole} />
-    {notice && <p role="status">{notice}</p>}
+    {notice && <Text role="status">{notice}</Text>}
   </>;
 }
 
@@ -76,13 +77,13 @@ function LiveMembers({ userId }) {
     setAttempt(previous => previous + 1);
   };
   return <>
-    {result.loading && <p role="status">팀원 목록을 불러오는 중입니다.</p>}
-    {result.error && <div className="admin-team-retry">
-      <p role="alert">팀원 목록을 불러오지 못했습니다.</p>
+    {result.loading && <Text role="status">팀원 목록을 불러오는 중입니다.</Text>}
+    {result.error && <Box className="admin-team-retry">
+      <Text role="alert">팀원 목록을 불러오지 못했습니다.</Text>
       <ActionButton shape="pill" surface="floating" onClick={retry}>다시 불러오기</ActionButton>
-    </div>}
+    </Box>}
     {result.members && <MemberList members={result.members} onRoleChange={changeRole} />}
-    {notice && <p role="status">{notice}</p>}
+    {notice && <Text role="status">{notice}</Text>}
   </>;
 }
 
@@ -90,9 +91,9 @@ export function AdminTeamSettings({ sessionUser }) {
   const title = useId();
   if (sessionUser?.role !== 'ADMIN' || !['fixture', 'api'].includes(sessionUser.source)) return null;
   const preview = sessionUser.source === 'fixture';
-  return <section aria-labelledby={title} className="admin-team-settings">
-    <h3 id={title}>팀원 권한</h3>
+  return <Box as="section" aria-labelledby={title} className="admin-team-settings">
+    <Heading level={3} id={title}>팀원 권한</Heading>
     {preview ? <PreviewMembers key={sessionUser.id} sessionUser={sessionUser} />
       : <LiveMembers key={sessionUser.id} userId={sessionUser.id} />}
-  </section>;
+  </Box>;
 }

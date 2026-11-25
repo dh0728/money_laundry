@@ -3,6 +3,7 @@
 import { MotionGlobalConfig } from "motion/react";
 import { memo, useLayoutEffect, useRef } from "react";
 import { DEFAULT_ANIMATION_EASING } from "./animation";
+import "../chart-utilities.css";
 
 export interface SeriesPointMarkerStyle {
   /** Fill color for the inner circle */
@@ -134,7 +135,7 @@ export interface SeriesPointMarkerProps extends SeriesPointMarkerStyle {
   enterDuration: number;
 }
 
-/** Marker style once the enter fade has finished (what Motion left inline). */
+/** End keyframe matching the marker's resting CSS. */
 const MARKER_ENTERED_STYLE = { opacity: 1, filter: "blur(0px)" } as const;
 
 /**
@@ -205,7 +206,7 @@ export function SeriesPointMarker({
       <g
         key={`${dataKey}-${index}-${revealEpoch}`}
         ref={enterRef}
-        style={MARKER_ENTERED_STYLE}
+        className="chart-marker-entered"
       >
         <MarkerCircles
           fill={fill}

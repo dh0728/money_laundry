@@ -1,8 +1,8 @@
 import React, { Children, cloneElement, isValidElement, useState } from 'react';
-import { ArrowDown, ArrowDownLeft, ArrowUp, ArrowUpDown, ArrowUpRight, ArrowLeftRight, Banknote, Bell, CalendarDays, CalendarRange,
-  CircleGauge, ClipboardCheck, Clock, CreditCard, FileStack, FileText, Fingerprint, Hash, Landmark, Layers,
-  ListChecks, ListTree, Network, ScanSearch, Settings2, Tag, Timer, UserRound, WalletCards } from 'lucide-react';
-import { Table, TableBody, TableCell, TableHead, TableHeader } from '@/components/ui/table';
+import { Activity, ArrowDown, ArrowDownLeft, ArrowUp, ArrowUpDown, ArrowUpRight, ArrowLeftRight, Banknote, Bell, CalendarDays, CalendarRange,
+  ChevronRight, CircleGauge, ClipboardCheck, Clock, CreditCard, FileStack, FileText, Fingerprint, Hash, Landmark, Layers,
+  ListChecks, Network, Scale, Settings2, Tag, Target, Timer, UserRound, WalletCards } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRowHead } from '@/components/ui/table';
 import { ActionButton } from './primary-button';
 import SpringCheck from './react-bits/SpringCheck';
 import { CountTag } from './semantic-tags';
@@ -15,7 +15,7 @@ const savedSelections = new Map();
 const sortFields = new WeakMap();
 const columnIcons = {
   ID: Fingerprint, transaction: ArrowLeftRight, '거래': ArrowLeftRight, '거래 ID': ArrowLeftRight,
-  rule: ListTree, Alert: Bell, Episode: FileStack, judgment: ClipboardCheck, target: ScanSearch, version: Layers,
+  rule: Scale, Alert: Bell, Episode: FileStack, judgment: ClipboardCheck, target: Target, version: Layers,
   account: Landmark, '계좌': Landmark, '상대 계좌': Landmark, '계좌 흐름': Network,
   date: CalendarDays, '거래 기간': CalendarRange, '기간 · KST': CalendarRange, '일자': CalendarDays,
   '거래 시각': Clock, '원본 거래 시각': Clock, '시각': Clock, '경과일': Timer,
@@ -23,7 +23,7 @@ const columnIcons = {
   to: ArrowDownLeft, '수취 계좌': ArrowDownLeft, '수취 은행 · 계좌': ArrowDownLeft, '방향': ArrowLeftRight,
   incoming: WalletCards, outgoing: WalletCards, incomingCount: Hash, outgoingCount: Hash, net: Banknote, amount: Banknote, '금액': Banknote,
   '거래 금액': Banknote, '지급 금액': Banknote, '수취 금액': Banknote, '결제 수단': CreditCard,
-  score: CircleGauge, '모델 점수': CircleGauge, '모델 점수·사람 판정': CircleGauge, '조사 신호': ScanSearch,
+  score: CircleGauge, '모델 점수': CircleGauge, '모델 점수·사람 판정': CircleGauge, '조사 신호': Activity,
   owner: UserRound, author: UserRound, '송금 소유주': UserRound, '수취 소유주': UserRound, '담당자': UserRound, '담당': UserRound,
   status: ListChecks, '조사 상태': ListChecks, '처리 상태': ListChecks, '업무 상태': ListChecks,
   verdict: ClipboardCheck, '판정': ClipboardCheck,
@@ -187,13 +187,27 @@ export function WorkflowQueryHeading({ title, summary, tools = true }) {
 }
 
 export function WorkflowTable({ label, title = label, summary, className = '', tableClassName = 'workflow-data-table',
-  tools = true, selection, children }) {
-  return <div className="data-table-frame">
+  tools = true, selection, compact, hierarchy, scrollRef, scrollbarGutter = 'stable', cellAlignment,
+  invertSelectedControls, children }) {
+  return <div className="data-table-frame" data-hierarchy={hierarchy || undefined}
+    data-cell-alignment={cellAlignment} data-invert-selected-controls={invertSelectedControls || undefined}>
     <WorkflowQueryHeading title={title} summary={summary} tools={tools} />
     <div className="data-table-content">
-      <div className={`data-table-scroll ${className}`} role="region" aria-label={`${label} 스크롤`} tabIndex={0}>
+      <div ref={scrollRef} className={`data-table-scroll ${className}`} data-compact={compact || undefined}
+        data-scrollbar-gutter={scrollbarGutter === 'auto' ? 'auto' : undefined}
+        role="region" aria-label={`${label} 스크롤`} tabIndex={0}>
         <Table className={tableClassName} aria-label={label}>{selection ? withSelectionColumn(children, selection) : children}</Table>
       </div>
     </div>
   </div>;
+}
+
+export function TableBranchToggle({ label, expanded, onClick, children }) {
+  return <ActionButton className="table-branch-toggle" aria-expanded={expanded} aria-label={label} onClick={onClick}>
+    <ChevronRight className="icon" aria-hidden="true" />{children}
+  </ActionButton>;
+}
+
+export function TableRecordCell({ action, children }) {
+  return <TableRowHead><div className="table-record-cell">{action}{children}</div></TableRowHead>;
 }

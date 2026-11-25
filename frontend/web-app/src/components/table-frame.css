@@ -1,3 +1,4 @@
+@import "./ui/table.css";
 .data-table-frame {
   --table-selection-width: var(--aml-size-control-comfortable);
   --table-cell-inset: var(--workspace-gap);
@@ -65,11 +66,53 @@
   min-block-size: 0;
   scrollbar-gutter: stable;
 }
+.data-table-scroll[data-scrollbar-gutter="auto"] { scrollbar-gutter: auto }
 .data-table-scroll:focus-visible {
   outline: var(--aml-stroke-focus) solid var(--focus-ring);
   outline-offset: calc(-1 * var(--aml-stroke-focus));
 }
 .data-table-scroll > [data-slot="table-container"] { min-inline-size: max-content; overflow: visible }
+.data-table-scroll[data-compact="true"] { --table-cell-inset: var(--aml-space-4) }
+.data-table-frame[data-hierarchy] .data-table-scroll > [data-slot="table-container"] {
+  min-inline-size: var(--hierarchy-table-min-width);
+}
+.data-table-frame[data-hierarchy] table { table-layout: fixed }
+.data-table-frame[data-hierarchy] tr[data-row-level="3"] {
+  scroll-margin-block-start: var(--header-height);
+}
+.data-table-frame[data-hierarchy] tbody tr[data-row-level="1"] { background-color: var(--information-panel-surface) }
+.data-table-frame[data-hierarchy] tbody tr[data-row-level] > :is(th, td) { padding-block: var(--aml-space-4) }
+.data-table-frame[data-hierarchy] th[scope="rowgroup"] { text-align: start }
+.data-table-frame[data-hierarchy] tbody tr:is([data-row-level="2"], [data-row-level="3"]) > th {
+  border-inline-start: var(--aml-stroke-divider) solid var(--aml-data-grid);
+}
+@media (min-width: 1121px) and (min-height: 481px) {
+  .data-table-frame[data-hierarchy],
+  .data-table-frame[data-hierarchy] :is(.data-table-content, .data-table-scroll) { flex: 1 }
+}
+.table-branch-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--aml-space-4);
+  padding: 0;
+  min-block-size: var(--aml-size-control-compact);
+  font-weight: inherit;
+  white-space: nowrap;
+}
+.table-branch-toggle .icon {
+  inline-size: var(--aml-size-icon-mini);
+  block-size: var(--aml-size-icon-mini);
+}
+.table-branch-toggle[aria-expanded="true"] .icon { rotate: calc(var(--aml-rotation-flip) / 2) }
+.table-record-cell {
+  display: grid;
+  grid-template-columns: var(--aml-size-control) minmax(0, max-content);
+  align-items: center;
+  min-block-size: var(--aml-size-control);
+  gap: var(--aml-space-4);
+}
+.table-record-cell > [data-tag="link"] { grid-column: 2; justify-self: start; padding: 0 }
+.table-record-cell > [data-tag="link"] code { font-weight: var(--aml-type-body-strong-weight) }
 .data-table-frame table {
   inline-size: 100%;
   border-collapse: separate;
@@ -81,15 +124,15 @@
 }
 .data-table-frame table :is(th, td) {
   padding: var(--table-cell-inset);
-  border-block-end: var(--aml-stroke-divider) solid var(--aml-data-grid);
   vertical-align: middle;
   white-space: nowrap;
 }
+.data-table-frame[data-cell-alignment="top"] tbody :is(th, td) { vertical-align: top }
 .data-table-frame table thead th {
   position: sticky;
   inset-block-start: 0;
-  z-index: 1;
-  background: var(--information-panel-surface);
+  z-index: var(--table-header-layer);
+  background-color: var(--information-panel-surface);
   color: var(--text);
   font-weight: var(--aml-type-body-strong-weight);
   text-align: start;
@@ -112,24 +155,27 @@
   --text: var(--selection-ink);
   --muted-text: var(--selection-muted);
   --focus-ring: var(--selection-ink);
-  background: var(--selection-surface);
+  background-color: var(--selection-surface);
   color: var(--selection-ink);
 }
+.data-table-frame[data-invert-selected-controls="true"] tbody tr[data-selected="true"] {
+  --divider: var(--selection-divider);
+  --hover: var(--selection-hover);
+  --pressed: var(--selection-press);
+  background: var(--selection-surface);
+}
 .data-table-frame tbody tr[data-verdict]:not([data-selected="true"], [data-state="selected"]) {
-  --table-row-hover-strength: 10%;
-  background: var(--record-verdict-surface);
+  --table-row-hover-strength: var(--table-row-hover-verdict-strength);
+  background-color: var(--record-verdict-surface);
 }
 .data-table-frame tbody tr[data-slot="table-row"]:not([data-selected="true"], [data-state="selected"]):has(
   > :is(th, td) :is(button, a[href], input):not(:disabled, [aria-disabled="true"])
 ):is(:hover, :has(:focus-visible)) {
-  background: color-mix(in srgb, var(--record-verdict-surface, var(--information-panel-surface)),
-    light-dark(var(--aml-black-100), var(--aml-white-100)) var(--table-row-hover-strength, 14%));
+  background-color: color-mix(in srgb, var(--record-verdict-surface, var(--information-panel-surface)),
+    light-dark(var(--aml-black-100), var(--aml-white-100)) var(--table-row-hover-strength, var(--table-row-hover-default-strength)));
 }
 .data-table-frame table th:has(> .table-sort-button) {
   padding: 0;
-}
-.data-table-frame th:has(> .table-sort-button):not(:last-child) {
-  border-inline-end: var(--aml-stroke-divider) solid var(--aml-data-grid);
 }
 .data-table-frame .table-sort-button {
   display: flex;
@@ -149,6 +195,11 @@
   align-items: center;
   gap: var(--aml-space-6);
 }
+.data-table-frame .data-table-scroll[data-compact="true"] .table-sort-button {
+  column-gap: var(--table-cell-inset);
+  padding-inline: var(--table-cell-inset);
+}
+.data-table-scroll[data-compact="true"] .table-field-label { column-gap: var(--table-cell-inset) }
 .table-field-label .icon,
 .data-table-frame .table-sort-button .icon {
   flex: none;
@@ -164,3 +215,70 @@
   background: var(--selection-surface);
   --focus-ring: var(--selection-ink);
 }
+
+/* 전체 폭 화면, 사건 목록과 원장처럼 스크롤 영역을 갖는 공용 표. */
+@media (min-width: 769px) and (min-height: 481px) {
+  [data-case-list-table] .data-table-scroll { padding-block-end: var(--workspace-footer-inset) }
+}
+.screen-layout > [data-case-list-table] {
+  display: flex;
+  flex-direction: column;
+  max-block-size: var(--workspace-available-block);
+}
+.case-table-scroll.entry-list { margin-block-start: 0 }
+@media (max-width: 768px), (max-height: 480px) {
+  .screen-layout > [data-case-list-table],
+  [data-case-list-table] .case-table-scroll.entry-list { max-block-size: none }
+}
+.preview-case-table code { font-family: var(--aml-font-mono) }
+.case-evidence-table { min-block-size: 0 }
+.case-table-pages { display: contents }
+.screen-layout:has(> [data-workflow="case-overview"]) > .screen-table {
+  min-block-size: 0;
+  align-self: start;
+}
+.overview-panel-visual:has(.case-evidence-table) { justify-content: start }
+.preview-case-overview .case-evidence-table { margin-block-start: var(--workspace-gap); min-inline-size: 0; min-block-size: 0 }
+.ledger-tables {
+  display: grid;
+  min-inline-size: 0;
+  align-content: start;
+  gap: var(--workspace-panel-gap);
+}
+@media (min-width: 1121px) and (min-height: 481px) {
+  .screen-layout:has(> [data-investigation-component="ledger"] > .ledger-tables) {
+    display: flex;
+    flex-direction: column;
+    padding-block-end: 0;
+  }
+  .screen-layout:has(> [data-investigation-component="ledger"] > .ledger-tables)
+    > [data-investigation-component="ledger"] {
+    display: grid;
+    flex: 1;
+    grid-template-rows: minmax(0, 1fr);
+    min-block-size: 0;
+  }
+  .ledger-tables { grid-template-rows: minmax(var(--workspace-panel-min-height), 1fr) minmax(0, auto) }
+  .ledger-tables .data-table-scroll { padding-block-end: var(--workspace-footer-inset) }
+}
+
+/* 필터가 붙는 표 헤더와 화면별 행 읽기 방식. */
+.data-table-tools > .context-query-tools { margin-inline-start: auto }
+.table-query-slot:not(:has(.active-query-tags)) { display: none }
+.workflow-rule-list tbody tr[data-selected] { cursor: pointer }
+.workflow-rule-list .workflow-data-table th[scope="row"] { white-space: normal }
+.workflow-report .data-table-frame :is(.workflow-report-targets, .workflow-report-patterns) {
+  flex-flow: column nowrap;
+  align-items: flex-start;
+}
+.variable-table {
+  max-block-size: min(var(--table-scroll-region-max-height), calc(var(--aml-space-64) * 7));
+}
+.variable-table thead {
+  position: sticky;
+  inset-block-start: 0;
+  background: var(--information-panel-surface);
+}
+.variable-table > [data-slot="table-container"] { min-inline-size: 0 }
+.variable-table :is(th, td) { padding: var(--aml-space-8) var(--aml-space-12) }
+.variable-table td { white-space: normal; overflow-wrap: anywhere }
