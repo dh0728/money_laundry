@@ -643,7 +643,11 @@ button:not(:disabled), [role=button]:not([aria-disabled=true]), [role=tab], [rol
 .transaction-connector { position:absolute; top:0; bottom:0; z-index:var(--layer-raised-content); color:var(--muted-foreground); pointer-events:none; }
 .owner-account-connector { left:var(--owner-stage-width); width:var(--transaction-connector-width); }
 .account-transaction-connector { left:calc(var(--owner-stage-width) + var(--transaction-connector-width) + var(--account-stage-width)); width:var(--transaction-connector-width); }
-.transaction-connector-edge { position:absolute; inset:0; }
+.transaction-connector-edge {
+  --source-y: calc(var(--transaction-stage-connector-origin) + var(--aml-space-64) * var(--source-index));
+  --target-y: calc(var(--transaction-stage-connector-origin) + var(--aml-space-64) * var(--target-index));
+  position:absolute; inset:0;
+}
 .transaction-connector-edge[data-active="false"] { color:var(--muted-foreground); }
 .transaction-connector-edge[data-active="true"] { color:var(--foreground); z-index:var(--layer-raised-content); }
 .transaction-connector-edge::before { content:""; position:absolute; top:var(--source-y); left:0; width:50%; border-top:var(--transaction-connector-stroke) solid; }

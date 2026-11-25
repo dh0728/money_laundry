@@ -2,6 +2,12 @@ import React, { useId } from 'react';
 import { readChartNumber } from '../chart-design-values';
 import './transaction-flow-graphics.css';
 
+export function TransactionFlowBand({ suspicious }) {
+  return <svg viewBox="0 0 420 112" aria-hidden="true" focusable="false" className="pointer-events-none absolute inset-0 h-full w-full">
+    <path d="M118 38 C176 38 244 38 302 38 L302 74 C244 74 176 74 118 74 Z" className={suspicious ? 'fill-destructive/35' : 'fill-muted-foreground/35'} />
+  </svg>;
+}
+
 export function FlowConnectionOverlay({ connections, ref }) {
   return <svg ref={ref} className="flow-connection-overlay" aria-hidden="true" focusable="false">
     {connections.map(({ name, targetIndex, active, d }) => <path key={`${name}-${targetIndex}`} data-source={name}
