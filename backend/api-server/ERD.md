@@ -28,6 +28,7 @@ erDiagram
     episodes ||--o{ episode_alerts : contains
     alerts ||--o| episode_alerts : belongs
     episodes ||--o{ judgments : judged
+    judgments ||--o{ ai_reports : reported
     alerts ||--o{ work_requests : requested
     episodes ||--o{ work_requests : requested
     rules ||--o{ rule_versions : versions
@@ -65,6 +66,7 @@ erDiagram
 | review | episodes | Episode 담당·상태·종결 결과·처리 기한(due_on)·현재 범위 요약/revision/digest. Alert와 별도 테이블 |
 | review | alert_versions, alert_transactions, alert_coverage_checks | 버전별 불변 생성 근거·거래·커버리지. alert_transactions.seed_risk는 당시 SEED의 p_laundering이며 나머지는 NULL. 현재 위험도는 현재 조사 범위에서 계산해 root summary와 생성 컬럼 risk_score에 저장 |
 | review | judgments | Alert 또는 Episode의 판정(정상/이상, 사유 유형, 근거·관찰·판정 사유, 판정자·시각). 유효한 판정은 사건당 하나이며, 재검토로 다시 열면 이전 판정은 superseded_at을 채워 기록으로 남긴다 |
+| review | ai_reports | 법정 STR 작성을 위한 분석 보고서. '의심' 판정(judgment_id) 하나를 근거로 만든다. 코드가 만든 사실 목록·표(facts), Claude 서술(ai_output), 담당자 수정본(edited_output), 입력 해시·모델·프롬프트 버전, 생성 상태(GENERATED/FAILED)·실패 코드, 작성자·수정자와 시각. 다시 만들면 새 줄을 쌓고 최신 줄을 보여 준다 |
 | review | work_requests | 보관함의 업무 요청·지시(유형, 대상 사건, 보낸 사람·받는 사람, 사유, 기한, 상태, 처리 내용, 적용 시각과 적용 전 상태, 읽지 않은 사람) |
 | review | alert_tx_edits | 직원이 Alert에서 뺀 거래(target 없음)와 다른 OPEN Alert로 옮긴 거래(target 있음), 사유·수정자 |
 | review | episode_alerts | Episode에 편입된 Alert. Episode 거래는 소속 Alert의 현재 거래 합집합 |

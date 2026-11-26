@@ -414,6 +414,20 @@ CREATE TABLE review.judgments (
 );
 CREATE UNIQUE INDEX judgments_alert ON review.judgments(alert_id) WHERE superseded_at IS NULL;
 CREATE UNIQUE INDEX judgments_episode ON review.judgments(episode_id) WHERE superseded_at IS NULL;
+-- 법정 STR 작성을 위한 분석 보고서. '의심' 판정 하나를 근거로 만든다. 다시 만들면 새 줄을 쌓고 최신 줄을 보여 준다.
+-- facts는 코드가 만든 사실 목록·표(Claude 입력), ai_output은 Claude 서술, edited_output은 담당자 수정본이다.
+CREATE TABLE review.ai_reports (
+ report_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ judgment_id BIGINT NOT NULL REFERENCES review.judgments,
+ status TEXT NOT NULL CHECK(status IN ('GENERATED','FAILED')),
+ facts JSONB NOT NULL, ai_output JSONB, edited_output JSONB,
+ CHECK(status='FAILED' OR ai_output IS NOT NULL),
+ input_digest TEXT NOT NULL, model TEXT NOT NULL, prompt_version TEXT NOT NULL, error_code TEXT,
+ created_by BIGINT NOT NULL REFERENCES core.users, created_at TIMESTAMPTZ NOT NULL,
+ edited_by BIGINT REFERENCES core.users, edited_at TIMESTAMPTZ,
+ CHECK(num_nonnulls(edited_by,edited_at) IN (0,2))
+);
+CREATE INDEX ai_reports_judgment ON review.ai_reports(judgment_id,report_id DESC);
 -- 보관함의 업무 요청. 분석가가 관리자에게 요청하거나 관리자가 분석가에게 지시한다.
 -- 재검토(다시 열기)·담당 변경·처리 상태·처리 기한은 적용될 때 applied_at과 적용 전 상태(before)를 남긴다.
 CREATE TABLE review.work_requests (

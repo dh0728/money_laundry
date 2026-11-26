@@ -91,12 +91,24 @@ def request_upload(client, day, file, size, checksum, *, cf_headers=None):
     return target
 
 
-def upload_file(source, target, size):
+def _chunks(stream, size, on_progress, chunk=1 << 20):
+    """Yields the file in 1 MiB blocks and reports bytes handed to the connection so far."""
+    sent = 0
+    while block := stream.read(chunk):
+        sent += len(block)
+        if on_progress is not None:
+            on_progress(sent, size)
+        yield block
+
+
+def upload_file(source, target, size, on_progress=None):
     headers = dict(target['headers'])
+    # An explicit length keeps httpx from switching to chunked encoding, which signed PUTs refuse.
     headers['Content-Length'] = str(size)
     with source.open('rb') as stream:
         # The timeout bounds each read/write, not the whole transfer of a large file.
-        response = httpx.put(target['url'], content=stream, headers=headers, timeout=60)
+        response = httpx.put(target['url'], content=_chunks(stream, size, on_progress),
+                             headers=headers, timeout=60)
     if not 200 <= response.status_code < 300:
         raise UploadHttpError(response.status_code)
 
