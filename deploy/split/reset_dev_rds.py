@@ -22,10 +22,9 @@ from pathlib import Path
 ROOT = Path("/opt/aml")
 DATABASE = "aml_dev_v3"
 SCHEMAS = ("core", "ingest", "ledger", "analysis", "review", "ops", "private", "evaluation")
+# Banks are ledger data now (named by the loaded ledger files), so only accounts and FX rates are kept.
 CONFIGURATION = {
     "users": "user_id,username,name,role,password_hash,last_assigned_at,created_at",
-    "banks": "bank_id,name,country,is_reporting,report_format,created_at,updated_at",
-    "bank_reporting_periods": "period_id,bank_id,effective_from_date,effective_to_date",
     "fx_rates": "fx_rate_version,currency,units_per_usd",
 }
 
@@ -65,7 +64,7 @@ with psycopg.connect(url, user=os.environ["SPRING_DATASOURCE_USERNAME"],
         pairs = sql.SQL(",").join(sql.SQL("{},(SELECT coalesce(json_agg(t),'[]'::json) FROM (SELECT {} FROM core.{}) t)").format(
             sql.Literal(table), sql.SQL(",").join(map(sql.Identifier, columns.split(","))), sql.Identifier(table))
             for table, columns in CONFIGURATION.items())
-        # One SELECT gives all four tables one snapshot; NUMERIC rates stay exact as text.
+        # One SELECT gives both tables one snapshot; NUMERIC rates stay exact as text.
         tables = db.execute(sql.SQL("SELECT json_build_object({})::text").format(pairs)).fetchone()[0]
         print(tables)
     elif ACTION == "drop":
@@ -88,23 +87,23 @@ with psycopg.connect(url, user=os.environ["SPRING_DATASOURCE_USERNAME"],
     elif ACTION == "restore":
         tables = PAYLOAD
         with db.transaction():
-            db.execute("LOCK TABLE core.users,core.banks,core.bank_reporting_periods,core.fx_rates IN ACCESS EXCLUSIVE MODE")
+            db.execute("LOCK TABLE core.users,core.fx_rates IN ACCESS EXCLUSIVE MODE")
             busy = db.execute("""SELECT EXISTS(SELECT FROM ingest.uploads) OR EXISTS(SELECT FROM analysis.jobs)
                 OR EXISTS(SELECT FROM ledger.transactions) OR EXISTS(SELECT FROM review.alerts)
                 OR EXISTS(SELECT FROM review.episodes)""").fetchone()[0]
             if busy:
                 raise SystemExit("REFUSED: business data exists; restore only into a fresh schema")
-            db.execute("DELETE FROM core.bank_reporting_periods; DELETE FROM core.banks; DELETE FROM core.users; DELETE FROM core.fx_rates")
+            db.execute("DELETE FROM core.users; DELETE FROM core.fx_rates")
             for table, columns in CONFIGURATION.items():
                 rows = tables[table]
                 if table == "users":
                     # Assignment rotation is business state, never restored as configuration.
                     rows = [dict(row, last_assigned_at=None) for row in rows]
                 names = sql.SQL(",").join(map(sql.Identifier, columns.split(",")))
-                overriding = sql.SQL(" OVERRIDING SYSTEM VALUE" if table in ("users", "bank_reporting_periods") else "")
+                overriding = sql.SQL(" OVERRIDING SYSTEM VALUE" if table == "users" else "")
                 db.execute(sql.SQL("INSERT INTO core.{t}({c}){o} SELECT {c} FROM json_populate_recordset(NULL::core.{t},%s::json)").format(
                     t=sql.Identifier(table), c=names, o=overriding), (json.dumps(rows),))
-            for table, column in (("users", "user_id"), ("bank_reporting_periods", "period_id")):
+            for table, column in (("users", "user_id"),):
                 db.execute(sql.SQL("SELECT setval(pg_get_serial_sequence({t},{c}),coalesce(max({ci}),1),max({ci}) IS NOT NULL) FROM core.{ti}").format(
                     t=sql.Literal("core." + table), c=sql.Literal(column), ci=sql.Identifier(column), ti=sql.Identifier(table)))
         print(json.dumps({table: len(rows) for table, rows in tables.items()}))

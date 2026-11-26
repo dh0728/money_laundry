@@ -27,7 +27,7 @@ GRANTS = REPO / "backend/api-server/worker/analysis_permissions.sql"
 def tables(users=1):
     return {"users": [dict(user_id=1, username="admin", name="관리자", role="ADMIN", password_hash="hash",
                            last_assigned_at=None, created_at="2026-10-13T00:00:00+00:00")][:users],
-            "banks": [], "bank_reporting_periods": [], "fx_rates": []}
+            "fx_rates": []}
 
 
 class BackupFileTests(unittest.TestCase):
@@ -138,21 +138,22 @@ class InnerSqlTests(unittest.TestCase):
     def test_backup_drop_migrate_restore_grant(self):
         self.migrate()
         self.admin.execute("UPDATE core.users SET password_hash='kept-hash' WHERE username='admin'")
-        self.admin.execute("INSERT INTO core.banks(bank_id,name,is_reporting) VALUES(12,'Germany Bank #12',true)")
-        self.admin.execute("INSERT INTO core.bank_reporting_periods(bank_id,effective_from_date) VALUES(12,'2023-08-31')")
+        # Banks are ledger data: they are neither backed up nor restored.
+        self.admin.execute("INSERT INTO core.banks(bank_id,name) VALUES(12,'Germany Bank #12')")
         report = json.loads(self.run_inner("inspect"))
         self.assertEqual(report["unexpected_schemas"], [])
         self.assertEqual(report["flyway_versions"], ["1"])
         saved = json.loads(self.run_inner("backup"), parse_float=str)
-        self.assertEqual(len(saved["banks"]), 1)
+        self.assertEqual(set(saved), {"users", "fx_rates"})
+        self.assertEqual(len(saved["fx_rates"]), 15)
         self.assertEqual(self.run_inner("drop"), "EMPTIED")
         self.assertIsNone(self.admin.execute("SELECT to_regclass('core.users')").fetchone()[0])
         self.assertIsNone(self.admin.execute("SELECT to_regclass('public.flyway_schema_history')").fetchone()[0])
         self.migrate()
         counts = json.loads(self.run_inner("restore", saved))
-        self.assertEqual(counts["banks"], 1)
+        self.assertEqual(counts["fx_rates"], 15)
         self.assertEqual(self.admin.execute("SELECT password_hash FROM core.users WHERE username='admin'").fetchone()[0], "kept-hash")
-        self.assertEqual(self.admin.execute("SELECT name FROM core.banks").fetchone()[0], "Germany Bank #12")
+        self.assertEqual(self.admin.execute("SELECT count(*) FROM core.banks").fetchone()[0], 0)
         self.admin.execute("CREATE ROLE aml_dev_analysis LOGIN")
         self.assertEqual(self.run_inner("grant"), "GRANTED")
         self.assertTrue(self.admin.execute("SELECT has_table_privilege('aml_dev_analysis','analysis.jobs','SELECT')").fetchone()[0])

@@ -48,8 +48,6 @@ class DatabaseTransitionTests(unittest.TestCase):
         reset = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(reset)
         self.admin.execute("UPDATE core.users SET password_hash='fixture-hash' WHERE username='admin'")
-        self.admin.execute("INSERT INTO core.banks(bank_id,name,is_reporting) VALUES(991,'Fixture',true)")
-        self.admin.execute("INSERT INTO core.bank_reporting_periods(bank_id,effective_from_date) VALUES(991,'2023-01-01')")
         self.admin.execute("INSERT INTO core.fx_rates VALUES('precision-fixture','USD',123456789012.12345678)")
 
         def psql(statement, database=None):
