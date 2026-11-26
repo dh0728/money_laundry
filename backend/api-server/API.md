@@ -541,3 +541,14 @@ TRANSFER는 Episode 측 이벤트 하나만 알림으로 제공한다. 같은 �
 | POST /api/v1/settings/team/{userId}/role | `{role:"STAFF"\|"ADMIN"}`. ADMIN만(아니면 403). 본인 권한은 바꿀 수 없다(409). 바뀐 권한은 다음 요청부터 적용된다. `{id,name,role}`. 팀원 목록은 GET /api/v1/demo/users |
 | GET /api/v1/settings/model-risk-bands | 모델 점수 위험 구간(화면 표시 기준). `{medium,high}` = 주의·위험 구간의 시작 점수. 기본 70·90 |
 | POST /api/v1/settings/model-risk-bands | `{medium,high}`. ADMIN만. 1 ≤ medium < high ≤ 99, 아니면 400. 모델의 판단 임계값과 Alert 구성에는 영향이 없다 |
+
+## 14. AI 요약
+
+| API | 내용 |
+|---|---|
+| GET /api/v1/ai-summary/cases/{caseId} | Alert·Episode 개요의 AI 요약. 로그인 STAFF/ADMIN. `{caseId,kind,headline,points[{text,sources[]}],facts[{id,text}],model,generatedAt}`. kind는 ALERT/EPISODE. 없는 사건 404, 키 미설정·Claude 실패·거절·검사 탈락은 503 `AI_SUMMARY_UNAVAILABLE` |
+
+- 서버가 현재 범위 요약(`review.cases.summary`)과 룰 적중으로 사실 목록(F1…)을 만들고, Claude는 그 목록만 보고 결론 한 줄과 근거 문장을 쓴다. Episode는 소속 Alert 요약과 둘 이상의 Alert에 나오는 계좌를 더한다.
+- 서버는 근거 번호가 없는 사실을 가리키거나 사실 목록에 없는 숫자를 쓴 문장을 버린다. 결론 줄이 걸리거나 남는 문장이 없으면 503이다.
+- 결과는 DB에 저장하지 않는다. 모델·프롬프트 버전과 사실 목록이 같으면 서버 메모리(최근 500건)의 결과를 다시 쓴다. 서버를 다시 띄우면 다시 만든다.
+- 설정: `ANTHROPIC_API_KEY`(비면 503), `AI_MODEL`(기본 `claude-haiku-5-5`). 화면은 503이면 기존 규칙 문장을 그대로 보여 준다.
