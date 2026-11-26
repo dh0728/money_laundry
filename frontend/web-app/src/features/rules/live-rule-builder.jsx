@@ -12,7 +12,7 @@ import {
   conditionCount, definitionFromTemplate, formatValue, isGroup, parseValue, removeFilterItem, removeWhereItem, sameDefinition, sideOf,
   sidedText, templateOf, toggleWhereOperator, windowLabel, windowOptions,
 } from './rule-definition';
-import { codeToRuleId, loadRuleCatalog, problemText, refreshLiveRules } from './live-rule-store';
+import { codeToRuleId, loadRuleCatalog, openRuleInList, problemText } from './live-rule-store';
 import './live-rule-engine.css';
 
 // 룰 만들기. 템플릿을 고르면 기본값이 채워지고, IF(세는 거래 · 기간 · 적중 조건) → THEN 을 고쳐 초안으로 저장한다.
@@ -384,20 +384,14 @@ export function LiveRuleBuilder({ actionsHost, initialRuleId = ruleFromAddress()
     setSaving(true);
     setFailure('');
     try {
-      if (saved) {
-        const result = await saveRuleDraft(saved.ruleId, saved.versionId, { name: trimmed, definition, revision: saved.revision });
-        setSaved({ ...saved, revision: result.revision, name: result.name, definition });
-      } else {
-        const result = await createRule({ name: trimmed, template: templateKey, definition });
-        setSaved({ ...result, versionNo: 1, name: trimmed, definition });
-        // 새로 고쳐도 같은 초안을 이어서 쓰도록 주소에 룰 번호를 남긴다
-        window.history.replaceState(window.history.state, '', `${window.location.pathname}?rule=${result.code}`);
-      }
-      setNotice('');
-      void refreshLiveRules();
+      const code = saved
+        ? (await saveRuleDraft(saved.ruleId, saved.versionId, { name: trimmed, definition, revision: saved.revision }), saved.code)
+        : (await createRule({ name: trimmed, template: templateKey, definition })).code;
+      // 저장하면 룰 목록으로 가서 방금 저장한 룰을 보여 준다. 다음에 할 일(백테스트 · 시험 운영 · 승인 요청)이 거기 있고,
+      // 더 고치려면 거기서 "이어서 작성"으로 돌아온다. 화면이 넘어갈 때까지 저장 버튼은 꺼 둔다(두 번 저장하지 않게).
+      openRuleInList(code);
     } catch (error) {
       setFailure(problemText(error, '룰을 저장하지 못했습니다.'));
-    } finally {
       setSaving(false);
     }
   }
@@ -422,12 +416,6 @@ export function LiveRuleBuilder({ actionsHost, initialRuleId = ruleFromAddress()
           <p aria-busy={checking || undefined}>{check?.sentence ?? (checkFailure || (check ? '형식이 맞지 않아 문장으로 읽을 수 없습니다.' : '조건을 확인하는 중입니다.'))}</p>
         </section>
         {failure && <p role="alert" data-rule-block-error>{failure}</p>}
-        {saved && !dirty && <div role="status" className="rule-draft-actions">
-          <p><strong>{saved.code}</strong> 초안이 저장되었습니다.</p>
-          <ActionButton as="a" href={`/rules?rule=${saved.code}`}>저장한 룰 보기</ActionButton>
-          {(catalog.backtestTemplates ?? []).includes(templateKey) && check?.canRun
-            && <ActionButton as="a" href={`/rules/backtest?rule=${saved.code}`}>백테스트로 열기</ActionButton>}
-        </div>}
       </form>
     </Panel>
     <Checklist check={check} checking={checking} failure={checkFailure} />

@@ -7,6 +7,7 @@ import {
 } from '@/api/rules';
 import { LiveRuleBuilder } from './live-rule-builder';
 import { LiveRuleList } from './live-rule-list';
+import { openRuleInList } from './live-rule-store';
 import { activeRuleFixture, catalogFixture, checkFixture, draftRuleFixture, rulesFixture } from './rule-test-fixtures';
 
 // 서비스 모드의 룰 만들기 · 룰 목록. 서버 응답은 실제 응답을 줄인 것(rule-test-fixtures)으로 대신한다.
@@ -14,6 +15,9 @@ vi.mock('@/api/rules', () => ({
   fetchRuleCatalog: vi.fn(), fetchRules: vi.fn(), fetchRule: vi.fn(), validateRule: vi.fn(), createRule: vi.fn(), saveRuleDraft: vi.fn(), deleteRuleDraft: vi.fn(),
   commandRule: vi.fn(), createRuleVersion: vi.fn(), cloneRule: vi.fn(),
 }));
+
+// 룰 목록으로 넘어가는 것(페이지를 새로 읽는다)만 가짜로 바꾸고 나머지는 그대로 쓴다
+vi.mock('./live-rule-store', async original => ({ ...(await original()), openRuleInList: vi.fn() }));
 
 const fanOutDefaults = catalogFixture.templates.find(template => template.key === 'FAN_OUT').defaults;
 const fanOut = { schema: 2, template: 'FAN_OUT', ...fanOutDefaults };
@@ -104,28 +108,40 @@ it('값을 고치고 조건 줄 사이의 AND 를 눌러 OR 로 바꾸면 바뀐
   expect(fanOutDefaults.where.items).toEqual([{ metric: 'DISTINCT_COUNTERPARTIES', cmp: 'GTE', value: 6 }]);
 });
 
-it('처음 저장은 룰을 만들고 주소에 번호를 남기며, 다시 저장은 같은 초안을 revision 과 함께 고친다', async () => {
+it('새 룰을 저장하면 룰을 만들고 룰 목록으로 가서 그 룰을 보여 준다', async () => {
   await builder();
   fireEvent.change(screen.getByLabelText('룰 이름'), { target: { value: '  분산 송금 감시  ' } });
   await waitFor(() => expect(saveButton()).toBeEnabled());
   fireEvent.click(saveButton());
 
-  expect(await screen.findByRole('heading', { name: 'RULE-009 · v1 작성 중' })).toBeInTheDocument();
+  await waitFor(() => expect(openRuleInList).toHaveBeenCalledWith('RULE-009'));
   expect(createRule).toHaveBeenCalledWith({ name: '분산 송금 감시', template: 'FAN_OUT', definition: fanOut });
-  expect(window.location.search).toBe('?rule=RULE-009');
-  expect(screen.getByRole('link', { name: '저장한 룰 보기' })).toHaveAttribute('href', '/rules?rule=RULE-009');
-  expect(screen.getByRole('link', { name: '백테스트로 열기' })).toHaveAttribute('href', '/rules/backtest?rule=RULE-009');
-  // 고친 것이 없으면 다시 저장하지 않고, 저장한 룰의 템플릿은 바꾸지 못한다
+  expect(openRuleInList).toHaveBeenCalledTimes(1);
+  // 화면이 넘어갈 때까지 저장 버튼은 꺼져 있다. 한 번 더 눌러도 룰이 또 생기지 않는다.
+  expect(saveButton()).toBeDisabled();
+  fireEvent.click(saveButton());
+  expect(createRule).toHaveBeenCalledTimes(1);
+  // 예전에는 이 화면에 머물며 "초안이 저장되었습니다"와 링크를 보여 줬다
+  expect(screen.queryByText(/초안이 저장되었습니다/)).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: '저장한 룰 보기' })).not.toBeInTheDocument();
+});
+
+it('이어서 쓰던 초안을 저장하면 같은 초안을 revision 과 함께 고치고 룰 목록으로 간다', async () => {
+  render(<LiveRuleBuilder actionsHost={footer} initialRuleId={4} />);
+  expect(await screen.findByRole('heading', { name: 'RULE-004 · v1 작성 중' })).toBeInTheDocument();
+  await screen.findByText(checkFixture.sentence, undefined, { timeout: 3000 });
+  // 고친 것이 없으면 저장하지 않고, 저장된 룰의 템플릿은 바꾸지 못한다
   expect(saveButton()).toBeDisabled();
   expect(screen.getByRole('button', { name: /RANDOM/ })).toBeDisabled();
 
   fireEvent.change(part('기간').getByLabelText('기간'), { target: { value: '1440' } });
-  await waitFor(() => expect(lastChecked()).toMatchObject({ ruleId: 9, definition: { windowMinutes: 1440 } }), { timeout: 3000 });
+  await waitFor(() => expect(lastChecked()).toMatchObject({ ruleId: 4, definition: { windowMinutes: 1440 } }), { timeout: 3000 });
   await waitFor(() => expect(saveButton()).toBeEnabled());
   fireEvent.click(saveButton());
-  await waitFor(() => expect(saveRuleDraft).toHaveBeenCalledWith(9, 31, { name: '분산 송금 감시', definition: { ...fanOut, windowMinutes: 1440 }, revision: 0 }));
-  expect(createRule).toHaveBeenCalledTimes(1);
-  await waitFor(() => expect(saveButton()).toBeDisabled());
+  await waitFor(() => expect(openRuleInList).toHaveBeenCalledWith('RULE-004'));
+  expect(saveRuleDraft).toHaveBeenCalledWith(4, draftRuleFixture.working.versionId,
+    { name: '분산 송금 감시', definition: { ...draftRuleFixture.working.definition, windowMinutes: 1440 }, revision: draftRuleFixture.working.revision });
+  expect(createRule).not.toHaveBeenCalled();
 });
 
 it('고친 조건을 확인하지 못하면 고치기 전 조건의 문장을 남기지 않고 저장을 막는다', async () => {
@@ -164,7 +180,10 @@ it('형식이 틀리면 저장을 막고, 서버가 저장을 거절하면 사�
   await waitFor(() => expect(saveButton()).toBeEnabled(), { timeout: 3000 });
   fireEvent.click(saveButton());
   expect(await screen.findByRole('alert')).toHaveTextContent('룰을 만들 권한이 없습니다.');
+  // 저장하지 못하면 이 화면에 남아 사유를 보여 주고, 고쳐서 다시 저장할 수 있다
   expect(screen.getByRole('heading', { name: '새 룰' })).toBeInTheDocument();
+  expect(openRuleInList).not.toHaveBeenCalled();
+  expect(saveButton()).toBeEnabled();
 });
 
 it('이어서 작성은 저장된 초안을 불러오고, 고칠 수 없는 룰이면 새 룰로 연다', async () => {
