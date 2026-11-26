@@ -44,6 +44,7 @@ import { uiSizeOptions } from '../config/appearance-options.js';
 import { enableBackdropDismissal, setupOverlayDismissal } from '../lib/overlay-dismissal.js';
 import { SquishSwitch, bindSquishSwitch } from '../components/squish-switch.js';
 import { mountNotificationPreference, receivesSampleNotifications } from '../features/settings/notification-preference.jsx';
+import { notificationRowTitle, ruleNotificationLink, RuleNotificationLink } from '../features/rules/rule-notification.jsx';
 import { getModelRiskThresholds, loadLiveModelRiskThresholds } from '../features/settings/model-risk-settings.js';
 import { restoreWorkTabCodes, setWorkTabCodes } from './work-tab-state.js';
 import { benchmarkLedgerPath, dashboardRoute, initialDetail, isBenchmarkTransactionCode, isLedgerScreen, ledgerTableScreen, loginRoute, previewUrl, readPreviewRoute, validWorkCode } from './preview-route.js';
@@ -226,7 +227,7 @@ function Notification() {
       item = next;
       button.dataset.notificationId = item.id;
       button.setAttribute('aria-controls', item.request ? 'work-request-dialog' : 'notification-dialog');
-      title.data = item.title;
+      title.data = notificationRowTitle(item);
       marker.classList.toggle('unread-dot', !item.read);
       status.hidden = item.read;
       const dateTime = item.time.toISOString();
@@ -351,6 +352,7 @@ document.body.replaceChildren(HTMLFragment(Header() + NavigationSidebar() +
     HeadingHTML('', 'id="notification-detail-title"', 3) +
     TextHTML(TextHTML('', 'id="notification-detail-time"', 'time'), '', 'p') +
     TextHTML('', 'id="notification-detail-description"', 'p') +
+    BoxHTML('', 'id="notification-detail-rule"') +
     BoxHTML('', 'id="notification-detail-cases" hidden'),
   ) + PreferenceDialog('work-request', '업무 요청', BoxHTML('', 'id="work-request-content"'), { wrapContent: false }) +
   Tooltip() + LoginScreen()));
@@ -1256,6 +1258,7 @@ searchDialog.addEventListener('keydown', event => {
 });
 const unreadOnly = byId('unread-only');
 const notificationDialog = byId('notification-dialog');
+const notificationRuleRoot = createRoot(byId('notification-detail-rule'));
 const workRequestDialog = byId('work-request-dialog');
 const workRequestRoot = createRoot(byId('work-request-content'));
 const inboxRequestFooter = byId('inbox-request-footer');
@@ -1274,12 +1277,15 @@ function openNotification(item) {
   time.dateTime = item.time.toISOString();
   time.textContent = dateFormat.format(item.time);
   byId('notification-detail-description').textContent = item.description || '알림에 추가 내용이 없습니다.';
+  // 룰 알림은 이어진 사건이 없다. 그 룰의 화면으로 가는 길을 대신 둔다.
+  const ruleLink = ruleNotificationLink(item);
+  notificationRuleRoot.render(ruleLink ? createElement(RuleNotificationLink, { item }) : null);
   const related = byId('notification-detail-cases');
-  related.hidden = !liveInbox;
+  related.hidden = !liveInbox || Boolean(ruleLink);
   related.replaceChildren();
   notificationDialog.showModal();
   if (!item.read) void markInboxRead([item]);
-  if (liveInbox) void loadNotificationCases(item, related);
+  if (liveInbox && !ruleLink) void loadNotificationCases(item, related);
 }
 
 function workRequestActor() {

@@ -121,11 +121,11 @@ describe('escape-hatch', () => {
 });
 
 describe('automation', () => {
-  it('세 작업 브랜치의 CI가 위반 0건과 실제 API 빌드를 검사한다', () => {
+  it('frontend·dev 병합 요청과 dev 푸시의 CI가 위반 0건과 실제 API 빌드를 검사한다', () => {
     const ci = readFileSync(resolve(repo, '.github/workflows/ci.yml'), 'utf8').replaceAll('\r\n', '\n');
-    for (const event of ['push', 'pull_request']) {
+    for (const [event, expected] of Object.entries({ push: ['dev'], pull_request: ['frontend', 'dev'] })) {
       const branches = ci.match(new RegExp(`^  ${event}:\\n    branches:\\n((?:      - [^\\n]+\\n)+)`, 'm'))?.[1];
-      for (const branch of ['fe/work', 'frontend', 'dev']) expect(branches).toContain(`- ${branch}\n`);
+      for (const branch of expected) expect(branches).toContain(`- ${branch}\n`);
     }
     for (const step of ['pnpm run lint\n', 'pnpm run lint:design --strict', 'pnpm test', 'pnpm run build', 'VITE_API_MODE: live']) expect(ci).toContain(step);
   });

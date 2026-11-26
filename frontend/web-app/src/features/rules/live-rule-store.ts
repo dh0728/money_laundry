@@ -8,6 +8,9 @@ import { fetchRuleCatalog, fetchRules, type RuleCatalog, type RuleList, type Rul
 /** 서버에 붙여 실행했는가(VITE_API_MODE=live). 사건의 룰 적중처럼 서버가 있어야만 나오는 것을 가를 때만 쓴다. */
 export const liveRules = import.meta.env.VITE_API_MODE === 'live'
 
+/** 룰 목록으로 가서 그 룰을 고른 채로 연다. 화면의 다른 링크처럼 페이지를 새로 읽는다. */
+export const openRuleInList = (code: string) => window.location.assign(`/rules?rule=${code}`)
+
 export const ruleStatusNames: Record<RuleStatus, string> = {
   DRAFT: '작성 중', SHADOW: '시험 운영', PENDING: '승인 대기', ACTIVE: '운영 중', PAUSED: '중지', RETIRED: '교체됨',
 }
