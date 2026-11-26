@@ -35,7 +35,6 @@ import { caseRoute, frameLabel, screenFrame, ScreenLayout, ScreenNavigation, sec
 import { BoxHTML, BrandSymbol, Button, DecorativeCanvasHTML, Divider, GlassDialog, HeadingHTML, HTMLFragment, HTMLNode,
   Icon, IconButton, InputHTML, ProfileAvatarHTML, ScrollArea, Sidebar, TextHTML, Tooltip, bindTooltip, hideTooltip } from '../components/components.js';
 import { Text } from '../components/layout-primitives.jsx';
-import { RadarSweep } from '../components/radar-sweep';
 import { setupGlassMaterial } from '../components/glass-material.js';
 import { mountLoginScene } from '../features/auth/preview-login-scene.js';
 import { uiSizeOptions } from '../config/appearance-options.js';
@@ -337,7 +336,11 @@ function LoginScreen() {
   return BoxHTML(
     BoxHTML('', 'class="login-particle-layer" aria-hidden="true"') + DecorativeCanvasHTML('class="login-scene"') +
     card +
-    BoxHTML('', 'id="preview-login-preparation" class="login-preparation" tabindex="-1" hidden') +
+    BoxHTML(
+      BoxHTML(BrandSymbol(), 'id="preview-login-indicator" class="login-preparation-indicator" aria-hidden="true"') +
+      BoxHTML('', 'id="preview-login-preparation-message"'),
+      'id="preview-login-preparation" class="login-preparation" tabindex="-1" hidden',
+    ) +
     PreferenceDialog('login-help', '계정 찾기', TextHTML('', 'id="login-help-instructions"', 'p')),
     'id="preview-login" aria-label="로그인" hidden', 'main',
   );
@@ -1750,7 +1753,8 @@ const loginHost = byId('preview-login');
 const loginCard = loginForm.closest('.login-card');
 const loginScene = mountLoginScene(loginHost, appMotionPreference);
 const loginPreparation = byId('preview-login-preparation');
-const loginPreparationRoot = createRoot(loginPreparation);
+const loginIndicator = byId('preview-login-indicator');
+const loginPreparationRoot = createRoot(byId('preview-login-preparation-message'));
 let workspacePreparation = 0;
 let liveWorkspaceRequests;
 
@@ -1759,14 +1763,12 @@ function showWorkspacePreparation(retry) {
   loginHost.hidden = false;
   loginCard.hidden = true;
   loginPreparation.hidden = false;
+  loginIndicator.hidden = Boolean(retry);
   // Focus follows the login form into the preparation status, or to the retry action.
   flushSync(() => loginPreparationRoot.render(retry ? [
     createElement(Text, { key: 'message', role: 'alert' }, '작업 화면을 준비하지 못했습니다.'),
     createElement(PrimaryButton, { key: 'retry', tone: 'brand', onClick: retry }, '다시 시도'),
-  ] : [
-    createElement(RadarSweep, { key: 'radar', className: 'login-preparation-radar' }),
-    createElement(Text, { key: 'message', role: 'status' }, '작업 화면 준비 중'),
-  ]));
+  ] : createElement(Text, { role: 'status' }, '작업 화면 준비 중')));
   (retry ? loginPreparation.querySelector('button') : loginPreparation).focus({ preventScroll: true });
 }
 const loginId = byId('preview-login-id');

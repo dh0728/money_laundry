@@ -6,7 +6,6 @@
 @import "./chart-palette.css";
 @import "./figma-colors.css";
 @import "./status-colors.css";
-@import "./radar-sweep.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -54,6 +53,8 @@
   --palette-zinc-300: hsl(240 4.8% 88%);
   --palette-zinc-700: hsl(240 5.3% 26.1%);
   --palette-zinc-900: hsl(240 5.9% 10%);
+  --palette-signal-red-600: #e60000;
+  --palette-signal-red-500: #ff0000;
   --palette-signal-red-600-a45: #e6000073;
   --palette-signal-red-500-a45: #ff000073;
   --palette-black-a30: #0000004d;
@@ -73,6 +74,12 @@
   --palette-graph-dark: #070709;
   --palette-zinc-700-graph: #3f3f46;
   --palette-zinc-100-graph: #e7e7ea;
+  --palette-radar-hot: #ff8189;
+  --palette-radar-deep: #38050a;
+  --palette-radar-bezel-light: #55555e;
+  --palette-radar-bezel-mid: #0a0a0c;
+  --palette-radar-bezel-dark: #2e2e35;
+  --palette-radar-disc: #08080a;
   --palette-green-600: oklch(.60 .17 145);
   --palette-green-400: oklch(.72 .19 145);
   --palette-heat-light-0: oklch(.930 .100 128.0);
@@ -359,6 +366,30 @@
   --motion-reduced: .01ms;
   --interactive-edge-glow: 0 0 0 1px color-mix(in oklch, var(--foreground) 38%, transparent), 0 0 16px color-mix(in oklch, var(--foreground) 18%, transparent);
   --selection-fill: var(--selection-background);
+  --radar-core-hot: var(--palette-radar-hot);
+  --radar-core-deep: var(--palette-radar-deep);
+  --radar-bezel-light: var(--palette-radar-bezel-light);
+  --radar-bezel-mid: var(--palette-radar-bezel-mid);
+  --radar-bezel-dark: var(--palette-radar-bezel-dark);
+  --radar-disc: var(--palette-radar-disc);
+  --radar-core-radius: 5px;
+  --radar-core-gradient-midpoint: 0.4;
+  --radar-bezel-gradient-midpoint: 0.5;
+  --radar-disc-radius: 15px;
+  --radar-bezel-stroke: 1.5px;
+  --radar-outer-ring-radius: 12.5px;
+  --radar-outer-ring-opacity: 0.3;
+  --radar-outer-ring-stroke: 0.6px;
+  --radar-inner-ring-radius: 8.5px;
+  --radar-inner-ring-opacity: 0.25;
+  --radar-inner-ring-stroke: 0.5px;
+  --radar-trail-faint-opacity: 0.08;
+  --radar-trail-middle-opacity: 0.2;
+  --radar-trail-bright-opacity: 0.6;
+  --radar-beam-stroke: 1.4px;
+  --radar-highlight-radius: 1.3px;
+  --radar-highlight-opacity: 0.85;
+  --radar-sweep-duration: 2.2s;
   --agent-sidebar-top: 60px;
   --agent-sidebar-viewport-share: 0.92;
   --agent-sidebar-max-width: 720px;
@@ -565,6 +596,24 @@ button:not(:disabled), [role=button]:not([aria-disabled=true]), [role=tab], [rol
 .agent-resize-handle { background:transparent; touch-action:none; user-select:none; }
 .agent-resize-handle:hover, .agent-resize-handle:active { background:var(--border); }
 .agent-resize-handle-x { width:var(--aml-space-6); margin-left:calc(var(--aml-space-6) / -2); cursor:col-resize; }
+.rdr-glow { filter:drop-shadow(0 0 var(--aml-space-2) var(--rdr-glow)); }
+.radar-core { r: var(--radar-core-radius); }
+.radar-disc { r: var(--radar-disc-radius); stroke-width: var(--radar-bezel-stroke); }
+.radar-outer-ring {
+  r: var(--radar-outer-ring-radius);
+  stroke-opacity: var(--radar-outer-ring-opacity);
+  stroke-width: var(--radar-outer-ring-stroke);
+}
+.radar-inner-ring {
+  r: var(--radar-inner-ring-radius);
+  stroke-opacity: var(--radar-inner-ring-opacity);
+  stroke-width: var(--radar-inner-ring-stroke);
+}
+.radar-trail-faint { fill-opacity: var(--radar-trail-faint-opacity); }
+.radar-trail-middle { fill-opacity: var(--radar-trail-middle-opacity); }
+.radar-trail-bright { fill-opacity: var(--radar-trail-bright-opacity); }
+.radar-beam { stroke-width: var(--radar-beam-stroke); }
+.radar-highlight { r: var(--radar-highlight-radius); fill-opacity: var(--radar-highlight-opacity); }
 .agent-sidebar {
   top: var(--agent-sidebar-top);
   height: calc(100dvh - var(--agent-sidebar-top));

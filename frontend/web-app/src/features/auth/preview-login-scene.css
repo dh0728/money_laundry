@@ -47,10 +47,17 @@
 }
 .login-preparation:focus { outline: none }
 .login-preparation p { margin: 0 }
-.login-preparation-radar {
+.login-preparation-indicator:not([hidden]) {
+  display: grid;
+  place-items: center;
   inline-size: var(--aml-space-64);
   block-size: var(--aml-space-64);
+  border: var(--aml-stroke-divider) solid var(--divider);
+  border-radius: var(--aml-radius-full);
+  color: var(--text);
 }
+.login-preparation-indicator .aml-radar-symbol { --icon-size: var(--aml-space-40) }
+.login-preparation > div:last-child { display: grid; justify-items: center; gap: var(--aml-space-12) }
 
 #preview-login[data-login-motion="entering"] :is(.login-card, .login-preparation) {
   animation: preview-login-enter var(--login-travel-duration) var(--login-travel-ease) both;
