@@ -615,8 +615,10 @@ function EpisodeOverview({ panels, evidence, summary }) {
   </>;
 }
 
-export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, history = [], activeRules = [], reportData, paginationHost, evidenceSelection, ruleHits }) {
+export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, history = [], activeRules = [], reportData, paginationHost, evidenceSelection, ruleHits, aiSummary }) {
   const selected = useCaseEvidenceSelection(evidenceSelection);
+  // 서비스 모드의 Claude 요약(API.md §14). 읽는 중이거나 실패하면 아래의 규칙 문장을 그대로 쓴다.
+  const ai = aiSummary?.status === 'ready' ? aiSummary.summary : null;
   if (!row) return <Text>선택한 사건의 개요를 불러올 수 없습니다.</Text>;
   const evidence = caseOverviewEvidence(row.related);
   const { records, accounts, focus, inflows, outflows, lead } = evidence;
@@ -640,15 +642,18 @@ export function PreviewCaseOverview({ row, perPanel, initialPanel, appearance, h
               [[focus?.code, accounts.length, records.length, inflows.length, outflows.length, representative.code, lead?.score]])] : []}>
             <Sparkles className="icon" aria-hidden="true" /> AI 요약
           </SectionDownloadHeading>
-          <Text as="strong">{focus ? <><Text as="code">{focus.code}</Text> · 근거 거래 {focus.transactions.size}건 집중</>
+          <Text as="strong" data-ai-summary={ai ? 'claude' : undefined}>{ai ? ai.headline
+            : focus ? <><Text as="code">{focus.code}</Text> · 근거 거래 {focus.transactions.size}건 집중</>
             : records.length > 0 ? `계좌 ${accounts.length}개 · 근거 거래 ${records.length}건` : '연결된 거래 없음'}</Text>
           {trends.length > 0 && <Box className="overview-amount-charts">{trends.map(trend =>
             <EvidenceBars key={trend.label} {...trend} reduced={appearance.reduced} />)}</Box>}
-          <Box as="ul" className="overview-summary-facts">
+          {ai ? <Box as="ul" className="overview-summary-facts">
+            {ai.points.map(point => <Box as="li" key={point.text}>{point.text}</Box>)}
+          </Box> : <Box as="ul" className="overview-summary-facts">
             {focus && <Box as="li">중심 계좌 기준 유입 {inflows.length}건 · 유출 {outflows.length}건</Box>}
             {representative && <Box as="li">{lead ? `최고 점수 거래 ${lead.score}점` : '첫 근거 거래'} · <LinkTag code={representative.code} />
               {' · '}<Text as="code">{representative.from.code}</Text> → <Text as="code">{representative.to.code}</Text> · {amount(representative)}</Box>}
-          </Box>
+          </Box>}
         </AISummaryPanel>;
   return <Box className="preview-case-overview" data-per-panel={perPanel}>
     <CaseIdentity row={row} />

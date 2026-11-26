@@ -17,6 +17,7 @@ import { LiveRuleBacktest } from '../features/rules/live-rule-backtest';
 import { LiveRuleList } from '../features/rules/live-rule-list';
 import { liveActiveRules, liveRules, refreshLiveRules } from '../features/rules/live-rule-store';
 import { useCaseRuleHits } from '../features/rules/case-rule-hits';
+import { useCaseAiSummary } from '../features/investigation/case-ai-summary';
 import { liveSource } from '../features/investigation/live-data.js';
 import { readWorkspaceDuration } from '../features/dashboard/workspace-metrics';
 import { SortableTableHead, tableCount, useTableSort, WorkflowQueryHeading, WorkflowTable } from '../components/workflow-table';
@@ -409,6 +410,7 @@ function CaseReviewActions({ overview }) {
  */
 function CaseOverview({ overview, appearance }) {
   const hits = useCaseRuleHits(liveRules ? overview?.row?.caseId : undefined);
+  const aiSummary = useCaseAiSummary(liveRules ? overview?.row?.caseId : undefined);
   // 서비스 모드는 로그인할 때 룰 목록을 읽어 둔다. 샘플 모드는 여기서 읽고, 읽고 나면 다시 그린다.
   const [, setRulesLoaded] = useState(false);
   useEffect(() => {
@@ -420,7 +422,8 @@ function CaseOverview({ overview, appearance }) {
     perPanel={overview.perPanel} initialPanel={overview.initialPanel} />;
   return <Suspense fallback={loading}><PreviewCaseOverview {...overview} appearance={appearance}
     history={reportHistory(overview?.reportData)} activeRules={liveActiveRules()}
-    ruleHits={liveRules ? { ...hits, alertCode } : undefined} /></Suspense>;
+    ruleHits={liveRules ? { ...hits, alertCode } : undefined}
+    aiSummary={liveRules ? aiSummary : undefined} /></Suspense>;
 }
 
 function Workflow({ kind, view, dashboard, overview }) {
