@@ -140,8 +140,45 @@ class DashboardExecutionTests {
     assertThat(active).isZero();
   }
 
+  /**
+   * The read pool keeps no idle connections and waits only 750 ms to open one, so four cold opens
+   * at once can fail on a slow CI runner. Open all four first; idle connections stay in the pool.
+   */
+  private void warmReadPool() throws Exception {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+    while (true) {
+      var all = new CountDownLatch(4);
+      boolean ok = true;
+      try (var executor = Executors.newFixedThreadPool(4)) {
+        var tasks = new ArrayList<Future<Boolean>>();
+        for (int i = 0; i < 4; i++)
+          tasks.add(
+              executor.submit(
+                  () -> {
+                    try {
+                      return reads.read(
+                          c -> {
+                            all.countDown();
+                            try {
+                              return all.await(2, TimeUnit.SECONDS);
+                            } catch (InterruptedException e) {
+                              throw new IllegalStateException(e);
+                            }
+                          });
+                    } catch (DashboardReadDatabase.Unavailable e) {
+                      return false;
+                    }
+                  }));
+        for (var task : tasks) ok &= task.get(5, TimeUnit.SECONDS);
+      }
+      if (ok) return;
+      assertThat(System.nanoTime()).as("dashboard read pool warm-up").isLessThan(deadline);
+    }
+  }
+
   @Test
   void pool_exhaustion_is_bounded_and_does_not_queue_requests_indefinitely() throws Exception {
+    warmReadPool();
     var entered = new CountDownLatch(4);
     var release = new CountDownLatch(1);
     try (var executor = Executors.newFixedThreadPool(4)) {
@@ -162,7 +199,7 @@ class DashboardExecutionTests {
                           return 1;
                         })));
       try {
-        assertThat(entered.await(2, TimeUnit.SECONDS)).isTrue();
+        assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
         long start = System.nanoTime();
         assertThatThrownBy(() -> reads.read(c -> 1))
             .isInstanceOf(DashboardReadDatabase.Unavailable.class);
