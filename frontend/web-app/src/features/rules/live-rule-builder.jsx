@@ -14,18 +14,16 @@ import {
   conditionCount, definitionFromTemplate, formatValue, isGroup, parseValue, removeFilterItem, removeWhereItem, sameDefinition, sideOf,
   sidedText, templateOf, toggleWhereOperator, windowLabel, windowOptions,
 } from './rule-definition';
-import { codeToRuleId, loadRuleCatalog, problemText, refreshLiveRules } from './live-rule-store';
+import { codeToRuleId, loadRuleCatalog, openRuleInList, problemText } from './live-rule-store';
 import { Box, Heading, Text } from '@/components/layout-primitives';
 import './live-rule-engine.css';
 
-// 룰 만들기. 템플릿의 기본값을 바탕으로 검사 조건과 적중 후 동작을 정한다.
+// 룰 만들기. 템플릿을 고르면 기본값이 채워지고, IF(세는 거래 · 기간 · 적중 조건) → THEN 을 고쳐 초안으로 저장한다.
 // 쓸 수 있는 항목 · 범위 · 기본값은 서버 카탈로그가, 문장과 검토 체크리스트는 서버 검증(validate)이 정한다.
 
 const groupTitles = { PATTERN: '패턴 템플릿', GENERAL: '일반 템플릿' };
-const matchCopy = {
-  ALL: { label: '모두 맞아야 함', addCondition: '함께 맞아야 할 조건 추가', addGroup: '모두 맞아야 하는 묶음 추가' },
-  ANY: { label: '하나만 맞아도 됨', addCondition: '대신 맞아도 되는 조건 추가', addGroup: '하나만 맞아도 되는 묶음 추가' },
-};
+/** 조건을 잇는 말. 정의의 ALL 은 AND, ANY 는 OR 로 적는다. */
+const matchWord = op => (op === 'ANY' ? 'OR' : 'AND');
 
 function RuleSelect({ label, value, options, onChange }) {
   return <FormDropdown label={label} value={String(value ?? '')} onValueChange={onChange}>
@@ -55,16 +53,16 @@ function RemoveButton({ label, onClick }) {
   </ActionButton>;
 }
 
-/** 조건을 어떻게 함께 검사하는지 보여 준다. 적중 조건에서는 두 방식 사이를 바꿀 수 있다. */
+/** 조건 줄 사이의 AND / OR. onToggle 이 있으면 눌러서 바꿀 수 있다. */
 function Connector({ op, onToggle }) {
-  const { label } = matchCopy[op];
-  const next = matchCopy[op === 'ANY' ? 'ALL' : 'ANY'].label;
+  const word = matchWord(op);
+  const next = matchWord(op === 'ANY' ? 'ALL' : 'ANY');
   return onToggle
-    ? <Button type="button" layout="text" className="rule-connector" data-rule-match={op} title={`‘${next}’으로 바꾸기`}
-      aria-label={`${label}. 누르면 ‘${next}’으로 바꿉니다`} onClick={onToggle}>
-      {label}<Repeat2 className="icon" aria-hidden="true" />
+    ? <Button type="button" layout="text" className="rule-connector" data-rule-match={op} title="눌러서 AND ↔ OR 바꾸기"
+      aria-label={`${word}. 누르면 ${next} 로 바꿉니다`} onClick={onToggle}>
+      {word}<Repeat2 className="icon" aria-hidden="true" />
     </Button>
-    : <Text as="span" className="rule-connector" data-rule-match={op}>{label}</Text>;
+    : <Text as="span" className="rule-connector" data-rule-match={op}>{word}</Text>;
 }
 
 /** 조건 한 줄: 항목 · 비교 · 값 · 단위. "이면" 꼴 항목은 항목만 고른다. */
@@ -86,14 +84,14 @@ function ConditionRow({ kind, condition, specs, comparators, options, side, onIt
   </Box>;
 }
 
-function AddButton({ op, group, onClick, disabled, disabledReason }) {
-  const { addCondition, addGroup } = matchCopy[op];
+/** @param op 이 버튼으로 생기는 조건이 이어지는 방식(ALL · ANY). 버튼 색만 정한다. */
+function AddButton({ op, children, onClick, disabled, disabledReason }) {
   return <ActionButton className="rule-add" data-rule-match={op} shape="pill" disabled={disabled} title={disabledReason} onClick={onClick}>
-    <Plus className="icon" aria-hidden="true" />{group ? addGroup : addCondition}
+    <Plus className="icon" aria-hidden="true" />{children}
   </ActionButton>;
 }
 
-/** 묶음의 줄 사이에 현재 검사 방식을 놓는다. */
+/** 그룹 하나의 줄들. 줄 사이에 AND / OR 를 놓는다. */
 function ConditionLines({ group, onToggle, render }) {
   return <Box as="ol" className="rule-lines">
     {group.items.map((item, index) => <Box as="li" key={index} data-rule-match={group.op}>
@@ -105,7 +103,7 @@ function ConditionLines({ group, onToggle, render }) {
 
 function Part({ kind, title, note, children }) {
   return <Box as="section" className="rule-part" data-rule-block={kind} aria-label={title}>
-    <Box as="header"><Heading level={4}>{title}</Heading>{note && <Text className="workflow-rule-note">{note}</Text>}</Box>
+    <Box as="header"><Heading level={3}>{title}</Heading>{note && <Text className="workflow-rule-note">{note}</Text>}</Box>
     {children}
   </Box>;
 }
@@ -130,20 +128,19 @@ function FilterPart({ catalog, template, definition, side, change }) {
     </Box>}
     {definition.filter.items.length === 0 && <Text className="rule-empty">조건이 없으면 모든 거래를 셉니다.</Text>}
     <ConditionLines group={definition.filter} render={(item, index) => isGroup(item)
-      ? <Box className="rule-group" data-rule-match={item.op} role="group" aria-label={matchCopy.ANY.label}>
-        <Text as="strong" className="rule-group-label">{matchCopy.ANY.label}</Text>
+      ? <Box className="rule-group" data-rule-match={item.op} role="group" aria-label="OR 그룹">
         <ConditionLines group={item} render={(inner, at) => row(inner, [index, at], true)} />
         <Box className="rule-add-row">
-          <AddButton op="ANY" disabled={full} onClick={() => change(current => addFilterCondition(current, catalog, [index], options(true)[0].value))} />
-          <RemoveButton label="묶음 지우기" onClick={() => change(current => removeFilterItem(current, [index]))} />
+          <AddButton op="ANY" disabled={full} onClick={() => change(current => addFilterCondition(current, catalog, [index], options(true)[0].value))}>조건 추가</AddButton>
+          <RemoveButton label="OR 그룹 지우기" onClick={() => change(current => removeFilterItem(current, [index]))} />
         </Box>
       </Box>
       : row(item, [index], false)} />
     <Box className="rule-add-row">
-      <AddButton op="ALL" disabled={full || !fields.length} onClick={() => change(current => addFilterCondition(current, catalog, [], fields[0]))} />
-      <AddButton op="ANY" group disabled={full || hasAny || !options(true).length}
-        disabledReason={hasAny ? '세는 거래에는 이 묶음을 하나만 둘 수 있습니다.' : undefined}
-        onClick={() => change(current => addFilterAnyGroup(current, catalog, options(true)[0].value))} />
+      <AddButton op="ALL" disabled={full || !fields.length} onClick={() => change(current => addFilterCondition(current, catalog, [], fields[0]))}>조건 추가</AddButton>
+      <AddButton op="ANY" disabled={full || hasAny || !options(true).length}
+        disabledReason={hasAny ? '세는 거래에는 OR 그룹을 하나만 둘 수 있습니다.' : undefined}
+        onClick={() => change(current => addFilterAnyGroup(current, catalog, options(true)[0].value))}>OR 그룹 추가</AddButton>
     </Box>
   </Part>;
 }
@@ -191,46 +188,49 @@ function WherePart({ catalog, template, definition, side, change }) {
     onValue={value => change(current => changeWhereValue(current, path, value))}
     onRemove={() => change(current => removeWhereItem(current, path))} />;
   const newGroupOp = definition.where.op === 'ALL' ? 'ANY' : 'ALL';
-  return <Part kind="threshold" title="적중 조건" note="센 거래가 어떤 기준을 맞춰야 적중할지 정합니다.">
+  return <Part kind="threshold" title="적중 조건" note="센 결과가 얼마면 적중인지 정합니다.">
     {pathType && <PathLines catalog={catalog} template={template} definition={definition} change={change} />}
     {!pathType && !metrics.length && <Text className="rule-empty">세는 거래를 통과한 거래가 곧 적중입니다.</Text>}
     {metrics.length > 0 && <>
       <ConditionLines group={definition.where} onToggle={() => change(current => toggleWhereOperator(current, []))}
         render={(item, index) => isGroup(item)
-          ? <Box className="rule-group" data-rule-match={item.op} role="group" aria-label={matchCopy[item.op].label}>
-            <Text as="strong" className="rule-group-label">{matchCopy[item.op].label}</Text>
+          ? <Box className="rule-group" data-rule-match={item.op} role="group" aria-label="안쪽 그룹">
             <ConditionLines group={item} onToggle={() => change(current => toggleWhereOperator(current, [index]))}
               render={(inner, at) => row(inner, [index, at])} />
             <Box className="rule-add-row">
-              <AddButton op={item.op} disabled={full} onClick={() => change(current => addWhereCondition(current, catalog, [index], metrics[0]))} />
-              <RemoveButton label="묶음 지우기" onClick={() => change(current => removeWhereItem(current, [index]))} />
+              <AddButton op={item.op} disabled={full} onClick={() => change(current => addWhereCondition(current, catalog, [index], metrics[0]))}>조건 추가</AddButton>
+              <RemoveButton label="안쪽 그룹 지우기" onClick={() => change(current => removeWhereItem(current, [index]))} />
             </Box>
           </Box>
           : row(item, [index])} />
       <Box className="rule-add-row">
-        <AddButton op={definition.where.op} disabled={full} onClick={() => change(current => addWhereCondition(current, catalog, [], metrics[0]))} />
-        <AddButton op={newGroupOp} group disabled={full} onClick={() => change(current => addWhereGroup(current, catalog, metrics[0]))} />
+        <AddButton op={definition.where.op} disabled={full} onClick={() => change(current => addWhereCondition(current, catalog, [], metrics[0]))}>조건 추가</AddButton>
+        <AddButton op={newGroupOp} disabled={full} onClick={() => change(current => addWhereGroup(current, catalog, metrics[0]))}>그룹 추가</AddButton>
       </Box>
     </>}
   </Part>;
 }
 
-function RuleBlocks({ catalog, template, definition, change }) {
+function IfThenBlock({ catalog, template, definition, change }) {
   const side = sideOf(template, definition);
   const then = catalog.then.find(option => option.key === definition.then);
-  return <Box className="rule-blocks" role="group" aria-label="룰 구성">
-    <Box className="rule-clause">
-      <Heading level={3} className="rule-clause-title">검사 조건</Heading>
-      <FilterPart catalog={catalog} template={template} definition={definition} side={side} change={change} />
-      <WindowPart catalog={catalog} template={template} definition={definition} change={change} />
-      <WherePart catalog={catalog} template={template} definition={definition} side={side} change={change} />
+  return <Box className="rule-if-then" role="group" aria-label="조건 블록">
+    <Box className="rule-clause" data-clause="if">
+      <Text as="span" className="rule-keyword">IF</Text>
+      <Box className="rule-clause-body">
+        <FilterPart catalog={catalog} template={template} definition={definition} side={side} change={change} />
+        <WindowPart catalog={catalog} template={template} definition={definition} change={change} />
+        <WherePart catalog={catalog} template={template} definition={definition} side={side} change={change} />
+      </Box>
     </Box>
-    <Box className="rule-clause" data-rule-block="action">
-      <Heading level={3} className="rule-clause-title">적중 후 동작</Heading>
-      <Box className="rule-condition">
-        <RuleSelect label="적중했을 때" value={definition.then} onChange={key => change(current => changeThen(current, key))}
-          options={catalog.then.map(option => ({ value: option.key, label: option.enabled ? option.label : `${option.label} (준비 중)`, disabled: !option.enabled }))} />
-        <Text as="span" className="rule-unit">{then?.key === 'ATTACH_EVIDENCE' ? '룰에 적중한 거래가 기존 Alert에 포함되면 그 Alert에 근거로 붙입니다.' : then?.note}</Text>
+    <Box className="rule-clause" data-clause="then">
+      <Text as="span" className="rule-keyword">THEN</Text>
+      <Box className="rule-clause-body">
+        <Box className="rule-condition">
+          <RuleSelect label="적중했을 때" value={definition.then} onChange={key => change(current => changeThen(current, key))}
+            options={catalog.then.map(option => ({ value: option.key, label: option.enabled ? option.label : `${option.label} (준비 중)`, disabled: !option.enabled }))} />
+          <Text as="span" className="rule-unit">{then?.key === 'ATTACH_EVIDENCE' ? '룰에 적중한 거래가 기존 Alert에 포함되면 그 Alert에 근거로 붙입니다.' : then?.note}</Text>
+        </Box>
       </Box>
     </Box>
   </Box>;
@@ -271,17 +271,7 @@ function TemplateFacts({ template }) {
   </Box>;
 }
 
-function ruleSentenceLines(sentence) {
-  // RuleSentence의 거래 단건·집계·경로 문형만 풀어 쓰고, 새 문형은 원문을 보여 준다.
-  const action = / (Alert에 근거로 표시합니다\.|Alert를 생성합니다\.)$/.exec(sentence);
-  if (!action) return [sentence];
-  const conditions = sentence.slice(0, action.index);
-  if (conditions.endsWith('거래가 들어오면')) return [`${conditions} 적중입니다.`, action[1]];
-  const counted = /^(.+) 세어, (.+(?:이면|돌아오면))$/.exec(conditions);
-  if (!counted) return [sentence];
-  return [`${counted[1]} 셉니다.`, `${counted[2]} 적중입니다.`, action[1]];
-}
-
+/** 문장에서 굵게 보여 줄 말(조건 항목의 이름과 값)을 찾는 식. 문장 자체는 서버가 준 그대로 둔다. */
 function summaryEmphasis(catalog, template, definition) {
   const side = sideOf(template, definition);
   const filter = (template.filterFields ?? []).flatMap(key => {
@@ -302,6 +292,7 @@ function summaryEmphasis(catalog, template, definition) {
   return new RegExp(`(${[...criteria, range, threshold].join('|')})`, 'g');
 }
 
+/** 문장 한 줄. emphasis 에 걸리는 말만 굵게 한다. */
 function SummaryLine({ line, emphasis }) {
   return <Text>{emphasis ? line.split(emphasis).map((text, index) => index % 2
     ? <Text as="strong" key={index} data-summary-value={/^[±\d]/.test(text) || undefined}>{text}</Text> : text) : line}</Text>;
@@ -432,28 +423,22 @@ export function LiveRuleBuilder({ actionsHost, initialRuleId = ruleFromAddress()
     setSaving(true);
     setFailure('');
     try {
-      if (saved) {
-        const result = await saveRuleDraft(saved.ruleId, saved.versionId, { name: trimmed, definition, revision: saved.revision });
-        setSaved({ ...saved, revision: result.revision, name: result.name, definition });
-      } else {
-        const result = await createRule({ name: trimmed, template: templateKey, definition });
-        setSaved({ ...result, versionNo: 1, name: trimmed, definition });
-        // 새로 고쳐도 같은 초안을 이어서 쓰도록 주소에 룰 번호를 남긴다
-        window.history.replaceState(window.history.state, '', `${window.location.pathname}?rule=${result.code}`);
-      }
-      setNotice('');
-      void refreshLiveRules();
+      const code = saved
+        ? (await saveRuleDraft(saved.ruleId, saved.versionId, { name: trimmed, definition, revision: saved.revision }), saved.code)
+        : (await createRule({ name: trimmed, template: templateKey, definition })).code;
+      // 저장하면 룰 목록으로 가서 방금 저장한 룰을 보여 준다. 다음에 할 일(백테스트 · 시험 운영 · 승인 요청)이 거기 있고,
+      // 더 고치려면 거기서 "이어서 작성"으로 돌아온다. 화면이 넘어갈 때까지 저장 버튼은 꺼 둔다(두 번 저장하지 않게).
+      openRuleInList(code);
     } catch (error) {
       setFailure(problemText(error, '룰을 저장하지 못했습니다.'));
-    } finally {
       setSaving(false);
     }
   }
 
-  const summary = check?.sentence == null
-    ? [checkFailure || (check ? '형식이 맞지 않아 문장으로 읽을 수 없습니다.' : '조건을 확인하는 중입니다.')]
-    : ruleSentenceLines(check.sentence);
-  const emphasis = summary.length > 1 ? summaryEmphasis(catalog, template, definition) : undefined;
+  // 문장은 서버가 준 한 문장을 그대로 보여 주고, 조건 항목의 이름과 값만 굵게 한다. 문장을 못 받았으면 사유를 그대로 적는다.
+  const sentence = check?.sentence ?? null;
+  const summary = sentence ?? (checkFailure || (check ? '형식이 맞지 않아 문장으로 읽을 수 없습니다.' : '조건을 확인하는 중입니다.'));
+  const emphasis = sentence ? summaryEmphasis(catalog, template, definition) : undefined;
 
   return <Box className="screen-row screen-rule-editor rule-builder">
     <TemplateLibrary catalog={catalog} selected={templateKey} locked={Boolean(saved)} onPick={pick} />
@@ -469,20 +454,14 @@ export function LiveRuleBuilder({ actionsHost, initialRuleId = ruleFromAddress()
             onChange={event => { setName(event.target.value); setFailure(''); }} />
         </Box>
         <TemplateFacts template={template} />
-        <RuleBlocks catalog={catalog} template={template} definition={definition} change={change} />
+        <IfThenBlock catalog={catalog} template={template} definition={definition} change={change} />
         <Box as="section" className="rule-draft-preview" aria-label="이 룰을 문장으로 읽으면">
           <Heading level={3} className="rule-clause-title">이 룰을 문장으로 읽으면</Heading>
           <Box className="rule-summary-lines" aria-busy={checking || undefined}>
-            {summary.map((line, index) => <SummaryLine key={line} line={line} emphasis={index < summary.length - 1 ? emphasis : undefined} />)}
+            <SummaryLine line={summary} emphasis={emphasis} />
           </Box>
         </Box>
         {failure && <Text role="alert" data-rule-block-error>{failure}</Text>}
-        {saved && !dirty && <Box role="status" className="rule-draft-actions">
-          <Text><Text as="strong">{saved.code}</Text> 초안이 저장되었습니다.</Text>
-          <ActionButton as="a" href={`/rules?rule=${saved.code}`}>저장한 룰 보기</ActionButton>
-          {(catalog.backtestTemplates ?? []).includes(templateKey) && check?.canRun
-            && <ActionButton as="a" href={`/rules/backtest?rule=${saved.code}`}>백테스트로 열기</ActionButton>}
-        </Box>}
       </Box>
     </Panel>
     <Checklist check={check} checking={checking} failure={checkFailure} />

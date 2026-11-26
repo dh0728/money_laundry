@@ -304,6 +304,7 @@
   --rule-keyword-min-width: 3.5rem;
   --rule-numeric-field-min-width: 4.5rem;
   --rule-backtest-panel-min-width: 22rem;
+  --rule-backtest-field-min-width: 8rem;
   --rule-builder-columns: minmax(0, 1fr) minmax(0, 1.1fr);
   --rule-validation-columns: var(--aml-space-20) var(--aml-space-64) 1fr;
   --date-ticker-glass-shadow-light-ink: rgb(0 0 0 / 0.12);

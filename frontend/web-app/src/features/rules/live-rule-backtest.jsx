@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { cancelBacktest, fetchBacktest, fetchBacktests, fetchRule, requestBacktest } from '@/api/rules';
+import { cancelBacktest, fetchBacktest, fetchBacktestPeriod, fetchBacktests, fetchRule, requestBacktest } from '@/api/rules';
 import { Box, Heading, Text } from '@/components/layout-primitives';
+import { Input } from '@/components/ui/input';
 import { FormDropdown, FormDropdownItem } from '../../components/form-dropdown';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
@@ -11,7 +12,8 @@ import { ScreenActions } from '../../components/screen-actions';
 import { StatusTag } from '../../components/semantic-tags';
 import { csvDownloadEntry, TableQueryTools } from '../../components/query-controls';
 import { SortableTableHead, tableCount, useTableSort, WorkflowTable } from '../../components/workflow-table';
-import { sidedText, sideOf, templateOf } from './rule-definition';
+import { chosenPeriod, lookbackFrom, periodText } from './backtest-period';
+import { sidedText, sideOf, templateOf, windowLabel } from './rule-definition';
 import { transactionCode } from '../investigation/live-data.js';
 import {
   codeToRuleId, loadRuleCatalog, problemText, refreshLiveRules, ruleStatusNames, ruleStatusPresets,
@@ -21,6 +23,7 @@ import './live-rule-engine.css';
 
 // 백테스트. 룰을 고르면 그 룰의 작업 중 버전(없으면 운영 버전)을 과거 원장에 돌린다.
 // 운영 버전이 따로 있으면 서버가 같은 기간에 같이 돌려 새로 걸림 · 빠짐을 낸다. 실행은 서버가 하고 화면은 2초마다 상태를 읽는다.
+// 검사 기간은 타겟 날(검사하는 마지막 날)과 검사 일수로 고른다. 타겟 날 뒤의 거래는 서버가 읽지 않는다.
 
 const POLL_MS = 2000;
 /** 사례 표에 한 번에 보여 주는 줄 수 */
@@ -31,6 +34,8 @@ const CASE_PAGE = 20;
  * "처음 거래하는 상대" 필터 없이 건 일반 룰은 넷 중 셋이 10% 이상이었다(룰-템플릿-정의 5.3). 그 사이의 값으로 잡았다.
  */
 const WIDE_SHARE = 1;
+/** 검사 일수 선택지(일). 룰의 기간 선택지 1일 · 3일 · 7일에 맞췄다. 이 밖에 "전체"가 있다. */
+const SPAN_DAYS = [1, 3, 7];
 
 const countFormat = new Intl.NumberFormat('ko-KR');
 const decimalFormat = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 2 });
@@ -54,6 +59,8 @@ const caseStates = {
 const judgements = { SUSPICIOUS: '의심', NORMAL: '정상' };
 const active = status => status === 'QUEUED' || status === 'RUNNING';
 const windowText = minutes => (minutes % 60 === 0 ? `${minutes / 60}시간` : `${minutes}분`);
+/** 룰의 기간만큼 돌아보는 범위를 적는 글자. 기간이 없는 템플릿(단건 고액거래)은 돌아보지 않는다. */
+const lookbackText = (from, windowMinutes) => (from && windowMinutes ? `${from}부터 (룰의 기간 ${windowLabel(windowMinutes)})` : '없음 (기간 없이 거래 1건씩 봅니다)');
 
 function runTimeText(value) {
   const date = new Date(value);
@@ -95,6 +102,39 @@ const subjectNouns = { ACCOUNT: { name: '대상', unit: '개' }, TX: { name: '�
 /** 사례의 대상을 화면에 적는 글자. 계좌는 가명 ID 앞 8자리, 거래는 화면의 거래 코드(T-yymmdd-00000000)다. */
 function subjectText(item) {
   return item.subjectType === 'TX' && item.txId != null && item.occurredAt ? transactionCode(item) : item.subject;
+}
+
+/**
+ * 검사 기간. 타겟 날과 검사 일수를 고르면 실행하기 전에 무엇을 읽을지 보여 준다.
+ * @param range 서버가 준 고를 수 있는 범위. 못 읽었으면 null 이고 failure 에 사유가 있다
+ * @param chosen 고른 타겟 날 · 검사 일수로 정한 검사 날짜(chosenPeriod 의 결과)
+ * @param windowMinutes 돌릴 버전의 룰 기간. 기간이 없는 템플릿은 없다
+ */
+function Period({ range, failure, day, span, chosen, windowMinutes, disabled, onDay, onSpan }) {
+  return <Panel className="backtest-card" aria-label="검사 기간">
+    <Box as="header" className="backtest-card-heading"><Heading>검사 기간</Heading></Box>
+    {range ? <>
+      <Box className="rule-backtest-period">
+        <Box as="label">타겟 날
+          <Input type="date" value={day} min={range.earliest} max={range.ledgerTo} disabled={disabled}
+            aria-invalid={chosen.error ? true : undefined} onChange={event => onDay(event.target.value)} />
+        </Box>
+        <Box as="label">검사 일수
+          <FormDropdown label="검사 일수" value={span} onValueChange={onSpan} disabled={disabled}>
+            {SPAN_DAYS.map(days => <FormDropdownItem key={days} value={String(days)}>{days}일</FormDropdownItem>)}
+            <FormDropdownItem value="ALL">전체</FormDropdownItem>
+          </FormDropdown>
+        </Box>
+      </Box>
+      {chosen.error ? <Text role="alert" data-rule-block-error>{chosen.error}</Text> : <Box as="dl" className="rule-condition-facts rule-backtest-preview">
+        <Box><Box as="dt">검사하는 날짜</Box><Box as="dd">{periodText(chosen)}
+          {chosen.clipped && <Text as="span" className="workflow-rule-note"> 원장 첫 {count(range.warmupDays)}일은 검사하지 않아 {span}일을 채우지 못합니다.</Text>}</Box></Box>
+        <Box><Box as="dt">돌아보는 거래</Box><Box as="dd">{lookbackText(lookbackFrom(chosen.from, windowMinutes, range.ledgerFrom), windowMinutes)}</Box></Box>
+        <Box><Box as="dt">처음 거래하는 상대 · 바쁜 계좌</Box><Box as="dd">{range.ledgerFrom} ~ {chosen.to} 기준</Box></Box>
+      </Box>}
+      <Text className="backtest-meta">타겟 날 뒤의 거래는 읽지 않습니다. 원장은 {range.ledgerFrom} ~ {range.ledgerTo} 이고 첫 {count(range.warmupDays)}일은 이력으로만 씁니다.</Text>
+    </> : <Text className="backtest-meta" role={failure ? 'status' : undefined}>{failure || '원장의 날짜 범위를 불러오는 중입니다.'}</Text>}
+  </Panel>;
 }
 
 function Notices({ run, wholePath }) {
@@ -148,7 +188,9 @@ function Scope({ run, noun, noAlert }) {
   return <Panel className="rule-backtest-scope" aria-label="검사 범위">
     <Heading>검사 범위</Heading>
     <Box as="dl" className="rule-condition-facts rule-backtest-facts">
-      <Box><Box as="dt">기간</Box><Box as="dd">{run.period.from} ~ {run.period.to} ({count(run.period.days)}일)</Box></Box>
+      <Box><Box as="dt">검사한 날짜</Box><Box as="dd">{periodText(run.period)}</Box></Box>
+      {run.lookback && <Box><Box as="dt">돌아본 거래</Box><Box as="dd">{lookbackText(run.lookback.from, run.lookback.windowMinutes)}</Box></Box>}
+      {run.lookback?.ledgerFrom && <Box><Box as="dt">처음 거래하는 상대 · 바쁜 계좌</Box><Box as="dd">{run.lookback.ledgerFrom} ~ {run.busy?.until ?? run.period.to} 기준</Box></Box>}
       <Box><Box as="dt">검사한 거래</Box><Box as="dd">{count(run.txCount)}건</Box></Box>
       <Box><Box as="dt">근거 거래</Box><Box as="dd">{count(run.evidenceTxCount)}건 · 검사한 거래의 {percent(run.evidenceShare)}</Box></Box>
       <Box><Box as="dt">이미 있는 Alert 와 겹침</Box><Box as="dd">{noun.name} {count(run.alertOverlap)}{noun.unit}</Box></Box>
@@ -199,7 +241,7 @@ function Cases({ run, catalog, side, order, templateKey, noun, registerTableTool
 }
 
 const historyComparison = row => row.baseline ? `운영 v${row.baseline.versionNo} 과 비교` : '';
-const historyPeriod = row => `${row.period.from} ~ ${row.period.to}`;
+const historyPeriod = row => periodText(row.period);
 const previousConditions = '조건을 고치기 전';
 
 function History({ rows, selectedId, onOpen, unavailableText }) {
@@ -256,9 +298,21 @@ export function LiveRuleBacktest({ initialRule, registerTableTools, actionsHost 
   const [run, setRun] = useState(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  // 검사 기간: 서버가 준 고를 수 있는 범위, 타겟 날(검사하는 마지막 날), 검사 일수('1' · '3' · '7' · 'ALL')
+  const [range, setRange] = useState(null);
+  const [rangeFailure, setRangeFailure] = useState('');
+  const [day, setDay] = useState('');
+  const [span, setSpan] = useState('ALL');
 
   useEffect(() => {
     let current = true;
+    // 범위를 못 읽어도(원장이 비었을 때 등) 화면은 뜬다. 그때는 기간을 고르지 못하고 서버의 기본 기간으로 돌린다.
+    fetchBacktestPeriod().then(loaded => {
+      if (!current) return;
+      setRange(loaded);
+      setRangeFailure('');
+      setDay(chosen => chosen || loaded.to);
+    }, error => { if (current) setRangeFailure(problemText(error, '원장의 날짜 범위를 불러오지 못했습니다.')); });
     Promise.all([refreshLiveRules(), loadRuleCatalog()]).then(([list, loaded]) => {
       if (!current) return;
       setRules(list.content);
@@ -333,12 +387,17 @@ export function LiveRuleBacktest({ initialRule, registerTableTools, actionsHost 
   const blocked = !detail ? '' : !target ? '돌릴 버전이 없습니다.'
     : !supported ? `${detail.templateName} 템플릿의 백테스트는 아직 제공하지 않습니다.${supportedNames ? ` 지금은 ${supportedNames} 만 됩니다.` : ''}` : '';
 
+  // 고른 타겟 날과 검사 일수로 정한 검사 날짜. 전체 기간 그대로면 기간을 보내지 않는다(서버의 기본 기간과 같다).
+  const chosen = range ? chosenPeriod(range, day, span === 'ALL' ? 'ALL' : Number(span)) : null;
+  const periodError = chosen?.error ?? '';
+
   async function start() {
-    if (!target || blocked || busy || running) return;
+    if (!target || blocked || periodError || busy || running) return;
     setBusy(true);
     setMessage('');
     try {
-      const accepted = await requestBacktest({ versionId: target.versionId });
+      const accepted = await requestBacktest(chosen && !chosen.whole
+        ? { versionId: target.versionId, from: chosen.from, to: chosen.to } : { versionId: target.versionId });
       setRun(await fetchBacktest(accepted.backtestId));
       setHistory(await fetchBacktests(detail.ruleId));
     } catch (error) {
@@ -379,17 +438,19 @@ export function LiveRuleBacktest({ initialRule, registerTableTools, actionsHost 
           <Text>{baseline.sentence || baseline.summary}</Text>
         </> : <Text className="backtest-meta">{detail?.operating ? '운영 버전 그대로 돌립니다. 비교할 새 버전이 없습니다.' : '운영 버전이 없어 비교하지 않습니다.'}</Text>}
       </Panel>
+      <Period range={range} failure={rangeFailure} day={day} span={span} chosen={chosen} windowMinutes={target?.definition?.windowMinutes}
+        disabled={running || busy} onDay={setDay} onSpan={setSpan} />
       <Panel className="backtest-card" aria-label="실행 상태">
         <Box as="header" className="backtest-card-heading"><Heading>실행 상태</Heading>
           {run && <StatusTag preset={statusPresets[run.status]}>{statusNames[run.status]}</StatusTag>}</Box>
         {run ? <>
           {running && <Progress className="rule-backtest-progress" max={100} value={run.progress} aria-label="진행률" />}
-          <Text className="backtest-meta">v{run.versionNo} · {run.period.from} ~ {run.period.to} ({count(run.period.days)}일)</Text>
+          <Text className="backtest-meta">v{run.versionNo} · {periodText(run.period)}</Text>
           <Text className="backtest-meta">{run.requestedBy} · <RunTime value={run.requestedAt} /></Text>
           {running && <Text>{run.status === 'QUEUED' ? '앞선 백테스트가 끝나기를 기다립니다.' : `${run.progress}% · 쿼리가 하나 끝날 때마다 올라갑니다.`}
             {run.cancelRequested ? ' 취소를 요청했습니다.' : ''}</Text>}
           {run.status === 'FAILED' && <Text role="alert" data-rule-block-error>{errorTexts[run.errorCode] ?? errorTexts.INTERNAL}</Text>}
-        </> : <Text className="backtest-meta">아직 돌린 백테스트가 없습니다. 원장 첫 7일은 이력으로만 쓰고 그 뒤 날짜를 검사합니다.</Text>}
+        </> : <Text className="backtest-meta">아직 돌린 백테스트가 없습니다.</Text>}
       </Panel>
     </Box>
     {blocked && <Text role="status" className="rule-backtest-blocked">{blocked}</Text>}
@@ -410,7 +471,7 @@ export function LiveRuleBacktest({ initialRule, registerTableTools, actionsHost 
       <PrimaryButton tone="inverse" as="a" href={code ? `/rules?rule=${code}` : '/rules'}>룰 목록</PrimaryButton>
       {detail?.working?.editable
         && <PrimaryButton tone="inverse" as="a" href={`/rules/new?rule=${detail.code}`}>조건 고치기</PrimaryButton>}
-      <PrimaryButton tone="brand" disabled={!target || Boolean(blocked) || busy || running} title={blocked || undefined}
+      <PrimaryButton tone="brand" disabled={!target || Boolean(blocked) || Boolean(periodError) || busy || running} title={blocked || periodError || undefined}
         onHold={() => void start()}>{run && !running ? '다시 실행' : '백테스트 실행'}</PrimaryButton>
     </ScreenActions>
   </Box>;
