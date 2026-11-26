@@ -30,6 +30,8 @@ services:
       INFERENCE_ALLOW_LOOPBACK: ${DEV_INFERENCE_ALLOW_LOOPBACK:-false}
       INFERENCE_CA_FILE: ${DEV_INFERENCE_CA_FILE:-}
       INFERENCE_API_TOKEN: ${DEV_INFERENCE_API_TOKEN:?DEV_INFERENCE_API_TOKEN is required}
+      # Claude key for AI summaries, read by deploy.py from SSM /aml/dev/ai/anthropic-api-key.
+      ANTHROPIC_API_KEY: ${DEV_ANTHROPIC_API_KEY:-}
       AWS_REGION: ${AWS_REGION:-ap-northeast-2}
       AWS_DEFAULT_REGION: ${AWS_REGION:-ap-northeast-2}
       TZ: Asia/Seoul
