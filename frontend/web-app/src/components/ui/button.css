@@ -1,0 +1,26 @@
+.aml-choice-button {
+  display: grid;
+  gap: var(--aml-space-2);
+  inline-size: 100%;
+  padding: var(--aml-space-8) var(--aml-space-12);
+  border: var(--aml-stroke-divider) solid var(--divider, var(--border));
+  border-radius: var(--aml-panel-control-radius, var(--aml-radius-control));
+  background: var(--information-panel-surface, var(--background));
+  color: var(--text, var(--foreground));
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.aml-choice-button > span { color: var(--muted-text, var(--muted-foreground)); font-size: var(--aml-type-caption-size); overflow-wrap: anywhere }
+.aml-choice-button:hover:not(:disabled):not([aria-pressed="true"]) { background: var(--hover, var(--accent, var(--background))) }
+.aml-choice-button[aria-pressed="true"] {
+  border-color: var(--selection-divider, var(--selection-border, var(--border)));
+  background: var(--selection-surface, var(--selection-background));
+  color: var(--selection-ink, var(--selection-foreground));
+}
+.aml-choice-button[aria-pressed="true"] > span { color: var(--selection-muted, var(--selection-muted-foreground, var(--foreground))) }
+.aml-choice-button:disabled { cursor: not-allowed; opacity: var(--aml-opacity-disabled, inherit) }
+.aml-choice-button:focus-visible {
+  outline: var(--aml-stroke-focus) solid var(--focus-ring, var(--ring, var(--foreground)));
+  outline-offset: var(--aml-stroke-focus);
+}

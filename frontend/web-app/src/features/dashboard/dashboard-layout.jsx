@@ -1,13 +1,15 @@
-import React from 'react';
+import React, { useId, useRef, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import GlideSelect from '../../components/react-bits/GlideSelect';
 import MagicBento from '../../components/react-bits/MagicBento';
 import { Panel } from '../../components/panel';
 import { SectionDownloadHeading } from '../../components/section-download';
+import { printWorkspace } from '../../lib/page-export';
 import { AISummaryPanel } from '../../components/ai-summary-panel';
 import { CaseProgressLanes } from '../investigation/preview-case-card';
 import { readWorkspaceGap } from './workspace-metrics';
 import './preview-dashboard.css';
-import { Box, Grid, Stack, Text } from '@/components/layout-primitives';
+import { Box, Grid, Heading, Stack, Text } from '@/components/layout-primitives';
 
 export function DashboardMetricGrid({ items, appearance, loading = false }) {
   return <Box className="dashboard-metrics-box">
@@ -18,12 +20,40 @@ export function DashboardMetricGrid({ items, appearance, loading = false }) {
   </Box>;
 }
 
-export function DashboardIndicatorsGrid({ children, ...props }) {
-  return <Grid as="section" columns={12} className="dashboard-priority-metrics" {...props}>{children}</Grid>;
+function DashboardSectionGrid({ title, children, loading = false, downloadEntries = [], ...props }) {
+  const [expanded, setExpanded] = useState(true);
+  const ref = useRef(null);
+  const contentId = useId();
+  const entries = loading ? [] : [{ label: `${title} 전체`, format: 'PDF로 저장',
+    download: () => printWorkspace(ref.current.closest('#workspace'), ref.current) }, ...downloadEntries];
+  return <Grid as="section" columns={12} aria-label={title} ref={ref} {...props}>
+    <SectionDownloadHeading className="dashboard-section-header" headingClassName="dashboard-section-heading" entries={entries}
+      disclosure={loading ? undefined : { controls: contentId, expanded, onToggle: () => setExpanded(open => !open) }}>
+      {title}
+    </SectionDownloadHeading>
+    <Box id={contentId} data-dashboard-section-content inert={!expanded} aria-hidden={!expanded || undefined}>{children}</Box>
+  </Grid>;
 }
 
-export function InstitutionMetricsGrid({ children, ...props }) {
-  return <Grid as="section" columns={12} className="dashboard-institution-metrics" {...props}>{children}</Grid>;
+export function DashboardTransactionGrid(props) {
+  return <DashboardSectionGrid title="거래·위험 분석" className="dashboard-flow-family" {...props} />;
+}
+
+export function DashboardWorkGrid(props) {
+  return <DashboardSectionGrid title="업무 현황" className="dashboard-work-details" {...props} />;
+}
+
+export function InstitutionMetricsGrid(props) {
+  return <DashboardSectionGrid title="핵심 지표" className="dashboard-institution-metrics" {...props} />;
+}
+
+export function DashboardFocusGrid(props) {
+  return <DashboardSectionGrid title="우선 확인" className="dashboard-focus-grid" {...props} />;
+}
+
+export function ChartTopicSelect({ label, value, options, onChange }) {
+  return <GlideSelect className="dashboard-chart-topic" appearance="panel-title" ariaLabel={label} value={value}
+    options={options} onChange={onChange} expandInline />;
 }
 
 export function PersonalDashboardOverview({ children, recommendation, ...props }) {
@@ -47,8 +77,8 @@ function LoadingChart({ className = '', chartClass = 'dashboard-proportion-band'
   </Panel>;
 }
 
-function LoadingSeries({ className }) {
-  return <LoadingChart className={className}>
+function LoadingSeries({ className, showTools }) {
+  return <LoadingChart className={className} showTools={showTools}>
     <Skeleton className="dashboard-loading-note dashboard-loading-series-legend" />
     <Box className="dashboard-series">
       <Skeleton className="dashboard-series-plot" />
@@ -73,22 +103,23 @@ function LoadingMetric({ detail, trend }) {
 }
 
 function LoadingInstitutionMetrics() {
-  return <InstitutionMetricsGrid>
-    {Array.from({ length: 6 }, (_, index) => index === 3
-      ? <LoadingChart className="dashboard-completion" showTools key={index}>
-        <Box className="dashboard-metric-reading dashboard-completion-reading">
-          <Skeleton className="dashboard-loading-note" />
-          <Skeleton className="dashboard-loading-value" />
-        </Box>
-        <Skeleton className="dashboard-loading-completion-legend" />
-        <Box className="dashboard-series">
-          <Skeleton className="dashboard-series-plot" />
-        </Box>
-      </LoadingChart> :
-      <Panel as="article" key={index} data-compact-kpi={index >= 4 || undefined}>
-        <LoadingMetric detail={index >= 4} trend />
+  return <InstitutionMetricsGrid loading>
+    {Array.from({ length: 4 }, (_, index) =>
+      <Panel as="article" key={index} data-compact-kpi={index >= 3 || undefined}>
+        <LoadingMetric detail={index >= 3} trend />
       </Panel>)}
   </InstitutionMetricsGrid>;
+}
+
+function LoadingCompletion() {
+  return <LoadingChart className="dashboard-completion" showTools>
+    <Box className="dashboard-metric-reading dashboard-completion-reading">
+      <Skeleton className="dashboard-loading-note" />
+      <Skeleton className="dashboard-loading-value" />
+    </Box>
+    <Skeleton className="dashboard-loading-completion-legend" />
+    <Box className="dashboard-series"><Skeleton className="dashboard-series-plot" /></Box>
+  </LoadingChart>;
 }
 
 function LoadingRecommendation({ reduced }) {
@@ -106,24 +137,25 @@ function LoadingRecommendation({ reduced }) {
 export function DashboardAnalyticsSkeleton({ reduced }) {
   return <Box className="dashboard-analytics dashboard-loading dashboard-workflow-charts" aria-busy="true">
     <Text as="span" className="visually-hidden" role="status">대시보드 차트 불러오는 중</Text>
-    <Box aria-hidden="true" className="dashboard-analytics">
+    <Box aria-hidden="true" className="dashboard-analytics dashboard-institution-relations">
       <LoadingInstitutionMetrics />
-      <DashboardIndicatorsGrid>
-        <LoadingSeries className="dashboard-priority-metric dashboard-new-entities" />
-        <LoadingStaffChart />
-        <LoadingStaffChart />
-      </DashboardIndicatorsGrid>
-      <Grid columns={12} className="dashboard-flow-family dashboard-work-overview-grid">
-        <LoadingChart className="dashboard-transaction-flow" chartClass="staged-sankey-chart" />
-        <LoadingSeries className="dashboard-flow-volume" />
-        <LoadingChart className="dashboard-flow-risk" chartClass="dashboard-score-band" showNote={false} />
+      <DashboardFocusGrid loading>
+        <LoadingChart className="dashboard-sla-donut" chartClass="dashboard-loading-donut" />
         <LoadingRecommendation reduced={reduced} />
-      </Grid>
-      <LoadingChart className="dashboard-investigation-flow" chartClass="staged-sankey-chart" />
-      <Grid columns={12} className="dashboard-flow-status-grid">
+      </DashboardFocusGrid>
+      <DashboardTransactionGrid loading>
+        <LoadingChart className="dashboard-transaction-flow" chartClass="staged-sankey-chart" />
+        <LoadingSeries className="dashboard-flow-volume" showTools />
+        <LoadingChart className="dashboard-flow-risk" chartClass="dashboard-score-band" showNote={false} />
+      </DashboardTransactionGrid>
+      <DashboardWorkGrid loading>
+        <LoadingCompletion />
+        <LoadingStaffChart />
+        <LoadingStaffChart />
+        <LoadingChart className="dashboard-investigation-flow" chartClass="staged-sankey-chart" />
         <LoadingSeries className="dashboard-flow-status" />
-        <LoadingSeries className="dashboard-flow-status" />
-      </Grid>
+        <DashboardBoardSkeleton showTitle={false} />
+      </DashboardWorkGrid>
     </Box>
   </Box>;
 }
@@ -137,7 +169,7 @@ export function DashboardSkeleton({ mine, appearance, benchmark = false }) {
       <LoadingChart className="dashboard-personal-history" chartClass="dashboard-loading-history" />
       <LoadingChart className="dashboard-personal-history" chartClass="dashboard-loading-history" />
     </PersonalDashboardOverview> : <DashboardAnalyticsSkeleton reduced={appearance.reduced} />}
-    <DashboardBoardSkeleton />
+    {mine && <DashboardBoardSkeleton />}
   </Box>;
 }
 
@@ -188,10 +220,10 @@ export function BenchmarkAnalyticsSkeleton({ showPatterns = true } = {}) {
   </Box>;
 }
 
-export function DashboardBoardSkeleton() {
+export function DashboardBoardSkeleton({ showTitle = true } = {}) {
   return <Box className="dashboard-board dashboard-loading" aria-busy="true">
     <Text as="span" className="visually-hidden" role="status">업무 현황 불러오는 중</Text>
-    <Box className="dashboard-board-heading"><Skeleton className="dashboard-loading-title" /></Box>
+    {showTitle && <Box className="dashboard-board-heading"><Skeleton className="dashboard-loading-title" /></Box>}
     <CaseProgressLanes renderLane={({ preset }) => <LoadingLane key={preset} />} />
   </Box>;
 }

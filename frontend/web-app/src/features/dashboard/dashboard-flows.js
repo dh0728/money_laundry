@@ -54,13 +54,17 @@ function fixtureBanks(total) {
   const example = [64, 48, 37, 26];
   let previous = 0;
   let cumulative = 0;
-  return example.map((value, index) => {
+  const ranked = example.map((value, index) => {
     cumulative += value;
     const boundary = Math.round(total * cumulative / 175);
     const row = { name: '가상 은행 ' + 'ABCD'[index], value: boundary - previous };
     previous = boundary;
     return row;
-  }).filter(row => row.value > 0);
+  }).filter(row => row.value > 0)
+    .sort((left, right) => right.value - left.value || left.name.localeCompare(right.name, 'ko-KR'));
+  const leading = ranked.slice(0, 3);
+  const remainder = ranked.slice(3).reduce((sum, row) => sum + row.value, 0);
+  return remainder ? [...leading, { name: '기타', value: remainder }] : leading;
 }
 
 export function transactionFlow(data) {
@@ -72,11 +76,11 @@ export function transactionFlow(data) {
   const flow = graph();
   const remainderColor = sample ? flowColors.normal : flowColors.neutral;
 
-  const senders = sample ? fixtureBanks(total) : [{ name: '은행별 거래 미집계', value: total }];
-  const senderNodes = senders.map(row => flow.node(row.name, 0, sample ? row.value : null, flowColors.neutral));
+  const recipients = sample ? fixtureBanks(total) : [{ name: '은행별 거래 미집계', value: total }];
+  const recipientNodes = recipients.map(row => flow.node(row.name, 0, sample ? row.value : null, flowColors.neutral));
   const totalNode = flow.node('전체 거래', 1, total, flowColors.neutral, { anchor: 'total' });
   const receivedWeight = total ? (other + suspicious * scale) / total : 1;
-  senders.forEach((row, index) => flow.link(senderNodes[index], totalNode, row.value, { weight: row.value * receivedWeight }));
+  recipients.forEach((row, index) => flow.link(recipientNodes[index], totalNode, row.value, { weight: row.value * receivedWeight }));
 
   if (other > 0) {
     const otherNode = flow.node(sample ? '정상' : '그 외 거래', 2, other, remainderColor,

@@ -34,29 +34,6 @@
   padding: 0;
   list-style: none;
 }
-.rule-template-card {
-  display: grid;
-  gap: var(--aml-space-2);
-  inline-size: 100%;
-  padding: var(--aml-space-8) var(--aml-space-12);
-  border: var(--aml-stroke-divider) solid var(--divider);
-  border-radius: var(--aml-panel-control-radius);
-  background: var(--information-panel-surface);
-  color: var(--text);
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
-}
-.rule-template-card > span { color: var(--muted-text); font-size: var(--aml-type-caption-size); overflow-wrap: anywhere }
-.rule-template-card:hover:not(:disabled):not([aria-pressed="true"]) { background: var(--hover) }
-.rule-template-card[aria-pressed="true"] {
-  border-color: var(--selection-divider);
-  background: var(--selection-surface);
-  color: var(--selection-ink);
-}
-.rule-template-card[aria-pressed="true"] > span { color: var(--selection-muted) }
-.rule-template-card:disabled { cursor: not-allowed; opacity: var(--aml-opacity-disabled) }
-.rule-template-card:focus-visible,
 .rule-value:focus-visible,
 .rule-connector:focus-visible {
   outline: var(--aml-stroke-focus) solid var(--focus-ring);

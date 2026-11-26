@@ -158,7 +158,7 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
           <Text className="case-judgment-note">저장하면 이 업무가 처리 완료로 이동합니다.</Text>
         </Box> : eligible && <>
           <Box className="case-judgment-dropdowns">
-            <GlideSelect ariaLabel="처리 방식" placeholder="처리 방식 선택" value={verdict}
+            <GlideSelect fullWidth ariaLabel="처리 방식" placeholder="처리 방식 선택" value={verdict}
               options={[
                 { value: 'normal', label: row.kind === 'Alert' ? '정상 종결' : '정상' },
                 { value: 'abnormal', label: row.kind === 'Alert' ? '단독 의심 종결' : '이상' },
@@ -172,7 +172,7 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
                   setVerdict(value);
                 }
               }} />
-            <GlideSelect ariaLabel="판정 사유 유형" placeholder="판정 사유 유형 선택"
+            <GlideSelect fullWidth ariaLabel="판정 사유 유형" placeholder="판정 사유 유형 선택"
               value={reasonCategory} onChange={setReasonCategory}
               options={Object.entries(judgmentReasonLabels).map(([value, label]) => ({ value, label }))} />
           </Box>

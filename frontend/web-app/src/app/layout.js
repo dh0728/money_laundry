@@ -10,8 +10,9 @@ import { fetchNotificationCases, fetchNotifications, setNotificationsRead } from
 import { bindCardGlow } from '../components/card-glow.js';
 import { ConfirmHoldButton, PrimaryButton } from '../components/primary-button.jsx';
 import { DialogClose, DialogFooter, DialogHeader } from '../components/dialog-parts.jsx';
+import { FooterPagination } from '../components/footer-pagination.jsx';
 import { SearchField } from '../components/search-field.jsx';
-import { csvDownloadEntry, inDateRange, PageDownloadControl, QueryRadio, QueryToolbar, setupQueryControls } from '../components/query-controls.jsx';
+import { csvDownloadEntry, inDateRange, QueryRadio, setupQueryControls, WorkspaceQueryDock } from '../components/query-controls.jsx';
 import { dashboardFixtureBoardPage, dashboardFixtureResponse, dashboardFixtures, dashboardPeriodEnd, dashboardRecordCodes } from '../mocks/dashboard-fixtures.js';
 import { personalWorkHistory } from '../features/dashboard/personal-work-history.js';
 import { liveCodes, liveSource, liveSourceLoaded, loadLiveSource, rebuildLiveSource, resetLiveSource } from '../features/investigation/live-data.js';
@@ -126,7 +127,7 @@ function Header() {
       'id="search-toggle" aria-haspopup="dialog" aria-controls="search-dialog" data-drawer-button', '', 'floating'),
     'data-drawer-controls'), 'class="header-frame header-frame--left"');
   const navigation = BoxHTML(BoxHTML(
-    BoxHTML('', 'id="screen-navigation" class="header-frame screen-navigation" hidden') + PageDownloadControl(),
+    BoxHTML('', 'id="screen-navigation" class="header-frame screen-navigation" hidden'),
     'class="contextual-header"',
   ), 'class="header-frame header-frame--center"');
   const viewControls = BoxHTML(
@@ -237,12 +238,7 @@ function Notification() {
 }
 
 function Inbox() {
-  const pagination = BoxHTML(
-    Button('이전', { attributes: 'id="inbox-previous"' }) +
-    TextHTML('', 'id="inbox-page-status" aria-live="polite"') +
-    Button('다음', { attributes: 'id="inbox-next"' }),
-    'class="inbox-pages" id="inbox-pages" hidden',
-  );
+  const pagination = BoxHTML('', 'class="inbox-pages" id="inbox-pages"');
   return Sidebar(Divider() + ScrollArea('', 'id="notifications"') + pagination +
     BoxHTML('', 'class="inbox-request-footer" id="inbox-request-footer"', 'footer'),
   'id="inbox" aria-label="보관함" hidden inert');
@@ -349,6 +345,7 @@ function LoginScreen() {
 
 document.body.replaceChildren(HTMLFragment(Header() + NavigationSidebar() +
   BoxHTML('', 'id="workspace" aria-label="콘텐츠"', 'main') + Footer() +
+  WorkspaceQueryDock() +
   Inbox() + SearchDialog() + AccountDialog() + SettingsDialog() + PreferenceDialog('notification', '알림 상세',
     HeadingHTML('', 'id="notification-detail-title"', 3) +
     TextHTML(TextHTML('', 'id="notification-detail-time"', 'time'), '', 'p') +
@@ -551,11 +548,12 @@ let unmountCaseEvidence;
 let activeEvidence;
 let benchmarkLedgerView;
 let dashboardSource;
+const institutionDashboardCache = new WeakMap();
+const institutionDashboardFreshMs = 60_000;
 let caseListPage = { key: '', page: 0 };
 let navigationFrame;
 let headerPath;
 let headerCode;
-const queryToolStorage = HTMLNode(BoxHTML(QueryToolbar()));
 const queryControls = setupQueryControls({
   onChange: tool => {
     if (tool === 'sort' && activePath?.startsWith('dashboard/')) {
@@ -569,8 +567,7 @@ const queryControls = setupQueryControls({
     showWorkspace('', activeWorkCode, activePath, 'replace');
   },
   workspace: byId('workspace'),
-  controls: queryToolStorage.firstElementChild,
-  pageDownload: byId('page-download').firstElementChild,
+  controls: byId('workspace-query-dock').firstElementChild,
 });
 mountWorkflowNotifications(byId('workflow-notifications'));
 mountNotificationPreference(byId('notification-preference'));
@@ -719,7 +716,7 @@ function showBenchmarkWorkspace(path, code, navigationMode, params) {
     if (!host.isConnected) return;
     queryControls.setScreen(path, [], { rows: [], asOf: new Date(dataset.period.end + 'T00:00:00'), dashboard: true });
     const { range } = queryControls.selection();
-    queryControls.renderTags(workspace.querySelector('[data-query-tags]'));
+    queryControls.renderTags();
     mountedWorkflows.updateDashboard({ dataset, range });
     const days = dataset.days.filter(row => inDateRange(new Date(row.date + 'T00:00:00'), range));
     registerBenchmarkExport('ibm-hi-small-daily', '조회 기간 원본 집계',
@@ -740,8 +737,35 @@ function afterWorkspacePaint(callback) {
 }
 
 function loadPreviewDashboard(mounted, source, query) {
+  if (!query.mine) {
+    const key = `${getModelRiskThresholds().join(',')}:${queryControls.params('dashboard/all')}`;
+    const previous = institutionDashboardCache.get(source);
+    const entry = previous?.key === key ? previous : { key };
+    const render = data => { if (mountedWorkflows === mounted) mounted.updateDashboard(data); };
+    const load = () => {
+      render(entry.data);
+      if (entry.data && Date.now() - entry.loadedAt < institutionDashboardFreshMs) return;
+      institutionDashboardCache.set(source, entry);
+      afterWorkspacePaint(() => {
+        if (mountedWorkflows !== mounted) return;
+        entry.request ??= Promise.resolve().then(() => serviceMode
+          ? liveDashboardResponse(source, query) : dashboardFixtureResponse(source, query)
+        ).then(summary => {
+          const rows = summary.cases;
+          entry.data = { ...summary, board: dashboardFixtureBoardPage(rows, { size: Math.max(1, rows.length) }) };
+          entry.loadedAt = Date.now();
+          return entry.data;
+        }).finally(() => { entry.request = undefined; });
+        entry.request.then(render, () => {
+          if (!entry.data) render({ error: true, retry: load });
+        });
+      });
+    };
+    load();
+    return;
+  }
+
   const withWorkHistory = summary => {
-    if (!query.mine) return summary;
     const username = serviceMode ? currentPreviewUser()?.username : source.staff;
     const requests = serviceMode
       ? (liveWorkRequestsReady() ? liveWorkRequests() : undefined)
@@ -757,11 +781,11 @@ function loadPreviewDashboard(mounted, source, query) {
         mounted.updateDashboard(withWorkHistory(summary));
         afterWorkspacePaint(() => {
           if (mountedWorkflows !== mounted) return;
-          const rows = query.mine ? summary.mine : summary.cases;
+          const rows = summary.mine;
           const board = dashboardFixtureBoardPage(rows, { size: Math.max(1, rows.length) });
           const data = { ...summary, board };
           mounted.updateDashboard(withWorkHistory(data));
-          if (query.mine && serviceMode && !liveWorkRequestsReady()) void liveWorkspaceRequests?.then(() => {
+          if (serviceMode && !liveWorkRequestsReady()) void liveWorkspaceRequests?.then(() => {
             if (mountedWorkflows === mounted && liveWorkRequestsReady()) {
               mounted.updateDashboard(current => current?.board ? withWorkHistory(current) : current);
             }
@@ -830,6 +854,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
   const groupPrefix = path?.includes('/alerts') ? 'A' : path?.includes('/episodes') ? 'E' : 'T';
   const group = tabGroups.find(item => item.prefix === groupPrefix);
   const isDashboard = path?.startsWith('dashboard/');
+  const isPersonalDashboard = path === 'dashboard/mine';
   const isReport = path?.startsWith('report/');
   const isCaseDetail = /^(alert|episode)\//.test(path ?? '');
   const isCaseList = /^add-tab\/(alerts|episodes)(?:-|\/|$)/.test(path ?? '');
@@ -842,7 +867,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     dashboardSource = caseSource(groups);
   }
   const queryData = isDashboard ? {
-    rows: path === sections.dashboard ? dashboardSource.mine : dashboardSource.cases,
+    rows: isPersonalDashboard ? dashboardSource.mine : dashboardSource.cases,
     asOf: serviceMode ? liveDashboardAsOf(dashboardSource) : dashboardPeriodEnd,
     dashboard: true,
   } : isCaseList ? { rows: dashboardSource.cases.filter(row => row.code.startsWith(groupPrefix)) } : undefined;
@@ -875,7 +900,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     source: benchmarkFailed ? '원본 데이터를 불러올 수 없습니다.' : undefined,
   }) : '';
   workspace.replaceChildren(HTMLFragment(screen));
-  queryControls.renderTags(workspace.querySelector('[data-query-tags]'));
+  queryControls.renderTags();
   mountedWorkflows = mountWorkflows(workspace, undefined, {
     actionsHost: byId('footer-actions'),
     paginationHost: byId('footer-pagination'),
@@ -968,7 +993,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     rule: isRuleId(selectedRule) ? selectedRule : undefined,
   });
   if (isDashboard) loadPreviewDashboard(mountedWorkflows, dashboardSource,
-    { ...queryControls.selection(), mine: path === sections.dashboard });
+    { ...queryControls.selection(), mine: isPersonalDashboard });
   const caseGraphHost = byId('workspace').querySelector('[data-case-flow]');
   const evidenceHost = workspace.querySelector('[data-case-evidence]');
   const evidenceTable = evidenceHost && !caseGraphHost && mountTransactionEvidenceTable(evidenceHost, relatedTransactions);
@@ -1233,6 +1258,7 @@ const workRequestDialog = byId('work-request-dialog');
 const workRequestRoot = createRoot(byId('work-request-content'));
 const inboxRequestFooter = byId('inbox-request-footer');
 const inboxRequestRoot = createRoot(inboxRequestFooter);
+const inboxPaginationRoot = createRoot(byId('inbox-pages'));
 let workRequestOrigin;
 const notificationRows = new Map();
 const emptyNotifications = HTMLNode(TextHTML('', 'class="inbox-empty"', 'p'));
@@ -1405,12 +1431,10 @@ function renderNotifications(arrivalIds) {
     (activeRow.isConnected ? activeRow : list.querySelector('button') ?? unreadOnly).focus({ preventScroll: true });
   }
   byId('mark-all-read').disabled = !items.some(item => !item.read);
-  byId('inbox-pages').hidden = !liveInbox || liveInbox.totalPages <= 1;
-  if (liveInbox) {
-    byId('inbox-page-status').textContent = `${liveInbox.number + 1} / ${liveInbox.totalPages} 페이지`;
-    byId('inbox-previous').disabled = liveInbox.number === 0;
-    byId('inbox-next').disabled = liveInbox.number + 1 >= liveInbox.totalPages;
-  }
+  inboxPaginationRoot.render(liveInbox ? createElement(FooterPagination, {
+    compact: true, label: '보관함 페이지 이동', page: liveInbox.number, pageCount: liveInbox.totalPages,
+    onPageChange: refreshLiveInbox,
+  }) : null);
 }
 
 async function refreshLiveInbox(page = 0, initialRequests) {
@@ -1488,8 +1512,6 @@ byId('mark-all-read').addEventListener('click', () => {
   void markInboxRead((liveInbox?.content ?? notifications).filter(item => !item.read));
   renderNotifications();
 });
-byId('inbox-previous').addEventListener('click', () => void refreshLiveInbox((liveInbox?.number ?? 1) - 1));
-byId('inbox-next').addEventListener('click', () => void refreshLiveInbox((liveInbox?.number ?? 0) + 1));
 renderNotifications();
 
 bindCardGlow(document.body);

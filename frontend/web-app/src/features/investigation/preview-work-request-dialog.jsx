@@ -19,7 +19,7 @@ export const requestStateLabels = {
 };
 
 function StaffSelect({ label, value, onChange, except }) {
-  return <GlideSelect ariaLabel={label} placeholder={label + ' 선택'} value={value}
+  return <GlideSelect fullWidth ariaLabel={label} placeholder={label + ' 선택'} value={value}
     options={requestStaff.filter(staff => staff.username !== except)
       .map(staff => ({ value: staff.username, label: staff.name }))} onChange={onChange} />;
 }
@@ -27,7 +27,7 @@ function StaffSelect({ label, value, onChange, except }) {
 function ReviewStatusSelect({ value, onChange, except }) {
   return <Box className="case-judgment-field">
     <Text as="span">변경할 처리 상태</Text>
-    <GlideSelect ariaLabel="변경할 처리 상태" placeholder="처리 상태 선택" value={value} onChange={onChange}
+    <GlideSelect fullWidth ariaLabel="변경할 처리 상태" placeholder="처리 상태 선택" value={value} onChange={onChange}
       options={activeReviewStatuses.filter(status => status !== except).map(status => ({ value: status, label: status }))} />
   </Box>;
 }
@@ -59,7 +59,7 @@ export function WorkRequestForm({ actor, cases, initialCode, relation, onSend })
         <Text>비교 후보 · <Text as="code">{relation.codes.join(', ')}</Text></Text>
       </Box> : <Box className="case-judgment-field">
         <Text as="span">요청 유형</Text>
-        <GlideSelect ariaLabel="요청 유형" placeholder="요청 유형 선택" value={typeKey}
+        <GlideSelect fullWidth ariaLabel="요청 유형" placeholder="요청 유형 선택" value={typeKey}
           onChange={value => { setTypeKey(value); setRecipient(''); setReviewStatus(''); setError(''); }}
           options={Object.entries(workRequestTypes).filter(([key, type]) => type.role === actor.role && key !== 'relationReview')
             .map(([value, type]) => ({ value, label: type.label }))} />
@@ -67,7 +67,7 @@ export function WorkRequestForm({ actor, cases, initialCode, relation, onSend })
       {type && <>
         {!relation && <Box className="case-judgment-field">
           <Text as="span">대상 업무</Text>
-          <GlideSelect ariaLabel="대상 업무" placeholder={eligible.length ? 'Alert 또는 Episode 선택' : '선택 가능한 업무 없음'}
+          <GlideSelect fullWidth ariaLabel="대상 업무" placeholder={eligible.length ? 'Alert 또는 Episode 선택' : '선택 가능한 업무 없음'}
             value={row?.code ?? ''} disabled={!eligible.length}
             options={eligible.map(item => ({ value: item.code, label: `${item.code} · ${verdictLabels[item.verdict]}` }))}
             onChange={value => { setCode(value); setRecipient(''); setReviewStatus(''); setError(''); }} />
@@ -134,7 +134,7 @@ export function WorkRequestDetail({ item, actor, currentAssignee, onRespond, onO
         event.preventDefault();
         showFailure(onRespond({ id: item.id, action, note, assignee, reviewStatus }), setError);
       }}>
-        <GlideSelect ariaLabel="처리 방법" value={action} placeholder="처리 방법 선택" onChange={setAction}
+        <GlideSelect fullWidth ariaLabel="처리 방법" value={action} placeholder="처리 방법 선택" onChange={setAction}
           options={(admin ? ['approved', 'declined'] : ['completed', 'needs-discussion'])
             .map(value => ({ value, label: requestStateLabels[value] }))} />
         {needsAssignee && <StaffSelect label="새 담당자" value={assignee} onChange={setAssignee} except={currentAssignee} />}

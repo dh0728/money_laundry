@@ -164,6 +164,8 @@ const MagicBento = ({
   const starRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const engineRef = useRef<{ sync: () => void } | null>(null);
   const [cols, setCols] = useState(Math.max(1, Math.round(columns)));
+  const hasEffects = enableBorderGlow || enableSpotlight || (!disableAnimations &&
+    (enableStars || enableTilt || enableMagnetism || clickEffect || intro));
 
   const palette = theme === 'light' ? 'light' : 'dark';
   const glow = parseRgb(glowColor) ?? INK[palette];
@@ -482,7 +484,7 @@ const MagicBento = ({
     };
 
     const wake = () => {
-      if (raf || !visible) return;
+      if (!hasEffects || raf || !visible) return;
       last = performance.now();
       raf = requestAnimationFrame(frame);
     };
@@ -607,23 +609,25 @@ const MagicBento = ({
       });
     }
 
-    const visibility = new IntersectionObserver(entries => {
+    const visibility = hasEffects ? new IntersectionObserver(entries => {
       visible = entries.some(entry => entry.isIntersecting);
       if (visible) {
         dirty = true;
         wake();
       }
-    });
-    visibility.observe(root);
+    }) : null;
+    visibility?.observe(root);
 
-    window.addEventListener('pointermove', onPointerMove, { passive: true });
-    window.addEventListener('pointerdown', onPointerDown, { passive: true });
-    window.addEventListener('pointerup', release, { passive: true });
-    window.addEventListener('pointercancel', release, { passive: true });
-    window.addEventListener('scroll', onScroll, { passive: true, capture: true });
-    window.addEventListener('resize', onScroll, { passive: true });
-    document.addEventListener('pointerout', onPointerOut);
-    root.addEventListener('click', onClick);
+    if (hasEffects) {
+      window.addEventListener('pointermove', onPointerMove, { passive: true });
+      window.addEventListener('pointerdown', onPointerDown, { passive: true });
+      window.addEventListener('pointerup', release, { passive: true });
+      window.addEventListener('pointercancel', release, { passive: true });
+      window.addEventListener('scroll', onScroll, { passive: true, capture: true });
+      window.addEventListener('resize', onScroll, { passive: true });
+      document.addEventListener('pointerout', onPointerOut);
+      root.addEventListener('click', onClick);
+    }
     root.addEventListener('keydown', onKeyDown);
 
     engineRef.current = {
@@ -645,7 +649,7 @@ const MagicBento = ({
       window.clearTimeout(settleTimer);
       window.clearTimeout(introTimer);
       gate?.disconnect();
-      visibility.disconnect();
+      visibility?.disconnect();
       resizeObserver.disconnect();
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerdown', onPointerDown);
@@ -658,7 +662,7 @@ const MagicBento = ({
       root.removeEventListener('keydown', onKeyDown);
       engineRef.current = null;
     };
-  }, []);
+  }, [hasEffects]);
 
   useIsomorphicLayoutEffect(() => {
     engineRef.current?.sync();

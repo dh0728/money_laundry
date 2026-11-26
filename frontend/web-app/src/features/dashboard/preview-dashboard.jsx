@@ -5,13 +5,13 @@ import { ArrowUpRight, Sparkles } from 'lucide-react';
 import CountUp from '../../components/react-bits/CountUp';
 import { CaseProgressBoard } from '../investigation/preview-case-card';
 import {
-  BenchmarkAnalyticsSkeleton, DashboardAnalyticsSkeleton, DashboardBoardSkeleton,
+  BenchmarkAnalyticsSkeleton, ChartTopicSelect, DashboardAnalyticsSkeleton, DashboardBoardSkeleton,
   DashboardMetricGrid, PersonalDashboardOverview,
 } from './dashboard-layout';
 import { ibmLaundering, ibmTotal } from '../investigation/ibm-hi-small-aggregate';
 import { benchmarkDashboardMetrics } from './benchmark-dashboard-metrics';
 import { ActionButton } from '../../components/primary-button';
-import { csvDownloadEntry } from '../../components/query-controls';
+import { caseCsvDownloadEntry, csvDownloadEntry } from '../../components/query-controls';
 import { BoardSectionDownload, SectionDownloadHeading } from '../../components/section-download';
 import { Box, Heading, Stack, Text } from '../../components/layout-primitives';
 import { LinkTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
@@ -107,49 +107,15 @@ function MetricTrendPlot({ label, trend, known, reduced }) {
 
 function MetricComparison({ comparison, relation }) {
   const { numerator, denominator, numeratorRelation, denominatorRelation } = comparison;
-  const valueRef = React.useRef(null);
-  React.useLayoutEffect(() => {
-    const value = valueRef.current;
-    if (!value) return;
-    let active = true;
-    let frame = 0;
-    let observedWidth;
-    const fit = () => {
-      if (!active || !value.clientWidth) return;
-      value.style.removeProperty('--dashboard-comparison-fit');
-      const available = value.clientWidth;
-      const textWidth = value.scrollWidth;
-      if (textWidth > available) {
-        const fullSize = Number.parseFloat(getComputedStyle(value).fontSize);
-        value.style.setProperty('--dashboard-comparison-fit', `${Math.floor(fullSize * available / textWidth)}px`);
-      }
-    };
-    const scheduleFit = () => {
-      if (!active) return;
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(fit);
-    };
-    fit();
-    const observer = new ResizeObserver(([entry]) => {
-      const { width } = entry.contentRect;
-      if (width === observedWidth) return;
-      observedWidth = width;
-      scheduleFit();
-    });
-    observer.observe(value.parentElement);
-    document.fonts?.ready.then(scheduleFit);
-    return () => { active = false; cancelAnimationFrame(frame); observer.disconnect(); };
-  }, [numerator, denominator]);
-
-  return <Text as="strong" ref={valueRef} className="dashboard-metric-value dashboard-metric-comparison"
+  return <Text as="strong" className="dashboard-metric-value dashboard-metric-comparison"
     data-dashboard-metric-source={denominatorRelation ? undefined : relation}>
-    <Text as="span" data-kpi-tone="suspect" data-dashboard-metric-source={numeratorRelation}>{formatter.format(numerator)}</Text>{' / '}
+    <Text as="span" data-kpi-tone="suspect" data-dashboard-metric-source={numeratorRelation}>{formatter.format(numerator)}</Text>/
     <Text as="span" data-dashboard-metric-source={denominatorRelation}>{formatter.format(denominator)}</Text>
     {denominator > 0 && <Text as="span" data-kpi-tone="suspect">{' '}({compactShare(numerator, denominator)})</Text>}
   </Text>;
 }
 
-function Metric({ item, reduced }) {
+function Metric({ item, reduced, control, downloadable = false, uniformValueSize = false }) {
   const { label, value, unit, detail, key, relation, comparison, tone, trend } = item;
   const wide = (typeof value === 'number' ? formatter.format(value).length : value.length) >= 8;
   const reading = <Box className="dashboard-metric-reading">
@@ -161,11 +127,15 @@ function Metric({ item, reduced }) {
         {unit && <Text as="small">{unit}</Text>}
       </Text>
     </Box>;
-  return <Box className="dashboard-metric">
-    <SectionDownloadHeading as="h3">{label}</SectionDownloadHeading>
+  return <Box className="dashboard-metric" data-uniform-value-size={uniformValueSize || undefined}>
+    <SectionDownloadHeading as={control ? Box : 'h3'} downloadLabel={downloadable && trend ? label : undefined}
+      printLabel={downloadable && !trend ? label : undefined}
+      readRoot={host => host.closest('.dashboard-metric')}>
+      {control ? <><Heading level={3} className="visually-hidden">{label}</Heading>{control}</> : label}
+    </SectionDownloadHeading>
     {comparison ? <MetricComparison comparison={comparison} relation={relation} /> : reading}
     {detail && <Text>{detail}</Text>}
-    {trend && <MetricTrend label={label} trend={trend} reduced={reduced} />}
+    {trend && <MetricTrend key={label} label={label} trend={trend} reduced={reduced} />}
   </Box>;
 }
 
@@ -176,13 +146,42 @@ function Metrics({ items, appearance }) {
   }))} appearance={appearance} />;
 }
 
+// Applying a date filter remounts the dashboard; keep the choice for this page session.
+let unfinishedMetricKind = 'alert';
+const unfinishedMetricOptions = [
+  { value: 'alert', label: '미처리 Alert' },
+  { value: 'episode', label: '미완료 Episode' },
+];
+
+function UnfinishedMetricCard({ dailyAlertStatus, dailyEpisodeStatus, reduced }) {
+  const [kind, setKind] = React.useState(unfinishedMetricKind);
+  const isAlert = kind === 'alert';
+  const label = isAlert ? 'Alert' : 'Episode';
+  const daily = isAlert ? dailyAlertStatus : dailyEpisodeStatus;
+  const { unfinished, total } = reviewStatusTotals(daily);
+  const control = <ChartTopicSelect label="미처리 상태 업무 종류" value={kind} options={unfinishedMetricOptions} onChange={next => {
+    unfinishedMetricKind = next;
+    setKind(next);
+  }} />;
+  const item = {
+    label: isAlert ? '미처리 Alert' : '미완료 Episode',
+    value: compactShare(unfinished, total),
+    detail: daily ? `${label} ${count(total)} 중 ${count(unfinished)} · ${isAlert ? '검토 대기와 처리 중' : '처리 중'}`
+      : `${label} 상태 집계 미제공`,
+    tone: 'in-progress',
+    trend: unfinishedStatusTrend(daily),
+    relation: (isAlert ? unfinished > 0 : total > 0) ? `open-${kind}s` : undefined,
+  };
+  return <Panel as="article" data-compact-kpi>
+    <Metric control={control} item={item} reduced={reduced} downloadable uniformValueSize />
+  </Panel>;
+}
+
 function institutionMetricCards(data, reduced) {
   const { coverageScope, investigation, linked, operationalDaily, dailyAlertStatus, dailyEpisodeStatus } = data;
   const total = data.transactions.length;
   const suspicious = data.suspicious.length;
   const institution = coverageScope === 'institution';
-  const alerts = reviewStatusTotals(dailyAlertStatus);
-  const episodes = reviewStatusTotals(dailyEpisodeStatus);
   const alertTotal = investigation?.totalAlerts;
   const metrics = [
     { label: '의심 거래 / 들어온 거래', value: total,
@@ -204,20 +203,13 @@ function institutionMetricCards(data, reduced) {
       trend: dailyTrend(operationalDaily, row => dailyRate(row.linked, row.suspicious), flowColors.suspect, { rate: true }),
       comparison: linked == null ? null : { numerator: linked, denominator: suspicious },
       relation: linked > 0 ? 'linked' : undefined },
-    { label: '미처리 Alert', value: compactShare(alerts.unfinished, alerts.total), compact: true,
-      detail: dailyAlertStatus ? `Alert ${count(alerts.total)} 중 ${count(alerts.unfinished)} · 검토 대기와 처리 중` : 'Alert 상태 집계 미제공',
-      tone: 'in-progress',
-      trend: unfinishedStatusTrend(dailyAlertStatus),
-      relation: alerts.unfinished > 0 ? 'open-alerts' : undefined },
-    { label: '미완료 Episode', value: compactShare(episodes.unfinished, episodes.total), compact: true,
-      detail: dailyEpisodeStatus ? `Episode ${count(episodes.total)} 중 ${count(episodes.unfinished)} · 처리 중` : 'Episode 상태 집계 미제공',
-      tone: 'in-progress',
-      trend: unfinishedStatusTrend(dailyEpisodeStatus),
-      relation: episodes.total > 0 ? 'open-episodes' : undefined },
   ];
-  return metrics.map(item => <Panel as="article" key={item.label} data-compact-kpi={item.compact || undefined}>
-    <Metric item={{ ...item, key: `institution-${item.label}` }} reduced={reduced} />
-  </Panel>);
+  return [
+    ...metrics.map(item => <Panel as="article" key={item.label}>
+      <Metric item={{ ...item, key: `institution-${item.label}` }} reduced={reduced} downloadable uniformValueSize />
+    </Panel>),
+    <UnfinishedMetricCard key="unfinished" dailyAlertStatus={dailyAlertStatus} dailyEpisodeStatus={dailyEpisodeStatus} reduced={reduced} />,
+  ];
 }
 
 const personalStages = ['배정된 업무', '현재 상태', '완료 판정'];
@@ -308,6 +300,7 @@ function DashboardSummary({ trail, reduced, showContext }) {
     ]))] : [];
   return <AISummaryPanel as="section" reduced={reduced} className="dashboard-priority-panel">
     <SectionDownloadHeading headingClassName="dashboard-priority-heading" downloadLabel={trail ? '분석 추천' : undefined}
+      printLabel={showContext && !trail ? '분석 추천' : undefined}
       entries={downloads} readRoot={host => host.closest('.dashboard-priority-panel').querySelector('.account-trail-network')}>
       <Sparkles className="icon" aria-hidden="true" />분석 추천
     </SectionDownloadHeading>
@@ -334,21 +327,15 @@ function interleaveCaseKinds(records) {
     [alerts[index], episodes[index]].filter(Boolean)).flat();
 }
 
-function WorkBoard({ records, mine, sort, appearance, statusByCode }) {
-  const title = mine ? '내 업무 현황' : '업무 현황';
-  const rows = records.map(row => {
-    const status = statusByCode?.[row.code] ?? row.status;
-    return status === row.status ? row : { ...row, status };
-  });
-  return <Box as="section" className="dashboard-board" aria-label={mine ? '내 담당 업무' : title}>
-    <Box as="header" className="dashboard-board-heading">
-      <Heading id="dashboard-work-title" tabIndex={-1}>{title}</Heading>
+function WorkBoard({ rows, mine, sort, appearance }) {
+  return <Box as="section" className="dashboard-board" aria-label={mine ? '내 담당 업무' : '업무 상태 보드'}>
+    {mine && <Box as="header" className="dashboard-board-heading">
+      <Heading id="dashboard-work-title" tabIndex={-1}>내 업무 현황</Heading>
       <Box data-dashboard-sort-tags></Box>
       <Box className="dashboard-board-actions">
-        <Box data-dashboard-sort></Box>
-        <BoardSectionDownload records={rows} label={title} file="work-board" />
+        <BoardSectionDownload records={rows} label="내 업무 현황" file="work-board" />
       </Box>
-    </Box>
+    </Box>}
     <Box className="dashboard-board-scroll">
       <CaseProgressBoard rows={rows} reduced={appearance.reduced} theme={appearance.theme} showAssignee={!mine}
         plainCount pageSize={8}
@@ -358,8 +345,14 @@ function WorkBoard({ records, mine, sort, appearance, statusByCode }) {
 }
 
 export function PreviewDashboard({ mine, data, appearance }) {
-  const rows = data.board?.content;
+  const rows = data.board?.content.map(row => {
+    const status = data.investigation.statusByCode?.[row.code] ?? row.status;
+    return status === row.status ? row : { ...row, status };
+  });
   const summary = <DashboardSummary trail={data.accountRecommendation} reduced={appearance.reduced} showContext={!mine} />;
+  const board = rows ? <WorkBoard rows={rows} mine={mine} sort={data.sort} appearance={appearance} />
+    : <DashboardBoardSkeleton showTitle={mine} />;
+  const boardEntries = rows?.length ? [caseCsvDownloadEntry('업무 상태 보드', 'work-board', rows)] : [];
   return <Box className="preview-dashboard" data-mine={mine}>
     {mine ? <PersonalDashboardOverview recommendation={summary}>
       <PersonalInvestigation data={data} reduced={appearance.reduced} />
@@ -373,11 +366,11 @@ export function PreviewDashboard({ mine, data, appearance }) {
         renderEntry={entry => <><LinkTag code={entry.code} /><VerdictTag verdict={entry.verdict} /></>} />
     </PersonalDashboardOverview> : (
       <React.Suspense fallback={<DashboardAnalyticsSkeleton reduced={appearance.reduced} />}>
-        <Analytics data={data} reduced={appearance.reduced} summary={summary} metrics={institutionMetricCards(data, appearance.reduced)} />
+        <Analytics data={data} reduced={appearance.reduced} summary={summary} metrics={institutionMetricCards(data, appearance.reduced)}
+          board={board} boardEntries={boardEntries} />
       </React.Suspense>
     )}
-    {rows ? <WorkBoard records={rows}
-      mine={mine} sort={data.sort} appearance={appearance} statusByCode={data.investigation.statusByCode} /> : <DashboardBoardSkeleton />}
+    {mine && board}
   </Box>;
 }
 

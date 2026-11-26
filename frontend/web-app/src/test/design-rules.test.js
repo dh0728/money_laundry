@@ -161,6 +161,76 @@ describe('component/raw-element', () => {
   }, 30000);
 });
 
+describe('dashboard design boundaries', () => {
+  it('accepts common components and type imports but rejects direct UI implementations', async () => {
+    const { ESLint } = await import('eslint');
+    const code = [
+      "import { Panel } from '@/components/panel';",
+      "import type { DateRange } from 'react-day-picker';",
+      "import { DayPicker } from 'react-day-picker';",
+      "export { Dialog } from '@radix-ui/react-dialog';",
+      "export const load = () => import('recharts');",
+      'export const Html = () => <Panel dangerouslySetInnerHTML={{ __html: html }} />;',
+      'export const Token = () => <Panel style={{ "--aml-type-body-size": "inherit" }} />;',
+      'element.style.setProperty("--aml-type-body-size", "inherit");',
+      'export const Color = () => <Panel color="red" />;',
+      'export const Safe = () => <Panel style={{ "--dashboard-accent": "var(--text)" }} />;',
+    ].join('\n');
+    const [result] = await new ESLint({ cwd: app }).lintText(code, { filePath: resolve(app, 'src/features/dashboard/example.tsx') });
+    expect(result.fatalErrorCount).toBe(0);
+    for (const [id, lines] of [['component-dashboard-ui-source', [3, 4, 5, 6]], ['token-dashboard-usage', [7, 8, 9]]]) {
+      const messages = result.messages.filter(message => message.ruleId === `aml/${id}`);
+      expect(messages.map(message => [message.line, message.severity])).toEqual(lines.map(line => [line, 2]));
+    }
+  }, 30000);
+
+  it('accepts local aliases of tokens and rejects direct color, keyword sizing and public token overrides', async () => {
+    const stylelint = (await import('stylelint')).default;
+    const { stylelintPlugins, designStylelintRules } = await import('../../scripts/design-lint-plugin.mjs');
+    const result = await stylelint.lint({
+      cwd: app,
+      codeFilename: resolve(app, 'src/features/dashboard/example.css'),
+      code: [
+        '.ok { --dashboard-ink: var(--text); color: var(--dashboard-ink); font-size: var(--aml-type-body-size); }',
+        '.size { font-size: large; }',
+        '.paint { color: red; }',
+        '.override { --aml-type-body-size: inherit; }',
+        '@property --aml-type-body-size { syntax: "<length>"; inherits: true; initial-value: 0px; }',
+        '.background { background: blue; }',
+      ].join('\n'),
+      config: { plugins: stylelintPlugins, rules: { 'aml/token-dashboard-usage': designStylelintRules['aml/token-dashboard-usage'] } },
+    });
+    const warnings = result.results[0].warnings;
+    expect(warnings.map(warning => [warning.line, warning.severity]).sort((left, right) => left[0] - right[0]))
+      .toEqual([2, 3, 4, 5, 6].map(line => [line, 'error']));
+  });
+
+  it('rejects base controls and new entry points outside the approved dashboard catalog', async () => {
+    const { ESLint } = await import('eslint');
+    const code = [
+      "import GlideSelect from '@/components/react-bits/GlideSelect';",
+      "import { ActionButton } from '../../components/primary-button';",
+      "import { Select } from '../../components/ui/select.tsx';",
+      "export { Select as DashboardSelect } from '@/components/ui/select';",
+      "export const load = () => import('@/components/NewDashboardControl');",
+    ].join('\n');
+    const [result] = await new ESLint({ cwd: app }).lintText(code, { filePath: resolve(app, 'src/features/dashboard/example.tsx') });
+    expect(result.messages.filter(message => message.ruleId === 'aml/component-dashboard-ui-source').map(message => message.line))
+      .toEqual([3, 4, 5]);
+  }, 30000);
+
+  it('rejects a basic control copied into a different shared module', async () => {
+    const { ESLint } = await import('eslint');
+    const eslint = new ESLint({ cwd: app });
+    const code = 'export const Control = () => <button type="button">Select</button>;';
+    const [newControl] = await eslint.lintText(code, { filePath: resolve(app, 'src/components/new-control.tsx') });
+    const [owner] = await eslint.lintText(code, { filePath: resolve(app, 'src/components/react-bits/GlideSelect.tsx') });
+    const ownerRule = message => message.ruleId === 'aml/component-control-owner';
+    expect(newControl.messages.some(ownerRule)).toBe(true);
+    expect(owner.messages.some(ownerRule)).toBe(false);
+  }, 30000);
+});
+
 describe('token/inline-style', () => {
   it('타입 표기와 조건부 스타일 안에서도 실제 CSS 속성을 검사한다', async () => {
     const { ESLint } = await import('eslint');

@@ -10,7 +10,7 @@ import { useElementSize } from '../../components/charts/charts/use-element-size'
 import { ChartTooltip } from '../../components/charts/charts/tooltip/chart-tooltip';
 import { previewJudgmentReason } from './case-judgment-data';
 import { FooterPagination } from '../../components/footer-pagination';
-import { NativeSelect } from '../../components/ui/select';
+import GlideSelect from '../../components/react-bits/GlideSelect';
 import { Panel } from '../../components/panel';
 import { AISummaryPanel } from '../../components/ai-summary-panel';
 import { SectionDownloadHeading } from '../../components/section-download';
@@ -504,9 +504,8 @@ function PanelOverview({ panels, initialPanel, paginationHost }) {
   const panel = panels[index];
   const pager = <FooterPagination host={paginationHost} label="개요 패널 이동" unit="패널"
     page={index} pageCount={panels.length} onPageChange={select}>
-    <Box as="label" className="visually-hidden" htmlFor="case-overview-panel">개요 패널</Box>
-    <NativeSelect id="case-overview-panel" value={index} onChange={event => select(Number(event.target.value))}
-      options={panels.map(({ title, number }, value) => ({ value, label: `${number}. ${title}` }))} />
+    <GlideSelect ariaLabel="개요 패널" placement="top" value={String(index)} onChange={value => select(Number(value))}
+      options={panels.map(({ title, number }, value) => ({ value: String(value), label: `${number}. ${title}` }))} />
   </FooterPagination>;
   return <>
     <Box className="overview-panel-layout">

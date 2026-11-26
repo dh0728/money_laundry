@@ -322,7 +322,7 @@ body:has(#sidebar:not([hidden])) .sidebar-chrome .drawer-chrome__primary > .butt
   align-items: center;
   gap: var(--aml-space-6);
 }
-.app-header .brand-pill.icon-button { padding-inline: var(--aml-space-6) }
+.app-header .brand-pill.icon-button { padding-inline: var(--aml-space-6) calc(var(--aml-space-6) + var(--aml-space-8)) }
 .header-view-controls {
   display: flex;
   flex: none;
@@ -420,14 +420,10 @@ body:has(#sidebar:not([hidden])) .sidebar-chrome .drawer-chrome__primary > .butt
   font-size: var(--aml-type-caption-size);
 }
 .inbox-pages {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   padding: var(--aml-space-8);
   border-block-start: var(--aml-stroke-divider) solid var(--divider);
-  font-size: var(--aml-type-caption-size);
 }
-.inbox-pages > .button { padding: var(--aml-space-8) }
+.inbox-pages:empty { display: none }
 .inbox-request-footer {
   flex: none;
   padding: var(--workspace-inset);
@@ -442,8 +438,6 @@ body:has(#sidebar:not([hidden])) .sidebar-chrome .drawer-chrome__primary > .butt
   min-block-size: 0;
 }
 .work-request-form { display: grid; gap: var(--aml-space-16) }
-.work-request-form .glide-select__trigger { inline-size: 100% }
-.work-request-form .glide-select__chevron { margin-inline-start: auto; flex-shrink: 0 }
 .work-request-form p { margin: 0 }
 .work-request-message { white-space: pre-wrap; overflow-wrap: anywhere }
 .divider { border: 0; margin: 0; flex: none; height: var(--aml-stroke-divider); background: var(--divider) }

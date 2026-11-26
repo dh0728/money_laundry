@@ -389,6 +389,7 @@
   --metric-value-size-min: 1.5rem;
   --metric-value-size: clamp(var(--metric-value-size-min), 30cqi, var(--workspace-kpi-value-size));
   --metric-wide-value-size: clamp(var(--metric-value-size-min), 20cqi, var(--workspace-kpi-value-size));
+  --metric-uniform-value-size: clamp(var(--metric-value-size-min), 10cqi, var(--workspace-kpi-value-size));
   --metric-composite-value-size: clamp(var(--metric-value-size-min), 18cqi, var(--workspace-kpi-value-size));
   --metric-value-line-height: 1.1;
   --loading-placeholder-title-width: min(60%, calc(2 * var(--aml-space-64)));
@@ -638,7 +639,8 @@ body {
   --aml-type-body-strong-lineHeight: var(--aml-density-body-line-height);
   --aml-type-section-title-size: var(--aml-density-section-size);
   --aml-type-section-title-lineHeight: var(--aml-density-section-line-height);
-  --aml-type-panel-title-size: max(var(--aml-type-section-title-size), var(--aml-space-20));
+  --aml-type-region-title-size: max(var(--aml-type-section-title-size), var(--aml-space-20));
+  --aml-type-panel-title-size: var(--aml-type-section-title-size);
   --aml-type-panel-title-lineHeight: var(--aml-type-section-title-lineHeight);
   --aml-type-panel-title-weight: 700;
   --aml-type-page-title-size: var(--aml-density-page-size);

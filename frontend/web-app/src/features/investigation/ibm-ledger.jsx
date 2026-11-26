@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { NativeSelect } from '@/components/ui/select';
+import GlideSelect from '@/components/react-bits/GlideSelect';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CaseDataTable, RecordIdCell } from './case-table-components';
 import { Panel } from '../../components/panel';
@@ -117,12 +117,14 @@ export function BenchmarkLedger({ dataset, code = '', filters, tableView = true,
           <SearchField variant="compact" label="거래 ID" value={lookup} placeholder="정확한 거래 ID 입력"
             onChange={event => { setLookup(event.target.value); goToPage(0); }} />
         </Box>
-        <Box as="label">거래일
-          <NativeSelect value={selectedDay} onChange={event => { setSelectedDay(event.target.value); goToPage(0); }}
+        <Box className="benchmark-filter-group">
+          <Text as="span">거래일</Text>
+          <GlideSelect ariaLabel="거래일" size="sm" value={selectedDay} onChange={value => { setSelectedDay(value); goToPage(0); }}
             options={[{ value: '', label: '전체 날짜' }, ...days.map(day => ({ value: day, label: day }))]} />
         </Box>
-        <Box as="label">원본 라벨
-          <NativeSelect value={label} onChange={event => { setLabel(event.target.value); goToPage(0); }}
+        <Box className="benchmark-filter-group">
+          <Text as="span">원본 라벨</Text>
+          <GlideSelect ariaLabel="원본 라벨" size="sm" value={label} onChange={value => { setLabel(value); goToPage(0); }}
             options={[
               { value: 'all', label: '전체 라벨' },
               { value: 'labeled', label: labelText(true) },

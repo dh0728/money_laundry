@@ -14,12 +14,11 @@ import { createPageCsvZip, printWorkspace } from '../lib/page-export';
 import { downloadVisualizations, hasVisualizations } from '../lib/preview-visual-export.js';
 import JellyRadio from './react-bits/JellyRadio';
 import { QueryCheck } from './selection-check';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { FormDropdown, FormDropdownItem } from './form-dropdown';
 import { readWorkspaceGap } from '../features/dashboard/workspace-metrics.js';
 import { sortSavedTableRows, tableSortFields } from './workflow-table';
 import 'react-day-picker/style.css';
 import '../styles/page-export-print.css';
-import './form-dropdown.css';
 import './query-controls.css';
 
 const statuses = reviewStates.map(({ value }) => value);
@@ -41,15 +40,18 @@ function queryToolButton(tool, label, surface) {
     `data-query-tool="${tool}" aria-haspopup="dialog" aria-expanded="false" hidden`, 'query-trigger', surface);
 }
 
-export function QueryToolbar() {
-  const buttons = Object.entries(queryTools).map(([tool, label]) => `<div class="query-control">
-    ${queryToolButton(tool, label, 'ghost')}
-  </div>`).join('');
+export function QueryToolbar({ page = false } = {}) {
+  const buttons = Object.entries(queryTools).map(([tool, label]) => {
+    const pageExport = page && tool === 'download';
+    return `<div class="query-control"${pageExport ? ' id="page-download"' : ''}>
+      ${queryToolButton(tool, pageExport ? pageDownloadLabel : label, 'ghost')}
+    </div>`;
+  }).join('');
   return `<div class="context-query-tools" role="group" aria-label="조회 도구" hidden>${buttons}</div>`;
 }
 
-export function PageDownloadControl() {
-  return `<div id="page-download" class="query-control">${queryToolButton('download', pageDownloadLabel, 'floating')}</div>`;
+export function WorkspaceQueryDock() {
+  return `<div id="workspace-query-dock" class="glass floating-glass">${QueryToolbar({ page: true })}</div>`;
 }
 
 const embeddedToolbar = { __html: QueryToolbar() };
@@ -368,14 +370,12 @@ function TableFilterPane({ filter, onApply }) {
 
 function CalendarDropdown({ 'aria-label': label, disabled, options, value, onChange }) {
   const { host } = useContext(QueryActions);
-  return <Select value={String(value)} disabled={disabled}
-    onValueChange={value => onChange({ target: { value } })}>
-    <SelectTrigger aria-label={label} className="form-dropdown-trigger query-calendar-select"><SelectValue /></SelectTrigger>
-    <SelectContent className="form-dropdown-options query-calendar-options" position="popper" align="start"
-      portalContainer={host.closest('.query-tool-popover')}>
-      {options.map(({ value, label, disabled }) => <SelectItem key={value} value={String(value)} disabled={disabled}>{label}</SelectItem>)}
-    </SelectContent>
-  </Select>;
+  return <FormDropdown label={label} value={String(value)} disabled={disabled}
+    onValueChange={value => onChange({ target: { value } })}
+    triggerClassName="query-calendar-select" optionsClassName="query-calendar-options"
+    portalContainer={host.closest('.query-tool-popover')}>
+    {options.map(({ value, label, disabled }) => <FormDropdownItem key={value} value={String(value)} disabled={disabled}>{label}</FormDropdownItem>)}
+  </FormDropdown>;
 }
 
 function AmlCalendar({ month, onMonth, range, onRange, asOf }) {
@@ -482,18 +482,17 @@ function DownloadOptions({ entries, onDone }) {
 
 let nextPopoverId = 0;
 
-export function setupQueryControls({ onChange, workspace, controls, embedded = false, pageDownload, downloadSurface = 'ghost',
+export function setupQueryControls({ onChange, workspace, controls, embedded = false, downloadSurface = 'ghost',
   tooltip = document.getElementById('tooltip') }) {
   const events = new AbortController();
   const eventOptions = { signal: events.signal };
-  const toolbarButtons = [...controls.querySelectorAll('[data-query-tool]')];
-  const buttons = pageDownload ? [...toolbarButtons, pageDownload] : toolbarButtons;
+  const pageDownload = controls.querySelector('#page-download [data-query-tool]');
+  const buttons = [...controls.querySelectorAll('[data-query-tool]')];
+  const toolbarButtons = buttons.filter(button => button !== pageDownload);
   const queryButtons = toolbarButtons.filter(button => button.matches(queryTriggerSelector));
   const downloadButton = toolbarButtons.find(button => button.dataset.queryTool === 'download');
   if (downloadButton) downloadButton.dataset.buttonSurface = downloadSurface;
-  const sortControl = toolbarButtons.find(button => button.dataset.queryTool === 'sort')?.parentElement;
-  const sortSibling = sortControl?.nextElementSibling;
-  const toolbarHome = controls.parentElement;
+  const sortButton = queryButtons.find(button => button.dataset.queryTool === 'sort');
   const popover = document.createElement('div');
   popover.id = `query-tool-popover-${++nextPopoverId}`;
   popover.popover = 'auto';
@@ -533,15 +532,18 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     const value = queries.get(scope) ?? defaultQuery;
     return localTable && value.sort ? { ...value, sort: '' } : value;
   };
-  const tableFrame = () => controls.closest('.data-table-frame');
+  const tableArea = () => embedded ? controls : workspace.querySelector('[data-table-tools]');
   function syncConditions() {
-    const host = controls.closest('.data-table-heading')?.querySelector('[data-table-query]')
-      ?? tableFrame()?.querySelector('[data-table-query]') ?? workspace.querySelector('[data-query-tags]');
+    const table = tableArea();
+    const frame = table?.closest('.data-table-frame');
+    const host = workspace.querySelector('[data-query-tags]')
+      ?? table?.closest('.data-table-heading')?.querySelector('[data-table-query]')
+      ?? frame?.querySelector('[data-table-query]');
     if (!host) return;
     if (conditionTags.parentElement !== host) host.prepend(conditionTags);
     const value = current();
     const groups = filterGroups(rows, scope);
-    const sort = tableSortFields(tableFrame()).find(field => field.direction);
+    const sort = tableSortFields(frame).find(field => field.direction);
     const filter = tableTools?.filter;
     const range = tableTools?.period?.range;
     const extra = [];
@@ -563,7 +565,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
       onChange={(next, tool) => {
         queries.set(scope, localTable ? { ...next, sort: queries.get(scope)?.sort ?? '' } : next);
         if (tool === 'sort' && boardSortHost) {
-          sortControl?.querySelector('[data-query-tool="sort"]')?.focus({ preventScroll: true });
+          sortButton?.focus({ preventScroll: true });
         } else focusTags = true;
         onChange(tool, current());
       }} />);
@@ -581,12 +583,6 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
       button.toggleAttribute('data-query-applied', applied[button.dataset.queryTool]);
     }
   }
-  function moveToolbar(target) {
-    const previous = controls.parentElement;
-    if (previous === target) return;
-    if (previous?.matches('[data-table-tools]')) previous.hidden = true;
-    target.append(controls);
-  }
   function visibleLocalDownloads() {
     return [...workspace.querySelectorAll('[data-local-query-tools]')]
       .filter(element => {
@@ -599,22 +595,12 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
   }
   function syncTools(workspaceReady = true) {
     const hasRows = Boolean(scope && rows.length);
-    const tableSlot = embedded ? toolbarHome : localTable && workspaceReady
-      ? workspace.querySelector('[data-table-tools]') : null;
-    const screenSlot = !localTable && workspaceReady ? workspace.querySelector('[data-screen-query-tools]') : null;
-    const target = tableSlot ?? screenSlot;
-    const dashboardSort = workspaceReady && scope?.startsWith('dashboard-') && workspace.querySelector('[data-dashboard-sort]');
-    const sortHost = dashboardSort || controls;
-    if (sortControl && sortControl.parentElement !== sortHost) {
-      sortHost.insertBefore(sortControl, dashboardSort ? null : sortSibling);
-    }
     const hasDownloadEntries = tableTools?.entries?.some(entry => !entry.disabled);
     const available = {
       filter: hasRows || Boolean(tableTools?.filter),
       sort: hasRows && !localTable || Boolean(tableTools?.sort),
       period: Boolean(tableTools?.period || scope && (hasRows || periodAnchor)),
-      download: tableTools?.panelDownload !== false && (hasRows || hasDownloadEntries)
-        && (!pageDownload || localTable && hasDownloadEntries),
+      download: tableTools?.panelDownload !== false && (hasRows || hasDownloadEntries),
     };
     for (const button of toolbarButtons) {
       const hidden = !available[button.dataset.queryTool];
@@ -624,11 +610,9 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
       const hidden = !screen || !workspaceReady;
       if (pageDownload.hidden !== hidden) pageDownload.hidden = hidden;
     }
-    const hideToolbar = !target || toolbarButtons.every(button => button.hidden || !controls.contains(button));
+    const hideToolbar = !workspaceReady || buttons.every(button => button.hidden);
     if (controls.hidden !== hideToolbar) controls.hidden = hideToolbar;
-    if (tableSlot && tableSlot.hidden !== hideToolbar) tableSlot.hidden = hideToolbar;
-    moveToolbar(target ?? toolbarHome);
-    if (resumeTableFocus && tableSlot && !hideToolbar) {
+    if (resumeTableFocus && !hideToolbar) {
       if (document.activeElement === document.body) {
         resumeTableFocus.focus({ preventScroll: true });
         if (tooltip) hideTooltip(tooltip);
@@ -838,6 +822,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     downloadEntries,
     registerTableTools(options) {
       tableTools = options;
+      downloadButton?.setAttribute('aria-label', options?.downloadLabel ?? queryTools.download);
       syncTools();
       return () => {
         if (tableTools === options) tableTools = undefined;
@@ -848,8 +833,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
       tagsRoot = undefined;
       conditionTags.remove();
     },
-    renderTags(host) {
-      if (!scope || !host) return;
+    renderTags() {
       syncTools();
     },
     caseRows() {
@@ -883,7 +867,6 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
         resumeTableFocus = undefined;
       }
       dismiss();
-      moveToolbar(toolbarHome);
       scope = next;
       screen = path;
       localTable = hasLocalTableTools(path);

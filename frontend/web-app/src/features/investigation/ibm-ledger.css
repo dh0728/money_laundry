@@ -13,7 +13,7 @@
   gap: var(--aml-space-8);
   margin-block-start: var(--aml-space-12);
 }
-.benchmark-filters > :is(label, .benchmark-search-group) {
+.benchmark-filters > :is(.benchmark-filter-group, .benchmark-search-group) {
   display: grid;
   gap: var(--aml-space-4);
   flex: 0 1 auto;
@@ -21,20 +21,6 @@
   font-size: var(--aml-type-caption-size);
 }
 .benchmark-search-group { flex: 1 1 16rem; max-inline-size: var(--benchmark-search-max-width) }
-.benchmark-filters select {
-  min-inline-size: 0;
-  min-block-size: var(--aml-density-control-compact);
-  padding-inline: var(--aml-space-8);
-  border: var(--aml-stroke-control) solid var(--divider);
-  border-radius: var(--aml-radius-control);
-  background: var(--inner-surface);
-  color: var(--text);
-  font-size: var(--ui-font-size);
-}
-.benchmark-filters select:focus-visible {
-  outline: var(--aml-stroke-focus) solid var(--focus-ring);
-  outline-offset: var(--aml-space-2);
-}
 .benchmark-detail header {
   display: flex;
   flex-wrap: wrap;

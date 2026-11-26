@@ -1,3 +1,5 @@
+import { appReducedMotion } from '@/hooks/use-reduced-motion';
+
 // Pointer geometry adapted from React Bits BorderGlow.
 export function updateBorderGlowPointer(card, clientX, clientY, bounds = card.getBoundingClientRect()) {
   const { left, top, width, height } = bounds;
@@ -13,9 +15,12 @@ export function updateBorderGlowPointer(card, clientX, clientY, bounds = card.ge
 export function bindCardGlow(workspace) {
   const surfaceSelector = '[data-card-interactive]';
   const page = workspace.ownerDocument;
+  const view = page.defaultView;
   let active;
   let tiltBounds;
   let clipping;
+  let pointerFrame = null;
+  let pendingPointer;
 
   function clipArea(surface) {
     const area = { left: -Infinity, right: Infinity, top: -Infinity, bottom: Infinity };
@@ -109,7 +114,7 @@ export function bindCardGlow(workspace) {
     }
     updateBorderGlowPointer(active, event.clientX, event.clientY, bounds);
     active.setAttribute('data-card-spotlight', '');
-    if (tiltBounds) {
+    if (tiltBounds && !appReducedMotion()) {
       const rx = (0.5 - y / height) * 12;
       const ry = (x / width - 0.5) * 12;
       active.setAttribute('data-card-tilted', '');
@@ -118,22 +123,40 @@ export function bindCardGlow(workspace) {
       active.style.setProperty('--card-tilt-scale', String(tiltScale(active, tiltBounds, clipping, rx, ry)));
     }
   }
-  function clearOnScroll() {
-    workspace.setAttribute('data-card-glow-scrolling', '');
+
+  function queueMove(event) {
+    pendingPointer = event;
+    if (pointerFrame !== null) return;
+    pointerFrame = view.requestAnimationFrame(() => {
+      pointerFrame = null;
+      const latest = pendingPointer;
+      pendingPointer = undefined;
+      move(latest);
+    });
+  }
+
+  function resetPointer() {
+    if (pointerFrame !== null) view.cancelAnimationFrame(pointerFrame);
+    pointerFrame = null;
+    pendingPointer = undefined;
     clear();
   }
-  workspace.addEventListener('pointermove', move, { passive: true });
-  workspace.addEventListener('pointerleave', clear);
-  workspace.addEventListener('pointercancel', clear);
+  function clearOnScroll() {
+    workspace.setAttribute('data-card-glow-scrolling', '');
+    resetPointer();
+  }
+  workspace.addEventListener('pointermove', queueMove, { passive: true });
+  workspace.addEventListener('pointerleave', resetPointer);
+  workspace.addEventListener('pointercancel', resetPointer);
   page.addEventListener('scroll', clearOnScroll, { passive: true, capture: true });
-  page.addEventListener('aml:appearance', clear);
+  page.addEventListener('aml:appearance', resetPointer);
   return () => {
-    clear();
-    workspace.removeEventListener('pointermove', move);
-    workspace.removeEventListener('pointerleave', clear);
-    workspace.removeEventListener('pointercancel', clear);
+    resetPointer();
+    workspace.removeEventListener('pointermove', queueMove);
+    workspace.removeEventListener('pointerleave', resetPointer);
+    workspace.removeEventListener('pointercancel', resetPointer);
     page.removeEventListener('scroll', clearOnScroll, true);
-    page.removeEventListener('aml:appearance', clear);
+    page.removeEventListener('aml:appearance', resetPointer);
     workspace.removeAttribute('data-card-glow-scrolling');
   };
 }

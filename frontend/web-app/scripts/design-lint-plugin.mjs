@@ -1,9 +1,10 @@
 // AML RADAR 디자인 규칙 구현. 규칙 목록·수준은 scripts/design-rules.mjs, 예외는 scripts/design-exceptions.json 한 곳에만 둔다.
 // eslint 플러그인(aml/*)과 stylelint 플러그인(aml/*)이 같은 규칙 이름을 쓴다.
 import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { relative, resolve, sep } from 'node:path'
+import { posix, relative, resolve, sep } from 'node:path'
 import stylelint from 'stylelint'
 import { bannedIconPackage, designRules, pluginRuleName } from './design-rules.mjs'
+import { dashboardUiCatalog, legacyDashboardUiImports } from '../dashboard-ui-catalog.mjs'
 
 export const appRoot = resolve(import.meta.dirname, '..')
 export const rel = file => relative(appRoot, resolve(appRoot, file)).split(sep).join('/')
@@ -17,6 +18,19 @@ export const baselinePath = resolve(appRoot, 'scripts/design-baseline.json')
 export const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'))
 const excepted = (ruleId, path) => exceptions.some(entry => entry.rule === ruleId && entry.file === path)
 const inside = (path, prefixes) => prefixes.some(prefix => prefix.endsWith('/') ? path.startsWith(prefix) : path === prefix)
+const isDashboard = path => path.startsWith('src/features/dashboard/')
+const dashboardDependencies = new Set(['react', 'date-fns', 'lucide-react'])
+const nativeControls = new Set(['button', 'input', 'select', 'textarea'])
+const nativeControlOwners = new Set([
+  'data-table/data-table-column-header.tsx', 'query-controls.jsx', 'search-field.jsx',
+  'react-bits/BellToggle.jsx', 'react-bits/BranchedMenu.tsx', 'react-bits/GlideSelect.tsx',
+  'react-bits/RubberSegment.tsx', 'react-bits/SpringCheck.tsx', 'react-bits/Stepper.tsx',
+  'ui/checkbox.tsx', 'ui/input.tsx', 'ui/radio-group.tsx', 'ui/select.tsx', 'ui/sidebar.tsx', 'ui/textarea.tsx',
+].map(file => `src/components/${file}`))
+const designTokenName = /^--(?:aml-|palette-)/
+const dashboardPaintProperty = /^(?:color|background(?:-color)?|fill|stroke|outline-color|border(?:-[a-z-]+)?-color)$/
+const dashboardTokenReference = /var\(\s*--/
+const dashboardPaintValue = value => dashboardTokenReference.test(value) || /^(?:inherit|currentcolor|transparent|none)$/i.test(value)
 
 export const COLOR_RE = /(?<![\w&/-])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![\w-])|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(\s*[-+]?[\d.]/g
 const TABLE_TAGS = new Set(['table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption', 'colgroup', 'col'])
@@ -64,6 +78,7 @@ function resolveModule(from, spec) {
   return null
 }
 let varWorlds
+export const invalidateDesignVariableIndex = () => { varWorlds = undefined }
 function varWorldSets() {
   if (varWorlds) return varWorlds
   // runtime = JS가 style·setProperty로 넣는 변수('--x' 문자열). 어느 컴포넌트가 넣을지 모르므로 묶음과 상관없이 정의로 본다.
@@ -243,6 +258,64 @@ const eslintRules = {
         report(node, `<${name} as=…>는 상자·글자 태그만 받는다. 버튼·입력·표·그림은 각자의 공용 부품을 쓴다.`)
     },
     ...onStrings((node, value) => { for (const match of value.matchAll(RAW_TAG_IN_STRING)) if (RAW_TAGS.has(match[1])) report(node, `문자열 맨 태그 <${match[1]}> 대신 components.js의 공용 부품을 쓴다.`) }),
+  }),
+  'component-dashboard-ui-source': eslintRule('component/dashboard-ui-source', ({ path, report }) => {
+    if (!isDashboard(path)) return {}
+    const checkModule = node => {
+      if (node.importKind === 'type' || node.exportKind === 'type' ||
+        (node.specifiers?.length && node.specifiers.every(specifier => specifier.importKind === 'type' || specifier.exportKind === 'type'))) return
+      const source = node.source?.value
+      if (typeof source === 'string') {
+        if (dashboardDependencies.has(source)) return
+        const clean = source.replace(/\?.*$/, '')
+        const local = clean.startsWith('@/') ? posix.normalize(`src/${clean.slice(2)}`) :
+          /^\.\.?\//.test(clean) ? posix.join(posix.dirname(path), clean) : null
+        if (local?.startsWith('src/')) {
+          if (!local.startsWith('src/components/')) return
+          const module = local.slice('src/components/'.length).replace(/\.[cm]?[jt]sx?$/, '')
+          if (dashboardUiCatalog.has(module) || legacyDashboardUiImports.get(path) === module) return
+          report(node, '승인된 공용 컴포넌트만 사용한다. 선택은 GlideSelect, 버튼은 ActionButton을 먼저 확인한다.')
+          return
+        }
+      }
+      report(node, '대시보드의 UI는 저장소의 공용 컴포넌트에서 가져온다(동적 import도 정해진 경로만 허용).')
+    }
+    return {
+      ImportDeclaration: checkModule,
+      ImportExpression: checkModule,
+      ExportAllDeclaration: checkModule,
+      ExportNamedDeclaration(node) { if (node.source) checkModule(node) },
+      JSXAttribute(node) { if (node.name.name === 'dangerouslySetInnerHTML') report(node, '원시 HTML 대신 공용 컴포넌트를 쓴다.') },
+      CallExpression(node) {
+        if (node.callee.type === 'Identifier' && node.callee.name === 'require') report(node, '대시보드는 검사 가능한 import로 의존성을 불러온다.')
+      },
+    }
+  }),
+  'component-control-owner': eslintRule('component/control-owner', ({ path, report }) => {
+    if (!path.startsWith('src/components/') || nativeControlOwners.has(path)) return {}
+    return {
+      JSXOpeningElement(node) {
+        if (nativeControls.has(node.name.name))
+          report(node, '공용 폴더에서도 새 기본 컨트롤을 복제하지 않는다. ActionButton, SearchField, GlideSelect 등 기존 부품을 사용한다.')
+      },
+    }
+  }),
+  'token-dashboard-usage': eslintRule('token/dashboard-usage', ({ path, report }) => !isDashboard(path) ? {} : {
+    Property(node) {
+      const name = node.key.value ?? node.key.name
+      if (designTokenName.test(name)) report(node, `${name}은 공용 토큰이므로 대시보드에서 다시 정의하지 않는다.`)
+    },
+    CallExpression(node) {
+      const member = node.callee
+      const name = node.arguments[0]?.value
+      if (member.type === 'MemberExpression' && /^(setProperty|removeProperty)$/.test(member.property.name ?? member.property.value) && designTokenName.test(name))
+        report(node, `${name}은 공용 토큰이므로 대시보드에서 변경하지 않는다.`)
+    },
+    JSXAttribute(node) {
+      const value = node.value?.type === 'JSXExpressionContainer' ? node.value.expression : node.value
+      if (dashboardPaintProperty.test(node.name.name) && value?.type === 'Literal' && typeof value.value === 'string' && !dashboardPaintValue(value.value.trim()))
+        report(node, `${node.name.name}에 직접 색상 대신 디자인 토큰을 쓴다.`)
+    },
   }),
   'token-raw-color': eslintRule('token/raw-color', ({ report }) => onStrings((node, value) => {
     for (const match of value.matchAll(COLOR_RE)) report(node, `직접 색 값 ${match[0].trim()} 대신 색 토큰(var(--…))을 쓴다.`)
@@ -528,9 +601,27 @@ export const stylelintPlugins = [
     const match = decl.value.match(PALETTE_VAR)
     if (match) report(decl, `${decl.prop}: 원시 색 --${match[1]} 대신 의미 토큰을 쓴다.`)
   }) : undefined),
-  cssRule('token/undefined-var', ({ root, path, report }) => root.walkDecls(decl => {
-    for (const name of undefinedVars(decl.value, path)) report(decl, `${decl.prop}: 정의 없는 변수 ${name}`)
-  })),
+  cssRule('token/undefined-var', ({ root, path, report }) => {
+    const localDefinitions = new Set()
+    root.walkDecls(/^--/, declaration => { localDefinitions.add(declaration.prop) })
+    root.walkDecls(decl => {
+      for (const name of undefinedVars(decl.value, path)) {
+        if (!localDefinitions.has(name)) report(decl, `${decl.prop}: 정의 없는 변수 ${name}`)
+      }
+    })
+  }),
+  cssRule('token/dashboard-usage', ({ root, path, report }) => {
+    if (!isDashboard(path)) return
+    root.walkAtRules('property', rule => {
+      if (designTokenName.test(rule.params.trim())) report(rule, `${rule.params}은 공용 토큰이므로 대시보드에서 다시 정의하지 않는다.`)
+    })
+    root.walkDecls(decl => {
+      const value = decl.value.trim()
+      if (designTokenName.test(decl.prop)) report(decl, `${decl.prop}은 공용 토큰이므로 대시보드에서 다시 정의하지 않는다.`)
+      else if (decl.prop === 'font-size' && value !== 'inherit' && !dashboardTokenReference.test(value)) report(decl, '대시보드 글자 크기는 타입 토큰을 쓴다.')
+      else if (dashboardPaintProperty.test(decl.prop) && !dashboardPaintValue(value)) report(decl, `${decl.prop}에 직접 색상 대신 디자인 토큰을 쓴다.`)
+    })
+  }),
   cssRule('icon/local-svg', ({ root, report }) => root.walkDecls(decl => {
     if (/url\([^)]*\.svg/.test(decl.value)) report(decl, `${decl.prop}: SVG 파일 대신 lucide-react 아이콘을 쓴다.`)
   })),

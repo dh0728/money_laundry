@@ -13,6 +13,11 @@
   inline-size: var(--footer-pagination-control-size);
   block-size: var(--footer-pagination-control-size);
 }
+.footer-pagination[data-compact] {
+  justify-content: space-between;
+  font-size: var(--aml-type-caption-size);
+}
+.footer-pagination-text-button { padding: var(--aml-space-8) }
 .footer-pagination select {
   min-inline-size: 0;
   max-inline-size: var(--footer-pagination-select-max-width);

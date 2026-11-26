@@ -39,6 +39,9 @@ export interface GlideSelectProps {
   rememberPosition?: boolean;
   disabled?: boolean;
   inlineList?: boolean;
+  expandInline?: boolean;
+  appearance?: 'panel-title';
+  fullWidth?: boolean;
   ariaLabel?: string;
   className?: string;
 }
@@ -80,6 +83,9 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
   rememberPosition = true,
   disabled = false,
   inlineList = false,
+  expandInline = false,
+  appearance,
+  fullWidth = false,
   ariaLabel = 'Select',
   className = ''
 }) => {
@@ -110,7 +116,7 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
     const trigger = triggerRef.current;
     if (!el) return;
     const place = () => {
-      if (!trigger || !el.showPopover) return;
+      if (expandInline || !trigger || !el.showPopover) return;
       const r = trigger.getBoundingClientRect();
       const style = getComputedStyle(el);
       const gap = Number.parseFloat(style.getPropertyValue('--aml-space-6'));
@@ -128,7 +134,7 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
       el.style.setProperty('--gs-positioned-top', nextSide === 'bottom' ? `${r.bottom + gap}px` : 'auto');
       el.style.setProperty('--gs-positioned-bottom', nextSide === 'top' ? `${window.innerHeight - r.top + gap}px` : 'auto');
     };
-    if (trigger && el.showPopover && !el.matches(':popover-open')) el.showPopover();
+    if (!expandInline && trigger && el.showPopover && !el.matches(':popover-open')) el.showPopover();
     place();
     el.toggleAttribute('data-instant', instant.current);
     el.dataset.state = 'closed';
@@ -177,14 +183,14 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
     if (disabled) return;
     clearTimeout(closeTimer.current);
     instant.current = true;
-    setActive(selected >= 0 ? selected : viaKey ? 0 : null);
+    setActive(expandInline ? items.findIndex((_, index) => index !== selected) : selected >= 0 ? selected : viaKey ? 0 : null);
     setPhase('open');
   };
   const close = (mode: 'instant' | 'pop') => {
     setActive(null);
     clearTimeout(closeTimer.current);
     const el = menuRef.current;
-    if (mode === 'instant' || reduced || !el) {
+    if (expandInline || mode === 'instant' || reduced || !el) {
       setPhase('closed');
       return;
     }
@@ -227,7 +233,8 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
     const go = (i: number) => {
       e.preventDefault();
       instant.current = true;
-      setActive(Math.min(n - 1, Math.max(0, i)));
+      const index = Math.min(n - 1, Math.max(0, i));
+      setActive(expandInline && index === selected ? cur : index);
     };
     if (k === 'ArrowDown' || k === 'ArrowUp') go(active === null ? cur : cur + (k === 'ArrowDown' ? 1 : -1));
     else if (k === 'Home' || k === 'End') go(k === 'Home' ? 0 : n - 1);
@@ -257,6 +264,13 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
   const rowAt = (y: number) => {
     const list = menuRef.current?.firstElementChild;
     if (!scrub.current || !list) return null;
+    if (expandInline) {
+      const row = [...list.querySelectorAll<HTMLElement>('[data-index]:not([hidden])')].find(option => {
+        const { top, bottom } = option.getBoundingClientRect();
+        return y >= top && y < bottom;
+      });
+      return row ? Number(row.dataset.index) : null;
+    }
     const option = list.querySelector<HTMLElement>('[data-index]');
     if (!option) return null;
     const step = option.offsetHeight + Number.parseFloat(getComputedStyle(list).rowGap);
@@ -302,6 +316,10 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
       data-size={size}
       data-disabled={disabled ? '' : undefined}
       data-inline-list={inlineList ? '' : undefined}
+      data-expand-inline={expandInline || undefined}
+      data-expanded={expandInline && phase === 'open' || undefined}
+      data-appearance={appearance}
+      data-full-width={fullWidth || undefined}
       data-motion-reduced={reduced || undefined}
       style={{
           '--gs-accent': accentColor,
@@ -347,7 +365,7 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
         </span>
       </button>}
       {phase !== 'closed' ? (
-        <div ref={menuRef} popover={inlineList ? undefined : 'manual'} className="glide-select__menu" data-state="open" data-side={side} data-align={align}>
+        <div ref={menuRef} popover={inlineList || expandInline ? undefined : 'manual'} className="glide-select__menu" data-state="open" data-side={side} data-align={align}>
           <div
             id={`${id}-list`}
             role="listbox"
@@ -373,6 +391,7 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
                 key={it.value}
                 id={`${id}-${i}`}
                 role="option"
+                hidden={expandInline && i === selected}
                 aria-selected={i === selected}
                 data-index={i}
                 className="glide-select__option"

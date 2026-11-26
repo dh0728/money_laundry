@@ -1,7 +1,8 @@
 import { afterEach, expect, it } from 'vitest';
 import { cyclicSankeySampleCode, dashboardFixtures, dashboardFixtureResponse, dashboardFixtureBoardPage, dashboardRecordCodes } from './dashboard-fixtures';
 import { readPreviewRoute } from '../app/preview-route';
-import { investigationFlow, reviewStatusTotals } from '../features/dashboard/dashboard-flows';
+import { investigationFlow, reviewStatusTotals, transactionFlow } from '../features/dashboard/dashboard-flows';
+import { countUnfinishedCaseAges } from '../features/dashboard/dashboard-sla-donut';
 import { previewAdmin, previewAnalysts, previewStaff } from '../features/auth/preview-session-user';
 import { changePreviewEpisode } from '../features/investigation/preview-episode-transfer';
 
@@ -36,6 +37,32 @@ it('derives multi-day KPI, charts and board from the same identifiable records',
   const later = data.transactions.find(row => row.code.startsWith('T-261118'));
   expect(readPreviewRoute(new URL(`http://localhost:5215/transactions/${later.code}`)).code).toBe(later.code);
   expect(dashboardFixtureBoardPage(data.cases, { page: 1 }).content).toEqual(data.cases.slice(20, 40));
+});
+
+it('shows three leading sample recipient banks and keeps the remainder in a single node', () => {
+  const data = dashboardFixtureResponse(source);
+  const recipients = flow => flow.nodes.filter(node => node.stage === 0).map(({ name, count }) => [name, count]);
+  const flow = transactionFlow(data);
+  expect(recipients(flow)).toEqual([['가상 은행 A', 64], ['가상 은행 B', 48], ['가상 은행 C', 37], ['기타', 26]]);
+  expect(sum(flow.links.filter(link => flow.nodes[link.source].stage === 0), 'count')).toBe(data.transactions.length);
+  expect(recipients(transactionFlow({ ...data, transactions: data.transactions.slice(0, 2), suspicious: [] })))
+    .toEqual([['가상 은행 A', 1], ['가상 은행 C', 1]]);
+  expect(recipients(transactionFlow({ ...data, dataSource: 'live' }))).toEqual([['은행별 거래 미집계', null]]);
+});
+
+it('uses the filtered dashboard case collection and effective status for the elapsed chart', () => {
+  const full = dashboardFixtureResponse(source);
+  const day = new Date('2026-11-11T00:00:00');
+  const filtered = dashboardFixtureResponse(source, { range: { from: day, to: day } });
+  for (const [data, kind, daily] of [
+    [full, 'Alert', full.dailyAlertStatus], [full, 'Episode', full.dailyEpisodeStatus],
+    [filtered, 'Alert', filtered.dailyAlertStatus], [filtered, 'Episode', filtered.dailyEpisodeStatus],
+  ]) {
+    const ages = countUnfinishedCaseAges(data.cases, data.investigation.statusByCode, kind);
+    expect(ages.total).toBe(reviewStatusTotals(daily).unfinished);
+    expect(ages.unknown).toBe(0);
+    expect(sum(ages.segments, 'value')).toBe(ages.total);
+  }
 });
 
 it('connects each sample Episode to distinct Alerts and their source transactions', () => {

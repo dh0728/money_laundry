@@ -115,7 +115,7 @@ export function CaseTransactionEdit({ row, selected = [], destinations = [], can
           </Box>
           {operation === 'transfer' && <Box className="case-judgment-dropdowns">
             <Text as="span">이동할 Alert</Text>
-            <GlideSelect ariaLabel="이동할 Alert" placeholder="Alert 선택" value={destination}
+            <GlideSelect fullWidth ariaLabel="이동할 Alert" placeholder="Alert 선택" value={destination}
               options={targets.map(({ code, pattern }) => ({ value: code, label: pattern ? `${code} · ${pattern}` : code }))}
               onChange={value => { setDestination(value); setError(''); }} />
           </Box>}

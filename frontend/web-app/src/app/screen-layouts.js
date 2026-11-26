@@ -1,7 +1,7 @@
 import { FilePenLine, LayoutDashboard, Scale, ScanSearch } from 'lucide-react';
 import { BoxHTML, HeadingHTML, PanelHTML, TextHTML } from '../components/components.js';
 import { frames } from './screen-frames.js';
-import { isLedgerScreen, ledgerTableScreen } from './preview-route.js';
+import { dashboardRoute, isLedgerScreen, ledgerTableScreen } from './preview-route.js';
 
 const titles = {
   'dashboard/mine': '내 대시보드', 'dashboard/all': '전체 대시보드',
@@ -35,7 +35,7 @@ export function frameLabel(path) {
 }
 
 export const sections = {
-  dashboard: 'dashboard/mine',
+  dashboard: dashboardRoute.screen,
   rules: 'rule-engine/draft-list',
   report: 'report/write/table',
   T: 'add-tab/owner-account-transaction',
@@ -229,10 +229,8 @@ export function ScreenLayout(path, { code = '', hasQuery = false, showCaseJudgme
   const label = frameLabel(path);
   const heading = code ? `${code} · ${label}` : label;
   const judgment = showCaseJudgment && route && !route.readOnly && !route.detail.startsWith('judge');
-  const queryTools = route && ['analysis', 'related'].includes(route.detail)
-    ? '' : BoxHTML('', 'class="screen-query-tools" data-screen-query-tools');
   const queryRow = BoxHTML(
-    (hasQuery ? BoxHTML('', 'class="screen-query-tags" data-query-tags') : '') + queryTools,
+    hasQuery ? BoxHTML('', 'class="screen-query-tags" data-query-tags') : '',
     'class="screen-query-row"',
   );
   const queryArea = BoxHTML(queryRow +

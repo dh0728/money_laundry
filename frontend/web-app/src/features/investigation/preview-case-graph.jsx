@@ -2,7 +2,7 @@ import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } f
 import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { TableBody, TableCell, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FormDropdown, FormDropdownGroup, FormDropdownItem, FormDropdownLabel } from '../../components/form-dropdown';
 import { PanelLeft, Settings2, X } from 'lucide-react';
 import { ActionButton } from '../../components/primary-button';
 import { QueryCheck } from '../../components/selection-check';
@@ -31,7 +31,6 @@ import { GraphFlowStroke, readGraphFlowDuration } from '../../components/charts/
 import { OwnerGraphTimeline } from '../graph/owner-graph-timeline';
 import { useSpringNodeDrag } from '../graph/graph-node-drag';
 import { modelRiskLabels } from '../settings/model-risk-settings';
-import '../../components/form-dropdown.css';
 import './preview-case-graph.css';
 import { Box, Heading, Text } from '@/components/layout-primitives';
 import { dataSeriesColors } from '@/components/charts/charts/chart-context';
@@ -115,32 +114,28 @@ function GraphSettings({ id, groups, showDetails, onDetailsChange, ownerView, sa
       </Box>}
       <Box className="preview-graph-picker">
         <Box as="label" htmlFor="case-graph-selection">계좌·연결 선택</Box>
-        <Select value={selection ?? allGraphRelations} disabled={!network.nodes.length}
+        <FormDropdown id="case-graph-selection" value={selection ?? allGraphRelations} disabled={!network.nodes.length}
+          size="sm" triggerClassName="preview-graph-picker-trigger" optionsClassName="preview-graph-picker-options"
           onValueChange={value => onSelect(value === allGraphRelations ? undefined : value)}>
-          <SelectTrigger id="case-graph-selection" className="form-dropdown-trigger preview-graph-picker-trigger" size="sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="form-dropdown-options preview-graph-picker-options" position="popper" align="start">
-            <SelectItem value={allGraphRelations}>전체 관계</SelectItem>
-            {!ownerView && selection?.startsWith('owner:') &&
-              <SelectItem value={selection}>{selection.slice('owner:'.length)} 전체</SelectItem>}
-            {ownerView
-              ? [...Map.groupBy(network.nodes, node => node.owner)].map(([owner, nodes]) =>
-                <SelectGroup key={owner ?? ''}>
-                  <SelectLabel>{owner || '소유주 미상'}</SelectLabel>
-                  {owner && <SelectItem value={`owner:${owner}`}>{owner} 전체</SelectItem>}
-                  {nodes.map(node => <SelectItem key={node.id} value={node.id}>{node.id}</SelectItem>)}
-                </SelectGroup>)
-              : <SelectGroup>
-                <SelectLabel>계좌</SelectLabel>
-                {network.nodes.map(node => <SelectItem key={node.id} value={node.id}>{node.id}</SelectItem>)}
-              </SelectGroup>}
-            <SelectGroup>
-              <SelectLabel>연결</SelectLabel>
-              {network.edges.map(edge => <SelectItem key={edge.id} value={edge.id}>{edge.source} → {edge.target}</SelectItem>)}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+          <FormDropdownItem value={allGraphRelations}>전체 관계</FormDropdownItem>
+          {!ownerView && selection?.startsWith('owner:') &&
+            <FormDropdownItem value={selection}>{selection.slice('owner:'.length)} 전체</FormDropdownItem>}
+          {ownerView
+            ? [...Map.groupBy(network.nodes, node => node.owner)].map(([owner, nodes]) =>
+              <FormDropdownGroup key={owner ?? ''}>
+                <FormDropdownLabel>{owner || '소유주 미상'}</FormDropdownLabel>
+                {owner && <FormDropdownItem value={`owner:${owner}`}>{owner} 전체</FormDropdownItem>}
+                {nodes.map(node => <FormDropdownItem key={node.id} value={node.id}>{node.id}</FormDropdownItem>)}
+              </FormDropdownGroup>)
+            : <FormDropdownGroup>
+              <FormDropdownLabel>계좌</FormDropdownLabel>
+              {network.nodes.map(node => <FormDropdownItem key={node.id} value={node.id}>{node.id}</FormDropdownItem>)}
+            </FormDropdownGroup>}
+          <FormDropdownGroup>
+            <FormDropdownLabel>연결</FormDropdownLabel>
+            {network.edges.map(edge => <FormDropdownItem key={edge.id} value={edge.id}>{edge.source} → {edge.target}</FormDropdownItem>)}
+          </FormDropdownGroup>
+        </FormDropdown>
       </Box>
       <Box className="preview-graph-hops">
         <Box as="label" htmlFor="case-graph-hops">선택 계좌 기준 연결 단계 (hop)</Box>

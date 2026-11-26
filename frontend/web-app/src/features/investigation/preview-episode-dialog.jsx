@@ -69,7 +69,7 @@ export function PreviewEpisodeDialog({ cases, row, save, onClose, unlink = false
           <Text>{reason.trim()}</Text>
         </Box> : <>
           {!unlink && <Box className="case-judgment-dropdowns">
-            <GlideSelect ariaLabel="편입 방식" value={useNewEpisode ? 'new' : 'existing'}
+            <GlideSelect fullWidth ariaLabel="편입 방식" value={useNewEpisode ? 'new' : 'existing'}
               options={[
                 { value: 'existing', label: '기존 Episode에 편입' },
                 ...(selected.length >= 2 ? [{ value: 'new', label: '새 Episode 생성' }] : []),
@@ -79,7 +79,7 @@ export function PreviewEpisodeDialog({ cases, row, save, onClose, unlink = false
               <Box><Box as="dt">생성 예정 ID</Box><Box as="dd"><Text as="code">{newEpisodeCode}</Text></Box></Box>
             </Box> : <Box className="case-judgment-field">
               <Text as="span">대상 Episode ID</Text>
-              <GlideSelect ariaLabel="대상 Episode" placeholder="Episode ID 선택"
+              <GlideSelect fullWidth ariaLabel="대상 Episode" placeholder="Episode ID 선택"
                 value={target} onChange={setTarget} options={episodes.map(item => item.code)}
                 disabled={!episodes.length} />
               {!episodes.length && <Text>편입할 수 있는 진행 중 Episode가 없습니다.</Text>}

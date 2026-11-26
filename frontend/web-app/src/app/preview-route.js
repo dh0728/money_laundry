@@ -21,7 +21,7 @@ const queryLists = {
 };
 const detailDefaults = { A: 'alert/overview-allpanel', E: 'episode/overview' };
 export const loginRoute = { screen: 'login', code: '' };
-export const dashboardRoute = { screen: 'dashboard/mine', code: '' };
+export const dashboardRoute = { screen: 'dashboard/all', code: '' };
 
 export const validWorkCode = code => typeof code === 'string' && workCode.test(code);
 const transactionCode = code => validWorkCode(code) && code.startsWith('T-');
@@ -76,7 +76,7 @@ export function readPreviewRoute(url, { serviceMode = false } = {}) {
 
 export function previewUrl({ screen, code, benchmarkLedger = false, serviceMode = false }, query = new URLSearchParams()) {
   const params = new URLSearchParams(query);
-  let path = available.get(screen) ?? '/dashboard/mine';
+  let path = available.get(screen) ?? available.get(dashboardRoute.screen);
   if (screen === 'login') path = '/login';
   else if (screen?.startsWith('dashboard/')) params.delete('view');
   else if (isLedgerScreen(screen)) {

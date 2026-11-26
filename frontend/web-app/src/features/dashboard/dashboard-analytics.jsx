@@ -1,8 +1,9 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { Panel } from '../../components/panel';
 import { LinkTag, PatternTag, ReviewStatusTag } from '../../components/semantic-tags';
 import { BarChart } from '../../components/charts/charts/bar-chart';
+import { AlertStatusBars } from '../../components/charts/alert-status-bars';
 import { Bar, BarHatch } from '../../components/charts/charts/bar';
 import { BarXAxis } from '../../components/charts/charts/bar-x-axis';
 import { readChartNumber } from '../../components/charts/chart-design-values';
@@ -11,12 +12,14 @@ import { ChartTooltip } from '../../components/charts/charts/tooltip/chart-toolt
 import { TooltipContent } from '../../components/charts/charts/tooltip/tooltip-content';
 import { ibmLaundering, ibmPatterns, ibmRemaining } from '../investigation/ibm-hi-small-aggregate';
 import { SectionDownloadHeading } from '../../components/section-download';
+import { csvDownloadEntry } from '../../components/query-controls';
 import { dashboardPattern } from '../../mocks/dashboard-patterns';
-import { Box, Grid as LayoutGrid, Text } from '../../components/layout-primitives';
+import { Box, Heading, Text } from '../../components/layout-primitives';
 import { SankeyDetailsLinks, StagedSankey } from '@/components/charts/charts/sankey/staged-sankey';
 import { flowColors, investigationFlow, reviewStatusTotals, share as compactShare, statusLabels, transactionFlow } from './dashboard-flows';
 import { dataSeriesColors, transactionTotalColor } from '@/components/charts/charts/chart-context';
-import { DashboardIndicatorsGrid, InstitutionMetricsGrid } from './dashboard-layout';
+import { ChartTopicSelect, DashboardFocusGrid, DashboardTransactionGrid, DashboardWorkGrid, InstitutionMetricsGrid } from './dashboard-layout';
+import { DashboardSlaDonut } from './dashboard-sla-donut';
 
 const integer = new Intl.NumberFormat('ko-KR');
 const count = value => `${integer.format(value)}건`;
@@ -66,9 +69,12 @@ function DailySeries({ rows, series, reduced, label, showShare = false, detail, 
   </Box>;
 }
 
-function ChartPanel({ title, headingAs, note, children, className = '', hasChart = true, ...props }) {
+function ChartPanel({ title, headingAs, note, children, className = '', hasChart = true, entries, topicPicker, ...props }) {
   return <Panel as="article" className={`dashboard-chart ${className}`} {...props}>
-    <SectionDownloadHeading as={headingAs} downloadLabel={hasChart ? title : undefined}>{title}</SectionDownloadHeading>
+    <SectionDownloadHeading as={topicPicker ? Box : headingAs} downloadLabel={hasChart ? title : undefined}
+      printLabel={!hasChart && !entries?.length ? title : undefined} entries={entries}>
+      {topicPicker ? <><Heading level={2} className="visually-hidden">{title}</Heading>{topicPicker}</> : title}
+    </SectionDownloadHeading>
     {note && <Text className="dashboard-note">{note}</Text>}
     {children}
   </Panel>;
@@ -210,19 +216,6 @@ const newEntitySeries = [
   { key: 'newOwners', label: '새 소유주', color: dataSeriesColors.pink, totalInk: 'var(--case-comparison-pink)', value: row => integer.format(row.newOwners) + '명' },
 ];
 
-function NewEntitiesMetric({ data, reduced }) {
-  const available = data.coverageScope === 'institution';
-  const title = '새 계좌 · 새 소유주';
-  const hasChart = available && (data.newAccounts > 0 || data.newOwners > 0);
-  return <ChartPanel title={title} note={available ? '전체 거래 이력상 최초 등장 · KST' : '기관 전체 조회에서 제공'}
-    className="dashboard-priority-metric dashboard-new-entities" hasChart={hasChart}
-    data-sankey-detail={available ? 'new-entities' : undefined}>
-    {available && <SeriesLegend series={newEntitySeries.map(item => ({ ...item, total: item.value(data) }))} />}
-    {hasChart && <DailySeries rows={data.operationalDaily} series={newEntitySeries} detail={newEntitySeries} reduced={reduced}
-      label="거래 이력 기준 일별 최초 등장 계좌와 소유주" stacked={false} />}
-  </ChartPanel>;
-}
-
 const meanCount = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 });
 
 function StaffWorkloadMetric({ workload, reduced, showAssignments }) {
@@ -309,35 +302,51 @@ function RiskSegments({ data }) {
   </ChartPanel>;
 }
 
-function TransactionDetails({ data, flow, reduced, summary }) {
+const transactionTrendTitles = { total: '기간별 거래량 추이', 'new-entities': '새 계좌 · 새 소유주' };
+const transactionTrendOptions = Object.entries(transactionTrendTitles).map(([value, label]) => ({ value, label }));
+const transactionTrendSeries = [
+  { key: 'total', label: '전체 거래', color: transactionTotalColor, value: row => count(row.total) },
+  { key: 'displaySuspicious', label: '모델 의심 거래', color: flowColors.suspect,
+    value: row => count(row.suspicious) + ' · ' + share(row.suspicious, row.total) },
+];
+
+function TransactionTrend({ data, flow, reduced }) {
+  const [topic, setTopic] = useState('total');
+  const showEntities = topic === 'new-entities';
+  const available = !showEntities || data.coverageScope === 'institution';
+  const hasChart = showEntities ? available && (data.newAccounts > 0 || data.newOwners > 0) : flow.hasData;
+  const series = showEntities ? newEntitySeries : transactionTrendSeries;
+  const rows = showEntities ? data.operationalDaily
+    : data.operationalDaily.map(row => ({ ...row, displaySuspicious: row.suspicious * flow.scale }));
+  const title = transactionTrendTitles[topic];
+  const note = showEntities ? (available ? '전체 거래 이력상 최초 등장 · KST' : '기관 전체 조회에서 제공')
+    : (flow.scale > 1 ? '의심 막대 높이 ×' + flow.scale + ' · 건수·비율 원본' : '거래일 기준 · KST');
+  return <ChartPanel title={title} note={note} className="dashboard-flow-volume"
+    data-sankey-detail={available ? topic : undefined} hasChart={hasChart}
+    topicPicker={<ChartTopicSelect label={`${title} · 주제 변경`}
+      value={topic} onChange={setTopic} options={transactionTrendOptions} />}>
+    {showEntities && available && <SeriesLegend series={series.map(item => ({ ...item, total: item.value(data) }))} />}
+    {!showEntities && hasChart && <SeriesLegend series={series} />}
+    {hasChart ? <DailySeries key={topic} rows={rows} series={series} detail={series} reduced={reduced}
+      label={showEntities ? '거래 이력 기준 일별 최초 등장 계좌와 소유주' : title} stacked={false} />
+      : !showEntities && <Text className="dashboard-note">표시할 일별 거래량이 없습니다.</Text>}
+  </ChartPanel>;
+}
+
+function TransactionDetails({ data, flow, reduced, scope }) {
   const { scale } = flow;
-  const series = [
-    { key: 'total', label: '전체 거래', color: transactionTotalColor },
-    { key: 'displaySuspicious', label: '모델 의심 거래', color: flowColors.suspect },
-  ];
-  const detail = [
-    { ...series[0], value: row => count(row.total) },
-    { ...series[1], value: row => count(row.suspicious) + ' · ' + share(row.suspicious, row.total) },
-  ];
-  const rows = data.operationalDaily.map(row => ({ ...row, displaySuspicious: row.suspicious * scale }));
   const badge = [flow.sample ? '은행별 건수는 예시' : null,
     scale > 1 ? '이상 띠 두께 ×' + scale + ' · 건수·비율 원본' : null].filter(Boolean).join(' · ');
-  return <LayoutGrid columns={12} className="dashboard-flow-family dashboard-work-overview-grid">
+  return <DashboardTransactionGrid aria-label="거래·위험 분석">
+    {scope && <Text className="dashboard-note dashboard-transaction-scope">거래 집계 범위 · {scope}</Text>}
     <ChartPanel title="거래 분류" note={badge} className="dashboard-transaction-flow" hasChart={flow.hasData}>
       {flow.hasData ? <StagedSankey data={flow} stages={transactionStages} label="거래 분류 흐름" reduced={reduced} />
         : <Text className="dashboard-note">조회 기간에 거래가 없습니다.</Text>}
       {import.meta.env.DEV && data.dataSource === 'sample' && <LinkTag href="/dashboard/all?data=ibm">IBM 원본 거래 집계</LinkTag>}
     </ChartPanel>
-    <ChartPanel title="기간별 거래량 추이" note={scale > 1 ? '의심 막대 높이 ×' + scale + ' · 건수·비율 원본' : '거래일 기준 · KST'}
-      className="dashboard-flow-volume" data-sankey-detail="total" hasChart={flow.hasData}>
-      {flow.hasData ? <>
-        <SeriesLegend series={series} />
-        <DailySeries rows={rows} series={series} detail={detail} reduced={reduced} label="기간별 거래량 추이" stacked={false} />
-      </> : <Text className="dashboard-note">표시할 일별 거래량이 없습니다.</Text>}
-    </ChartPanel>
+    <TransactionTrend data={data} flow={flow} reduced={reduced} />
     <RiskSegments data={data} />
-    {summary}
-  </LayoutGrid>;
+  </DashboardTransactionGrid>;
 }
 
 function StatusLegend({ series, sums, target }) {
@@ -349,20 +358,59 @@ function StatusLegend({ series, sums, target }) {
   </Box>;
 }
 
-function InvestigationStatus({ data, episode = false, reduced }) {
-  const keys = episode ? ['inProgress', 'done'] : ['pending', 'inProgress', 'done'];
-  const daily = episode ? data.dailyEpisodeStatus : data.dailyAlertStatus;
-  const rows = (daily ?? []).map(row => ({ ...row, label: row.date.slice(5).replace('-', '/') }));
-  const series = keys.map(key => ({ key, label: statusLabels[key], color: flowColors[key] }));
-  const sums = reviewStatusTotals(rows);
-  const { total } = sums;
-  const title = episode ? '일별 Episode 처리 상태' : '일별 Alert 처리 상태';
-  const note = total ? '생성일별 현재 상태 · ' + count(total) + ' · 완료 ' + compactShare(sums.done, total) : '생성일별 현재 상태 · KST';
-  return <ChartPanel title={title} note={note} className="dashboard-flow-status" hasChart={total > 0}>
-    {total ? <>
-      <StatusLegend series={series} sums={sums} target={episode ? key => key === 'done' ? 'completed-episodes' : 'open-episodes' : undefined} />
-      <DailySeries rows={rows} series={series} reduced={reduced} label={title} separatedStack />
-    </> : <Text className="dashboard-note">{daily ? '조회 기간에 생성된 업무가 없습니다.' : '처리 상태 집계 미제공'}</Text>}
+function StatusComparisonTooltip({ active, payload, series }) {
+  const point = active && payload?.[0]?.payload;
+  if (!point) return null;
+  const rows = series.map(({ key, label, color }) => ({ label, color, value: count(point[key]) }));
+  return <Box className="dashboard-status-tooltip" role="tooltip">
+    <TooltipContent title={`${point.date} KST`} rows={rows} />
+  </Box>;
+}
+
+function InvestigationStatus({ data, reduced }) {
+  const datasets = [
+    { id: 'alert', label: 'Alert', daily: data.dailyAlertStatus, keys: ['pending', 'inProgress', 'done'] },
+    { id: 'episode', label: 'Episode', daily: data.dailyEpisodeStatus, keys: ['inProgress', 'done'] },
+  ].map(dataset => ({ ...dataset, sums: reviewStatusTotals(dataset.daily),
+    statuses: dataset.keys.map(key => ({ key, label: statusLabels[key], color: flowColors[key] })),
+    byDate: new Map(dataset.daily?.map(row => [row.date, row])),
+  }));
+  const available = datasets.filter(dataset => dataset.daily);
+  const series = available.flatMap(({ id, label, statuses }) => statuses.map(status => ({
+    key: `${id}-${status.key}`, label: `${label} ${status.label}`, color: status.color, stackId: id,
+  })));
+  const dates = [...new Set(available.flatMap(dataset => [...dataset.byDate.keys()]))].sort();
+  const rows = dates.map(date => ({ date, ...Object.fromEntries(available.flatMap(({ id, byDate, keys }) =>
+    keys.map(key => [`${id}-${key}`, byDate.get(date)?.[key] ?? 0]))),
+  }));
+  const hasChart = available.some(({ sums }) => sums.total > 0);
+  const entries = available.filter(({ daily }) => daily.length > 0).map(({ id, label, daily, statuses }) =>
+    csvDownloadEntry(`일별 ${label} 처리 상태`, `daily-${id}-status`, ['생성일 (KST)', ...statuses.map(status => status.label)],
+      daily.map(row => [row.date, ...statuses.map(status => row[status.key])])));
+  const note = available.length === 2 ? '생성일별 현재 상태 · 왼쪽 Alert · 오른쪽 Episode · KST' : '생성일별 현재 상태 · KST';
+  return <ChartPanel title="일별 Alert·Episode 처리 상태" note={note} className="dashboard-flow-status" hasChart={hasChart} entries={entries}>
+    <Box className="dashboard-status-comparison-legend">
+      {datasets.map(({ id, label, daily, sums, statuses }) => <Box key={id} role="group" aria-label={`${label} 상태 집계`}>
+        <Text className="dashboard-note">{label} · {daily ? `${count(sums.total)} · 완료 ${compactShare(sums.done, sums.total)}` : '처리 상태 집계 미제공'}</Text>
+        {daily && <StatusLegend series={statuses} sums={sums} target={id === 'episode'
+          ? key => key === 'done' ? 'completed-episodes' : 'open-episodes' : undefined} />}
+      </Box>)}
+    </Box>
+    {hasChart ? <>
+      <AlertStatusBars data={rows} series={series} formatDay={day => day.slice(5).replace('-', '/')} separated reduced={reduced}
+        tooltip={<StatusComparisonTooltip series={series} />} />
+      <Box className="visually-hidden">
+        <Table>
+          <TableCaption>일별 Alert·Episode 처리 상태 건수</TableCaption>
+          <TableHeader><TableRow><TableHead scope="col">생성일 (KST)</TableHead>
+            {series.map(({ key, label }) => <TableHead scope="col" key={key}>{label}</TableHead>)}
+          </TableRow></TableHeader>
+          <TableBody>{rows.map(row => <TableRow key={row.date}><TableHead scope="row">{row.date}</TableHead>
+            {series.map(({ key }) => <TableCell key={key}>{count(row[key])}</TableCell>)}
+          </TableRow>)}</TableBody>
+        </Table>
+      </Box>
+    </> : <Text className="dashboard-note">{available.length ? '조회 기간에 생성된 업무가 없습니다.' : '표시할 처리 상태가 없습니다.'}</Text>}
   </ChartPanel>;
 }
 
@@ -400,8 +448,7 @@ function CaseCompletion({ data, reduced }) {
   </ChartPanel>;
 }
 
-export function Analytics({ data, reduced, summary, metrics }) {
-  const [transactionsCard, alertsCard, linkedCard, ...unfinishedCards] = metrics;
+export function Analytics({ data, reduced, summary, metrics, board, boardEntries }) {
   const hostRef = useRef(null);
   const transactions = transactionFlow(data);
   const investigation = investigationFlow(data);
@@ -415,25 +462,24 @@ export function Analytics({ data, reduced, summary, metrics }) {
   return <Box as="section" className="dashboard-analytics dashboard-workflow-charts dashboard-institution-relations"
     aria-label="기관 탐지 현황" ref={hostRef}>
     <InstitutionMetricsGrid aria-label="전체 대시보드 요약 지표">
-      {transactionsCard}{alertsCard}{linkedCard}
-      <CaseCompletion data={data} reduced={reduced} />
-      {unfinishedCards}
+      {metrics}
     </InstitutionMetricsGrid>
-    <DashboardIndicatorsGrid aria-label="기관 주요 지표">
-      <NewEntitiesMetric data={data} reduced={reduced} />
+    <DashboardFocusGrid>
+      <DashboardSlaDonut data={data} reduced={reduced} />
+      {summary}
+    </DashboardFocusGrid>
+    <TransactionDetails data={data} flow={transactions} reduced={reduced} scope={scope} />
+    <DashboardWorkGrid downloadEntries={boardEntries}>
+      <CaseCompletion data={data} reduced={reduced} />
       <StaffWorkloadMetric workload={data.institutionWorkload} reduced={reduced} showAssignments />
       <StaffWorkloadMetric workload={data.institutionWorkload} reduced={reduced} />
-    </DashboardIndicatorsGrid>
-    {scope && <Text className="dashboard-note">거래 집계 범위 · {scope}</Text>}
-    <TransactionDetails data={data} flow={transactions} reduced={reduced} summary={summary} />
-    <ChartPanel title="조사 처리 흐름" note={investigationNote + episodeNote} className="dashboard-investigation-flow" hasChart={investigation.hasData}>
-      {investigation.hasData ? <StagedSankey data={investigation} stages={investigationStages} label="조사 처리 흐름" reduced={reduced} />
-        : <Text className="dashboard-note">표시할 조사 처리 흐름이 없습니다.</Text>}
-    </ChartPanel>
-    <LayoutGrid columns={12} className="dashboard-flow-status-grid">
+      <ChartPanel title="조사 처리 흐름" note={investigationNote + episodeNote} className="dashboard-investigation-flow" hasChart={investigation.hasData}>
+        {investigation.hasData ? <StagedSankey data={investigation} stages={investigationStages} label="조사 처리 흐름" reduced={reduced} />
+          : <Text className="dashboard-note">표시할 조사 처리 흐름이 없습니다.</Text>}
+      </ChartPanel>
       <InvestigationStatus data={data} reduced={reduced} />
-      <InvestigationStatus data={data} reduced={reduced} episode />
-    </LayoutGrid>
+      {board}
+    </DashboardWorkGrid>
     {transactions.hasData && <SankeyDetailsLinks hostRef={hostRef}
       relations={scope ? relationTargets : institutionRelationTargets} />}
     <SankeyDetailsLinks hostRef={hostRef} routes={institutionMetricRoutes} />

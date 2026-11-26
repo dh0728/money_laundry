@@ -25,17 +25,24 @@ function layoutFailures({ pathname, table, selected, list, pageButtons }) {
 
   const pageControl = document.getElementById('page-download');
   const button = pageControl?.querySelector(download);
-  const nav = document.getElementById('screen-navigation');
+  const dock = document.getElementById('workspace-query-dock');
   if (pathname !== '/rules/new' && !visible(button)) failures.push('The page download is missing.');
   if (visible(button)) {
-    if (!pageControl.closest('.app-header') || pageControl.previousElementSibling !== nav) {
-      failures.push('The page download does not immediately follow navigation in the header.');
+    const tools = findVisible('[data-query-tool]', dock);
+    if (!dock.contains(pageControl) || getComputedStyle(dock).position !== 'fixed' ||
+        tools.at(-1) !== button ||
+        tools.some((tool, index) => index > 0 && tool.getBoundingClientRect().top <= tools[index - 1].getBoundingClientRect().bottom)) {
+      failures.push('Workspace tools must share a fixed vertical dock, with page download last.');
     }
-    const bounds = button.getBoundingClientRect();
-    const navBounds = nav?.getBoundingClientRect();
-    const sharesRow = navBounds && bounds.top < navBounds.bottom - 1 && bounds.bottom > navBounds.top + 1;
-    if (bounds.left < -1 || bounds.right > document.documentElement.clientWidth + 1 ||
-        (sharesRow && bounds.left < navBounds.right - 1)) failures.push('The header download overlaps navigation or is outside the viewport.');
+    if (pathname.startsWith('/dashboard/') && tools.map(tool => tool.dataset.queryTool).join() !== 'filter,sort,period,download') {
+      failures.push('The dashboard dock must include filter, sort, period, and download.');
+    }
+    const bounds = dock.getBoundingClientRect();
+    const footerTop = document.querySelector('.app-footer').getBoundingClientRect().top;
+    if (Math.abs(footerTop - bounds.bottom) > 1 || bounds.left < -1 || bounds.right > document.documentElement.clientWidth + 1 ||
+        parseFloat(getComputedStyle(workspace).paddingInlineEnd) > 0) {
+      failures.push('The workspace dock must float within the viewport above the footer and reserve no content width.');
+    }
   }
 
   const pageScope = {
@@ -54,15 +61,25 @@ function layoutFailures({ pathname, table, selected, list, pageButtons }) {
   }
 
   if (pathname === '/dashboard/mine' || pathname === '/dashboard/all') {
-    const sort = workspace.querySelector('.dashboard-board-actions > [data-dashboard-sort]');
-    const boardDownload = sort?.nextElementSibling;
-    if (!visible(boardDownload?.querySelector(download)) || downloadIn('.dashboard-board-heading').length !== 1) {
-      failures.push('The work board needs its own download next to sorting.');
+    if (pathname === '/dashboard/mine' && downloadIn('.dashboard-board-heading').length !== 1) {
+      failures.push('The work board needs its own download.');
     }
+    const bodyText = document.createElement('span');
+    bodyText.style.fontSize = 'var(--aml-type-body-size)';
+    bodyText.style.lineHeight = 'var(--aml-type-body-lineHeight)';
+    workspace.append(bodyText);
+    const { fontSize: bodySize, lineHeight: bodyLineHeight } = getComputedStyle(bodyText);
+    bodyText.remove();
     for (const lane of findVisible('.dashboard-board .case-progress-lane', workspace)) {
       const heading = lane.querySelector('.case-progress-heading');
-      if (!heading?.lastElementChild?.textContent.trim() || heading.querySelectorAll('.semantic-tag').length !== 1) {
+      const count = heading?.querySelector(':scope > .semantic-tag + span');
+      if (!count?.textContent.trim() || heading.querySelectorAll('.semantic-tag').length !== 1) {
         failures.push('The work lane needs a status tag and a plain count.');
+      } else {
+        const { fontSize, lineHeight } = getComputedStyle(count);
+        if (fontSize !== bodySize || lineHeight !== bodyLineHeight) {
+          failures.push(`The ${lane.getAttribute('aria-label')} work count must use body text size and line height.`);
+        }
       }
       const expectedDownloads = lane.querySelector('.preview-case-card') ? 1 : 0;
       if (findVisible(download, lane).length !== expectedDownloads) {
@@ -96,6 +113,11 @@ function layoutFailures({ pathname, table, selected, list, pageButtons }) {
   }
 
   if (pathname === '/dashboard/all') {
+    const workSection = workspace.querySelector('.dashboard-work-details');
+    if (workSection?.querySelector('.dashboard-section-heading')?.textContent !== '업무 현황' ||
+        workSection.querySelectorAll('.dashboard-board .case-progress-lane').length !== 3) {
+      failures.push('The overall dashboard work section must include all three work board lanes under its shared title.');
+    }
     const rowHeight = parseFloat(getComputedStyle(workspace).getPropertyValue('--aml-space-24'));
     for (const listRegion of findVisible('.dashboard-staff-scroll', workspace)) {
       if (listRegion.getBoundingClientRect().height > 7 * rowHeight + 0.5) {
@@ -160,8 +182,8 @@ function layoutFailures({ pathname, table, selected, list, pageButtons }) {
         (stacked ? abnormal.bottom > normal.top : abnormal.right > normal.left)) {
       failures.push('Report cards must put abnormal judgments before normal judgments.');
     }
-    if (findVisible('[data-query-tool="filter"]', workspace).length ||
-        !findVisible('[data-query-tool="sort"]', workspace).length) failures.push('Report cards must offer sorting instead of a verdict filter.');
+    if (!dock || findVisible('[data-query-tool="filter"]', dock).length ||
+        !findVisible('[data-query-tool="sort"]', dock).length) failures.push('Report cards must offer sorting instead of a verdict filter.');
   }
 
   if (list && table) {
@@ -178,7 +200,7 @@ function layoutFailures({ pathname, table, selected, list, pageButtons }) {
 }
 
 async function checkQueryPopover(page, tool, verify) {
-  const trigger = page.locator('#workspace [data-query-tool="' + tool + '"]:visible').first();
+  const trigger = page.locator('#workspace-query-dock [data-query-tool="' + tool + '"]:visible');
   if (!await trigger.isVisible()) throw new Error(tool + ' button is missing.');
 
   const panel = page.locator('.query-tool-popover[data-tool="' + tool + '"]:popover-open');
@@ -234,7 +256,7 @@ export async function checkWorkspaceLayout(page, { path, viewport }) {
   const list = investigationLists.includes(pathname);
   const table = searchParams.get('view') === 'table' || pathname === '/report' && !searchParams.has('view');
   const selected = searchParams.has('transaction');
-  if (pathname === '/dashboard/mine') {
+  if (pathname === '/dashboard/mine' || pathname === '/dashboard/all' && searchParams.get('data') !== 'ibm') {
     await page.locator('#workspace .dashboard-board .preview-case-card').first().waitFor({ timeout: 10000 });
   }
   const failures = await page.evaluate(layoutFailures, { pathname, list, table, selected, pageButtons });

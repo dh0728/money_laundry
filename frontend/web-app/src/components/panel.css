@@ -1,5 +1,6 @@
 :is(.screen-panel, .panel-inset) > h2,
-:is(.screen-panel, .panel-inset) > :where(header, div):first-child > h2 {
+:is(.screen-panel, .panel-inset) > h3:first-child,
+:is(.screen-panel, .panel-inset) > :where(header, div):first-child > :is(h2, h3) {
   margin: 0;
   font-size: var(--aml-type-panel-title-size);
   line-height: var(--aml-type-panel-title-lineHeight);

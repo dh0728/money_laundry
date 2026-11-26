@@ -2,6 +2,16 @@ import { expect, it } from 'vitest';
 import { previewUrl, readPreviewRoute } from './preview-route';
 import { ScreenNavigation, sections } from './screen-layouts';
 
+it('opens the overall dashboard by default and lists it before the personal dashboard', () => {
+  const route = readPreviewRoute(new URL('http://localhost/'));
+  expect(previewUrl(route)).toBe('/dashboard/all');
+  const navigation = ScreenNavigation(route.screen);
+  expect(navigation.global[0].value).toBe(route.screen);
+  expect(navigation.primary.map(({ label, active }) => [label, active]))
+    .toEqual([['전체', true], ['개인', false]]);
+  expect(readPreviewRoute(new URL('http://localhost/dashboard/mine')).screen).toBe('dashboard/mine');
+});
+
 it('keeps the selected transaction and data source when linking to the ledger table', () => {
   const url = new URL('http://localhost/investigate/ledger?transaction=T-261111-00000002&data=sample&view=table');
   const route = readPreviewRoute(url);

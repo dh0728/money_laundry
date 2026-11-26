@@ -3,7 +3,7 @@ import { Check, CircleAlert, Plus, Repeat2, X } from 'lucide-react';
 import { createRule, fetchRule, saveRuleDraft, validateRule } from '@/api/rules';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FormDropdown, FormDropdownItem } from '../../components/form-dropdown';
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
 import { Panel } from '../../components/panel';
 import { ScreenActions } from '../../components/screen-actions';
@@ -16,7 +16,6 @@ import {
 } from './rule-definition';
 import { codeToRuleId, loadRuleCatalog, problemText, refreshLiveRules } from './live-rule-store';
 import { Box, Heading, Text } from '@/components/layout-primitives';
-import '../../components/form-dropdown.css';
 import './live-rule-engine.css';
 
 // 룰 만들기. 템플릿의 기본값을 바탕으로 검사 조건과 적중 후 동작을 정한다.
@@ -29,14 +28,11 @@ const matchCopy = {
 };
 
 function RuleSelect({ label, value, options, onChange }) {
-  return <Select value={String(value ?? '')} onValueChange={onChange}>
-    <SelectTrigger className="form-dropdown-trigger" aria-label={label}><SelectValue /></SelectTrigger>
-    <SelectContent className="form-dropdown-options" position="popper" align="start">
-      {options.map(option => <SelectItem key={option.value} value={String(option.value)} disabled={option.disabled}>
-        {option.label}
-      </SelectItem>)}
-    </SelectContent>
-  </Select>;
+  return <FormDropdown label={label} value={String(value ?? '')} onValueChange={onChange}>
+    {options.map(option => <FormDropdownItem key={option.value} value={String(option.value)} disabled={option.disabled}>
+      {option.label}
+    </FormDropdownItem>)}
+  </FormDropdown>;
 }
 
 /** 숫자 칸. 입력하는 동안에는 적은 글자를 그대로 두고("0." 처럼 쓰다 만 값), 벗어나면 천 단위 쉼표로 보여 준다. */
@@ -244,7 +240,7 @@ function TemplateLibrary({ catalog, selected, locked, onPick }) {
   const available = catalog.templates.filter(template => template.available);
   const later = catalog.templates.filter(template => !template.available);
   const card = template => <Box as="li" key={template.key}>
-    <Button type="button" layout="choice" className="rule-template-card" aria-pressed={template.key === selected}
+    <Button type="button" layout="choice" aria-pressed={template.key === selected}
       disabled={!template.available || (locked && template.key !== selected)} onClick={() => onPick(template.key)}>
       <Text as="strong">{template.name}</Text>
       <Text as="span">{template.available ? template.shape : template.note}</Text>

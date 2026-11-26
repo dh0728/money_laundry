@@ -1,6 +1,6 @@
-export function printWorkspace(workspace) {
+export function printWorkspace(workspace, section) {
   const scrollAreas = new Set();
-  for (const element of workspace.querySelectorAll('*')) {
+  for (const element of (section ?? workspace).querySelectorAll('*')) {
     if (!(element instanceof HTMLElement)) continue;
     const { overflowX, overflowY } = getComputedStyle(element);
     if ([overflowX, overflowY].every(overflow => overflow !== 'auto' && overflow !== 'scroll')) continue;
@@ -10,10 +10,12 @@ export function printWorkspace(workspace) {
   const finish = () => {
     window.removeEventListener('afterprint', finish);
     workspace.removeAttribute('data-page-print');
+    section?.removeAttribute('data-page-print-section');
     scrollAreas.forEach(element => element.removeAttribute('data-page-print-scroll'));
   };
   scrollAreas.forEach(element => element.setAttribute('data-page-print-scroll', ''));
   workspace.setAttribute('data-page-print', '');
+  section?.setAttribute('data-page-print-section', '');
   window.addEventListener('afterprint', finish, { once: true });
   try {
     window.print();

@@ -2,6 +2,7 @@ import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 import { Slot } from "radix-ui"
+import "./button.css"
 
 const buttonVariants = cva(
   "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-(length:--control-focus-ring-width) focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
@@ -38,7 +39,7 @@ const buttonVariants = cva(
 )
 
 const buttonLayouts = {
-  choice: "rounded-lg border px-3 py-2.5 text-left text-xs transition-colors enabled:hover:bg-muted/50 disabled:cursor-not-allowed",
+  choice: "aml-choice-button",
   row: "w-full px-3 py-2.5 text-left outline-none interactive-surface focus-visible:ring-2 focus-visible:ring-ring",
   text: "text-inherit",
 }

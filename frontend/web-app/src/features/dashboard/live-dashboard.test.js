@@ -144,3 +144,22 @@ test('creation-day charts use explicit membership and current Episode verdicts o
   const both = await liveDashboardResponse({ ...source, cases });
   expect(both.dailyEpisodeStatus.at(-1)).toEqual({ date: '2023-09-08', pending: 0, inProgress: 1, done: 1 });
 });
+
+test('elapsed work uses live case ages and the linked Episode status', async () => {
+  const { liveDashboardResponse } = await import('./live-dashboard.js');
+  const { countUnfinishedCaseAges } = await import('./dashboard-sla-donut.jsx');
+  const cases = [
+    { ...alert, code: 'A-less-than-three', elapsed: 2 },
+    { ...alert, code: 'A-three', elapsed: 3 },
+    { ...alert, code: 'A-six', elapsed: 6 },
+    { ...alert, code: 'A-seven', elapsed: 7 },
+    { ...alert, code: 'A-member', elapsed: 9, episodeCode: 'E-done' },
+    { ...alert, code: 'E-done', kind: 'Episode', open: false, elapsed: 8 },
+    { ...alert, code: 'E-open', kind: 'Episode', elapsed: 7 },
+  ];
+  const data = await liveDashboardResponse({ ...source, cases });
+  const alerts = countUnfinishedCaseAges(data.cases, data.investigation.statusByCode, 'Alert');
+  const episodes = countUnfinishedCaseAges(data.cases, data.investigation.statusByCode, 'Episode');
+  expect(alerts.segments.map(segment => segment.value)).toEqual([2, 2]);
+  expect(episodes.segments.map(segment => segment.value)).toEqual([0, 1]);
+});

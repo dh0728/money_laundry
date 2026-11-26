@@ -26,4 +26,15 @@
     max-block-size: none;
     overflow: visible;
   }
+
+  #workspace[data-page-print] :has([data-page-print-section]) > :not([data-page-print-section], :has([data-page-print-section])),
+  #workspace[data-page-print] [data-page-print-section] .section-download-tools { display: none }
+
+  #workspace[data-page-print] [data-page-print-section] [data-dashboard-section-content][inert] {
+    position: static;
+    grid-template-columns: subgrid;
+    block-size: auto;
+    overflow: visible;
+    visibility: visible;
+  }
 }
