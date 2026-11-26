@@ -88,6 +88,39 @@ function layoutFailures({ pathname, table, selected, list, pageButtons }) {
     }
   }
 
+  if (pathname === '/dashboard/all') {
+    const overview = workspace.querySelector('.dashboard-institution-relations');
+    if (overview?.querySelector('.dashboard-today-metrics')) {
+      if (overview.firstElementChild?.getAttribute('aria-label') !== '오늘 할 일' ||
+          overview.querySelector('.dashboard-today-metrics').children.length !== 5) {
+        failures.push('The dashboard must begin with exactly five today metrics.');
+      }
+      for (const selector of ['.dashboard-focus-grid', '.dashboard-detection-grid']) {
+        const rows = findVisible(`${selector} > [data-dashboard-section-content] > :is(article, section, .dashboard-sla-donut)`, overview)
+          .map(panel => panel.getBoundingClientRect());
+        if (rows.some(row => rows.some(other => Math.abs(row.top - other.top) < 1 && Math.abs(row.bottom - other.bottom) > 1))) {
+          failures.push(`Panels on the same row in ${selector} must fill its height.`);
+        }
+      }
+      if (overview.querySelectorAll('.dashboard-work-details .dashboard-sla-donut').length !== 1 ||
+          !overview.lastElementChild?.matches('.dashboard-board-section, svg') ||
+          !overview.querySelector('.dashboard-board-section .dashboard-board')) {
+        failures.push('Work aging needs one operations panel, and the three boards need their own section.');
+      }
+      const trends = findVisible('.dashboard-flow-family :is(.dashboard-flow-volume, .dashboard-alert-lifecycle)', overview);
+      const [volume, lifecycle] = trends.map(panel => panel.getBoundingClientRect());
+      if (volume && lifecycle && Math.abs(volume.top - lifecycle.top) < 1 && Math.abs(volume.width - lifecycle.width) > 1) {
+        failures.push('The transaction and lifecycle panels must have equal widths.');
+      }
+      const staff = overview.querySelector('.dashboard-staff-workload');
+      const scroll = staff?.querySelector('[data-panel-fill]');
+      if (visible(scroll) && Math.abs(staff.getBoundingClientRect().bottom - scroll.getBoundingClientRect().bottom
+        - parseFloat(getComputedStyle(staff).paddingBottom)) > 1) {
+        failures.push('The staff chart must fill its panel up to the bottom padding.');
+      }
+    }
+  }
+
   if (pathname === '/dashboard/mine') {
     const panels = workspace.querySelectorAll([
       '.dashboard-personal-flow:has(.staged-sankey-chart)',
@@ -113,18 +146,17 @@ function layoutFailures({ pathname, table, selected, list, pageButtons }) {
   }
 
   if (pathname === '/dashboard/all') {
-    const workSection = workspace.querySelector('.dashboard-work-details');
+    const boardSection = workspace.querySelector('.dashboard-board-section');
     if (!findVisible('.dashboard-investigation-flow .staged-sankey-chart', workspace).length) {
       failures.push('The overall dashboard investigation flow chart is missing.');
     }
-    if (workSection?.querySelector('.dashboard-section-heading')?.textContent !== '업무 현황' ||
-        workSection.querySelectorAll('.dashboard-board .case-progress-lane').length !== 3) {
-      failures.push('The overall dashboard work section must include all three work board lanes under its shared title.');
+    if (boardSection?.querySelector('.dashboard-section-heading')?.textContent !== '처리 상태' ||
+        boardSection.querySelectorAll('.dashboard-board .case-progress-lane').length !== 3) {
+      failures.push('All three work board lanes must share their own processing-status section.');
     }
-    const rowHeight = parseFloat(getComputedStyle(workspace).getPropertyValue('--aml-space-24'));
-    for (const listRegion of findVisible('.dashboard-staff-scroll', workspace)) {
-      if (listRegion.getBoundingClientRect().height > 7 * rowHeight + 0.5) {
-        failures.push('An analyst list grows past its seven-row viewport.');
+    for (const listRegion of findVisible('.dashboard-staff-scroll[data-scroll-exception="long-chart"]', workspace)) {
+      if (listRegion.scrollHeight <= listRegion.clientHeight) {
+        failures.push('The long analyst list must keep its own scroll area.');
       }
     }
   }
@@ -255,8 +287,8 @@ async function checkWorkspaceQueryTools(page, { pathname, table, list }) {
 }
 
 async function checkClosedSectionExport(page) {
-  const header = page.locator('.dashboard-work-details .dashboard-section-header');
-  const toggle = header.getByRole('button', { name: '업무 현황', exact: true });
+  const header = page.locator('.dashboard-board-section .dashboard-section-header');
+  const toggle = header.getByRole('button', { name: '처리 상태', exact: true });
   await toggle.click();
   await header.evaluate(element => element.scrollIntoView({ block: 'center' }));
   const capture = await page.evaluateHandle(() => {
@@ -269,11 +301,11 @@ async function checkClosedSectionExport(page) {
     return result;
   });
   try {
-    await header.getByRole('button', { name: '업무 현황 전체 다운로드' }).click();
-    await page.getByRole('button', { name: 'PDF로 저장 · 업무 현황 전체', exact: true }).dispatchEvent('click');
+    await header.getByRole('button', { name: '처리 상태 전체 다운로드' }).press('Enter');
+    await page.getByRole('button', { name: 'PDF로 저장 · 처리 상태 전체', exact: true }).dispatchEvent('click');
     await page.emulateMedia({ media: 'print' });
     const correct = await capture.evaluate(({ section }) => {
-      if (section?.getAttribute('aria-label') !== '업무 현황') return false;
+      if (section?.getAttribute('aria-label') !== '처리 상태') return false;
       const workspace = section.closest('#workspace');
       workspace.setAttribute('data-page-print', '');
       section.setAttribute('data-page-print-section', '');

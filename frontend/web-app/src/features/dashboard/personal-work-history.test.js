@@ -12,10 +12,10 @@ test('the personal flow counts assigned cases once and splits completed cases by
     statusByCode: { 'alert-two': '처리 완료' }, verdictByCode: { 'alert-two': 'abnormal' },
   });
   expect(nodes.map(({ name, count }) => [name, count])).toEqual([
-    ['Alert', 2], ['Episode', 1], ['검토 대기', 1], ['처리 완료', 2], ['정상 판정', 1], ['이상 판정', 1],
+    ['Alert', 2], ['Episode', 1], ['처리 전', 1], ['처리 완료', 2], ['정상 판정', 1], ['이상 판정', 1],
   ]);
   expect(links.map(({ source, target, count }) => [nodes[source].name, nodes[target].name, count])).toEqual([
-    ['Alert', '검토 대기', 1], ['Alert', '처리 완료', 1], ['Episode', '처리 완료', 1],
+    ['Alert', '처리 전', 1], ['Alert', '처리 완료', 1], ['Episode', '처리 완료', 1],
     ['처리 완료', '정상 판정', 1], ['처리 완료', '이상 판정', 1],
   ]);
 });

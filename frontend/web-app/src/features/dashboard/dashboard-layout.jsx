@@ -47,8 +47,8 @@ export function DashboardWorkGrid(props) {
   return <DashboardSectionGrid title="업무 현황" className="dashboard-work-details" {...props} />;
 }
 
-export function InstitutionMetricsGrid(props) {
-  return <Grid columns={12} className="dashboard-institution-metrics" {...props} />;
+export function DashboardBoardGrid(props) {
+  return <DashboardSectionGrid title="처리 상태" className="dashboard-board-section" {...props} />;
 }
 
 export function DashboardFocusGrid(props) {
@@ -97,33 +97,12 @@ function LoadingStaffChart() {
   </LoadingChart>;
 }
 
-function LoadingMetric({ detail, trend }) {
+function LoadingMetric({ detail }) {
   return <Box className="dashboard-metric">
     <Skeleton className="dashboard-loading-title" />
     <Skeleton className="dashboard-loading-value" />
     {detail && <Skeleton className="dashboard-loading-note" />}
-    {trend && <Skeleton className="dashboard-loading-trend" />}
   </Box>;
-}
-
-function LoadingInstitutionMetrics() {
-  return <InstitutionMetricsGrid>
-    {Array.from({ length: 4 }, (_, index) =>
-      <Panel as="article" key={index} data-compact-kpi={index === 3 || undefined}>
-        <LoadingMetric detail={index !== 1} trend />
-      </Panel>)}
-  </InstitutionMetricsGrid>;
-}
-
-function LoadingCompletion() {
-  return <LoadingChart className="dashboard-completion" showTools>
-    <Box className="dashboard-metric-reading dashboard-completion-reading">
-      <Skeleton className="dashboard-loading-note" />
-      <Skeleton className="dashboard-loading-value" />
-    </Box>
-    <Skeleton className="dashboard-loading-completion-legend" />
-    <Box className="dashboard-series"><Skeleton className="dashboard-series-plot" /></Box>
-  </LoadingChart>;
 }
 
 function LoadingRecommendation({ reduced }) {
@@ -144,27 +123,26 @@ export function DashboardAnalyticsSkeleton({ reduced }) {
     <Box aria-hidden="true" className="dashboard-analytics dashboard-institution-relations">
       <DashboardFocusGrid loading>
         <LoadingChart className="dashboard-today-summary" chartClass="dashboard-loading-value" />
-        <LoadingChart className="dashboard-sla-donut" chartClass="dashboard-loading-donut" />
         <LoadingChart className="dashboard-priority-queue" chartClass="dashboard-series-plot" />
         <LoadingRecommendation reduced={reduced} />
       </DashboardFocusGrid>
       <DashboardTransactionGrid loading>
+        <LoadingChart className="dashboard-transaction-flow" chartClass="staged-sankey-chart" />
         <LoadingSeries className="dashboard-flow-volume" showTools />
         <LoadingSeries className="dashboard-alert-lifecycle" showTools />
-        <LoadingInstitutionMetrics />
-        <LoadingChart className="dashboard-transaction-flow" chartClass="staged-sankey-chart" />
       </DashboardTransactionGrid>
       <DashboardDetectionGrid loading>
         <LoadingChart className="dashboard-flow-risk" chartClass="dashboard-score-band" showNote={false} />
       </DashboardDetectionGrid>
       <DashboardWorkGrid loading>
-        <LoadingCompletion />
         <LoadingStaffChart />
-        <LoadingStaffChart />
+        <LoadingChart className="dashboard-sla-donut" chartClass="dashboard-loading-donut" />
         <LoadingChart className="dashboard-investigation-flow" chartClass="staged-sankey-chart" />
         <LoadingSeries className="dashboard-flow-status" />
-        <DashboardBoardSkeleton showTitle={false} />
       </DashboardWorkGrid>
+      <DashboardBoardGrid loading>
+        <DashboardBoardSkeleton showTitle={false} />
+      </DashboardBoardGrid>
     </Box>
   </Box>;
 }

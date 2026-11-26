@@ -7,6 +7,7 @@ import { TableBody, TableCell, TableHead, TableHeader, TableRow, TableRowHead } 
 import { TableFieldLabel, WorkflowTable } from '@/components/workflow-table';
 import { csvDownloadEntry } from '@/components/query-controls';
 import { workRequestUserName } from '../investigation/preview-work-requests';
+import { modelRiskBand } from '../settings/model-risk-settings';
 import './dashboard-priority-queue.css';
 
 const title = '우선 처리 큐';
@@ -21,10 +22,15 @@ const queueColumns = [
 ];
 const sourceColumn = { key: 'target', label: '탐지 출처' };
 const priority = ({ score, elapsed }) => score * elapsed;
+const hasModelScore = score => Number.isFinite(score) && score > 0 && score <= limits.maxScore;
+
+function priorityScoreBand(score) {
+  if (score >= 90) return 'high';
+  return modelRiskBand(score) === 'low' ? 'low' : 'medium';
+}
 
 export function rankPriorityCases(rows = []) {
-  // The live case adapter uses score 0 when the model score is missing.
-  return rows.filter(row => Number.isFinite(row.score) && row.score > 0 && row.score <= limits.maxScore &&
+  return rows.filter(row => hasModelScore(row.score) &&
     Number.isFinite(row.elapsed) && row.elapsed >= 0)
     .sort((left, right) => priority(right) - priority(left) || right.score - left.score ||
       left.code.localeCompare(right.code))
@@ -48,18 +54,18 @@ export function DashboardPriorityQueue({ rows }) {
     : rows.length ? '위험 점수와 경과일이 집계된 업무가 없습니다.'
       : '현재 조회 범위에 표시할 우선 처리 업무가 없습니다.';
 
-  return <Panel as="article" className="dashboard-chart dashboard-priority-queue" aria-label={title}>
+  return <Panel as="article" fillContent className="dashboard-chart dashboard-priority-queue" aria-label={title}>
     <SectionDownloadHeading entries={entries}>{title}</SectionDownloadHeading>
     {queue.length ? <>
       <Text className="dashboard-note">상위 {queue.length}건 · 위험 점수 × 경과일 높은 순{!showSources && ' · 탐지 출처 미집계'}</Text>
-      <WorkflowTable label={`${title} 상위 ${queue.length}건`} title={null} tools={false} scrollbarGutter="auto">
+      <WorkflowTable label={`${title} 상위 ${queue.length}건`} title={null} tools={false} scrollbarGutter="auto" fill>
         <TableHeader><TableRow>
           {columns.map(({ key, label }) => <TableHead key={key} scope="col"><TableFieldLabel column={key}>{label}</TableFieldLabel></TableHead>)}
         </TableRow></TableHeader>
         <TableBody>{queue.map(row => <TableRow key={row.code}>
           <TableRowHead><LinkTag code={row.code} /></TableRowHead>
-          <TableCell><ModelScoreTag score={row.score} /></TableCell>
-          <TableCell><CaseAgeTag days={row.elapsed} showRecent /></TableCell>
+          <TableCell><ModelScoreTag score={row.score} band={priorityScoreBand(row.score)} /></TableCell>
+          <TableCell><CaseAgeTag days={row.elapsed} showRecent overdueFromDays={7} /></TableCell>
           <TableCell>{row.pattern ? <PatternTag>{row.pattern}</PatternTag> : '미집계'}</TableCell>
           <TableCell><CaseActorTag>{row.assigneeLabel}</CaseActorTag></TableCell>
           {showSources && <TableCell>{row.sourceLabel ?? '미집계'}</TableCell>}

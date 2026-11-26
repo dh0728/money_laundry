@@ -49,7 +49,11 @@ function transferPath(source, target, bend) {
   return `M ${x1} ${y1} Q ${(x1 + x2) / 2 - directionY * bend} ${(y1 + y2) / 2 + directionX * bend}, ${x2} ${y2}`;
 }
 
-export function AccountTrailGraph({ comparison, focus, alwaysShowContext = false }) {
+export function AccountTrailOmittedEvidence({ count }) {
+  return count > 0 && <Text as="span" className="account-trail-omitted">이외 근거 거래 {count}건</Text>;
+}
+
+export function AccountTrailGraph({ comparison, focus, alwaysShowContext = false, showOmittedEvidence = true }) {
   const graphId = useId();
   const [selection, setSelection] = useState(null);
   const [contextExpanded, setContextExpanded] = useState(false);
@@ -134,7 +138,6 @@ export function AccountTrailGraph({ comparison, focus, alwaysShowContext = false
         setContextExpanded(open => !open);
         setSelection(null);
       }}>{showContext ? '주변 거래 접기' : `주변 거래 ${moreCount}건 펼치기`}</ActionButton>}
-    {(showContext || !moreCount) && comparison.omittedTransfers > 0 &&
-      <Text as="span" className="account-trail-omitted">이외 근거 거래 {comparison.omittedTransfers}건</Text>}
+    {showOmittedEvidence && (showContext || !moreCount) && <AccountTrailOmittedEvidence count={comparison.omittedTransfers} />}
   </Box>;
 }

@@ -350,10 +350,11 @@ function FilterPane({ value, groups, onApply, onResize, editingGroup }) {
   </QueryPanel>;
 }
 
-function SortPane({ value, sorts, onApply }) {
+function SortPane({ value, sorts, onApply, sortScope }) {
   const [sort, setSort] = useState(value.sort);
   return <QueryPanel title="정렬 기준" onSubmit={() => onApply({ ...value, sort })}>
     <div className="query-popover-body">
+      {sortScope && <p className="query-popover-note">대시보드에서는 ‘{sortScope}’ 섹션에만 적용됩니다.</p>}
       <QueryChoices label="정렬 기준" options={sorts} value={sort} onChange={setSort} />
     </div>
   </QueryPanel>;
@@ -521,6 +522,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
   let opening = 0;
   let scope;
   let screen;
+  let sortScope;
   let tableTools;
   let localTable = embedded;
   let rows = [];
@@ -720,7 +722,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
       : tablePeriod ? <PeriodPane value={{ range: tablePeriod.range }} asOf={tablePeriod.asOf}
         onApply={next => { close(); tablePeriod.onChange(next.range); }} onResize={position} />
       : <Panel value={value} groups={filterGroups(rows, scope)} sorts={availableSorts(rows)} asOf={asOf}
-          onApply={apply} onResize={position} editingGroup={editingGroup} />;
+          onApply={apply} onResize={position} editingGroup={editingGroup} sortScope={sortScope} />;
     flushSync(() => root.render(<QueryActions.Provider value={actions} key={version}>{content}</QueryActions.Provider>));
     if (!popover.matches(':popover-open')) popover.showPopover();
     position();
@@ -869,6 +871,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
       dismiss();
       scope = next;
       screen = path;
+      sortScope = data?.sortScope;
       localTable = hasLocalTableTools(path);
       tableTools = undefined;
       rows = data?.rows ?? (scope ? caseFixtureRows(codes) : []);

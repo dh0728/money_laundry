@@ -116,7 +116,7 @@ test('institution case filters keep both coverage counts in the same evidence su
   expect(data).toMatchObject({ dataSource: 'live', linked: 1, unlinked: 0, coverageScope: 'case-evidence' });
 });
 
-test('today uses the full KST business-day snapshot while queue and patterns follow the selected range', async () => {
+test('today and the priority queue use the business-day snapshot while patterns follow the selected range', async () => {
   const { liveDashboardResponse } = await import('./live-dashboard.js');
   const cases = [
     { ...alert, elapsed: 7, createdAt: '2023-09-06T01:00:00Z' },
@@ -136,7 +136,7 @@ test('today uses the full KST business-day snapshot while queue and patterns fol
     createdCases: 2, completedCreatedCases: 1, completedCases: 1, completionSampleCount: 1, averageCompletionSeconds: 3600,
     detection: { received: 10, analyzed: 8, suspicious: 3, basis: 'analysis-day' },
   });
-  expect(dashboard.priorityCases.map(row => [row.code, row.priorityScore])).toEqual([[alert.code, 665], ['E-member', 360]]);
+  expect(dashboard.priorityCases.map(row => [row.code, row.priorityScore])).toEqual([[alert.code, 665], ['E-member', 360], ['A-created', 0]]);
   expect(dashboard.patternAlertCounts).toEqual([{ label: 'Cycle', count: 1 }]);
 });
 

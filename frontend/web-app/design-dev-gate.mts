@@ -91,7 +91,14 @@ export function designDevGate(): Plugin {
     hotUpdate: {
       order: 'pre',
       async handler({ type, file, read }) {
-        if (this.environment.name !== 'client' || !isGuarded(file)) return
+        if (this.environment.name !== 'client') return
+        if (sourcePath(file) === 'dashboard-ui-catalog.json') {
+          checked.clear()
+          this.environment.moduleGraph.invalidateAll()
+          this.environment.hot.send({ type: 'full-reload' })
+          return []
+        }
+        if (!isGuarded(file)) return
         try {
           updated.add(file)
           const code = type === 'delete' ? undefined : await read()

@@ -187,7 +187,7 @@ const matrix = regression ? [{ width: 1440, height: 960, routes: [myDashboard] }
 process.env.VITE_API_MODE = 'fixture';
 const server = await createServer({
   root,
-  mode: 'test', // Design rules run in their own check, outside this browser matrix.
+  mode: 'test',
   cacheDir: 'node_modules/.vite-scroll-check',
   logLevel: 'warn',
   server: { host: '127.0.0.1', port: 0, hmr: false, watch: null },

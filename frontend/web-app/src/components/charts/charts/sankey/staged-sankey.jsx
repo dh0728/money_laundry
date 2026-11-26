@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { sankey } from 'd3-sankey';
 import { Box, Text } from '@/components/layout-primitives';
 import { SankeyChart } from './sankey-chart';
@@ -48,10 +48,6 @@ function Labels() {
       const x = node.x1 + offsets.nodeInset;
       const y = (node.y0 + node.y1) / 2;
       return <g key={node.index}>
-        {node.anchor && <>
-          <circle data-sankey-anchor={node.anchor} data-sankey-color={node.color} cx={(node.x0 + node.x1) / 2} cy={node.y1} opacity={0} />
-          <circle data-sankey-top-anchor={node.anchor} data-sankey-color={node.color} cx={(node.x0 + node.x1) / 2} cy={node.y0} opacity={0} />
-        </>}
         <text x={x} y={y} dy={node.detail ? offsets.labelWithDetail : offsets.label}>
           {node.name}
           <tspan dx={offsets.countInset}>{[countLabel(node.count, node.unit), node.ratio].filter(Boolean).join(' · ')}</tspan>
@@ -62,11 +58,7 @@ function Labels() {
     {links.filter(link => link.caption).map(link => {
       const x = link.target.x0 - offsets.linkCaptionInset;
       const y = (link.y0 + link.y1) / 2;
-      return <g key={link.index}>
-        <text textAnchor="end" x={x} y={y} dy={offsets.label}>{link.caption}</text>
-        {link.anchor && <circle data-sankey-top-anchor={link.anchor} data-sankey-anchor={link.anchor}
-          data-sankey-color={link.color ?? link.target.color} cx={x} cy={y} opacity={0} />}
-      </g>;
+      return <text key={link.index} textAnchor="end" x={x} y={y} dy={offsets.label}>{link.caption}</text>;
     })}
   </g>;
 }
@@ -77,19 +69,20 @@ function TooltipValue({ title, count, unit, note }) {
   </TooltipContent>;
 }
 
-export function StagedSankey({ data, stages, label, reduced }) {
+export function StagedSankey({ data, stages, label, reduced, fill = false }) {
   const scrollerRef = useRef(null);
   const layout = useMemo(() => layoutFor(stages.length), [stages.length]);
   const [design] = useState(() => {
     const inset = readChartNumber('--aml-space-8', 8);
     return {
-      margin: { left: inset, right: readChartNumber('--chart-sankey-stage-label-reserve', 174), top: inset, bottom: inset },
+      margin: { left: inset, right: fill ? readChartNumber('--chart-sankey-compact-label-reserve', 128)
+        : readChartNumber('--chart-sankey-stage-label-reserve', 174), top: inset, bottom: inset },
       nodeWidth: readChartNumber('--aml-space-10', 10),
       nodePadding: readChartNumber('--chart-sankey-stage-node-gap', 15),
       linkOpacity: readChartNumber('--chart-sankey-link-opacity', 0.3),
     };
   });
-  return <Box ref={scrollerRef} className="staged-sankey-scroller">
+  return <Box ref={scrollerRef} className="staged-sankey-scroller" data-panel-fill={fill || undefined}>
     <Box className="staged-sankey-content">
       <Box className="staged-sankey-stages" data-stage-count={stages.length}>
         {stages.map(name => <Text as="span" key={name}>{name}</Text>)}
@@ -106,160 +99,4 @@ export function StagedSankey({ data, stages, label, reduced }) {
       </SankeyChart>
     </Box>
   </Box>;
-}
-
-function RelationPaths({ hostRef, lines, metrics }) {
-  const [hoveredCard, setHoveredCard] = useState(null);
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return undefined;
-    const hover = event => setHoveredCard(event.pointerType === 'touch' ? null : event.target.closest?.('article') ?? null);
-    const leave = () => setHoveredCard(null);
-    host.addEventListener('pointerover', hover, { passive: true });
-    host.addEventListener('pointerleave', leave, { passive: true });
-    return () => {
-      host.removeEventListener('pointerover', hover);
-      host.removeEventListener('pointerleave', leave);
-    };
-  }, [hostRef]);
-
-  return <svg className="staged-sankey-relations" data-metric-relations={metrics || undefined} aria-hidden="true">
-    {lines.map(({ id, color, partial, path, startX, startY, endX, endY, sourceCard, targetCard }) =>
-      <g key={id} data-relation={id} data-partial={partial || undefined} style={{ '--staged-sankey-relation-color': color }}
-        data-related-hover={Boolean(hoveredCard && (hoveredCard === sourceCard || hoveredCard === targetCard)) || undefined}>
-        <path d={path} />
-        {metrics && <circle cx={startX} cy={startY} />}
-        <circle cx={endX} cy={endY} />
-      </g>)}
-  </svg>;
-}
-
-function relationPath(startX, startY, endX, endY) {
-  const turnY = (startY + endY) / 2;
-  return `M ${startX} ${startY} C ${startX} ${turnY}, ${endX} ${turnY}, ${endX} ${endY}`;
-}
-
-const endpointSelector = '.staged-sankey-scroller,[data-sankey-anchor],[data-sankey-top-anchor],[data-sankey-detail],[data-dashboard-metric-source],[data-dashboard-metric-target]';
-const endpointAttributes = ['data-sankey-detail', 'data-dashboard-metric-source', 'data-dashboard-metric-target'];
-const visibleEndpoint = element => element && !element.closest('[inert], [hidden]');
-
-function watchRelations(host, setLines, measure) {
-  let frame;
-  let endpoints = [];
-  const schedule = () => {
-    if (frame !== undefined) return;
-    frame = requestAnimationFrame(() => {
-      frame = undefined;
-      const next = measure(host.getBoundingClientRect());
-      setLines(previous => previous.length === next.length && previous.every((line, index) => {
-        const current = next[index];
-        return line.id === current.id && line.path === current.path && line.color === current.color
-          && line.sourceCard === current.sourceCard && line.targetCard === current.targetCard;
-      }) ? previous : next);
-    });
-  };
-  const sizes = new ResizeObserver(schedule);
-  const geometry = new MutationObserver(schedule);
-  const updateEndpoints = () => {
-    const next = [...host.querySelectorAll(endpointSelector)];
-    if (next.length !== endpoints.length || next.some((element, index) => element !== endpoints[index])) {
-      endpoints = next;
-      geometry.disconnect();
-      sizes.disconnect();
-      sizes.observe(host);
-      host.querySelectorAll(':scope > section').forEach(section => sizes.observe(section));
-      for (const endpoint of endpoints) {
-        sizes.observe(endpoint.ownerSVGElement ?? endpoint);
-        if (endpoint.ownerSVGElement) geometry.observe(endpoint, { attributes: true, attributeFilter: ['cx', 'cy', 'data-sankey-color'] });
-      }
-    }
-    schedule();
-  };
-  const topology = new MutationObserver(records => {
-    if (records.some(record => record.type === 'attributes' || [...record.addedNodes, ...record.removedNodes].some(node =>
-      node instanceof Element && (node.matches(endpointSelector) || node.querySelector(endpointSelector))))) updateEndpoints();
-  });
-  sizes.observe(host);
-  topology.observe(host, { childList: true, subtree: true, attributes: true, attributeFilter: [...endpointAttributes, 'inert'] });
-  const scroll = event => { if (event.target.matches?.('.staged-sankey-scroller')) schedule(); };
-  host.addEventListener('scroll', scroll, { capture: true, passive: true });
-  updateEndpoints();
-  return () => {
-    sizes.disconnect();
-    geometry.disconnect();
-    topology.disconnect();
-    host.removeEventListener('scroll', scroll, true);
-    if (frame !== undefined) cancelAnimationFrame(frame);
-  };
-}
-
-function metricRelation(value, mark, origin, { id, partial, color }) {
-  const card = value?.closest('article');
-  if (!visibleEndpoint(card) || !visibleEndpoint(mark)) return [];
-
-  const sourceBounds = value.getBoundingClientRect();
-  const cardBounds = card.getBoundingClientRect();
-  const plot = mark.closest('.staged-sankey-scroller');
-  const markBounds = mark.getBoundingClientRect();
-  const sourceAbove = cardBounds.top + cardBounds.height / 2 <= markBounds.top + markBounds.height / 2;
-  const anchor = mark.dataset.sankeyAnchor ?? mark.dataset.sankeyTopAnchor;
-  const edge = sourceAbove ? 'data-sankey-top-anchor' : 'data-sankey-anchor';
-  const facingMark = plot && anchor ? plot.querySelector(`[${edge}="${anchor}"]`) ?? mark : mark;
-  const targetBounds = facingMark === mark ? markBounds : facingMark.getBoundingClientRect();
-  const plotBounds = plot?.getBoundingClientRect();
-  const center = targetBounds.left + targetBounds.width / 2;
-  if (plotBounds && (center < plotBounds.left || center > plotBounds.right)) return [];
-
-  const startX = sourceBounds.left + sourceBounds.width / 2 - origin.left;
-  const startY = (sourceAbove ? cardBounds.bottom : cardBounds.top) - origin.top;
-  const endX = center - origin.left;
-  const endY = (plot ? targetBounds.top + targetBounds.height / 2 : sourceAbove ? targetBounds.top : targetBounds.bottom) - origin.top;
-  return [{ id, partial, color: color ?? mark.dataset.sankeyColor, startX, startY, endX, endY,
-    path: relationPath(startX, startY, endX, endY),
-    sourceCard: card, targetCard: mark.closest('article') }];
-}
-
-function MetricDetailsLinks({ hostRef, routes }) {
-  const [lines, setLines] = useState([]);
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return undefined;
-    return watchRelations(host, setLines, origin => routes.flatMap(route =>
-      metricRelation(host.querySelector(route.source), host.querySelector(route.target), origin, route)));
-  }, [hostRef, routes]);
-  return <RelationPaths hostRef={hostRef} lines={lines} metrics />;
-}
-
-function ChartDetailsLinks({ hostRef, relations }) {
-  const [lines, setLines] = useState([]);
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return undefined;
-    return watchRelations(host, setLines, origin => {
-      const chart = host.querySelector('.staged-sankey-scroller');
-      if (!visibleEndpoint(chart)) return [];
-      const chartBounds = chart.getBoundingClientRect();
-      return relations.flatMap(({ id, source = id, color }) => {
-        const target = host.querySelector(`[data-sankey-detail="${id}"]`);
-        if (!visibleEndpoint(target)) return [];
-        const end = target.getBoundingClientRect();
-        const aboveChart = end.bottom <= chartBounds.top;
-        const anchor = chart.querySelector(aboveChart ? `[data-sankey-top-anchor="${source}"]` : `[data-sankey-anchor="${source}"]`);
-        if (!anchor) return [];
-        const start = anchor.getBoundingClientRect();
-        const startX = start.left + start.width / 2 - origin.left;
-        const startY = start.top + start.height / 2 - origin.top;
-        const endX = end.left + end.width / 2 - origin.left;
-        const endY = (aboveChart ? end.bottom : end.top) - origin.top;
-        return [{ id, color: color ?? anchor.dataset.sankeyColor, endX, endY,
-          sourceCard: chart.closest('article'), targetCard: target.closest('article'),
-          path: relationPath(startX, startY, endX, endY) }];
-      });
-    });
-  }, [hostRef, relations]);
-  return <RelationPaths hostRef={hostRef} lines={lines} />;
-}
-
-export function SankeyDetailsLinks({ hostRef, relations, routes }) {
-  return routes ? <MetricDetailsLinks hostRef={hostRef} routes={routes} /> : <ChartDetailsLinks hostRef={hostRef} relations={relations} />;
 }

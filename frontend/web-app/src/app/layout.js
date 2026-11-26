@@ -12,6 +12,7 @@ import { ConfirmHoldButton, PrimaryButton } from '../components/primary-button.j
 import { DialogClose, DialogFooter, DialogHeader } from '../components/dialog-parts.jsx';
 import { FooterPagination } from '../components/footer-pagination.jsx';
 import { SearchField } from '../components/search-field.jsx';
+import { reviewStatusLabels } from '../lib/review-status.js';
 import { csvDownloadEntry, inDateRange, QueryRadio, setupQueryControls, WorkspaceQueryDock } from '../components/query-controls.jsx';
 import { dashboardFixtureBoardPage, dashboardFixtureResponse, dashboardFixtures, dashboardPeriodEnd, dashboardRecordCodes } from '../mocks/dashboard-fixtures.js';
 import { personalWorkHistory } from '../features/dashboard/personal-work-history.js';
@@ -95,7 +96,7 @@ try {
 const profileRole = '분석가';
 const now = Date.now();
 const sampleNotificationDescriptions = [
-  '새 Alert가 검토 대기에 추가되었습니다. 담당 업무 목록에서 근거 거래를 확인할 수 있습니다.',
+  `새 Alert가 ${reviewStatusLabels.pending} 상태로 등록되었습니다. 담당 업무 목록에서 근거 거래를 확인할 수 있습니다.`,
   '미완료 업무의 검토 기한이 다가왔습니다. 개인 대시보드에서 경과일을 확인할 수 있습니다.',
   '판정 보고서가 생성되었습니다. 보고서 화면에서 저장된 판정 내용을 확인할 수 있습니다.',
 ];
@@ -870,6 +871,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     rows: isPersonalDashboard ? dashboardSource.mine : dashboardSource.cases,
     asOf: serviceMode ? liveDashboardAsOf(dashboardSource) : dashboardPeriodEnd,
     dashboard: true,
+    sortScope: isPersonalDashboard ? '내 업무 현황' : '처리 상태',
   } : isCaseList ? { rows: dashboardSource.cases.filter(row => row.code.startsWith(groupPrefix)) } : undefined;
   activePath = path;
   const codes = queryControls.setScreen(path, tabCodes(group), queryData, params);

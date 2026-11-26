@@ -11,6 +11,15 @@
   margin-block-end: var(--aml-space-4);
 }
 
+.screen-panel[data-panel-content-fill] {
+  display: flex;
+  flex-direction: column;
+}
+[data-panel-content-fill] > [data-panel-fill] {
+  flex: 1 1 var(--panel-fill-basis, auto);
+  min-block-size: 0;
+}
+
 .panel-disclosure {
   --panel-disclosure-radius: var(--aml-radius-card);
   --panel-disclosure-inline-inset: var(--aml-panel-text-inset);

@@ -372,3 +372,9 @@ body:has(#inbox:not([hidden])) #workspace-query-dock {
   }
   .query-period-presets .query-choice { font-size: var(--aml-type-caption-size); padding-inline: var(--aml-space-4) }
 }
+.query-popover-note {
+  margin: 0;
+  color: var(--muted-text);
+  font-size: var(--aml-type-caption-size);
+  line-height: var(--aml-type-caption-lineHeight);
+}

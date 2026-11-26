@@ -74,6 +74,7 @@
   outline-offset: calc(-1 * var(--aml-stroke-focus));
 }
 .data-table-scroll > [data-slot="table-container"] { min-inline-size: max-content; overflow: visible }
+.data-table-frame[data-panel-fill] :is(.data-table-content, .data-table-scroll) { flex: 1 }
 .data-table-scroll[data-compact="true"] { --table-cell-inset: var(--aml-space-4) }
 .data-table-frame[data-hierarchy] .data-table-scroll > [data-slot="table-container"] {
   min-inline-size: var(--hierarchy-table-min-width);

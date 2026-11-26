@@ -4,7 +4,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { posix, relative, resolve, sep } from 'node:path'
 import stylelint from 'stylelint'
 import { bannedIconPackage, designRules, pluginRuleName } from './design-rules.mjs'
-import { dashboardUiCatalog, legacyDashboardUiImports } from '../dashboard-ui-catalog.mjs'
+import { readDashboardUiCatalog } from '../dashboard-ui-catalog.mjs'
 
 export const appRoot = resolve(import.meta.dirname, '..')
 export const rel = file => relative(appRoot, resolve(appRoot, file)).split(sep).join('/')
@@ -261,6 +261,7 @@ const eslintRules = {
   }),
   'component-dashboard-ui-source': eslintRule('component/dashboard-ui-source', ({ path, report }) => {
     if (!isDashboard(path)) return {}
+    const { approved, legacy } = readDashboardUiCatalog()
     const checkModule = node => {
       if (node.importKind === 'type' || node.exportKind === 'type' ||
         (node.specifiers?.length && node.specifiers.every(specifier => specifier.importKind === 'type' || specifier.exportKind === 'type'))) return
@@ -278,8 +279,8 @@ const eslintRules = {
             report(node, '화면에 보이는 표는 WorkflowTable, 스크린 리더용 차트 표는 AccessibleChartTable을 쓴다.')
             return
           }
-          if (dashboardUiCatalog.has(module) || legacyDashboardUiImports.get(path) === module) return
-          report(node, '승인된 공용 컴포넌트만 사용한다. 선택은 GlideSelect, 버튼은 ActionButton을 먼저 확인한다.')
+          if (approved.includes(module) || legacy[path] === module) return
+          report(node, `dashboard-ui-catalog.json에 등록되지 않은 import: ${source}`)
           return
         }
       }

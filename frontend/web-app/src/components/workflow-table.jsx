@@ -188,8 +188,8 @@ export function WorkflowQueryHeading({ title, summary, tools = true }) {
 
 export function WorkflowTable({ label, title = label, summary = undefined, className = '', tableClassName = 'workflow-data-table',
   tools = true, selection = undefined, compact = undefined, hierarchy = undefined, scrollRef = undefined, scrollbarGutter = 'stable',
-  cellAlignment = undefined, invertSelectedControls = undefined, children }) {
-  return <div className="data-table-frame" data-hierarchy={hierarchy || undefined}
+  cellAlignment = undefined, invertSelectedControls = undefined, fill = false, children }) {
+  return <div className="data-table-frame" data-panel-fill={fill || undefined} data-hierarchy={hierarchy || undefined}
     data-cell-alignment={cellAlignment} data-invert-selected-controls={invertSelectedControls || undefined}>
     <WorkflowQueryHeading title={title} summary={summary} tools={tools} />
     <div className="data-table-content">

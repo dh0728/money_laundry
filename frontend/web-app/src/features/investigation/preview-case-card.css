@@ -91,6 +91,11 @@
   align-content: start;
 }
 @media screen {
+  .case-progress-lane:has(.magic-bento__cell:nth-child(8)) {
+    content-visibility: auto;
+    contain-intrinsic-block-size: auto calc(8 * (4 * var(--aml-space-48) - var(--aml-space-4)) + 7 * var(--workspace-gap) + var(--aml-panel-control-size) + var(--aml-space-8));
+    overflow-clip-margin: var(--record-card-shadow-gutter);
+  }
   .case-progress-cards .magic-bento__content {
     content-visibility: auto;
     contain-intrinsic-block-size: auto calc(4 * var(--aml-space-48) - var(--aml-space-4));

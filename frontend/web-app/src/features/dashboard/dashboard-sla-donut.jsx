@@ -1,20 +1,16 @@
-import React, { useMemo, useRef, useState } from 'react';
-import { Box, Heading, Text } from '@/components/layout-primitives';
+import React, { useRef, useState } from 'react';
+import { Box, Text } from '@/components/layout-primitives';
 import { SectionDownloadHeading } from '@/components/section-download';
 import { Panel } from '@/components/panel';
 import { PieChart } from '@/components/charts/charts/pie/pie-chart';
 import { PieSlice } from '@/components/charts/charts/pie/pie-slice';
 import { readChartNumber } from '@/components/charts/chart-design-values';
 import { useElementSize } from '@/components/charts/charts/use-element-size';
+import { csvDownloadEntry } from '@/components/query-controls';
 import { cautionAgeDays, isOverdueCaseAge } from '../investigation/case-age';
 import { count } from './dashboard-flows';
-import { ChartTopicSelect } from './dashboard-layout';
 import './dashboard-sla-donut.css';
 
-const kindOptions = [
-  { value: 'Alert', label: '미처리 Alert 경과일' },
-  { value: 'Episode', label: '미처리 Episode 경과일' },
-];
 const ageBands = [
   { key: 'caution', label: `${cautionAgeDays}일 이하`, color: 'var(--status-caution-accent)' },
   { key: 'danger', label: `${cautionAgeDays}일 초과`, color: 'var(--status-danger-accent)' },
@@ -39,36 +35,12 @@ export function countUnfinishedCaseAges(cases, statusByCode, kind) {
   return { segments, total, unknown };
 }
 
-// The dashboard remounts when query conditions change.
-let selectedKind = 'Alert';
-
-export function DashboardSlaDonut({ data, reduced }) {
-  const [kind, setKind] = useState(selectedKind);
+function DonutFigure({ label, segments, centerLabel, centerValue, note, reduced, layout }) {
   const plotRef = useRef(null);
   const { width } = useElementSize(plotRef);
   const size = Math.floor(width);
-  const [layout] = useState(() => ({
-    innerRadiusRatio: readChartNumber('--overview-donut-inner-radius-ratio', 0.34),
-    cornerRadius: readChartNumber('--overview-donut-corner-radius', 8),
-    segmentGap: readChartNumber('--overview-donut-segment-gap', 0.045),
-  }));
-  const { cases, investigation } = data;
-  const statusByCode = investigation?.statusByCode;
-  const { segments, total, unknown } = useMemo(
-    () => countUnfinishedCaseAges(cases ?? [], statusByCode ?? {}, kind), [cases, statusByCode, kind],
-  );
   const chartData = segments.filter(segment => segment.value > 0);
-
-  return <Panel as="article" className="dashboard-chart dashboard-sla-donut">
-    <SectionDownloadHeading as={Box} downloadLabel={chartData.length ? `미처리 ${kind} 경과일` : undefined}
-      printLabel={!chartData.length ? `미처리 ${kind} 경과일` : undefined}>
-      <Heading level={2} className="visually-hidden">미처리 {kind} 경과일</Heading>
-      <ChartTopicSelect label="미처리 업무 경과일 유형" value={kind} options={kindOptions} onChange={next => {
-        selectedKind = next;
-        setKind(next);
-      }} />
-    </SectionDownloadHeading>
-    <Box as="figure" className="dashboard-sla-figure" aria-label={`${kind} 경과일 구간별 건수`}>
+  return <Box as="figure" className="dashboard-sla-figure" aria-label={label}>
       <Box ref={plotRef} className="dashboard-sla-plot">
         {size > 0 && chartData.length > 0 && <Box className="dashboard-sla-ring" aria-hidden="true">
           <PieChart data={chartData} size={size} innerRadius={size * layout.innerRadiusRatio}
@@ -78,7 +50,7 @@ export function DashboardSlaDonut({ data, reduced }) {
           </PieChart>
         </Box>}
         <Text as="span" className="dashboard-sla-total">
-          <Text as="span">미처리</Text><Text as="strong">{count(total)}</Text>
+          <Text as="span">{centerLabel}</Text><Text as="strong">{centerValue}</Text>
         </Text>
       </Box>
       <Box as="ul" className="dashboard-legend dashboard-sla-legend">
@@ -87,7 +59,38 @@ export function DashboardSlaDonut({ data, reduced }) {
           {label} <Text as="strong">{count(value)}</Text>
         </Box>)}
       </Box>
-      {unknown > 0 && <Text className="dashboard-note">경과일 미집계 {count(unknown)}</Text>}
-    </Box>
+      {note && <Text className="dashboard-note">{note}</Text>}
+    </Box>;
+}
+
+export function DashboardSlaDonut({ data, reduced }) {
+  const [layout] = useState(() => ({
+    innerRadiusRatio: readChartNumber('--overview-donut-inner-radius-ratio', 0.34),
+    cornerRadius: readChartNumber('--overview-donut-corner-radius', 8),
+    segmentGap: readChartNumber('--overview-donut-segment-gap', 0.045),
+  }));
+  const workload = data?.institutionWorkload;
+  const total = workload?.total ?? 0;
+  const overdue = workload?.overdue?.length ?? 0;
+  const unknown = workload?.unknownElapsed ?? 0;
+  const remainingLabel = workload?.unknownElapsed == null ? `${cautionAgeDays}일 초과 이외` : ageBands[0].label;
+  const segments = [
+    { ...ageBands[0], label: remainingLabel, value: total - overdue - unknown },
+    { ...ageBands[1], value: overdue },
+  ];
+  const title = '미처리 경과일';
+  const chart = segments.some(segment => segment.value > 0);
+  const entries = total ? [csvDownloadEntry(title, 'dashboard-unfinished-work-age', ['구간', '건수'], [
+    ...segments.map(segment => [segment.label, segment.value]),
+    ...(unknown > 0 ? [['미집계', unknown]] : []),
+  ])] : [];
+  const note = !workload ? '선택 기간 미처리 업무 미집계' : unknown > 0
+    ? `개별 Alert · Episode · 경과일 미집계 ${count(unknown)}` : '개별 Alert · Episode · 선택 기간 생성 업무';
+
+  return <Panel as="article" className="dashboard-chart dashboard-sla-donut">
+    <SectionDownloadHeading as="h3" downloadLabel={chart ? title : undefined}
+      printLabel={!chart ? title : undefined} entries={entries}>{title}</SectionDownloadHeading>
+    <DonutFigure label="미처리 업무의 경과일 구간별 건수" segments={segments} centerLabel="미처리"
+      centerValue={workload ? count(total) : '—'} note={note} reduced={reduced} layout={layout} />
   </Panel>;
 }

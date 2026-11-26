@@ -1,16 +1,18 @@
-.dashboard-flow-family > [data-dashboard-section-content] > .dashboard-institution-metrics {
-  grid-column: 1 / -1;
-  gap: var(--workspace-panel-gap);
-}
 .dashboard-flow-family > [data-dashboard-section-content] > :is(.dashboard-flow-volume, .dashboard-alert-lifecycle),
 .dashboard-detection-grid > [data-dashboard-section-content] > * { grid-column: 1 / -1 }
 .dashboard-detection-grid { gap: var(--workspace-panel-gap) }
 @media (width >= 68rem) {
-  .dashboard-flow-family > [data-dashboard-section-content] > .dashboard-flow-volume { grid-column: span 7 }
-  .dashboard-flow-family > [data-dashboard-section-content] > .dashboard-alert-lifecycle { grid-column: span 5 }
+  .dashboard-flow-family > [data-dashboard-section-content] > :is(.dashboard-flow-volume, .dashboard-alert-lifecycle) { grid-column: span 6 }
   .dashboard-detection-grid > [data-dashboard-section-content] > * { grid-column: span 4 }
 }
-.dashboard-work-details > [data-dashboard-section-content] > .dashboard-staff-metric.dashboard-staff-workload { grid-column: span 6 }
-@media (width < 68rem) {
-  .dashboard-work-details > [data-dashboard-section-content] > .dashboard-staff-metric.dashboard-staff-workload { grid-column: 1 / -1 }
+.dashboard-work-details > [data-dashboard-section-content] > :is(.dashboard-staff-metric, .dashboard-sla-donut, .dashboard-investigation-flow, .dashboard-flow-status) {
+  grid-column: 1 / -1;
+}
+@media (width >= 68rem) {
+  .dashboard-work-details > [data-dashboard-section-content] > :is(.dashboard-staff-metric, .dashboard-investigation-flow) {
+    grid-column: span 8;
+  }
+  .dashboard-work-details > [data-dashboard-section-content] > :is(.dashboard-sla-donut, .dashboard-flow-status) {
+    grid-column: span 4;
+  }
 }

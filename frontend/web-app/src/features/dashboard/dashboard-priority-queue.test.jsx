@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
+import { CaseAgeTag } from '@/components/semantic-tags';
 import { DashboardPriorityQueue, rankPriorityCases } from './dashboard-priority-queue';
 
 describe('priority case ranking', () => {
@@ -40,16 +41,19 @@ it('uses the shared workflow table without a duplicate title and preserves direc
   expect(within(table).getByRole('button', { name: 'A-1 상세 열기' }).dataset.workCode).toBe('A-1');
 });
 
-it('uses shared elapsed tags for all days and shared actor tags for all assignees', () => {
-  render(<DashboardPriorityQueue rows={[
-    { code: 'A-1', score: 80, elapsed: 4, assigneeName: '분석가 A' },
-    { code: 'A-2', score: 80, elapsed: 3, assignee: 'demo-staff-2' },
+it('uses shared tags and keeps the score and age highlight thresholds specific to the queue', () => {
+  render(<><DashboardPriorityQueue rows={[
+    { code: 'A-1', score: 90, elapsed: 7, assigneeName: '분석가 A' },
+    { code: 'A-2', score: 89, elapsed: 6, assignee: 'demo-staff-2' },
     { code: 'A-3', score: 80, elapsed: 0 },
-  ]} />);
+  ]} /><CaseAgeTag days={4} /></>);
 
+  expect(screen.getByText('7일 경과').dataset.preset).toBe('elapsedOverdue');
+  expect(screen.getByText('6일 경과').dataset.preset).toBe('elapsed');
   expect(screen.getByText('4일 경과').dataset.preset).toBe('elapsedOverdue');
-  expect(screen.getByText('3일 경과').dataset.preset).toBe('elapsed');
   expect(screen.getByText('0일 경과').dataset.preset).toBe('elapsed');
+  expect(screen.getByText('90점').closest('[data-tag="model-score"]').dataset.tone).toBe('danger');
+  expect(screen.getByText('89점').closest('[data-tag="model-score"]').dataset.tone).not.toBe('danger');
   for (const name of ['분석가 A', '분석가 01', '미배정']) {
     expect(screen.getByText(name).dataset.tag).toBe('case-actor');
   }

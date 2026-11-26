@@ -4,7 +4,7 @@ import { ActionButton, PrimaryButton } from '../../components/primary-button';
 import { DialogFooter } from '../../components/dialog-parts';
 import { Textarea } from '../../components/ui/textarea';
 import { Input } from '../../components/ui/input';
-import { LinkTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
+import { LinkTag, VerdictTag, reviewStatusLabel, verdictLabels } from '../../components/semantic-tags';
 import { activeReviewStatuses, previewCaseAssignee, requestAdmin, requestCases, requestStaff, workRequestTypes, workRequestUserName } from './preview-work-requests';
 import './case-judgment.css';
 import { Box, Text } from '../../components/layout-primitives';
@@ -28,7 +28,7 @@ function ReviewStatusSelect({ value, onChange, except }) {
   return <Box className="case-judgment-field">
     <Text as="span">변경할 처리 상태</Text>
     <GlideSelect fullWidth ariaLabel="변경할 처리 상태" placeholder="처리 상태 선택" value={value} onChange={onChange}
-      options={activeReviewStatuses.filter(status => status !== except).map(status => ({ value: status, label: status }))} />
+      options={activeReviewStatuses.filter(status => status !== except).map(status => ({ value: status, label: reviewStatusLabel(status) }))} />
   </Box>;
 }
 
@@ -125,7 +125,7 @@ export function WorkRequestDetail({ item, actor, currentAssignee, onRespond, onO
       <Text className="work-request-message">{item.reason}</Text>
       {item.before && <Box className="case-judgment-summary">
         <Text className="semantic-tag-group">변경 전 · {item.before.status}<VerdictTag verdict={item.before.verdict} /></Text>
-        {item.reviewStatus && <Text>변경 후 · {item.reviewStatus}</Text>}
+        {item.reviewStatus && <Text>변경 후 · {reviewStatusLabel(item.reviewStatus)}</Text>}
         {item.assignee && <Text>담당자 · {workRequestUserName(item.before.assignee)} → {workRequestUserName(item.assignee)}</Text>}
         {item.before.judgment && <Text className="work-request-message">이전 판정 사유 · {item.before.judgment.reason}</Text>}
       </Box>}

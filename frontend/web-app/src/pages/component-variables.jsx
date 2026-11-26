@@ -6,6 +6,7 @@ import { SearchField } from '../components/search-field';
 import { LinkTag, VerdictTag } from '../components/semantic-tags';
 import { SortableTableHead, tableCount, useTableSort, WorkflowTable } from '../components/workflow-table';
 import figmaColors from '../config/figma-colors.json';
+import { reviewStatusLabels } from '../lib/review-status';
 import './component-variables.css';
 import { Box, Text } from '@/components/layout-primitives';
 
@@ -19,9 +20,9 @@ const colorUses = {
   'surface/brand/accent/default': '강조 버튼 · 필터 · AI 요약',
   'surface/status/danger/accent/default': '이상 판정 · 고위험',
   'surface/status/caution/accent/default': '판정 전 · 주의 점수',
-  'surface/status/positive/accent/default': '정상 판정 · 낮은 점수 · 처리 완료',
-  'surface/status/pending/accent/default': '검토 대기 · 룰 초안',
-  'surface/status/info/accent/default': '처리 중',
+  'surface/status/positive/accent/default': `정상 판정 · 낮은 점수 · ${reviewStatusLabels.done}`,
+  'surface/status/pending/accent/default': `${reviewStatusLabels.pending} · 룰 초안`,
+  'surface/status/info/accent/default': reviewStatusLabels.inProgress,
 };
 const cardDimensions = {
   '--aml-radius-card': '카드·패널·표 모서리',

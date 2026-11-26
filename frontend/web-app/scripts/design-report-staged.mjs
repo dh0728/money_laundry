@@ -12,7 +12,7 @@ const snapshot = mkdtempSync(join(temporaryRoot, 'aml-design-'))
 try {
   const entries = execFileSync('git', ['ls-files', '-z', '--',
     `${application}/src`, `${application}/scripts`, `${application}/package.json`,
-    `${application}/dashboard-ui-catalog.mjs`,
+    `${application}/dashboard-ui-catalog.mjs`, `${application}/dashboard-ui-catalog.json`,
     `${application}/eslint.config.js`, `${application}/stylelint.config.mjs`, `${application}/*.html`,
   ], { cwd: repository })
   execFileSync('git', ['checkout-index', '-z', '--stdin', `--prefix=${snapshot.replaceAll('\\', '/')}/`], {

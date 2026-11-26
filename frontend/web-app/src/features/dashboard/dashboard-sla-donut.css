@@ -1,17 +1,17 @@
 .dashboard-sla-donut {
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(min-content, 1fr);
 }
 .dashboard-sla-figure {
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: var(--aml-space-12);
+  gap: var(--aml-space-6);
   margin: 0;
 }
 .dashboard-sla-plot {
   display: grid;
   place-items: center;
-  inline-size: min(100%, var(--overview-donut-size));
+  inline-size: min(100%, calc(var(--aml-space-64) * 3 + var(--aml-space-32)));
   aspect-ratio: 1;
 }
 .dashboard-sla-plot > * { grid-area: 1 / 1 }

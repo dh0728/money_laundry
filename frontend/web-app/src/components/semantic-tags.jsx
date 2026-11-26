@@ -4,7 +4,10 @@ import { modelRiskBand } from '../features/settings/model-risk-settings';
 import { cautionAgeDays, isOverdueCaseAge } from '../features/investigation/case-age';
 import { ActionButton } from './primary-button';
 import { Text } from './layout-primitives';
+import { reviewStates } from '../lib/review-status';
 import './semantic-tags.css';
+
+export { reviewStates } from '../lib/review-status';
 
 const statusTones = {
   abnormal: 'danger',
@@ -38,11 +41,6 @@ const patternNames = {
   random: 'RANDOM',
 };
 
-export const reviewStates = [
-  { value: '처리 전', label: '검토 대기', preset: 'pending' },
-  { value: '처리 중', label: '처리 중', preset: 'inProgress' },
-  { value: '처리 완료', label: '처리 완료', preset: 'done' },
-];
 const strongReviewPresets = new Set(reviewStates.map(state => state.preset));
 
 export function StatusTag({ preset, className = '', emphasis = 'solid', children }) {
@@ -53,9 +51,11 @@ export function StatusTag({ preset, className = '', emphasis = 'solid', children
     data-tone={statusTones[preset] ?? 'neutral'}>{Icon && <Icon className="semantic-tag-icon" aria-hidden="true" />}{children}</span>;
 }
 
-export function CaseAgeTag({ days, showRecent = false }) {
+/** @param {{ days?: number, showRecent?: boolean, overdueFromDays?: number }} props */
+export function CaseAgeTag({ days, showRecent = false, overdueFromDays }) {
   if (days == null || !(days >= (showRecent ? 0 : cautionAgeDays))) return null;
-  return <StatusTag preset={isOverdueCaseAge(days) ? 'elapsedOverdue' : 'elapsed'}>{days}일 경과</StatusTag>;
+  const overdue = overdueFromDays == null ? isOverdueCaseAge(days) : days >= overdueFromDays;
+  return <StatusTag preset={overdue ? 'elapsedOverdue' : 'elapsed'}>{days}일 경과</StatusTag>;
 }
 
 const countFormat = new Intl.NumberFormat('ko-KR');

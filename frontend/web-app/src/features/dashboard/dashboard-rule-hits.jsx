@@ -10,8 +10,8 @@ import { TableBody, TableCell, TableHead, TableHeader, TableRow, TableRowHead } 
 import { TableFieldLabel, WorkflowTable } from '@/components/workflow-table';
 import { codeToRuleId, liveRuleRows, refreshLiveRules } from '../rules/live-rule-store';
 
-const titleBase = '룰 운영 적중';
 const rankLimit = 5;
+const title = `룰 운영 적중 상위 ${rankLimit}`;
 const refreshAfterMs = 60_000;
 const formatCount = new Intl.NumberFormat('ko-KR');
 const columns = [
@@ -42,10 +42,19 @@ function readRuleRows(dataSource) {
   return liveRequest;
 }
 
+const isOperatingRule = row => row.hitCount > 0 || (Number.isSafeInteger(row.operatingVersionNo) && row.operatingVersionNo > 0);
+
 export function rankOperatingRuleHits(rows) {
-  return rows.filter(row => codeToRuleId(row.code) !== undefined && Number.isSafeInteger(row.hitCount) && row.hitCount > 0)
-    .toSorted((left, right) => right.hitCount - left.hitCount || left.code.localeCompare(right.code, 'en', { numeric: true }))
-    .slice(0, rankLimit);
+  const ranked = rows.map(row => ({ row, id: codeToRuleId(row.code) }))
+    .filter(({ row, id }) => Number.isSafeInteger(id) && id > 0 && Number.isSafeInteger(row.hitCount) && row.hitCount >= 0 &&
+      isOperatingRule(row))
+    .sort((left, right) => right.row.hitCount - left.row.hitCount || left.id - right.id);
+  const distinct = new Set();
+  return ranked.filter(({ id }) => {
+    if (distinct.has(id)) return false;
+    distinct.add(id);
+    return true;
+  }).slice(0, rankLimit).map(({ row }) => row);
 }
 
 export function DashboardRuleHits({ dataSource }) {
@@ -62,23 +71,22 @@ export function DashboardRuleHits({ dataSource }) {
 
   const visible = result?.dataSource === dataSource ? result : null;
   const rows = visible?.rows ?? [];
-  const title = rows.length ? `${titleBase} 상위 ${rows.length}` : titleBase;
-  const entries = rows.length ? [csvDownloadEntry(title, `operating-rule-hits-top-${rows.length}`, ['룰 코드', ...columns.map(column => column.label)],
-    rows.map(row => [row.code, row.name, row.hitCount, row.lastHitDate]))] : [];
+  const entries = rows.length ? [csvDownloadEntry(title, `operating-rule-hits-top-${rankLimit}`, ['룰 코드', ...columns.map(column => column.label)],
+    rows.map(row => [row.code, row.name, row.hitCount, row.hitCount > 0 ? row.lastHitDate : null]))] : [];
 
-  return <Panel as="article" className="dashboard-chart dashboard-rule-hits">
+  return <Panel as="article" fillContent className="dashboard-chart dashboard-rule-hits">
     <SectionDownloadHeading entries={entries} printLabel={title}>{title}</SectionDownloadHeading>
-    <Text className="dashboard-note">{dataSource === 'sample' ? '룰 엔진 샘플의 전체 운영 기록 · 대시보드 조회 기간과 별도' : '전체 운영 기록 · 대시보드 조회 기간과 별도'}</Text>
-    {rows.length ? <WorkflowTable label={title} title={null} tools={false} scrollbarGutter="auto">
+    <Text className="dashboard-note">{dataSource === 'sample' ? '샘플 전체 운영 기록' : '전체 운영 기록'} · 조회 기간과 별도</Text>
+    {rows.length ? <WorkflowTable label={title} title={null} tools={false} scrollbarGutter="auto" fill>
       <TableHeader><TableRow>{columns.map(({ key, label }) => <TableHead key={key} scope="col"><TableFieldLabel column={key}>{label}</TableFieldLabel></TableHead>)}</TableRow></TableHeader>
       <TableBody>{rows.map(row => <TableRow key={row.code}>
         <TableRowHead><LinkTag href={`/rules?rule=${encodeURIComponent(row.code)}`} aria-label={`${row.code} ${row.name} 상세 열기`}>{row.name}</LinkTag></TableRowHead>
         <TableCell numeric>{formatCount.format(row.hitCount)}건</TableCell>
-        <TableCell>{row.lastHitDate ?? '—'}</TableCell>
+        <TableCell>{(row.hitCount > 0 ? row.lastHitDate : null) ?? '—'}</TableCell>
       </TableRow>)}</TableBody>
     </WorkflowTable> : visible?.error ? <Box>
       <Text className="dashboard-note" role="status">운영 적중 집계를 불러오지 못했습니다.</Text>
       <ActionButton shape="pill" onClick={() => { setResult(null); setRetry(value => value + 1); }}>다시 시도</ActionButton>
-    </Box> : <Text className="dashboard-note" role="status">{visible ? '기록된 운영 적중이 없습니다.' : '운영 적중 집계를 불러오는 중입니다.'}</Text>}
+    </Box> : <Text className="dashboard-note" role="status">{visible ? '표시할 운영 룰이 없습니다.' : '운영 적중 집계를 불러오는 중입니다.'}</Text>}
   </Panel>;
 }

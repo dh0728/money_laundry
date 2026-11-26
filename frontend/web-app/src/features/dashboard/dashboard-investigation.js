@@ -53,6 +53,7 @@ function staffWorkload(openWork, overdue, assignmentRows, dates, roster) {
   }).sort((left, right) => right.total - left.total || left.name.localeCompare(right.name, 'ko'));
   const registeredAssignments = byAssignee.reduce((sum, row) => sum + (row.registered ? row.assignments : 0), 0);
   return { total: openWork.length, byAssignee, overdue, staffCount: staffById.size,
+    unknownElapsed: openWork.filter(row => !hasElapsedDays(row)).length,
     equalAssignments: staffById.size ? registeredAssignments / staffById.size : null };
 }
 
@@ -161,11 +162,12 @@ export function investigationDashboard(allCases, cases, dates, { assignmentRows 
   const recommendation = findAccountTrail(cases);
   const isIndependentWork = row => row.kind === 'Episode' || (row.kind === 'Alert' && !row.episodeCode && !episodeByAlert.has(row.code));
   const openWork = cases.filter(row => row.open && isIndependentWork(row));
-  const overdueWork = openWork.filter(row => isOverdueCaseAge(row.elapsed));
+  const overdueWork = openWork.filter(row => hasElapsedDays(row) && isOverdueCaseAge(row.elapsed));
+  const asOf = Date.parse(businessAt);
   return {
     ...(businessAt && {
       todaySnapshot: currentWorkSnapshot(allCases, isIndependentWork, businessAt, todayDetection),
-      priorityCases: workPriority(openWork, roster),
+      priorityCases: workPriority(allCases.filter(row => row.open && isIndependentWork(row) && !(Date.parse(row.createdAt) > asOf)), roster),
       patternAlertCounts: patternAlerts(cases),
     }),
     dailyAlertStatus,

@@ -316,9 +316,9 @@
   --chart-sankey-name-size: 13px;
   --chart-sankey-value-size: 11px;
   --chart-sankey-unassigned-link-color: gray;
-  --chart-sankey-connector-radius: 2.5px;
   --chart-sankey-stage-node-gap: 15px;
   --chart-sankey-stage-label-reserve: 174px;
+  --chart-sankey-compact-label-reserve: 128px;
   --chart-sankey-link-caption-inset: 9px;
   --chart-sankey-label-offset: .34;
   --chart-sankey-label-with-detail-offset: -.15;

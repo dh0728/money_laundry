@@ -25,7 +25,6 @@ async function loadTodayDetection(date) {
     if (![received, analyzed, suspicious].every(Number.isSafeInteger) || suspicious < 0 || suspicious > analyzed || analyzed > received) return null;
     return { received, analyzed, suspicious, basis: 'analysis-day' };
   } catch {
-    // The review board and period charts remain available while the pipeline projection is unavailable.
     return null;
   }
 }

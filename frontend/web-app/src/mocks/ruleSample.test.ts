@@ -24,7 +24,9 @@ const definitionOf = async (key: string): Promise<RuleDefinition> => {
 
 it('목록의 룰마다 상세가 있고 상태별 개수가 목록과 맞는다', async () => {
   const list = await fetchRules()
-  expect(list.content.map(row => row.code)).toEqual(['RULE-001', 'RULE-002', 'RULE-003', 'RULE-004', 'RULE-005', 'RULE-006', 'RULE-007'])
+  expect(list.content.map(row => row.code)).toEqual([
+    'RULE-001', 'RULE-002', 'RULE-003', 'RULE-004', 'RULE-005', 'RULE-006', 'RULE-007', 'RULE-008', 'RULE-009',
+  ])
   for (const [status, count] of Object.entries(list.counts)) expect(list.content.filter(row => row.status === status)).toHaveLength(count)
   for (const row of list.content) {
     const detail = await fetchRule(row.ruleId)
@@ -106,6 +108,7 @@ it('목록에 없는 비교를 입력하면 형식 오류로 처리한다', asyn
 
 it('저장 · 명령 · 복제 · 백테스트 실행은 받지 않고 샘플이라고 알린다', async () => {
   const definition = await definitionOf('FAN_OUT')
+  const original = await fetchRules()
   const writes = [
     () => createRule({ name: '새 룰', template: 'FAN_OUT' }), () => saveRuleDraft(1, 8, { name: '분산 송금 감시', definition, revision: 0 }),
     () => createRuleVersion(2), () => cloneRule(2), () => commandRule(4, { action: 'APPROVE', versionId: 4, revision: 0 }),
@@ -116,7 +119,7 @@ it('저장 · 명령 · 복제 · 백테스트 실행은 받지 않고 샘플이
     expect(failure).toBeInstanceOf(ApiError)
     expect(failure.problem).toMatchObject({ code: 'SAMPLE_READ_ONLY', detail: sampleReadOnlyNote })
   }
-  expect((await fetchRules()).content).toHaveLength(7)
+  expect(await fetchRules()).toEqual(original)
   expect(fetcher).not.toHaveBeenCalled()
 })
 
@@ -142,9 +145,12 @@ it('백테스트 기록의 줄마다 결과가 있고 운영 버전과 비교한
 })
 
 it('응답을 고쳐 써도 샘플은 그대로다', async () => {
+  const original = await fetchRules()
   const list = await fetchRules()
+  list.content.find(row => row.code === 'RULE-009')!.name = '응답에서 바꾼 이름'
+  list.counts.ACTIVE = 0
   list.content.length = 0
-  expect((await fetchRules()).content).toHaveLength(7)
+  expect(await fetchRules()).toEqual(original)
 })
 
 it('없는 번호는 404 로 답하고 샘플 사건에는 걸린 룰이 없다', async () => {

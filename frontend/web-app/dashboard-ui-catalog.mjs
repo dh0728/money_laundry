@@ -1,48 +1,5 @@
-// Public design-system entry points approved for direct dashboard use.
-// Add an entry only after the design owner approves the reuse or extension.
-export const dashboardUiCatalog = new Set([
-  'Provenance',
-  'DateRangeButton',
-  'SectionCards',
-  'ai-summary-panel',
-  'badges',
-  'charts/alert-status-bars',
-  'charts/chart-design-values',
-  'charts/charts/account-trail-graph',
-  'charts/charts/bar',
-  'charts/charts/bar-chart',
-  'charts/charts/bar-x-axis',
-  'charts/charts/chart-context',
-  'charts/charts/grid',
-  'charts/charts/pattern-relation',
-  'charts/charts/pie/pie-chart',
-  'charts/charts/pie/pie-slice',
-  'charts/charts/sankey/staged-sankey',
-  'charts/charts/tooltip/chart-tooltip',
-  'charts/charts/tooltip/tooltip-content',
-  'charts/charts/use-element-size',
-  'charts/sparkline',
-  'layout-primitives',
-  'page',
-  'panel',
-  'primary-button',
-  'query-controls',
-  'radar-sweep',
-  'react-bits/CountUp',
-  'react-bits/GlideSelect',
-  'react-bits/MagicBento',
-  'section-download',
-  'semantic-tags',
-  'states',
-  'ui/card',
-  'ui/skeleton',
-  'ui/switch',
-  'ui/table',
-  'ui/tooltip',
-  'workflow-table',
-])
+import { readFileSync } from 'node:fs'
 
-export const legacyDashboardUiImports = new Map([
-  ['src/features/dashboard/LiveWorkQueue.tsx', 'ui/button'],
-  ['src/features/dashboard/PersonalView.tsx', 'ui/select'],
-])
+export function readDashboardUiCatalog() {
+  return JSON.parse(readFileSync(new URL('./dashboard-ui-catalog.json', import.meta.url), 'utf8'))
+}

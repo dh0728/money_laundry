@@ -220,7 +220,7 @@ describe('Alert·Episode 목록 페이지 이동', () => {
     expect(host).toBeEmptyDOMElement();
     expect(screen.getByRole('button', { name: 'A-261111-000001 상세 열기' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'A-261111-000009 상세 열기' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '검토 대기 업무 더 보기' }));
+    fireEvent.click(screen.getByRole('button', { name: '처리 전 업무 더 보기' }));
     expect(screen.getByRole('button', { name: 'A-261111-000009 상세 열기' })).toBeTruthy();
     expect(onPageChange).not.toHaveBeenCalled();
   });
@@ -229,7 +229,7 @@ describe('Alert·Episode 목록 페이지 이동', () => {
     const readDate = vi.fn(() => new Date(2026, 10, 12));
     const explicit = { ...rows[0], get date() { return readDate(); } };
     const unknown = { ...rows[2], code: 'A-261132-000003' };
-    const entry = caseCsvDownloadEntry('검토 대기', 'review-pending', [explicit, rows[1], unknown]);
+    const entry = caseCsvDownloadEntry('처리 전', 'review-pending', [explicit, rows[1], unknown]);
     expect(entry.count).toBe(3);
     expect(entry.csv.filename).toBe('aml-review-pending.csv');
     expect(readDate).not.toHaveBeenCalled();
