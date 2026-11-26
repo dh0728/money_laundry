@@ -531,6 +531,15 @@
 .dashboard-loading-title { inline-size: var(--loading-placeholder-title-width); block-size: var(--aml-type-body-lineHeight) }
 .dashboard-loading-value { inline-size: var(--loading-placeholder-value-width); block-size: var(--workspace-kpi-value-size) }
 .dashboard-loading-note { inline-size: var(--loading-placeholder-note-width); block-size: var(--aml-type-caption-lineHeight) }
+.dashboard-loading .dashboard-priority-metric .dashboard-loading-title {
+  block-size: var(--aml-type-panel-title-lineHeight);
+  margin-block-end: var(--aml-space-4);
+}
+.dashboard-loading .dashboard-new-entities .dashboard-loading-series-legend {
+  block-size: calc(var(--metric-value-size) * var(--metric-value-line-height));
+}
+.dashboard-loading .dashboard-loading-staff-legend { block-size: var(--aml-type-body-lineHeight) }
+.dashboard-loading-staff-plot { block-size: calc(var(--aml-space-24) * var(--dashboard-staff-visible-rows)) }
 .dashboard-loading-trend { inline-size: 100%; min-block-size: var(--aml-space-48); flex: 1 1 auto }
 .dashboard-loading-recommendation-plot { block-size: var(--chart-series-height) }
 .dashboard-loading [data-slot="skeleton"].dashboard-score-band { border-radius: var(--aml-radius-card) }

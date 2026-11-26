@@ -52,10 +52,17 @@ function LoadingChart({ className = '', chartClass = 'dashboard-proportion-band'
 
 function LoadingSeries({ className }) {
   return <LoadingChart className={className}>
-    <Skeleton className="dashboard-loading-note" />
+    <Skeleton className="dashboard-loading-note dashboard-loading-series-legend" />
     <Box className="dashboard-series">
       <Skeleton className="dashboard-series-plot" />
     </Box>
+  </LoadingChart>;
+}
+
+function LoadingStaffChart() {
+  return <LoadingChart className="dashboard-priority-metric dashboard-staff-metric">
+    <Skeleton className="dashboard-loading-note dashboard-loading-staff-legend" />
+    <Skeleton className="dashboard-loading-staff-plot" />
   </LoadingChart>;
 }
 
@@ -91,6 +98,11 @@ export function DashboardAnalyticsSkeleton({ reduced }) {
   return <Box className="dashboard-analytics dashboard-loading dashboard-workflow-charts" aria-busy="true">
     <Text as="span" className="visually-hidden" role="status">대시보드 차트 불러오는 중</Text>
     <Box aria-hidden="true" className="dashboard-analytics">
+      <DashboardIndicatorsGrid>
+        <LoadingSeries className="dashboard-priority-metric dashboard-new-entities" />
+        <LoadingStaffChart />
+        <LoadingStaffChart />
+      </DashboardIndicatorsGrid>
       <Grid columns={12} className="dashboard-flow-family dashboard-work-overview-grid">
         <LoadingChart className="dashboard-transaction-flow" chartClass="staged-sankey-chart" />
         <LoadingSeries className="dashboard-flow-volume" />
