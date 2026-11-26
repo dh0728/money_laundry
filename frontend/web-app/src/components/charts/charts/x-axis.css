@@ -1,0 +1,21 @@
+.chart-x-axis-label {
+  position: absolute;
+  left: var(--chart-x-axis-label-x);
+  bottom: var(--aml-space-12);
+  width: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.chart-x-axis-label[data-animate-position] {
+  transition: left var(--chart-x-axis-slide-duration) var(--chart-x-axis-slide-ease);
+}
+
+.chart-x-axis-label-text {
+  opacity: var(--chart-x-axis-label-opacity);
+  transition:
+    opacity var(--chart-x-axis-label-fade-duration) ease-in-out,
+    color var(--chart-x-axis-label-color-duration) ease-out;
+}
+
+.chart-x-axis-label-text[data-highlighted] { color: var(--chart-x-axis-label-color) }

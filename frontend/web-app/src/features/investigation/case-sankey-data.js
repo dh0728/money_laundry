@@ -1,4 +1,3 @@
-import { sankeyLinkHorizontal } from 'd3-sankey';
 import { graphPartyId, graphRiskBand } from './case-graph-scope';
 
 function addAmount(totals, currency, amount) {
@@ -136,12 +135,4 @@ export function layoutCaseSankey(data, { width, height, nodeWidth, nodePadding }
     returnTop += link.width + returnGap;
   }
   return { nodes, links };
-}
-
-const horizontal = sankeyLinkHorizontal();
-export function caseSankeyPath(link) {
-  if (link.returnY === undefined) return horizontal(link) ?? '';
-  const { source, target, y0, y1, returnY } = link;
-  const bend = 16;
-  return `M ${source.x1} ${y0} C ${source.x1 + bend} ${y0}, ${source.x1 + bend} ${returnY}, ${source.x1} ${returnY} H ${target.x0} C ${target.x0 - bend} ${returnY}, ${target.x0 - bend} ${y1}, ${target.x0} ${y1}`;
 }

@@ -6,6 +6,7 @@ import { SharedPeriod, WorkspaceProvider } from '@/lib/WorkspaceProvider'
 import LiveDashboardPage from './LiveDashboardPage'
 import LiveLedgerPage from './LiveLedgerPage'
 import LiveCasesPage from './LiveCasesPage'
+import { Box } from '../components/layout-primitives'
 
 const { dashboard, owners, accounts, transactions, cases, clock } = vi.hoisted(() => ({
   dashboard: vi.fn(), owners: vi.fn(), accounts: vi.fn(), transactions: vi.fn(), cases: vi.fn(), clock: vi.fn(),
@@ -19,7 +20,7 @@ const noop = () => undefined
 const page = <T,>(content: T[]) => ({ content, totalElements: content.length, page: 0, size: 20, totalPages: 1 })
 function Screens() {
   const [tab, setTab] = useState('dashboard')
-  return <><nav>{['dashboard', 'ledger', 'alerts', 'episodes'].map(name => <button key={name} onClick={() => setTab(name)}>{name}</button>)}</nav><SharedPeriod>
+  return <><Box as="nav">{['dashboard', 'ledger', 'alerts', 'episodes'].map(name => <button key={name} onClick={() => setTab(name)}>{name}</button>)}</Box><SharedPeriod>
     {tab === 'dashboard' ? <LiveDashboardPage onOpen={noop} /> : tab === 'ledger' ? <LiveLedgerPage onOpen={noop} />
       : <LiveCasesPage kind={tab === 'alerts' ? 'ALERT' : 'EPISODE'} onOpen={noop} onBack={noop} />}
   </SharedPeriod></>

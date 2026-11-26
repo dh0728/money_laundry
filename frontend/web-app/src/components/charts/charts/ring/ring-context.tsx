@@ -11,10 +11,10 @@ export const ringCssVars = {
   label: "var(--chart-label)",
   ringBackground: "var(--border)",
   // Default ring colors from chart palette
-  ring1: "var(--chart-1)",
-  ring2: "var(--chart-2)",
-  ring3: "var(--chart-3)",
-  ring4: "var(--chart-4)",
+  ring1: "var(--aml-sky-050)",
+  ring2: "var(--aml-pink-050)",
+  ring3: "var(--aml-lime-050)",
+  ring4: "var(--palette-teal-500, var(--aml-sky-070))",
   ring5: "var(--chart-5)",
 };
 

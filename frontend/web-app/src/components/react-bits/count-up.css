@@ -1,0 +1,34 @@
+@import "../../styles/count-up-tokens.css";
+
+.count-up { font-variant-numeric: tabular-nums; }
+.count-up-fast { --count-up-duration: var(--count-up-fast-duration); }
+
+.count-up-roll {
+  display: inline-flex;
+  white-space: pre;
+  user-select: none;
+}
+
+.count-up-slot {
+  display: inline-block;
+  height: var(--count-up-cell-height);
+  line-height: var(--count-up-cell-height);
+}
+
+.count-up-overflow {
+  overflow: hidden;
+  width: var(--count-up-slot-width, auto);
+  opacity: var(--count-up-slot-opacity, 1);
+}
+
+.count-up-column { position: relative; }
+
+.count-up-strip {
+  display: flex;
+  flex-direction: column;
+  transform: translateY(var(--count-up-strip-offset, calc(-1 * var(--count-up-cell-height))));
+  filter: var(--count-up-strip-blur, none);
+}
+
+.count-up-digit { height: var(--count-up-cell-height); }
+.count-up-blur { position: absolute; }

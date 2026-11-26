@@ -1,4 +1,4 @@
-import type { AlertTransaction } from '@/api/alerts'
+import type { AlertDetail as AlertDetailData, AlertTransaction } from '@/api/alerts'
 
 // v23 "의심 거래 금액" 대신 쓰는 세 지표(v24 v23-domain.ts moneyMetrics).
 // 투입 원금: 계좌별 (보낸 돈 − 받은 돈)의 양수 합과 가장 큰 단일 거래 중 큰 값. 경로를 따라 같은 돈이 여러 번 더해지는 것을 줄인다.
@@ -29,3 +29,21 @@ export function sumBy<T>(items: T[], key: (item: T) => string, value: (item: T) 
 }
 
 export { usd } from '@/lib/format'
+
+/** 사건 밖에서 들어오고 나간 돈. 사건 안 경유 거래를 두 번 세지 않는다(거래 총액을 쓰지 않는 이유, 10/11) */
+export function flowFacts(tx: Pick<AlertDetailData['transactions'][number], 'fromAccount' | 'toAccount' | 'amountUsd'>[]) {
+  const senders = new Set(tx.map(t => t.fromAccount))
+  const receivers = new Set(tx.map(t => t.toAccount))
+  const externalIn = tx.filter(t => !receivers.has(t.fromAccount)).reduce((s, t) => s + t.amountUsd, 0)
+  const externalOut = tx.filter(t => !senders.has(t.toAccount)).reduce((s, t) => s + t.amountUsd, 0)
+  return { senders, receivers, externalIn, externalOut, passThrough: [...senders].filter(a => receivers.has(a)) }
+}
+
+export function overviewFacts(alert: AlertDetailData) {
+  const tx = alert.transactions
+  const { externalIn, externalOut, passThrough } = flowFacts(tx)
+  const inDegree = sumBy(tx, t => t.toAccount, () => 1)[0]
+  const outDegree = sumBy(tx, t => t.fromAccount, () => 1)[0]
+  const seeds = tx.filter(t => t.role === 'SEED')
+  return { tx, externalIn, externalOut, passThrough, inDegree, outDegree, seeds }
+}

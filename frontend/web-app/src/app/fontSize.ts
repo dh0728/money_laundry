@@ -7,7 +7,7 @@ const KEY = 'aml:fontScale'
 const read = () => { try { const v = Number(window.localStorage.getItem(KEY)); return FONT_SCALES.some(s => s.value === v) ? v : 100 } catch { return 100 } }
 let current = typeof window === 'undefined' ? 100 : read()
 const listeners = new Set<() => void>()
-const apply = () => { if (typeof document !== 'undefined') document.documentElement.style.fontSize = `${current}%` }
+const apply = () => { if (typeof document !== 'undefined') document.documentElement.style.setProperty('--workspace-font-scale', `${current}%`) }
 
 export function setFontScale(value: number) {
   current = value; apply()

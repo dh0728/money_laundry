@@ -7,7 +7,6 @@ const surfaceSelector = [
   '[data-button-surface="floating"]', '.star-border',
   '#workflow-notifications .swipe-toast__card',
 ].join(', ');
-const mapOptions = { brightness: 50, opacity: 0.92, blur: 6, reverseHorizontal: true };
 
 function svgElement(name, attributes) {
   const element = document.createElementNS(svgNamespace, name);
@@ -15,7 +14,7 @@ function svgElement(name, attributes) {
   return element;
 }
 
-function createFilter(id, width, height, radius, blur) {
+function createFilter(id, width, height, radius, blur, mapOptions) {
   const filter = svgElement('filter', {
     id, x: '0%', y: '0%', width: '100%', height: '100%', 'color-interpolation-filters': 'sRGB',
   });
@@ -42,6 +41,12 @@ function supportsGlassFilter() {
 export function setupGlassMaterial() {
   if (!supportsGlassFilter()) return;
 
+  const tokens = getComputedStyle(document.documentElement);
+  const mapOptions = {
+    opacity: parseFloat(tokens.getPropertyValue('--glass-refraction-map-opacity')),
+    blur: parseFloat(tokens.getPropertyValue('--glass-refraction-map-blur')),
+    reverseHorizontal: true,
+  };
   const definitions = svgElement('defs', {});
   const svg = svgElement('svg', { width: 0, height: 0, class: 'glass-refraction', 'aria-hidden': 'true' });
   svg.append(definitions);
@@ -80,7 +85,7 @@ export function setupGlassMaterial() {
     let entry = filters.get(key);
     if (!entry) {
       const id = `glass-material-${++serial}`;
-      const element = createFilter(id, width, height, radii, blur);
+      const element = createFilter(id, width, height, radii, blur, mapOptions);
       definitions.append(element);
       entry = { element, key, id, users: 0 };
       filters.set(key, entry);

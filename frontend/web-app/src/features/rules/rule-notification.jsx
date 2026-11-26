@@ -1,4 +1,5 @@
 import React from 'react';
+import { Text } from '@/components/layout-primitives';
 import { LinkTag } from '../../components/semantic-tags';
 
 // 보관함의 룰 알림. 서버는 다른 알림과 같은 목록에 caseKind=RULE, code=룰 번호(RULE-003)로 준다(API.md §11 "룰 알림").
@@ -22,5 +23,5 @@ export const notificationRowTitle = item => (ruleNotificationLink(item) ? `${ite
 export function RuleNotificationLink({ item }) {
   const link = ruleNotificationLink(item);
   if (!link) return null;
-  return <p>{link.label} <LinkTag href={link.href} code={item.code} aria-label={`${item.code} ${link.label} 열기`} /></p>;
+  return <Text>{link.label} <LinkTag href={link.href} code={item.code} aria-label={`${item.code} ${link.label} 열기`} /></Text>;
 }

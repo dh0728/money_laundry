@@ -43,6 +43,7 @@ const periodFixture = { ledgerFrom: '2023-09-01', ledgerTo: '2023-09-16', earlie
 
 let footer;
 beforeEach(() => {
+  HTMLElement.prototype.scrollIntoView ??= vi.fn();
   vi.mocked(fetchRuleCatalog).mockResolvedValue(catalogFixture);
   vi.mocked(fetchRules).mockResolvedValue(rulesFixture);
   vi.mocked(fetchRule).mockImplementation(ruleId => Promise.resolve(ruleId === 4 ? comparedRule : activeRuleFixture));
@@ -59,14 +60,20 @@ afterEach(() => {
 
 const runButton = name => within(footer).getByRole('button', { name });
 const card = name => within(screen.getByRole('region', { name }));
+/** 검사 기간 카드의 검사 일수를 고른다. 공용 선택창은 열어서 항목을 눌러야 한다. */
+const chooseSpan = async option => {
+  fireEvent.keyDown(card('검사 기간').getByRole('combobox', { name: '검사 일수' }), { key: 'ArrowDown' });
+  fireEvent.click(await screen.findByRole('option', { name: option }));
+};
 
 it('고른 룰의 새 버전과 비교할 운영 버전을 보여 주고, 실행하면 끝날 때까지 2초마다 상태를 읽는다', async () => {
   render(<LiveRuleBacktest initialRule="RULE-004" actionsHost={footer} />);
   await screen.findByRole('region', { name: '백테스트 대상 룰' });
   expect(await card('백테스트 대상 룰').findByText(working.sentence)).toBeInTheDocument();
-  expect(card('백테스트 대상 룰').getByLabelText('룰')).toHaveValue('RULE-004');
+  expect(card('백테스트 대상 룰').getByRole('combobox', { name: '룰' })).toHaveTextContent('RULE-004');
   expect(card('비교 기준').getByText('운영 버전 · v1')).toBeInTheDocument();
   expect(card('실행 상태').getByText(/아직 돌린 백테스트가 없습니다/)).toBeInTheDocument();
+  expect(card('실행 기록').getByRole('table', { name: '실행 기록' })).toHaveTextContent('아직 돌린 백테스트가 없습니다.');
   expect(within(footer).getByRole('link', { name: '조건 고치기' })).toHaveAttribute('href', '/rules/new?rule=RULE-004');
 
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
@@ -101,11 +108,15 @@ it('고른 룰의 새 버전과 비교할 운영 버전을 보여 주고, 실행
 });
 
 it('끝난 백테스트의 값 변화 표, 검사 범위, 사례, 알아 둘 것을 보여 준다', async () => {
-  vi.mocked(fetchBacktests).mockResolvedValue([completed]);
+  const earlier = head('CANCELLED', { backtestId: 30, versionNo: 1, baseline: null, currentDefinition: false });
+  vi.mocked(fetchBacktests).mockResolvedValue([completed, earlier]);
   vi.mocked(fetchBacktest).mockResolvedValue({ ...completed, currentDefinition: false, evidenceShare: 12.5, chunkedCount: 1 });
   render(<LiveRuleBacktest initialRule="RULE-004" actionsHost={footer} />);
 
   const sweep = within(await screen.findByRole('region', { name: '값을 바꾸면' }));
+  const sweepTable = sweep.getByRole('table', { name: '값을 바꾸면' });
+  expect(sweepTable.closest('.data-table-frame')).toContainElement(sweep.getByRole('heading', { name: '값을 바꾸면' }));
+  expect(sweepTable.closest('.screen-panel')).toBeNull();
   const current = sweep.getByRole('row', { name: /이번 값/ });
   expect(current).toHaveTextContent('5개');
   expect(within(current).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['3', '18', '2', '1']);
@@ -118,6 +129,8 @@ it('끝난 백테스트의 값 변화 표, 검사 범위, 사례, 알아 둘 것
 
   // 측정값은 템플릿이 정한 순서(수취 계좌 → 거래 → 총액)와 카탈로그의 문구 · 단위로 읽는다
   const cases = within(screen.getByRole('region', { name: '사례' }));
+  const casesTable = cases.getByRole('table', { name: '사례' });
+  expect(casesTable.closest('.screen-panel')).toBeNull();
   const added = within(cases.getByText('c41f3f2a').closest('tr'));
   expect(added.getByText('새로 걸림')).toBeInTheDocument();
   expect(added.getByText('수취 계좌 5개 · 거래 5건 · 보낸 총액 10,000 USD')).toBeInTheDocument();
@@ -133,8 +146,26 @@ it('끝난 백테스트의 값 변화 표, 검사 범위, 사례, 알아 둘 것
   expect(notices.getByText(/바쁜 계좌 2개는 평가하지 않았습니다/)).toHaveTextContent('72시간 안 같은 방향 거래 512건 초과');
   expect(notices.getByText(/바쁜 계좌 2개는 평가하지 않았습니다/)).not.toHaveTextContent('경로 자리');
   expect(notices.getByText(/32건을 넘는 대상이 1개/)).toBeInTheDocument();
-  expect(within(screen.getByRole('region', { name: '실행 기록' })).getByRole('button', { name: /v2 · 완료 · 운영 v1 과 비교/ }))
-    .toHaveAttribute('aria-pressed', 'true');
+  const history = card('실행 기록');
+  const historyTable = history.getByRole('table', { name: '실행 기록' });
+  expect(historyTable.closest('.data-table-frame')).toContainElement(history.getByRole('heading', { name: '실행 기록' }));
+  expect(historyTable.closest('.screen-panel')).toBeNull();
+  expect(history.getAllByRole('columnheader').map(cell => cell.textContent))
+    .toEqual(['버전', '상태', '비교 기준', '검사 기간', '검사한 거래', '요청자', '요청 시각']);
+  expect(history.getByRole('button', { name: '다운로드' })).toBeInTheDocument();
+  const currentRun = history.getByRole('button', { name: /v2 · 완료 · 운영 v1 과 비교/ });
+  expect(currentRun).toHaveAttribute('aria-pressed', 'true');
+  const currentRunRow = within(currentRun.closest('tr'));
+  expect(currentRunRow.getByText('12,000건')).toHaveAttribute('data-numeric', 'true');
+  expect(currentRunRow.getByText('2023-09-08 ~ 2023-09-16 (9일)')).toBeInTheDocument();
+  expect(currentRunRow.getByText('L1 심사자 A')).toBeInTheDocument();
+  fireEvent.click(history.getByRole('button', { name: '버전 · 오름차순 정렬' }));
+  const earlierRunRow = history.getAllByRole('row')[1];
+  expect(earlierRunRow).toHaveTextContent('조건을 고치기 전');
+  vi.mocked(fetchBacktest).mockResolvedValue(earlier);
+  fireEvent.click(within(earlierRunRow).getByText('취소됨'));
+  expect(await card('실행 상태').findByText('취소됨')).toBeInTheDocument();
+  expect(within(earlierRunRow).getByRole('button', { name: /v1 · 취소됨/ })).toHaveAttribute('aria-pressed', 'true');
 });
 
 it('타겟 날과 검사 일수를 고르면 실행 전에 읽을 범위를 보여 주고 그 기간으로 접수한다', async () => {
@@ -146,7 +177,7 @@ it('타겟 날과 검사 일수를 고르면 실행 전에 읽을 범위를 보�
   expect(await period.findByLabelText('타겟 날')).toHaveValue('2023-09-16');
   expect(period.getByLabelText('타겟 날')).toHaveAttribute('min', '2023-09-08');
   expect(period.getByLabelText('타겟 날')).toHaveAttribute('max', '2023-09-16');
-  expect(period.getByLabelText('검사 일수')).toHaveValue('ALL');
+  expect(period.getByRole('combobox', { name: '검사 일수' })).toHaveTextContent('전체');
   expect(period.getByText('검사하는 날짜').nextElementSibling).toHaveTextContent('2023-09-08 ~ 2023-09-16 (9일)');
   expect(period.getByText('돌아보는 거래').nextElementSibling).toHaveTextContent('2023-09-01부터 (룰의 기간 7일)');
   expect(period.getByText('처음 거래하는 상대 · 바쁜 계좌').nextElementSibling).toHaveTextContent('2023-09-01 ~ 2023-09-16 기준');
@@ -154,18 +185,18 @@ it('타겟 날과 검사 일수를 고르면 실행 전에 읽을 범위를 보�
 
   // 09-12 하루만: 그날만 검사하고 09-05 부터 돌아본다. 처음 거래하는 상대와 바쁜 계좌는 09-12 까지의 거래로 본다
   fireEvent.change(period.getByLabelText('타겟 날'), { target: { value: '2023-09-12' } });
-  fireEvent.change(period.getByLabelText('검사 일수'), { target: { value: '1' } });
+  await chooseSpan('1일');
   expect(period.getByText('검사하는 날짜').nextElementSibling).toHaveTextContent('2023-09-12 (1일)');
   expect(period.getByText('돌아보는 거래').nextElementSibling).toHaveTextContent('2023-09-05부터 (룰의 기간 7일)');
   expect(period.getByText('처음 거래하는 상대 · 바쁜 계좌').nextElementSibling).toHaveTextContent('2023-09-01 ~ 2023-09-12 기준');
 
   // 3일: 타겟 날을 포함해 앞으로 3일
-  fireEvent.change(period.getByLabelText('검사 일수'), { target: { value: '3' } });
+  await chooseSpan('3일');
   expect(period.getByText('검사하는 날짜').nextElementSibling).toHaveTextContent('2023-09-10 ~ 2023-09-12 (3일)');
   expect(period.queryByText(/채우지 못합니다/)).not.toBeInTheDocument();
 
   // 7일을 골라도 원장 첫 7일(09-07 까지)은 검사하지 않는다
-  fireEvent.change(period.getByLabelText('검사 일수'), { target: { value: '7' } });
+  await chooseSpan('7일');
   expect(period.getByText('검사하는 날짜').nextElementSibling).toHaveTextContent('2023-09-08 ~ 2023-09-12 (5일)');
   expect(period.getByText('원장 첫 7일은 검사하지 않아 7일을 채우지 못합니다.')).toBeInTheDocument();
 
@@ -176,7 +207,7 @@ it('타겟 날과 검사 일수를 고르면 실행 전에 읽을 범위를 보�
   expect(requestBacktest).toHaveBeenCalledWith({ versionId: 6, from: '2023-09-08', to: '2023-09-12' });
   // 도는 중에는 기간을 바꿀 수 없다
   expect(period.getByLabelText('타겟 날')).toBeDisabled();
-  expect(period.getByLabelText('검사 일수')).toBeDisabled();
+  expect(period.getByRole('combobox', { name: '검사 일수' })).toBeDisabled();
 });
 
 it('타겟 날이 검사할 수 있는 날짜 밖이면 실행을 막고, 범위를 못 읽으면 서버의 기본 기간으로 돌린다', async () => {
@@ -220,7 +251,8 @@ it('끝난 백테스트의 검사 범위에 돌아본 거래와 바쁜 계좌를
   expect(scope.getByText('검사한 날짜').nextElementSibling).toHaveTextContent('2023-09-10 ~ 2023-09-12 (3일)');
   expect(scope.getByText('돌아본 거래').nextElementSibling).toHaveTextContent('2023-09-03부터 (룰의 기간 7일)');
   expect(scope.getByText('처음 거래하는 상대 · 바쁜 계좌').nextElementSibling).toHaveTextContent('2023-09-01 ~ 2023-09-12 기준');
-  expect(within(screen.getByRole('region', { name: '실행 기록' })).getByText(/2023-09-10 ~ 2023-09-12 \(3일\) · 거래 12,000건/)).toBeInTheDocument();
+  // 실행 기록 표의 검사 기간 칸에도 일수가 붙는다
+  expect(within(screen.getByRole('table', { name: '실행 기록' })).getByText('2023-09-10 ~ 2023-09-12 (3일)')).toBeInTheDocument();
   view.unmount();
 
   // 기간이 없는 템플릿(단건 고액거래)은 돌아보지 않는다
@@ -348,7 +380,8 @@ it('평가기가 없는 템플릿은 실행을 막고, 서버가 접수를 거�
   expect(runButton('백테스트 실행')).toBeDisabled();
 
   // RULE-002(FAN-IN)는 운영 버전뿐이라 비교 없이 그 버전을 돌린다
-  fireEvent.change(card('백테스트 대상 룰').getByLabelText('룰'), { target: { value: 'RULE-002' } });
+  fireEvent.keyDown(card('백테스트 대상 룰').getByRole('combobox', { name: '룰' }), { key: 'ArrowDown' });
+  fireEvent.click(await screen.findByRole('option', { name: /^RULE-002/ }));
   expect(await card('비교 기준').findByText('운영 버전 그대로 돌립니다. 비교할 새 버전이 없습니다.')).toBeInTheDocument();
   vi.mocked(requestBacktest).mockRejectedValue(problem(400, 'VALIDATION_FAILED', '원장에 거래가 없어 백테스트를 돌릴 수 없습니다.'));
   await waitFor(() => expect(runButton('백테스트 실행')).toBeEnabled());

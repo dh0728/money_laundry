@@ -1,0 +1,14 @@
+:root {
+  --star-border-dark-surface: #0c0c0f;
+  --star-border-dark-ink: #fafafa;
+  --star-border-dark-track: var(--aml-white-010);
+  --star-border-light-ink: #18181b;
+  --star-border-light-track: rgba(24, 24, 27, 0.12);
+  --star-border-gap: 0.5rem;
+  --star-border-block-inset: 0.875rem;
+  --star-border-inline-inset: 1.5rem;
+  --star-border-line-height: 1.25;
+  --star-border-effect-layer: -1;
+  --star-border-focus-offset: 3px;
+  --star-border-disabled-opacity: 0.5;
+}

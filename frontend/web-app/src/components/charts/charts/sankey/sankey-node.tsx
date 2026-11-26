@@ -4,6 +4,7 @@ import type { SankeyNode as SankeyNodeType } from "d3-sankey";
 import { m, type Transition } from "motion/react";
 import { type ReactNode, type SVGProps, useCallback, useMemo } from "react";
 import { intFmt } from "../chart-formatters";
+import { cn } from "@/lib/utils";
 import { transitionWithDelay } from "../motion-utils";
 import {
   type SankeyLinkDatum,
@@ -264,19 +265,19 @@ function AnimatedNode({
   return (
     <g
       {...groupProps}
+      className={cn("sankey-interactive-mark", groupProps?.className)}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      style={{ cursor: "pointer", ...groupProps?.style }}
     >
       <m.rect
         animate={{ opacity: nodeOpacity, scaleY: 1 }}
+        className="sankey-node-mark"
         fill={fill}
         height={height}
         initial={{ opacity: 0, scaleY: 0 }}
         key={`node-${index}-${revealEpoch}`}
         rx={rx}
         ry={rx}
-        style={{ originY: 0.5 }}
         transition={nodeEnter}
         width={width}
         x={x}
@@ -285,7 +286,7 @@ function AnimatedNode({
       {showLabels ? (
         <>
           <NodeLabel
-            className="fill-foreground font-medium text-[13px]"
+            className="sankey-node-name fill-foreground font-medium"
             key={`name-${index}-${revealEpoch}`}
             layout={labelLayouts.name}
             opacity={nameOpacity}
@@ -295,7 +296,7 @@ function AnimatedNode({
           </NodeLabel>
           {labelLayouts.value ? (
             <NodeLabel
-              className="fill-foreground text-[11px]"
+              className="sankey-node-value fill-foreground"
               key={`value-${index}-${revealEpoch}`}
               layout={labelLayouts.value}
               opacity={valueOpacity}
@@ -335,10 +336,10 @@ export function SankeyNode({
   // Default colors using CSS variables
   const defaultColors = useMemo(
     () => [
-      "var(--chart-1)",
-      "var(--chart-2)",
-      "var(--chart-3)",
-      "var(--chart-4)",
+      "var(--aml-sky-050)",
+      "var(--aml-pink-050)",
+      "var(--aml-lime-050)",
+      "var(--palette-teal-500, var(--aml-sky-070))",
       "var(--chart-5)",
     ],
     []
@@ -357,7 +358,7 @@ export function SankeyNode({
         return getNodeColorProp(node, index);
       }
 
-      return defaultColors[index % defaultColors.length] ?? "var(--chart-1)";
+      return defaultColors[index % defaultColors.length] ?? "var(--aml-sky-050)";
     },
     [fill, getNodeColorProp, defaultColors]
   );

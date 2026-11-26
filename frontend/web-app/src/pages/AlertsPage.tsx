@@ -13,6 +13,7 @@ import { detailOf } from '@/mocks/alertDetail'
 import { useMockExcludedTransactions, withoutTransactions } from '@/mocks/transactionScope'
 import AlertDetailPage from './AlertDetailPage'
 import { live, mockSavedNote } from '@/lib/apiMode'
+import { Box } from '@/components/layout-primitives'
 
 // mock Alert는 2026-09-26까지 있다
 const today = () => (live ? new Date() : new Date(2026, 8, 26))
@@ -33,9 +34,9 @@ export default function AlertsPage({ alertId, onOpen, onOpenEpisode }: Props) {
   // 상세는 목록과 따로 불러온다. 목록은 Episode 연결 대상 고르기에만 쓴다.
   if (alertId) return <AlertDetailPage alertId={alertId} rows={rows} onOpenEpisode={onOpenEpisode} />
 
-  if (state.status === 'loading') return <div className="space-y-4"><LoadingBlock label="Alert 목록" /></div>
-  if (state.status === 'error') return <div className="space-y-4"><ErrorBlock message={state.message} onRetry={retry} /></div>
-  if (!rows.length) return <div className="space-y-4"><EmptyBlock>배정된 Alert가 없습니다.</EmptyBlock></div>
+  if (state.status === 'loading') return <Box className="space-y-4"><LoadingBlock label="Alert 목록" /></Box>
+  if (state.status === 'error') return <Box className="space-y-4"><ErrorBlock message={state.message} onRetry={retry} /></Box>
+  if (!rows.length) return <Box className="space-y-4"><EmptyBlock>배정된 Alert가 없습니다.</EmptyBlock></Box>
 
   async function link(alertIds: number[], target: EpisodeTarget, comment: string) {
     try {
@@ -54,9 +55,9 @@ export default function AlertsPage({ alertId, onOpen, onOpenEpisode }: Props) {
   }
 
   return (
-    <div className="space-y-4">
+    <Box className="space-y-4">
       
       <AlertList rows={rows} today={today()} onLink={link} onOpen={row => onOpen(row.alertId)} />
-    </div>
+    </Box>
   )
 }

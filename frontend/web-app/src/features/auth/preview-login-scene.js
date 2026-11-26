@@ -1,16 +1,15 @@
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
+import { readChartDurationSeconds, readChartNumber } from '../../components/charts/chart-design-values';
 import './preview-login-scene.css';
 
-const duration = 480;
 const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-const day = ['#257799', '#605fa0', '#237e80'];
-const night = ['#77ddf4', '#a5a6fa', '#61e1d1'];
+const radarTrailStops = [.12, .23, .34, .43, .47, .5];
 const particleOptions = {
   particleCount: 112, particleSpread: 9, cameraDistance: 33, speed: .2,
   particleBaseSize: 110, sizeRandomness: .8, glow: .42, twinkle: .2, depthOfField: .26,
   hoverEffect: 'parallax', particleHoverFactor: 2.6, clickBurst: false,
-  intro: false, alphaParticles: true, opacity: .43, pixelRatio: 1.35,
+  intro: false, alphaParticles: true, pixelRatio: 1.35,
 };
 
 const nodeCount = 432;
@@ -60,11 +59,10 @@ function rotation(yaw, pitch) {
   };
 }
 
-function drawRadarSweep(context, width, height, time, advance, dark) {
+function drawRadarSweep(context, width, height, time, advance, dark, { particles: [ink], radarMask }) {
   const x = width / 2;
   const y = height / 2;
   const radius = Math.hypot(x, y) * 1.1 * (1 + advance * .82);
-  const ink = (dark ? night : day)[0];
 
   context.save();
   context.globalAlpha = 1 - advance * .96;
@@ -89,12 +87,7 @@ function drawRadarSweep(context, width, height, time, advance, dark) {
   // The rotating light fades into its trail and stops at the leading face.
   const sweep = context.createConicGradient(time * .86 - Math.PI * 1.18, x, y);
   sweep.addColorStop(0, 'transparent');
-  sweep.addColorStop(.12, '#00000008');
-  sweep.addColorStop(.23, '#00000020');
-  sweep.addColorStop(.34, '#00000050');
-  sweep.addColorStop(.43, '#0000009a');
-  sweep.addColorStop(.47, '#000000db');
-  sweep.addColorStop(.5, '#000');
+  radarTrailStops.forEach((offset, index) => sweep.addColorStop(offset, radarMask[index]));
   sweep.addColorStop(.503, 'transparent');
   sweep.addColorStop(1, 'transparent');
   context.globalAlpha = 1;
@@ -104,10 +97,10 @@ function drawRadarSweep(context, width, height, time, advance, dark) {
   context.restore();
 }
 
-function drawShell(context, width, height, time, camera, progress, dark) {
+function drawShell(context, width, height, time, camera, progress, dark, palette) {
   const advance = progress ** 2 * (3 - 2 * progress);
   // Mask the radar on the cleared canvas before drawing the enclosing sphere.
-  drawRadarSweep(context, width, height, time, advance, dark);
+  drawRadarSweep(context, width, height, time, advance, dark, palette);
   const focal = Math.min(width, height) * .71;
   const rotate = rotation(.28 + time * .077 + camera.x * .46, .13 * Math.cos(time * .34) - camera.y * .33);
   const pulses = neighborhoods.map((_, index) => Math.sin(time * .88 + index * goldenAngle) * .40);
@@ -142,8 +135,7 @@ function drawShell(context, width, height, time, camera, progress, dark) {
   });
   const screen = nodes.map(({ position, presence }) => presence > .012 ? project(position, advance) : null);
   const fade = 1 - .92 * Math.max(0, (progress - .67) / .33);
-  const detail = dark ? '#75cde4' : '#376f8a';
-  const highlight = dark ? '#bdeaff' : '#426e9b';
+  const { detail, highlight } = palette;
   context.lineCap = 'round';
   context.strokeStyle = detail;
   for (const [start, end] of neighbors) {
@@ -198,14 +190,12 @@ function drawShell(context, width, height, time, camera, progress, dark) {
 export function mountLoginScene(host, motionPreference) {
   const canvas = host.querySelector('.login-scene');
   const card = host.querySelector('.login-card');
+  const particleLayer = host.querySelector('.login-particle-layer');
   const context = canvas.getContext('2d');
-  const particleLayer = document.createElement('div');
-  particleLayer.className = 'login-particle-layer';
-  particleLayer.setAttribute('aria-hidden', 'true');
-  host.prepend(particleLayer);
 
   let frame = 0;
   let timeout = 0;
+  let duration = 0;
   let startedAt = 0;
   let onFinish;
   let width = 0;
@@ -221,12 +211,23 @@ export function mountLoginScene(host, motionPreference) {
   const target = { x: 0, y: 0 };
   const reduced = () => motionPreference.matches || document.documentElement.dataset.reducedMotion === 'true';
   const dark = () => document.documentElement.dataset.theme === 'dark';
+  const readPalette = () => {
+    const styles = getComputedStyle(host);
+    const color = name => styles.getPropertyValue(`--login-scene-${name}`).trim();
+    return {
+      particles: color('particle-colors').split(/\s*,\s*/),
+      detail: color('network-ink'),
+      highlight: color('network-highlight'),
+      radarMask: color('radar-trail-mask').split(/\s*,\s*/),
+    };
+  };
+  let palette = readPalette();
 
   function paint(progress = 0) {
     if (!context || !width || !height || host.hidden) return;
     const isDark = dark();
     context.clearRect(0, 0, width, height);
-    drawShell(context, width, height, clock, camera, progress, isDark);
+    drawShell(context, width, height, clock, camera, progress, isDark, palette);
   }
 
   function stopFrame() {
@@ -292,7 +293,8 @@ export function mountLoginScene(host, motionPreference) {
     particleAppearance = appearance;
     particleRoot ??= createRoot(particleLayer);
     particleRoot.render(createElement(Particles, { ...particleOptions,
-      particleColors: isDark ? night : day, lightMode: !isDark, paused,
+      opacity: readChartNumber('--login-scene-particle-opacity', 0.43),
+      particleColors: palette.particles, lightMode: !isDark, paused,
       moveParticlesOnHover: !paused,
     }));
   }
@@ -303,6 +305,7 @@ export function mountLoginScene(host, motionPreference) {
       if (host.hidden) clearParticles();
       return;
     }
+    palette = readPalette();
     const paused = reduced();
     if (paused) {
       stopFrame();
@@ -356,6 +359,7 @@ export function mountLoginScene(host, motionPreference) {
         navigate(false);
         return;
       }
+      duration = readChartDurationSeconds('--login-travel-duration', 0.48) * 1000;
       onFinish = navigate;
       host.dataset.loginMotion = 'entering';
       host.setAttribute('aria-busy', 'true');

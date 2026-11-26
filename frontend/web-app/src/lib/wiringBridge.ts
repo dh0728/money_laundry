@@ -1,4 +1,6 @@
 import { fixture } from './apiMode'
+import { appReducedMotion } from '@/hooks/use-reduced-motion'
+import './wiring-bridge.css'
 
 // Reviewed AML fixture elements only; the host cannot supply arbitrary selectors.
 const fixtureAnchors: Record<string, { route: string; selectors: string[] }> = {
@@ -64,10 +66,6 @@ export function installWiringBridge(anchors: Record<string, { route: string; sel
     'case.overview.rules',
   ])
   const requestedAnchors = new Set<string>(Object.keys(anchors))
-  const cursorStyle = document.createElement('style')
-  cursorStyle.textContent = `${[...selectableIds].map(id => `body.aml-wiring-select [data-wiring-id="${id}"]`).join(',')} { cursor: pointer; }
-    body.aml-wiring-dragging, body.aml-wiring-dragging * { cursor: grabbing !important; }`
-  document.head.append(cursorStyle)
   const syncSelectCursor = () => document.body.classList.toggle('aml-wiring-select', parentOrigin !== null && mode === 'wires')
 
   const visible = (id: string) => [...document.querySelectorAll<HTMLElement>('[data-wiring-id]')]
@@ -93,7 +91,7 @@ export function installWiringBridge(anchors: Record<string, { route: string; sel
       if (element) {
         if (!request.started) {
           request.started = true; request.startedAt = performance.now()
-          element.scrollIntoView({ block: 'center', inline: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+          element.scrollIntoView({ block: 'center', inline: 'center', behavior: appReducedMotion() ? 'auto' : 'smooth' })
         }
         const rect = element.getBoundingClientRect()
         const steady = Math.abs(rect.x - request.lastX) < .5 && Math.abs(rect.y - request.lastY) < .5
@@ -109,6 +107,7 @@ export function installWiringBridge(anchors: Record<string, { route: string; sel
     const rects: Record<string, { x: number; y: number; width: number; height: number }> = {}
     for (const element of document.querySelectorAll<HTMLElement>('[data-wiring-id]')) {
       const id = element.dataset.wiringId
+      element.toggleAttribute('data-wiring-selectable', Boolean(id && selectableIds.has(id)))
       if (!id || id in rects || !element.getClientRects().length) continue
       const rect = element.getBoundingClientRect()
       if (rect.right < 0 || rect.left > innerWidth || rect.bottom < 0 || rect.top > innerHeight) continue
@@ -138,8 +137,6 @@ export function installWiringBridge(anchors: Record<string, { route: string; sel
         requestedAnchors.add(id)
         selectableIds.add(id)
       }
-      cursorStyle.textContent = `${[...selectableIds].map(id => `body.aml-wiring-select [data-wiring-id="${id}"]`).join(',')} { cursor: pointer; }
-        body.aml-wiring-dragging, body.aml-wiring-dragging * { cursor: grabbing !important; }`
       schedule()
       return
     }
@@ -168,7 +165,7 @@ export function installWiringBridge(anchors: Record<string, { route: string; sel
   window.addEventListener('resize', schedule)
   window.addEventListener('scroll', schedule, true)
   // Ant/Radix overlays render outside #root; observe their geometry anchors as well.
-  new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] })
+  new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'data-wiring-id'] })
   new MutationObserver(reportTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
   window.addEventListener('click', event => {
     if (parentOrigin == null || mode !== 'wires' || event.button !== 0 || !(event.target instanceof Element)) return

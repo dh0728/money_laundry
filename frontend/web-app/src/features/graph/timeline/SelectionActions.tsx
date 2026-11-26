@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import type { TimeTx } from './timeLayout'
+import { Text } from '@/components/layout-primitives'
 
 export type GraphContext = { kind: 'alert'; code: string } | { kind: 'episode'; code: string }
 type Action = 'exclude' | 'move' | 'split'
@@ -21,7 +22,7 @@ export function SelectionActions({ context, accounts, txs, onOnly, onClear }: { 
   const title = { exclude: '조사 범위에서 제거', move: context.kind === 'alert' ? 'Episode로 묶기' : 'Episode에서 빼기', split: '새 Alert로 분리' }
   return <>
     {/* 그래프 아래 고정 줄에 들어간다(김명기 10/12): 그래프를 가리지 않고, 나타나고 사라져도 그래프 크기가 변하지 않는다 */}
-    <b className="shrink-0 whitespace-nowrap font-medium">계좌 {accounts}개 · 거래 {txs.length}건</b>
+    <Text as="b" className="shrink-0 whitespace-nowrap font-medium">계좌 {accounts}개 · 거래 {txs.length}건</Text>
       <Button size="sm" variant="outline" className="h-7 shrink-0 text-xs" onClick={onOnly}>선택 거래만 보기</Button>
       <Button size="sm" variant="outline" className="h-7 shrink-0 text-xs" disabled={!txs.length} onClick={() => setAction('exclude')}>범위에서 제거</Button>
       <Button size="sm" variant="outline" className="h-7 shrink-0 text-xs" disabled={!txs.length} onClick={() => setAction('move')}>{title.move}</Button>

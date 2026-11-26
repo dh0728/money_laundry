@@ -2,7 +2,8 @@
 
 import { scaleLinear } from "d3-scale";
 import type { CurveFactory } from "d3-shape";
-import { m, useReducedMotion } from "motion/react";
+import { m } from "motion/react";
+import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
 import {
   useCallback,
   useEffect,
@@ -11,6 +12,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { readChartNumber } from "../chart-design-values";
 import { chartCssVars, useChartStable } from "./chart-context";
 import {
   LINE_LOADING_PULSE_EASE,
@@ -40,7 +42,7 @@ const HEIGHT_MIN_PCT = 20;
 const HEIGHT_MAX_PCT = 80;
 const DEFAULT_POINT_COUNT = 14;
 const DEFAULT_BAR_COUNT = 12;
-const DEFAULT_FILL = "var(--foreground)";
+const DEFAULT_FILL = "var(--text)";
 const DEFAULT_BAR_FILL_OPACITY = 0.45;
 const LINE_STROKE_OPACITY = 0.55;
 const AREA_FILL_TOP_OPACITY = 0.18;
@@ -114,19 +116,20 @@ function LoadingSweepMask({
   onSweepComplete: () => void;
 }) {
   const gradientStops = useMemo(() => generateEasedGradientStops(), []);
+  const [sweepBoxSize] = useState(() => readChartNumber("--chart-loading-sweep-box-size", 1));
   const lastXRef = useRef(SWEEP_START_X);
 
   const handleUpdate = useCallback(
     (latest: { x?: number }) => {
       const xValue = typeof latest.x === "number" ? latest.x : SWEEP_START_X;
-      // Re-roll once the band has cleared the visible area (crossed past 1),
+      // Re-roll once the band has cleared the visible area,
       // so the silhouette never changes shape under the user's eye.
-      if (xValue >= 1 && lastXRef.current < 1) {
+      if (xValue >= sweepBoxSize && lastXRef.current < sweepBoxSize) {
         onSweepComplete();
       }
       lastXRef.current = xValue;
     },
-    [onSweepComplete]
+    [onSweepComplete, sweepBoxSize]
   );
 
   return (
@@ -142,19 +145,19 @@ function LoadingSweepMask({
         ))}
       </linearGradient>
       <pattern
-        height="1"
+        height={sweepBoxSize}
         id={`${chartId}-pattern`}
         patternContentUnits="objectBoundingBox"
         patternTransform={`rotate(${SWEEP_ANGLE_DEG})`}
         patternUnits="objectBoundingBox"
-        width={3}
+        width={SWEEP_END_X - SWEEP_START_X}
         x="0"
         y="0"
       >
         <m.rect
           animate={{ x: SWEEP_END_X }}
           fill={`url(#${chartId}-grad)`}
-          height="1"
+          height={sweepBoxSize}
           initial={{ x: SWEEP_START_X }}
           onUpdate={handleUpdate}
           transition={{
@@ -163,7 +166,7 @@ function LoadingSweepMask({
             repeat: Number.POSITIVE_INFINITY,
             repeatType: "loop",
           }}
-          width="1"
+          width={sweepBoxSize}
           y="0"
         />
       </pattern>
@@ -212,7 +215,7 @@ export function LineLoadingSweep({
   durationSeconds = DEFAULT_SWEEP_DURATION_S,
 }: LineLoadingSweepProps) {
   const { innerWidth, innerHeight } = useChartStable();
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useAppReducedMotion();
   const reactId = useId();
   const chartId = `line-sweep-${reactId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const isLoop = mode === "loop";
@@ -397,7 +400,7 @@ export interface BarLoadingSkeletonProps {
   innerHeight: number;
   /** Number of skeleton bars. Default: 12 */
   barCount?: number;
-  /** Bar fill color. Default: `var(--foreground)` */
+  /** Bar fill color. Default: `var(--text)` */
   fill?: string;
   /** Bar fill opacity. Default: 0.45 */
   fillOpacity?: number;
@@ -424,7 +427,7 @@ export function BarLoadingSkeleton({
   barFraction = DEFAULT_BAR_FRACTION,
   durationSeconds = DEFAULT_SWEEP_DURATION_S,
 }: BarLoadingSkeletonProps) {
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useAppReducedMotion();
   const reactId = useId();
   const chartId = `bar-sweep-${reactId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const [tick, setTick] = useState(0);

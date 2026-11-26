@@ -1,0 +1,63 @@
+.graph-flow-pulse {
+  animation-name: graph-flow-travel;
+  animation-duration: var(--graph-flow-travel-duration);
+  animation-delay: var(--graph-flow-animation-delay);
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+
+.graph-flow-pulse > path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: var(--graph-flow-pulse-length) var(--graph-flow-travel-length);
+}
+
+.graph-flow-pulse > .graph-flow-pulse-color {
+  stroke-width: var(--graph-flow-link-width, var(--graph-flow-stroke-width));
+  stroke-opacity: var(--graph-flow-stroke-opacity);
+}
+
+.graph-flow-pulse > .graph-flow-pulse-highlight {
+  stroke: var(--graph-flow-highlight);
+  stroke-width: min(var(--graph-flow-highlight-width), calc(var(--graph-flow-link-width, var(--graph-flow-stroke-width)) / 2));
+}
+
+.graph-flow-pulse[data-ambient] {
+  animation-name: graph-flow-ambient;
+  animation-duration: var(--graph-flow-ambient-duration);
+  animation-iteration-count: infinite;
+}
+
+@keyframes graph-flow-ambient {
+  0% { stroke-dashoffset: var(--graph-flow-pulse-length); opacity: 0 }
+  2%, 13% { opacity: var(--graph-flow-ambient-opacity) }
+  15%, 100% { stroke-dashoffset: calc(-1 * var(--graph-flow-path-length)); opacity: 0 }
+}
+
+@keyframes graph-flow-travel {
+  from { stroke-dashoffset: var(--graph-flow-pulse-length); opacity: 0 }
+  12%, 88% { opacity: 1 }
+  to { stroke-dashoffset: calc(-1 * var(--graph-flow-path-length)); opacity: 0 }
+}
+
+.graph-flow-reveal-mask {
+  stroke: var(--graph-flow-highlight);
+  stroke-width: var(--graph-flow-mask-width);
+  stroke-dasharray: var(--graph-flow-path-length) var(--graph-flow-path-length);
+  animation-name: graph-flow-reveal;
+  animation-duration: var(--graph-flow-reveal-duration);
+  animation-delay: var(--graph-flow-animation-delay);
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+@keyframes graph-flow-reveal {
+  from { stroke-dashoffset: var(--graph-flow-path-length) }
+  to { stroke-dashoffset: 0 }
+}
+
+[data-reduced-motion="true"] .graph-flow-pulse { display: none }
+[data-reduced-motion="true"] .graph-flow-reveal-mask { stroke-dasharray: none; animation: none }
+@media (prefers-reduced-motion: reduce) {
+  .graph-flow-pulse { display: none }
+  .graph-flow-reveal-mask { stroke-dasharray: none; animation: none }
+}

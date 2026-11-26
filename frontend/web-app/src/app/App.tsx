@@ -1,11 +1,11 @@
 import { WorkspaceProvider, WorkspaceMain, SharedPeriod } from '@/lib/WorkspaceProvider'
 import { WorkspaceState } from '@/lib/workspaceState'
 import LiveNotificationsPage from '@/pages/LiveNotificationsPage'
-import { useCallback, useEffect, useEffectEvent, useRef, useState, type ComponentProps, type CSSProperties } from 'react'
+import { useCallback, useEffect, useEffectEvent, useRef, useState, type ComponentProps } from 'react'
 import { login, logout as logoutSession, restoreSession, type SessionUser } from '@/api/auth'
 import { ApiError } from '@/api/common'
 import { live } from '@/lib/apiMode'
-import { ArrowLeft, Maximize2, Minimize2, PanelLeft } from 'lucide-react'
+import { ArrowLeft, Maximize2, Minimize2, PanelLeft, type LucideIcon } from 'lucide-react'
 import { BrandWordmark, RadarMark } from '@/components/Brand'
 import GlobalSearch from '@/features/search/GlobalSearch'
 import LiveGlobalSearch from '@/features/search/LiveGlobalSearch'
@@ -13,6 +13,7 @@ import Agent, { AgentTrigger, type AgentMode } from '@/features/agent/Agent'
 import { mockAgentRecords, recordForRoute } from '@/features/agent/agentData'
 import { useTransactionTarget } from '@/features/transactions/transactionTarget'
 import { SidebarSelection } from '@/components/SidebarSelection'
+import { readChartNumber } from '@/components/charts/chart-design-values'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
@@ -37,6 +38,7 @@ import { currentScenario } from '@/mocks/scenario'
 import { CurrentUserContext, MOCK_USER, roleInfo, type CurrentUser } from './session'
 import { mainNav, manageNav, routeFromHash, toggleDocumentFullscreen, utilityNav, type Page } from './navigation'
 import { PendingWorkCount, UnreadNotificationCount } from './SidebarCounts'
+import { Box, Text } from '@/components/layout-primitives'
 
 
 const pageTitles: Record<Page, string> = {
@@ -63,33 +65,38 @@ function usePage() {
   return [route, go] as const
 }
 
-function SidebarDestinationButton({ onNavigate, ...props }: Omit<ComponentProps<typeof SidebarMenuButton>, 'onClick'> & { onNavigate: () => void }) {
+function SidebarDestinationButton({ onNavigate, icon: Icon, children, ...props }: Omit<ComponentProps<typeof SidebarMenuButton>, 'onClick'> & { onNavigate: () => void; icon?: LucideIcon }) {
   const { isMobile, setOpenMobile } = useSidebar()
-  return <SidebarMenuButton {...props} onClick={() => { onNavigate(); if (isMobile) setOpenMobile(false) }} />
+  return <SidebarMenuButton {...props} onClick={() => { onNavigate(); if (isMobile) setOpenMobile(false) }}>
+    {Icon && <Icon className="size-4" />}
+    {children}
+  </SidebarMenuButton>
 }
 
 function SidebarBrandToggle() {
   const { state, toggleSidebar } = useSidebar()
   return (
-    <button
+    <Button
+      layout="text"
       type="button"
       onPointerDown={event => { if (event.button !== 0) return; event.preventDefault(); toggleSidebar() }}
       onClick={event => { if (event.detail === 0) toggleSidebar() }}
       aria-label="사이드바 열기/닫기"
       aria-expanded={state === 'expanded'}
       title="사이드바 열기/닫기"
-      className="group/brand absolute inset-0 z-10 m-2 flex cursor-pointer touch-manipulation select-none items-center gap-2.5 rounded-md px-3 text-sm font-semibold tracking-tight outline-hidden hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sidebar-ring active:bg-[var(--selection-background)] active:text-[var(--selection-foreground)] group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0!"
+      className="group/brand absolute inset-0 z-10 m-2 flex cursor-pointer touch-manipulation select-none items-center gap-2.5 rounded-md px-3 text-sm font-semibold tracking-tight outline-hidden hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sidebar-ring active:bg-selection-background active:text-selection-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0!"
     >
-      <span className="relative inline-flex size-5 shrink-0 items-center justify-center">
+      <Text as="span" className="relative inline-flex size-5 shrink-0 items-center justify-center">
         <RadarMark className="size-5 transition-opacity group-hover/brand:opacity-0 group-focus-visible/brand:opacity-0" />
         <PanelLeft className="absolute size-4 opacity-0 transition-opacity group-hover/brand:opacity-100 group-focus-visible/brand:opacity-100" />
-      </span>
+      </Text>
       <BrandWordmark className="truncate group-data-[collapsible=icon]:hidden" />
-    </button>
+    </Button>
   )
 }
 
 const navButtonClass = 'h-10 px-4 group-data-[collapsible=icon]:h-10! group-data-[collapsible=icon]:w-12! group-data-[collapsible=icon]:px-4! group-data-[collapsible=icon]:[&>span]:hidden'
+const agentSidebarMinWidth = () => readChartNumber('--app-agent-sidebar-min-width', 1200)
 
 export default function App() {
   const [{ page, id }, go] = usePage()
@@ -124,7 +131,7 @@ export default function App() {
   const fullscreen = useCallback(() => void toggleDocumentFullscreen(document, appFullscreen, setAppFullscreen), [appFullscreen])
 
   useEffect(() => {
-    const narrow = window.matchMedia?.('(max-width: 1199px)')
+    const narrow = window.matchMedia?.(`(max-width: ${agentSidebarMinWidth() - 1}px)`)
     const closeOnNarrow = (event: MediaQueryListEvent) => { if (event.matches) setAgentOpen(false) }
     narrow?.addEventListener('change', closeOnNarrow)
     return () => narrow?.removeEventListener('change', closeOnNarrow)
@@ -173,13 +180,13 @@ export default function App() {
     return () => { window.removeEventListener('keydown', key); document.removeEventListener('fullscreenchange', screen) }
   }, [fullscreen])
 
-  if (restoring) return <div role="status" className="p-6">로그인 상태 확인 중…</div>
+  if (restoring) return <Box role="status" className="p-6">로그인 상태 확인 중…</Box>
   if (!user) return <LoginPage onLogin={signIn} message={authMessage} />
 
   return (
     <CurrentUserContext.Provider value={currentUser}>
     <WorkspaceProvider key={`${currentUser.userId}:${currentUser.role}`} state={workspace} >
-    <SidebarProvider className={appFullscreen ? 'app-fullscreen-fallback' : undefined} style={{ '--sidebar-width': '210px', '--sidebar-width-icon': '4rem' } as CSSProperties}>
+    <SidebarProvider className={appFullscreen ? 'app-sidebar-wrapper app-fullscreen-fallback' : 'app-sidebar-wrapper'}>
       <Sidebar collapsible="icon" className="app-sidebar">
         <SidebarSelection value={page}>
           <SidebarHeader className="h-15 flex-row items-center overflow-hidden p-0">
@@ -192,9 +199,8 @@ export default function App() {
                 <SidebarMenu className="gap-1.5">
                   {items.map(item => (
                     <SidebarMenuItem key={item.id}>
-                      <SidebarDestinationButton data-nav-id={item.id} isActive={page === item.id} tooltip={item.name} onNavigate={() => go(item.id)} className={navButtonClass}>
-                        <item.icon className="size-4" />
-                        <span>{item.name}</span>
+                      <SidebarDestinationButton data-nav-id={item.id} icon={item.icon} isActive={page === item.id} tooltip={item.name} onNavigate={() => go(item.id)} className={navButtonClass}>
+                        <Text as="span">{item.name}</Text>
                       </SidebarDestinationButton>
                     </SidebarMenuItem>
                   ))}
@@ -206,9 +212,8 @@ export default function App() {
                 <SidebarMenu className="gap-1.5">
                   {utilityNav.map(item => (
                     <SidebarMenuItem key={item.id}>
-                      <SidebarDestinationButton data-nav-id={item.id} isActive={page === item.id} tooltip={item.name} onNavigate={() => go(item.id)} className={navButtonClass}>
-                        <item.icon className="size-4" />
-                        <span>{item.name}</span>
+                      <SidebarDestinationButton data-nav-id={item.id} icon={item.icon} isActive={page === item.id} tooltip={item.name} onNavigate={() => go(item.id)} className={navButtonClass}>
+                        <Text as="span">{item.name}</Text>
                       </SidebarDestinationButton>
                       {item.id === 'notifications' && <UnreadNotificationCount />}
                     </SidebarMenuItem>
@@ -222,10 +227,10 @@ export default function App() {
               <SidebarMenuItem>
                 <SidebarDestinationButton data-nav-id="account" size="lg" tooltip="계정" isActive={page === 'account'} data-account-active={page === 'account'} onNavigate={() => go('account')} className="account-button h-12 gap-2.5 px-2 hover:bg-sidebar-accent group-data-[collapsible=icon]:size-12! group-data-[collapsible=icon]:p-2!">
                   <Avatar className="size-8 shrink-0"><AvatarFallback className="text-xs">{currentUser.name[0]}</AvatarFallback></Avatar>
-                  <span className="min-w-0 flex-1 text-left group-data-[collapsible=icon]:hidden">
-                    <span className="block text-xs font-medium">{currentUser.name}</span>
-                    <span className={`mt-0.5 block text-[0.625rem] ${page === 'account' ? 'text-sidebar-primary-foreground' : 'text-muted-foreground'}`}>{roleInfo[currentUser.role].label}</span>
-                  </span>
+                  <Text as="span" className="min-w-0 flex-1 text-left group-data-[collapsible=icon]:hidden">
+                    <Text as="span" className="block text-xs font-medium">{currentUser.name}</Text>
+                    <Text as="span" className={`mt-0.5 block text-3xs ${page === 'account' ? 'text-sidebar-primary-foreground' : 'text-muted-foreground'}`}>{roleInfo[currentUser.role].label}</Text>
+                  </Text>
                 </SidebarDestinationButton>
                 <PendingWorkCount routeKey={`${page}/${id ?? ''}`} />
               </SidebarMenuItem>
@@ -234,8 +239,8 @@ export default function App() {
         </SidebarSelection>
       </Sidebar>
       <SidebarInset className="flex h-svh min-w-0 flex-col overflow-hidden">
-        <header className="app-header z-40 grid h-15 min-w-0 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b bg-background px-4 min-[1100px]:gap-5 min-[1100px]:px-6">
-          <div className="header-navigation flex min-w-0 items-center">
+        <Box as="header" className="app-header z-40 grid h-15 min-w-0 shrink-0 items-center gap-3 border-b bg-background px-4 app-header:gap-5 app-header:px-6">
+          <Box className="header-navigation flex min-w-0 items-center">
           <SidebarTrigger className="size-9 rounded-full md:hidden" aria-label="메뉴 열기" />
           {/* 상세 화면에서는 머리 왼쪽에 목록으로 돌아가는 버튼을 둔다 */}
           {id && (page === 'alerts' || page === 'episodes') && (
@@ -243,19 +248,23 @@ export default function App() {
               <ArrowLeft className="size-4" />{page === 'alerts' ? 'Alert 목록' : 'Episode 목록'}
             </Button>
           )}
-          </div>
-          <div className="header-search flex min-w-0 w-full max-w-[460px] items-center gap-2 justify-self-center" data-testid="header-search">
+          </Box>
+          <Box className="header-search flex min-w-0 w-full items-center gap-2 justify-self-center" data-testid="header-search">
             {live ? <LiveGlobalSearch onNavigate={(next, nextId) => go(next, nextId)} /> : <GlobalSearch onNavigate={(next, nextId) => go(next, nextId)} onOpenTransaction={target => { setTransactionTarget(target); go('transactions') }} />}
-            <AgentTrigger open={agentOpen} onToggle={() => { if (agentOpen) { closeAgentRef.current(); return } if (window.innerWidth < 1200) setAgentMode('floating'); setAgentOpen(true) }} />
-          </div>
-          <div className="header-actions flex items-center justify-self-end gap-1.5" data-testid="header-actions">
-            <Button variant="ghost" size="sm" className="h-9 gap-2 rounded-full px-2 min-[1100px]:px-3" aria-label={isFullscreen ? '전체화면 종료 · F11' : '전체화면 · F11'} aria-pressed={isFullscreen} onClick={fullscreen}>
+            <AgentTrigger open={agentOpen} onToggle={() => {
+              if (agentOpen) { closeAgentRef.current(); return }
+              if (window.innerWidth < agentSidebarMinWidth()) setAgentMode('floating')
+              setAgentOpen(true)
+            }} />
+          </Box>
+          <Box className="header-actions flex items-center justify-self-end gap-1.5" data-testid="header-actions">
+            <Button variant="ghost" size="sm" className="h-9 gap-2 rounded-full px-2 app-header:px-3" aria-label={isFullscreen ? '전체화면 종료 · F11' : '전체화면 · F11'} aria-pressed={isFullscreen} onClick={fullscreen}>
               {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
               <Kbd>F11</Kbd>
             </Button>
-          </div>
-        </header>
-        <WorkspaceMain route={`${page}/${id ?? "list"}`} className={`app-main @container min-h-0 min-w-0 flex-1 overflow-y-auto px-7 py-7 pb-10 ${agentSidebar ? 'agent-sidebar-space' : ''}`} style={{ scrollbarGutter: 'stable' }}>
+          </Box>
+        </Box>
+        <WorkspaceMain route={`${page}/${id ?? "list"}`} className={`app-main @container min-h-0 min-w-0 flex-1 overflow-y-auto px-7 py-7 pb-10 ${agentSidebar ? 'agent-sidebar-space' : ''}`}>
           <SharedPeriod enabled={live && ['dashboard', 'transactions', 'alerts', 'episodes'].includes(page)}>
           {page === 'dashboard' ? (live ? <LiveDashboardPage onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <DashboardPage />)
             : page === 'transactions' ? (live ? <LiveLedgerPage transactionId={id} onOpen={(kind, caseId) => go(kind === 'ALERT' ? 'alerts' : 'episodes', caseId)} /> : <TransactionsPage />)
@@ -282,7 +291,7 @@ export default function App() {
             <AlertDialogCancel>취소</AlertDialogCancel>
             <AlertDialogAction onClick={() => void signOut()}>로그아웃</AlertDialogAction>
           </AlertDialogFooter>
-          {logoutError && <p role="alert" className="text-sm text-destructive-text">{logoutError}</p>}
+          {logoutError && <Text role="alert" className="text-sm text-destructive-text">{logoutError}</Text>}
         </AlertDialogContent>
       </AlertDialog>
     </SidebarProvider>

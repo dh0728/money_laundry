@@ -17,13 +17,23 @@ export function isSampleTransactionCode(code) {
   return codeDates.has(code.slice(2, 8));
 }
 
+export function sampleEpisodeAlertCodes(episodeCode) {
+  const [, stamp, suffix] = episodeCode.split('-');
+  const episodeNumber = Number(suffix);
+  const memberCount = episodeNumber % 3 === 0 ? 3 : 2;
+  return Array.from({ length: memberCount }, (_, index) => `A-${stamp}-${500000 + episodeNumber * 3 + index}`);
+}
+
 export function dashboardRecordCodes({ prefix, digits, first = [] }) {
   let serial = 0;
-  return dailyCounts.flatMap((counts, day) => {
+  const records = dailyCounts.flatMap((counts, day) => {
     const stamp = dashboardDays[day].slice(2).replaceAll('-', '');
     return Array.from({ length: counts[prefix] }, (_, index) => {
       const id = prefix === 'T' ? ++serial : !day ? first[index] ?? index + 1 : index + 1;
       return `${prefix}-${stamp}-${String(id).padStart(digits, '0')}`;
     });
   });
+  if (prefix !== 'A') return records;
+  const episodes = dashboardRecordCodes({ prefix: 'E', digits });
+  return [...records, ...episodes.flatMap(sampleEpisodeAlertCodes)];
 }

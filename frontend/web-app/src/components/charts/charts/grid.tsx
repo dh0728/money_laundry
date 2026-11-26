@@ -1,7 +1,8 @@
 "use client";
 
 import { m } from "motion/react";
-import { useId } from "react";
+import { useId, useState } from "react";
+import { readChartNumber } from "../chart-design-values";
 import { chartCssVars, useChartStable, useYScale } from "./chart-context";
 import { GridColumns, GridRows } from "./grid-lines";
 import { useGridShimmer } from "./use-grid-shimmer";
@@ -10,10 +11,7 @@ import {
   isLoadingGridChromePhase,
 } from "./y-domain-utils";
 
-const DEFAULT_SHIMMER_LENGTH_PX = 140;
 const DEFAULT_SHIMMER_SPEED = 1;
-const DEFAULT_SHIMMER_STROKE =
-  "color-mix(in oklch, var(--foreground) 68%, transparent)";
 
 export interface GridProps {
   /** Show horizontal grid lines. Default: true */
@@ -115,11 +113,18 @@ export function Grid({
   hideVerticalEdgeLines = false,
   yAxisId,
   shimmer = false,
-  shimmerStroke = DEFAULT_SHIMMER_STROKE,
-  shimmerLength = DEFAULT_SHIMMER_LENGTH_PX,
+  shimmerStroke = "var(--chart-grid-shimmer-ink)",
+  shimmerLength: shimmerLengthOverride,
   shimmerSpeed = DEFAULT_SHIMMER_SPEED,
   shimmerSync = false,
 }: GridProps) {
+  const [design] = useState(() => ({
+    fadeStart: readChartNumber("--chart-grid-fade-start", 0.1),
+    fadeEnd: readChartNumber("--chart-grid-fade-end", 0.9),
+    shimmerWidth: readChartNumber("--chart-grid-shimmer-width", 140),
+    shimmerShoulderOpacity: readChartNumber("--chart-grid-shimmer-shoulder-opacity", 0.45),
+  }));
+  const shimmerLength = shimmerLengthOverride ?? design.shimmerWidth;
   const { xScale, innerWidth, innerHeight, orientation, barScale, chartPhase } =
     useChartStable();
   const yScale = useYScale(yAxisId);
@@ -173,6 +178,14 @@ export function Grid({
   const vMaskId = `grid-cols-fade-${uniqueId}`;
   const vGradientId = `${vMaskId}-gradient`;
   const horizontalFadeMask = fadeHorizontal ? `url(#${hMaskId})` : undefined;
+  const fadeStops = (
+    <>
+      <stop offset={0} stopColor="var(--chart-grid-mask-ink)" stopOpacity={0} />
+      <stop offset={design.fadeStart} stopColor="var(--chart-grid-mask-ink)" stopOpacity={1} />
+      <stop offset={design.fadeEnd} stopColor="var(--chart-grid-mask-ink)" stopOpacity={1} />
+      <stop offset={1} stopColor="var(--chart-grid-mask-ink)" stopOpacity={0} />
+    </>
+  );
 
   return (
     <g className="chart-grid">
@@ -180,13 +193,7 @@ export function Grid({
       {horizontal && fadeHorizontal && (
         <defs>
           <linearGradient id={hGradientId} x1="0%" x2="100%" y1="0%" y2="0%">
-            <stop offset="0%" style={{ stopColor: "white", stopOpacity: 0 }} />
-            <stop offset="10%" style={{ stopColor: "white", stopOpacity: 1 }} />
-            <stop offset="90%" style={{ stopColor: "white", stopOpacity: 1 }} />
-            <stop
-              offset="100%"
-              style={{ stopColor: "white", stopOpacity: 0 }}
-            />
+            {fadeStops}
           </linearGradient>
           <mask id={hMaskId}>
             <rect
@@ -212,9 +219,9 @@ export function Grid({
             y2={0}
           >
             <stop offset="0%" stopColor={shimmerStroke} stopOpacity={0} />
-            <stop offset="35%" stopColor={shimmerStroke} stopOpacity={0.45} />
+            <stop offset="35%" stopColor={shimmerStroke} stopOpacity={design.shimmerShoulderOpacity} />
             <stop offset="50%" stopColor={shimmerStroke} stopOpacity={1} />
-            <stop offset="65%" stopColor={shimmerStroke} stopOpacity={0.45} />
+            <stop offset="65%" stopColor={shimmerStroke} stopOpacity={design.shimmerShoulderOpacity} />
             <stop offset="100%" stopColor={shimmerStroke} stopOpacity={0} />
           </m.linearGradient>
         </defs>
@@ -224,13 +231,7 @@ export function Grid({
       {vertical && fadeVertical && (
         <defs>
           <linearGradient id={vGradientId} x1="0%" x2="0%" y1="0%" y2="100%">
-            <stop offset="0%" style={{ stopColor: "white", stopOpacity: 0 }} />
-            <stop offset="10%" style={{ stopColor: "white", stopOpacity: 1 }} />
-            <stop offset="90%" style={{ stopColor: "white", stopOpacity: 1 }} />
-            <stop
-              offset="100%"
-              style={{ stopColor: "white", stopOpacity: 0 }}
-            />
+            {fadeStops}
           </linearGradient>
           <mask id={vMaskId}>
             <rect

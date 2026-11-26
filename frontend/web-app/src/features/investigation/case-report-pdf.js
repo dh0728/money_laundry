@@ -1,18 +1,31 @@
 import { buildImagePdf } from '../../lib/preview-pdf.js';
+import { downloadBlob } from '../../lib/report-io';
+import { createExportCanvas } from '../../components/export-canvas';
 import { judgmentReasonLabels } from './case-judgment-data.js';
 import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings.js';
+import '../../styles/case-report-tokens.css';
 
-const page = { width: 620, height: 877, margin: 44, limit: 819, scale: 2 };
-const contentWidth = page.width - 2 * page.margin;
-const fontFamily = '"Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR", sans-serif';
-const colors = { ink: '#14243a', muted: '#526278', line: '#dbe4ec', soft: '#edf3f8', paper: '#ffffff',
-  brand: '#164e63', normal: '#166534', abnormal: '#a32435' };
 const number = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 12 });
 const clock = new Intl.DateTimeFormat('sv-SE', {
   timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
 });
 const verdictText = { normal: '정상', abnormal: '이상', unjudged: '판정 전' };
 const labelFor = value => verdictText[value] ?? '기록 없음';
+
+function reportStyle() {
+  const style = getComputedStyle(document.documentElement);
+  const token = role => style.getPropertyValue(`--case-report-${role}`).trim();
+  const measure = role => Number.parseFloat(token(role));
+  const palette = ['ink', 'muted', 'line', 'soft', 'paper', 'brand', 'normal', 'abnormal', 'table-stripe'];
+  return {
+    measure,
+    fontFamily: style.getPropertyValue('--aml-font-family').trim(),
+    colors: Object.fromEntries(palette.map(role => [role, token(role)])),
+    type: role => measure(`type-${role}`),
+    weight: role => measure(`weight-${role}`),
+    leading: role => measure(`leading-${role}`),
+  };
+}
 
 function sourceTime(value) {
   if (!value) return '';
@@ -46,12 +59,8 @@ function evidencePeriod(records) {
   return from === to ? `${from} KST` : `${from} ~ ${to} KST`;
 }
 
-function textFont(size, weight) {
-  return `${weight} ${size}px ${fontFamily}`;
-}
-
-function splitLines(context, value, width, size, weight) {
-  context.font = textFont(size, weight);
+function splitLines(context, value, width, font) {
+  context.font = font;
   return String(value ?? '').split(/\r?\n/).flatMap(paragraph => {
     const lines = [];
     let line = '';
@@ -75,48 +84,59 @@ function splitLines(context, value, width, size, weight) {
   });
 }
 
-function makeWriter() {
+function makeWriter({ measure, fontFamily, colors, type, weight, leading }) {
+  const page = {
+    width: measure('page-width'),
+    height: measure('page-height'),
+    margin: measure('page-margin'),
+    limit: measure('content-limit'),
+    scale: measure('raster-scale'),
+  };
+  const contentWidth = page.width - 2 * page.margin;
+  const ruleWidth = measure('rule');
+  const headingHeight = leading('heading') + measure('text-gap');
+  const textFont = (size, fontWeight) => `${fontWeight} ${size}px ${fontFamily}`;
   const images = [];
   let context, canvas, cursor, continuation;
-  const paint = (content, x, y, { size = 11, weight = 400, color = colors.ink } = {}) => {
+  const paint = (content, x, y, { size = type('body'), fontWeight = weight('regular'), color = colors.ink } = {}) => {
     context.fillStyle = color;
-    context.font = textFont(size, weight);
+    context.font = textFont(size, fontWeight);
     context.fillText(content, x, y);
   };
   const rectangle = (x, y, width, height, fill) => {
     context.fillStyle = fill;
     context.fillRect(x, y, width, height);
   };
-  const rule = y => rectangle(page.margin, y, contentWidth, 1, colors.line);
+  const rule = y => rectangle(page.margin, y, contentWidth, ruleWidth, colors.line);
   const finish = () => {
-    rule(838);
-    paint('AML RADAR  /  내부 관리 검토', page.margin, 856, { size: 9, color: colors.muted });
-    paint(String(images.length + 1).padStart(2, '0'), page.width - page.margin - 15, 856,
-      { size: 10, weight: 700, color: colors.brand });
+    rule(measure('footer-rule'));
+    const baseline = measure('footer-text');
+    paint('AML RADAR  /  내부 관리 검토', page.margin, baseline, { size: type('caption'), color: colors.muted });
+    paint(String(images.length + 1).padStart(2, '0'), page.width - page.margin - measure('footer-number-width'), baseline,
+      { size: type('detail'), fontWeight: weight('bold'), color: colors.brand });
     const sheet = canvas;
-    images.push(new Promise((resolve, reject) => sheet.toBlob(blob => {
-      if (!blob) { reject(new Error('PDF 페이지를 이미지로 변환하지 못했습니다.')); return; }
-      blob.arrayBuffer().then(bytes => resolve({ width: sheet.width, height: sheet.height, jpeg: new Uint8Array(bytes) }), reject);
-    }, 'image/jpeg', .94)));
+    images.push(sheet.encode('image/jpeg', .94).then(async blob => ({
+      width: sheet.width, height: sheet.height, jpeg: new Uint8Array(await blob.arrayBuffer()),
+    })));
   };
   const start = () => {
     if (canvas) finish();
-    canvas = document.createElement('canvas');
-    canvas.width = page.width * page.scale;
-    canvas.height = page.height * page.scale;
-    context = canvas.getContext('2d', { alpha: false });
+    canvas = createExportCanvas(page.width * page.scale, page.height * page.scale, { alpha: false });
+    context = canvas.context;
     if (!context) throw new Error('PDF를 만들 수 없는 브라우저입니다.');
     context.scale(page.scale, page.scale);
     context.textBaseline = 'alphabetic';
     rectangle(0, 0, page.width, page.height, colors.paper);
-    rectangle(0, 0, page.width, 8, colors.brand);
-    paint('AML RADAR', page.margin, 38, { size: 13, weight: 800, color: colors.brand });
-    paint('내부 관리 검토용', page.width - page.margin - 78, 38, { size: 10, weight: 700, color: colors.muted });
-    rule(50);
-    cursor = 72;
+    rectangle(0, 0, page.width, measure('masthead-band'), colors.brand);
+    const baseline = measure('masthead-text');
+    paint('AML RADAR', page.margin, baseline, { size: type('wordmark'), fontWeight: weight('display'), color: colors.brand });
+    paint('내부 관리 검토용', page.width - page.margin - measure('masthead-label-width'), baseline,
+      { size: type('detail'), fontWeight: weight('bold'), color: colors.muted });
+    rule(measure('masthead-rule'));
+    cursor = measure('content-start');
     if (continuation) {
-      paint(`${continuation} · 계속`, page.margin, cursor, { size: 11, weight: 700, color: colors.brand });
-      cursor += 20;
+      paint(`${continuation} · 계속`, page.margin, cursor, { fontWeight: weight('bold'), color: colors.brand });
+      cursor += measure('continuation-height');
     }
   };
   const ensure = height => {
@@ -124,66 +144,80 @@ function makeWriter() {
     start();
     return true;
   };
-  const text = (value, { size = 11, weight = 400, color = colors.ink, lineHeight = 17, x = page.margin,
-    width = page.width - page.margin - x, bottom = 5 } = {}) => {
-    for (const line of splitLines(context, value, width, size, weight)) {
+  const text = (value, { size = type('body'), fontWeight = weight('regular'), color = colors.ink,
+    lineHeight = leading('body'), x = page.margin, width = page.width - page.margin - x, bottom = measure('text-gap') } = {}) => {
+    for (const line of splitLines(context, value, width, textFont(size, fontWeight))) {
       ensure(lineHeight);
-      paint(line, x, cursor + size, { size, weight, color });
+      paint(line, x, cursor + size, { size, fontWeight, color });
       cursor += lineHeight;
     }
     cursor += bottom;
   };
-  const heading = (value, nextHeight = 24) => {
-    ensure(26 + nextHeight);
-    text(value, { size: 15, weight: 750, lineHeight: 21, color: colors.brand });
+  const heading = (value, nextHeight = measure('heading-follow-height')) => {
+    ensure(headingHeight + nextHeight);
+    text(value, { size: type('heading'), fontWeight: weight('heading'), lineHeight: leading('heading'), color: colors.brand });
   };
   const metrics = items => {
-    ensure(79);
-    const gap = 8;
+    const height = measure('metric-height');
+    const blockHeight = height + measure('metric-bottom-gap');
+    ensure(blockHeight);
+    const gap = measure('metric-gap');
     const width = (contentWidth - gap * (items.length - 1)) / items.length;
     items.forEach(([label, value], index) => {
       const x = page.margin + index * (width + gap);
-      rectangle(x, cursor, width, 65, colors.soft);
-      paint(label, x + 11, cursor + 19, { size: 10, weight: 650, color: colors.muted });
-      paint(value, x + 11, cursor + 49, { size: 23, weight: 800, color: colors.ink });
+      const labelX = x + measure('metric-inset');
+      rectangle(x, cursor, width, height, colors.soft);
+      paint(label, labelX, cursor + measure('metric-label-offset'),
+        { size: type('detail'), fontWeight: weight('metric-label'), color: colors.muted });
+      paint(value, labelX, cursor + measure('metric-value-offset'),
+        { size: type('metric'), fontWeight: weight('display') });
     });
-    cursor += 79;
+    cursor += blockHeight;
   };
 
   const table = (title, rows) => {
-    const columns = [['거래 ID / 시각 KST', 134], ['송금 → 수취 / 결제 수단', 163], ['원본 금액', 102], ['모델 / 판정 / 처리', 133]];
-    const lineHeight = 14;
-    const headerHeight = 24;
-    const rowLines = row => row.map((value, index) => splitLines(context, value, columns[index][1] - 14, 10, 400));
+    const columns = [
+      ['거래 ID / 시각 KST', measure('table-column-transaction')],
+      ['송금 → 수취 / 결제 수단', measure('table-column-route')],
+      ['원본 금액', measure('table-column-amount')],
+      ['모델 / 판정 / 처리', measure('table-column-status')],
+    ];
+    const lineHeight = leading('table');
+    const headerHeight = measure('table-header-height');
+    const inset = measure('table-inset');
+    const size = type('detail');
+    const rowFont = textFont(size, weight('regular'));
+    const rowLines = row => row.map((value, index) => splitLines(context, value, columns[index][1] - 2 * inset, rowFont));
+    const rowHeight = lines => Math.max(...lines.map(column => column.length)) * lineHeight + measure('table-row-padding');
     const drawHeader = () => {
       rectangle(page.margin, cursor, contentWidth, headerHeight, colors.soft);
       let x = page.margin;
       for (const [label, width] of columns) {
-        paint(label, x + 7, cursor + 16, { size: 10, weight: 700, color: colors.brand });
+        paint(label, x + inset, cursor + measure('table-header-offset'), { size, fontWeight: weight('bold'), color: colors.brand });
         x += width;
       }
       cursor += headerHeight;
     };
-    const firstHeight = Math.max(...rowLines(rows[0]).map(column => column.length)) * lineHeight + 10;
-    ensure(26 + headerHeight + firstHeight + 1);
-    heading(title, headerHeight + firstHeight + 1);
+    const firstHeight = headerHeight + rowHeight(rowLines(rows[0])) + ruleWidth;
+    ensure(headingHeight + firstHeight);
+    heading(title, firstHeight);
     drawHeader();
     rows.forEach((row, index) => {
       const lines = rowLines(row);
-      const height = Math.max(...lines.map(column => column.length)) * lineHeight + 10;
-      if (ensure(height + 1)) drawHeader();
-      if (index % 2 === 1) rectangle(page.margin, cursor, contentWidth, height, '#f7f9fb');
+      const height = rowHeight(lines);
+      if (ensure(height + ruleWidth)) drawHeader();
+      if (index % 2 === 1) rectangle(page.margin, cursor, contentWidth, height, colors['table-stripe']);
       let x = page.margin;
       lines.forEach((column, cell) => {
-        column.forEach((line, i) => paint(line, x + 7, cursor + 15 + i * lineHeight,
-          { size: 10, color: i === 0 ? colors.ink : colors.muted }));
+        column.forEach((line, i) => paint(line, x + inset, cursor + measure('table-cell-offset') + i * lineHeight,
+          { size, color: i === 0 ? colors.ink : colors.muted }));
         x += columns[cell][1];
       });
       cursor += height;
       rule(cursor);
-      cursor += 1;
+      cursor += ruleWidth;
     });
-    cursor += 14;
+    cursor += measure('table-bottom-gap');
   };
   const setContinuation = value => { continuation = value; };
   start();
@@ -208,15 +242,19 @@ function evidenceCells(row) {
 export async function createCaseReportPdf(rows) {
   if (!rows.length) throw new Error('보고서에 포함할 판정을 선택해 주세요.');
   await document.fonts?.ready;
-  const output = makeWriter();
+  const style = reportStyle();
+  const { measure, colors, type, weight, leading } = style;
+  const output = makeWriter(style);
   const selectedTargets = uniqueRecords(rows.flatMap(row => row.targets ?? []));
   const allEvidence = uniqueRecords(selectedTargets.flatMap(fieldsFor));
   const abnormal = rows.filter(row => row.verdict === 'abnormal').length;
   const normal = rows.filter(row => row.verdict === 'normal').length;
   const highestScores = allEvidence.filter(record => modelRiskBand(record.score) === 'high')
     .toSorted((left, right) => right.score - left.score || left.code.localeCompare(right.code));
-  output.text('AML 판정 검토 보고서', { size: 26, weight: 800, lineHeight: 35, bottom: 6 });
-  output.text(`생성 시각  ${clock.format(new Date())} KST`, { size: 10, color: colors.muted, bottom: 13 });
+  output.text('AML 판정 검토 보고서',
+    { size: type('title'), fontWeight: weight('display'), lineHeight: leading('title'), bottom: measure('title-gap') });
+  output.text(`생성 시각  ${clock.format(new Date())} KST`,
+    { size: type('detail'), color: colors.muted, bottom: measure('time-gap') });
   output.metrics([
     ['선택 판정', `${number.format(rows.length)}건`], ['이상 판정', `${number.format(abnormal)}건`],
     ['연결 거래 · 중복 제거', `${number.format(allEvidence.length)}건`],
@@ -230,7 +268,7 @@ export async function createCaseReportPdf(rows) {
     output.text(`모델 ${modelRiskLabels().high}  ${number.format(highestScores.length)}건 · 최고 ${number.format(highest.score)}점 (${highest.code})`);
   }
   output.text('자료 범위  AML RADAR에서 선택한 판정과 그에 연결된 거래. 동일 거래 ID는 전체 합계에서 한 번 집계합니다.',
-    { size: 10, color: colors.muted, lineHeight: 15, bottom: 15 });
+    { size: type('detail'), color: colors.muted, lineHeight: leading('detail'), bottom: measure('section-gap') });
 
   for (const row of rows) {
     const targets = row.targets ?? [];
@@ -242,10 +280,10 @@ export async function createCaseReportPdf(rows) {
     const reasonCategory = Object.hasOwn(judgmentReasonLabels, row.reasonCategory)
       ? judgmentReasonLabels[row.reasonCategory] : '기록 없음';
     output.setContinuation(undefined);
-    output.ensure(109);
+    output.ensure(measure('case-start-clearance'));
     output.setContinuation(row.id);
-    output.heading(`${row.id} · ${row.kind || '업무'}`, 48);
-    output.text(`사람 판정  ${labelFor(row.verdict)}`, { weight: 750,
+    output.heading(`${row.id} · ${row.kind || '업무'}`, measure('case-heading-follow-height'));
+    output.text(`사람 판정  ${labelFor(row.verdict)}`, { fontWeight: weight('heading'),
       color: colors[row.verdict] ?? colors.ink });
     output.text(`판정 시각  ${time ? `${time} KST` : '기록 없음'}   ·   판정자 ${reviewer}`,
       { color: colors.muted });
@@ -255,26 +293,26 @@ export async function createCaseReportPdf(rows) {
     output.text(`판정 사유  ${row.reason || '기록 없음'}`);
     if (patterns.length) output.text(`관련 패턴  ${patterns.join('  ·  ')}`);
     output.text(`근거 거래  ${number.format(evidence.length)}건   ·   ${evidencePeriod(evidence)}`);
-    output.text(`통화별 금액  ${totalsByCurrency(evidence)}`, { bottom: 9 });
+    output.text(`통화별 금액  ${totalsByCurrency(evidence)}`, { bottom: measure('amount-gap') });
     if (targets.length) {
-      output.ensure(38);
-      output.text('판정 대상과 근거 참조', { weight: 750, bottom: 2 });
+      output.ensure(measure('reference-clearance'));
+      output.text('판정 대상과 근거 참조', { fontWeight: weight('heading'), bottom: measure('compact-gap') });
       for (const target of targets) {
         const references = uniqueRecords(fieldsFor(target)).map(record => record.code);
         const related = references.length > 0 && !(references.length === 1 && references[0] === target.code)
           ? `  ←  ${references.join(', ')}` : '';
-        output.text(`${target.code}${related}`, { size: 10, color: colors.muted, lineHeight: 15 });
+        output.text(`${target.code}${related}`, { size: type('detail'), color: colors.muted, lineHeight: leading('detail') });
       }
     }
     if (evidence.length) {
       output.table('연결 거래 근거', evidence.map(evidenceCells));
     } else {
-      output.text('연결된 근거 거래 기록이 없습니다.', { color: colors.muted, bottom: 15 });
+      output.text('연결된 근거 거래 기록이 없습니다.', { color: colors.muted, bottom: measure('section-gap') });
     }
   }
 
   output.setContinuation('후속 확인 사항');
-  output.heading('후속 확인 사항', 65);
+  output.heading('후속 확인 사항', measure('follow-up-clearance'));
   output.text('1. 연결 거래 ID로 원장을 대조하고 송금·수취 계좌, 거래 시각, 금액 및 원통화를 확인합니다.');
   output.text('2. 동일 계좌나 반복 경로가 여러 판정에 걸쳐 나타난 경우 거래 목적과 검토 근거를 함께 확인합니다.');
   if (rows.some(row => !row.reason || !row.at)) {
@@ -285,10 +323,5 @@ export async function createCaseReportPdf(rows) {
 
 export async function downloadCaseReport(rows) {
   const pdf = await createCaseReportPdf(rows);
-  const url = URL.createObjectURL(new Blob([pdf], { type: 'application/pdf' }));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = 'AML-RADAR-판정-검토-보고서.pdf';
-  anchor.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadBlob('AML-RADAR-판정-검토-보고서.pdf', new Blob([pdf], { type: 'application/pdf' }));
 }

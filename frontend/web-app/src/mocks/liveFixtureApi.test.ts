@@ -26,6 +26,11 @@ it('uses the same transaction facts and exact source IDs in every case and ledge
   for (const item of cases) for (const group of item.groups ?? []) for (const member of group.members) {
     const row = ledger.find(row => row.txId === member.txId)
     expect(row, `T-${member.txId} ledger exists`).toBeDefined()
+    expect(row?.occurredAt).toBe(member.transaction.occurredAt)
+    expect(row?.fromAccountId).toBe(member.transaction.fromAccountId)
+    expect(row?.toAccountId).toBe(member.transaction.toAccountId)
+    expect(row?.fromBankId).toBe(member.transaction.fromBankId)
+    expect(row?.toBankId).toBe(member.transaction.toBankId)
     expect(row?.amountPaid).toBe(member.transaction.amountPaid)
     expect(row?.paymentCurrency).toBe(member.transaction.paymentCurrency)
     const alertId = item.kind === 'ALERT' ? item.alertId : group.sourceAlertId
@@ -38,6 +43,38 @@ it('uses the same transaction facts and exact source IDs in every case and ledge
     for (const id of row.episodeIds) expect(cases.find(c => c.kind === 'EPISODE' && c.caseId === id)?.groups?.some(g => g.members.some(m => m.txId === row.txId)), `T-${row.txId} -> E-${id}`).toBe(true)
   }
 })
+it('connects every synthetic Episode to the actual shared accounts of its source Alerts', () => {
+  const cases = rows<ReviewCase>('/api/v1/review/cases')
+  const alertsById = new Map(cases.filter(row => row.alertId !== null).map(row => [row.alertId, row]))
+  for (const episode of cases.filter(row => row.kind === 'EPISODE')) {
+    expect(new Set(episode.sourceAlertIds).size, `E-${episode.caseId} distinct sources`).toBeGreaterThanOrEqual(2)
+    expect(new Set(episode.groups?.map(group => group.sourceAlertId))).toEqual(new Set(episode.sourceAlertIds))
+    const sources = episode.sourceAlertIds.map(alertId => {
+      const alert = alertsById.get(alertId)
+      expect(alert?.episodeId, `A-${alertId} points back to E-${episode.caseId}`).toBe(episode.caseId)
+      const source = alert?.groups?.flatMap(group => group.members) ?? []
+      expect(source.length).toBeGreaterThan(0)
+      return new Set(source.flatMap(({ transaction }) => [transaction.fromAccountId, transaction.toAccountId]))
+    })
+    const shared = [...sources[0]].filter(accountId => sources.every(accounts => accounts.has(accountId)))
+    expect(shared, `E-${episode.caseId} shared account`).not.toHaveLength(0)
+    expect(episode.history?.some(event => event.action === 'TRANSFER' && shared.some(accountId => event.comment?.includes(accountId)))).toBe(true)
+    expect(new Set(episode.accounts?.map(account => account.id))).toEqual(new Set(sources.flatMap(accounts => [...accounts])))
+  }
+})
+
+it('keeps the generated Episode transfer sequence grounded in transaction timestamps', () => {
+  const episodes = rows<ReviewCase>('/api/v1/review/cases?kind=EPISODE')
+  for (const episode of episodes.filter(row => row.caseId !== 50)) {
+    const evidence = (episode.groups ?? []).flatMap(group => group.members).map(row => row.transaction)
+      .sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))
+    expect(evidence).toHaveLength(2)
+    const [incoming, outgoing] = evidence
+    expect(incoming.toAccountId).toBe(outgoing.fromAccountId)
+    expect(incoming.occurredAt < outgoing.occurredAt).toBe(true)
+  }
+})
+
 it('derives dashboard aggregate counts from the same synthetic ledger and cases', () => {
   const dashboard = fixtureGet('/api/v1/dashboard') as DashboardResponse
   const ledger = rows<LedgerTransaction>('/api/v1/ledger/transactions')

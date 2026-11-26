@@ -1,13 +1,14 @@
 "use client";
 
-import { type CSSProperties, type ReactNode, useRef } from "react";
+import { type ReactNode, useRef } from "react";
+import { cn } from "@/lib/utils";
 import { useElementSize } from "./use-element-size";
+import "../chart-utilities.css";
 
 export interface ChartParentSizeProps {
   children: (size: { width: number; height: number }) => ReactNode;
   className?: string;
   debounceTime?: number;
-  style?: CSSProperties;
 }
 
 /**
@@ -19,16 +20,12 @@ export function ParentSize({
   children,
   className,
   debounceTime,
-  style,
 }: ChartParentSizeProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const { width, height } = useElementSize(parentRef, debounceTime ?? 300);
   return (
-    <div
-      className={className}
-      style={{ position: "relative", width: "100%", height: "100%", ...style }}
-    >
-      <div ref={parentRef} style={{ position: "absolute", inset: 0 }}>
+    <div className={cn("chart-parent-size", className)}>
+      <div ref={parentRef} className="chart-parent-size-content">
         {children({ width, height })}
       </div>
     </div>

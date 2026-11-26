@@ -16,12 +16,12 @@ export default function HoldButton({
   doneLabel = 'Deleted',
   icon = null,
   doneIcon = null,
-  backgroundColor = '#27272a',
-  fillColor = '#5227FF',
-  textColor = '#f5f5f5',
-  fillTextColor = '#ffffff',
+  backgroundColor,
+  fillColor,
+  textColor,
+  fillTextColor,
   size = 'md',
-  radius = 14,
+  radius,
   fillDirection = 'right',
   holdTime = 2000,
   releaseTime = 200,
@@ -34,7 +34,6 @@ export default function HoldButton({
   onHold,
   onTap,
   onClick,
-  style,
   className = '',
   ...buttonProps
 }) {
@@ -252,7 +251,6 @@ export default function HoldButton({
         '--hb-release': `${releaseTime}ms`,
         '--hb-press': pressScale,
         '--hb-wave': `${wave ? waveAmplitude : 0}px`,
-        ...style,
       }}
       onPointerDown={needsHold ? handlePointerDown : undefined}
       onPointerMove={needsHold ? handlePointerMove : undefined}
@@ -270,13 +268,13 @@ export default function HoldButton({
       <span id={`${hintId}-label`} className="hold-button__label">{labels}</span>
       <span className="hold-button__clip" aria-hidden="true">
         <span className="hold-button__fill">
-          <span className="hold-button__label hold-button__label--fill">{labels}</span>
+          <span className="hold-button__label">{labels}</span>
         </span>
         <span className="hold-button__crest" aria-hidden="true">
-          <span className="hold-button__label hold-button__label--fill">{labels}</span>
+          <span className="hold-button__label">{labels}</span>
         </span>
       </span>
-      {needsHold && <span id={hintId} className="hold-button__sr">
+      {needsHold && <span id={hintId} className="visually-hidden">
         확인하려면 버튼 또는 Enter나 Space 키를 {Math.round(holdTime / 100) / 10}초 동안 누르세요.
       </span>}
     </Tag>

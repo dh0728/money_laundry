@@ -9,6 +9,20 @@
   flex: none;
   margin-inline-start: auto;
 }
+.section-download-heading .section-heading-disclosure {
+  display: flex;
+  align-items: center;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  min-block-size: var(--aml-touch-target-min-size);
+  justify-content: flex-start;
+  gap: var(--aml-space-8);
+  padding: var(--aml-space-8);
+  padding-inline-end: calc(2 * var(--aml-space-8));
+  font: inherit;
+  text-align: start;
+}
+.section-heading-disclosure > .icon { display: block; flex: none; align-self: center }
 :where(.screen-panel, .dashboard-metric) > .section-download-heading:has(> .section-download-tools) {
   --query-control-size: var(--aml-panel-control-size);
   --panel-heading-offset: calc(var(--aml-panel-inset) - var(--panel-content-padding));

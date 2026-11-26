@@ -1,9 +1,12 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import BranchedMenu from '../../components/react-bits/BranchedMenu';
+import { readChartNumber } from '../../components/charts/chart-design-values';
+import { RiskBandArc, riskBandPoint } from '../../components/charts/charts/risk-band-ring';
 import { bindTooltip } from '../../components/components';
 import { LiveRuleBuilder } from './live-rule-builder';
 import { Panel } from '../../components/panel';
+import { Box, Heading, Text } from '@/components/layout-primitives';
 
 const rules = [
   { label: '거래 패턴', children: [
@@ -14,21 +17,14 @@ const rules = [
   ] },
 ];
 
-// Adapted from the React Bits CometDial arc geometry for two ordered thresholds.
-const start = 150;
-const sweep = 240;
-function point(value) {
-  const radians = (start + value / 100 * sweep) * Math.PI / 180;
-  return [100 + Math.cos(radians) * 78, 100 + Math.sin(radians) * 78];
-}
-function arc(low, high) {
-  const [x, y] = point(low);
-  const [endX, endY] = point(high);
-  return `M ${x} ${y} A 78 78 0 ${(high - low) * sweep > 18000 ? 1 : 0} 1 ${endX} ${endY}`;
-}
-
 export function RiskDial({ embedded = false } = {}) {
   const [thresholds, setThresholds] = useState([40, 75]);
+  const [design] = useState(() => ({
+    size: readChartNumber('--risk-dial-units', 200),
+    radius: readChartNumber('--risk-dial-radius', 78),
+    start: readChartNumber('--model-risk-dial-start-angle', 150),
+    sweep: readChartNumber('--model-risk-dial-sweep-angle', 240),
+  }));
   const title = useId();
   const face = useRef(null);
   useEffect(() => {
@@ -43,6 +39,7 @@ export function RiskDial({ embedded = false } = {}) {
       : [amber, Math.max(amber + 1, Math.min(99, value))]);
   }
   function move(event, which) {
+    const { start, sweep } = design;
     const bounds = event.currentTarget.parentElement.getBoundingClientRect();
     const x = event.clientX - bounds.left - bounds.width / 2;
     const y = event.clientY - bounds.top - bounds.height / 2;
@@ -54,26 +51,23 @@ export function RiskDial({ embedded = false } = {}) {
   return <Panel embedded={embedded} className="risk-dial"
     aria-label={embedded ? '모델 위험도 기준' : undefined} aria-labelledby={embedded ? undefined : title}>
     {!embedded && <>
-      <h2 id={title}>위험 구간</h2>
-      <p className="workflow-rule-note">경계점을 움직여 관심·고위험 구간을 비교합니다.</p>
+      <Heading id={title}>위험 구간</Heading>
+      <Text className="workflow-rule-note">경계점을 움직여 관심·고위험 구간을 비교합니다.</Text>
     </>}
-    <div className="risk-dial-face" ref={face}>
-      <svg aria-hidden="true" viewBox="0 0 200 200">
-        {[[0, thresholds[0], 'low'], [thresholds[0], thresholds[1], 'medium'], [thresholds[1], 100, 'high']].map(([a, b, band]) =>
-          <path key={band} data-band={band} d={arc(a, b)} fill="none" strokeWidth="9" />)}
-      </svg>
-      <div className="risk-dial-readouts" aria-hidden="true">
-        {thresholds.map((value, i) => <span key={labels[i]} data-risk-tooltip
-          data-band={i === 0 ? 'low' : 'high'} aria-label={labels[i]}>{value}</span>)}
-      </div>
+    <Box className="risk-dial-face" ref={face}>
+      <RiskBandArc values={thresholds} design={design} />
+      <Box className="risk-dial-readouts" aria-hidden="true">
+        {thresholds.map((value, i) => <Text as="span" key={labels[i]} data-risk-tooltip
+          data-band={i === 0 ? 'low' : 'high'} aria-label={labels[i]}>{value}</Text>)}
+      </Box>
       {thresholds.map((value, i) => {
-        const [x, y] = point(value);
+        const [x, y] = riskBandPoint(value, design);
         const min = i === 0 ? 1 : thresholds[0] + 1;
         const max = i === 0 ? thresholds[1] - 1 : 99;
-        return <span key={i} className="risk-dial-thumb" role="slider" tabIndex={0}
+        return <Text as="span" key={i} className="risk-dial-thumb" role="slider" tabIndex={0}
           data-risk-tooltip
           aria-label={labels[i]} aria-valuemin={min} aria-valuemax={max} aria-valuenow={value} aria-valuetext={`${value}점`}
-          style={{ left: `${x / 2}%`, top: `${y / 2}%` }}
+          style={{ '--risk-dial-thumb-x': `${x / (design.size / 100)}%`, '--risk-dial-thumb-y': `${y / (design.size / 100)}%` }}
           onKeyDown={event => {
             const next = {
               ArrowLeft: value - 1, ArrowDown: value - 1, ArrowRight: value + 1, ArrowUp: value + 1,
@@ -90,7 +84,7 @@ export function RiskDial({ embedded = false } = {}) {
           }}
           onPointerMove={event => { if (event.currentTarget.hasPointerCapture(event.pointerId)) move(event, i); }} />;
       })}
-    </div>
+    </Box>
   </Panel>;
 }
 
@@ -98,8 +92,8 @@ export function RuleTemplateMenu() {
   const [selected, setSelected] = useState('');
   return <>
     <BranchedMenu items={rules} color="var(--text)" accentColor="var(--text)" lineColor="var(--muted-text)"
-      width={220} className="rule-template-menu" onSelect={(_, item) => setSelected(item.label)} />
-    {selected && <p role="status">선택한 템플릿 · {selected}</p>}
+      width={readChartNumber('--rule-template-menu-width', 220)} className="rule-template-menu" onSelect={(_, item) => setSelected(item.label)} />
+    {selected && <Text role="status">선택한 템플릿 · {selected}</Text>}
   </>;
 }
 

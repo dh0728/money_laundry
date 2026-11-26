@@ -7,6 +7,7 @@ import {
   Children,
   isValidElement,
   memo,
+  type CSSProperties,
   type ReactElement,
   type ReactNode,
   useCallback,
@@ -28,6 +29,7 @@ import {
   PieStableContext,
   type PieStableContextValue,
 } from "./pie-context";
+import "./pie-chart.css";
 
 /** Default hover offset in pixels */
 export const DEFAULT_HOVER_OFFSET = 10;
@@ -441,24 +443,14 @@ const PieChartCore = memo(function PieChartCore({
   return (
     <PieProvider value={contextValue}>
       <div
-        className="grid"
-        style={{
-          gridTemplateColumns: "1fr",
-          gridTemplateRows: "1fr",
-          width: size,
-          height: size,
-        }}
+        className="pie-chart-layers"
+        style={{ "--pie-chart-size": `${size}px` } as CSSProperties}
       >
         {/* SVG layer with pie slices */}
         <svg
           aria-hidden="true"
+          className="pie-chart-svg"
           height={size}
-          style={{
-            gridArea: "1 / 1",
-            // No `paint` containment: it clips hover glow at the svg box.
-            contain: "layout style",
-            overflow: "visible",
-          }}
           width={size}
         >
           {/* Defs for patterns and gradients */}
@@ -484,8 +476,7 @@ const PieChartCore = memo(function PieChartCore({
         {/* HTML layer with center content - stacked on top via grid */}
         {centerChildren.length > 0 && (
           <div
-            className="pointer-events-none flex items-center justify-center"
-            style={{ gridArea: "1 / 1" }}
+            className="pie-chart-center pointer-events-none flex items-center justify-center"
           >
             {centerChildren}
           </div>
@@ -542,9 +533,9 @@ export function PieChart({
     return (
       <LazyMotion features={domAnimation}>
         <div
-          className={cn("relative flex items-center justify-center", className)}
+          className={cn("pie-chart-fixed relative flex items-center justify-center", className)}
           ref={containerRef}
-          style={{ width: fixedSize, height: fixedSize }}
+          style={{ "--pie-chart-size": `${fixedSize}px` } as CSSProperties}
         >
           <PieChartInner
             containerRef={containerRef}

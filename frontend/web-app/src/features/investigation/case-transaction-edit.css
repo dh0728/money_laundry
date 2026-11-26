@@ -8,7 +8,7 @@
   gap: 0 var(--aml-space-12);
 }
 .case-transaction-edit-targets > li + li { border-block-start: 0 }
-.case-transaction-edit-error { color: color-mix(in srgb, var(--status-danger-accent), var(--text) 42%) }
+.case-transaction-edit-error { color: color-mix(in srgb, var(--status-danger-accent), var(--text) var(--case-transaction-edit-error-text-share)) }
 @media (width < 420px) {
   .case-transaction-edit-trigger { padding-inline: var(--aml-space-8) }
 }

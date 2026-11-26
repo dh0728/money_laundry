@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { animate, motion, useMotionValue, useReducedMotion, useTransform, type MotionValue } from 'motion/react';
+import React, { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { animate, motion, useMotionValue, useTransform, type MotionStyle, type MotionValue } from 'motion/react';
+import { useAppReducedMotion } from '@/hooks/use-reduced-motion';
+import { readChartNumber } from '../charts/chart-design-values';
 
 import './RubberSegment.css';
 
@@ -65,12 +67,6 @@ const DEADZONE = 4;
 const SLOP = 10;
 const RUBBER = 0.55;
 const THUMB_EASING = 'cubic-bezier(0.23, 1, 0.32, 1)';
-const SIZES: Record<RubberSegmentSize, { height: number; font: number; pad: number; min: number }> = {
-  sm: { height: 28, font: 12, pad: 10, min: 36 },
-  md: { height: 36, font: 13, pad: 14, min: 44 },
-  lg: { height: 44, font: 14, pad: 18, min: 48 }
-};
-
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const rubber = (over: number, dim: number) => (over * dim * RUBBER) / (dim + RUBBER * Math.abs(over));
 const project = (v: number, glide: number) => {
@@ -98,13 +94,13 @@ const RubberSegment: React.FC<RubberSegmentProps> = ({
   defaultValue,
   onChange,
   linkTo,
-  trackColor = '#27272a',
-  thumbColor = '#fafafa',
-  textColor = '#fafafa',
-  activeTextColor = '#18181b',
+  trackColor,
+  thumbColor,
+  textColor,
+  activeTextColor,
   size = 'md',
-  radius = 10,
-  inset = 3,
+  radius = readChartNumber('--rubber-segment-radius', 10),
+  inset = readChartNumber('--rubber-segment-inset', 3),
   equalSlots = true,
   stretch = 100,
   squash = 3,
@@ -124,7 +120,7 @@ const RubberSegment: React.FC<RubberSegmentProps> = ({
     linkTo ? -1 : 0,
     list.findIndex(item => item.value === current)
   );
-  const systemReducedMotion = useReducedMotion();
+  const systemReducedMotion = useAppReducedMotion();
   const reduce = reducedMotion || systemReducedMotion;
 
   const trackRef = useRef<HTMLDivElement>(null);
@@ -174,14 +170,14 @@ const RubberSegment: React.FC<RubberSegmentProps> = ({
   };
 
   const listKey = list.map(item => item.value).join('|');
-  useLayoutEffect(() => {
+  const measureTrack = useEffectEvent(() => {
     measure();
     const observer = new ResizeObserver(measure);
     if (trackRef.current) observer.observe(trackRef.current);
     if (typeof document !== 'undefined' && document.fonts) document.fonts.ready.then(measure);
     return () => observer.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listKey, size, inset, equalSlots]);
+  });
+  useLayoutEffect(() => measureTrack(), [listKey, size, inset, equalSlots]);
 
   useEffect(
     () => () => {
@@ -399,14 +395,13 @@ const RubberSegment: React.FC<RubberSegmentProps> = ({
     itemRefs.current[next]?.focus();
   };
 
-  const preset = SIZES[size] || SIZES.md;
-
   return (
     <div
       ref={trackRef}
       role={linkTo ? undefined : 'radiogroup'}
       aria-label={linkTo ? undefined : ariaLabel}
       aria-disabled={disabled || undefined}
+      data-segment-size={size}
       data-equal={equalSlots ? '' : undefined}
       data-draggable={draggable && !disabled && !linkTo ? '' : undefined}
       className={`rubber-segment${className ? ` ${className}` : ''}`}
@@ -419,10 +414,6 @@ const RubberSegment: React.FC<RubberSegmentProps> = ({
           '--rs-radius': `${radius}px`,
           '--rs-inset': `${inset}px`,
           '--rs-thumb-radius': `${thumbRadius}px`,
-          '--rs-h': `var(--segment-height, ${preset.height}px)`,
-          '--rs-font': `var(--segment-label-size, ${preset.font}px)`,
-          '--rs-pad': `var(--segment-inline-padding, ${preset.pad}px)`,
-          '--rs-min': `${preset.min}px`
         } as CSSProperties
       }
       onPointerMove={handlePointerMove}
@@ -464,7 +455,7 @@ const RubberSegment: React.FC<RubberSegmentProps> = ({
           {content}
         </button>;
       })}
-      <motion.div ref={thumbRef} className="rubber-segment__thumb" aria-hidden="true" style={{ clipPath }}>
+      <motion.div ref={thumbRef} className="rubber-segment__thumb" aria-hidden="true" style={{ '--rs-thumb-clip': clipPath } as MotionStyle}>
         {list.map(item => (
           <span key={item.value} className="rubber-segment__item rubber-segment__copy">
             {item.icon}

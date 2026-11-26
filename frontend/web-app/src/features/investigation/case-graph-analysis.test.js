@@ -3,8 +3,10 @@ import { act, fireEvent, renderHook, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { buildCaseNetwork, graphRiskBand, graphTableSelection, graphVerdict, transactionsWithinHops } from './case-graph-scope';
 import { caseAccountLayout } from './case-pattern-layout';
-import { caseSankeyGraph, caseSankeyPath, layoutCaseSankey } from './case-sankey-data';
+import { caseSankeyGraph, layoutCaseSankey } from './case-sankey-data';
+import { sankeyLinkPath } from '@/components/charts/charts/sankey/sankey-path';
 import { ownerGraphLayout, ownerTransferPath } from '../graph/owner-graph-layout';
+import { caseGroupColor } from '../graph/graph-case-groups';
 import { mountCaseGraph } from './preview-case-graph';
 import { previewUrl, readPreviewRoute } from '../../app/preview-route';
 import { ScreenLayout, ScreenNavigation } from '../../app/screen-layouts';
@@ -22,6 +24,14 @@ const account = (code, owner = code) => ({ code, owner });
 const transfer = (code, from, to, score, verdict = 'unjudged') => ({ code, from, to, score, verdict });
 
 describe('case graph analysis', () => {
+  it('reserves the reference color while cycling through the comparison case colors', () => {
+    const reference = caseGroupColor(0);
+    const comparison = [1, 2, 3, 4].map(caseGroupColor);
+    expect(new Set(comparison).size).toBe(4);
+    expect(comparison).not.toContain(reference);
+    expect([5, 6, 7, 8].map(caseGroupColor)).toEqual(comparison);
+  });
+
   it('distinguishes score zero, exact thresholds and missing scores', () => {
     expect([undefined, null, -1, 101, 0, 69.99, 70, 89.99, 90, 100].map(graphRiskBand))
       .toEqual(['unknown', 'unknown', 'unknown', 'unknown', 'low', 'low', 'medium', 'medium', 'high', 'high']);
@@ -85,7 +95,7 @@ describe('case graph analysis', () => {
     const transactions = [fixture(1, first, other), fixture(2, second, other), fixture(3, first, other)];
     const active = { code: 'A-261111-000001', related: transactions };
     const host = document.createElement('div');
-    host.innerHTML = '<div data-case-flow="analysis" data-lens="owner"></div><div data-case-evidence="거래" data-analysis-table></div>';
+    host.innerHTML = '<div data-case-flow="analysis" data-lens="owner"></div><div data-case-evidence="거래" data-analysis-table></div><div data-case-accounts></div>';
     document.body.append(host);
     const graph = within(host);
     const checkbox = code => graph.getByRole('checkbox', { name: `${code} 선택` });
@@ -187,7 +197,7 @@ describe('case graph analysis', () => {
       method: '계좌이체', currency: 'KRW', amount: 100, status: '처리 전' }));
     const active = { code: 'A-261111-000001', pattern: 'FAN-OUT 82%', related: rows };
     const host = document.createElement('div');
-    host.innerHTML = '<div data-case-flow="analysis" data-lens="pattern"></div><div data-case-evidence="거래" data-analysis-table></div>';
+    host.innerHTML = '<div data-case-flow="analysis" data-lens="pattern"></div><div data-case-evidence="거래" data-analysis-table></div><div data-case-accounts></div>';
     document.body.append(host);
     const graph = within(host);
     const checkbox = code => graph.queryByRole('checkbox', { name: `${code} 선택` });
@@ -236,7 +246,7 @@ describe('case graph analysis', () => {
     ];
     const active = { code: 'A-261111-000001', related: rows };
     const host = document.createElement('div');
-    host.innerHTML = '<div data-case-flow="analysis" data-lens="sankey"></div><div data-case-evidence="거래" data-analysis-table></div>';
+    host.innerHTML = '<div data-case-flow="analysis" data-lens="sankey"></div><div data-case-evidence="거래" data-analysis-table></div><div data-case-accounts></div>';
     document.body.append(host);
     let cleanup;
     try {
@@ -276,7 +286,9 @@ describe('case graph analysis', () => {
     expect(layout.links[0].width).toBe(4 * layout.links[2].width);
     expect(layout.links[2].returnY).toBeLessThan(layout.nodes[1].y0);
     expect(layout.links[3].source).toBe(layout.links[3].target);
-    expect(layout.links.every(link => !/NaN|Infinity/.test(caseSankeyPath(link)))).toBe(true);
+    const paths = layout.links.map(link => sankeyLinkPath(link, 16));
+    expect(paths.every(path => path.startsWith('M') && !/NaN|Infinity/.test(path))).toBe(true);
+    expect(paths.map(path => path.includes(' H '))).toEqual([false, false, true, true]);
   });
 
   it('only claims pattern placement when supported and otherwise shows actual direction', () => {

@@ -1,8 +1,10 @@
+@import "../../styles/chart-tooltip-tokens.css";
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities) source(none);
 @source "./charts";
 
 @theme inline {
+  --text-2xs: var(--text-micro-size);
   --color-chart-label: var(--muted-text);
   --color-chart-tooltip-foreground: var(--text);
   --color-chart-tooltip-muted: var(--muted-text);
@@ -10,10 +12,81 @@
   --color-border: var(--divider);
 }
 
-.bklit-tooltip-panel.glass {
-  --glass-surface-face: color-mix(in srgb, var(--information-panel-surface) 64%, var(--glass-material-frost));
-  border: var(--aml-stroke-control) solid var(--glass-surface-edge);
-  border-radius: var(--aml-radius-card);
+.bklit-tooltip-anchor {
+  left: var(--chart-tooltip-left);
+  top: var(--chart-tooltip-top);
 }
+.bklit-tooltip-anchor[data-horizontal-viewport] {
+  inline-size: max-content;
+  max-inline-size: var(--chart-tooltip-viewport-width, 100%);
+  overflow-wrap: anywhere;
+}
+.bklit-tooltip-entrance { transform-origin: left top }
+.bklit-tooltip-entrance[data-flipped],
+.bklit-tooltip-panel[data-flipped] { transform-origin: right top }
+.bklit-tooltip-panel.glass {
+  --glass-surface-face: var(--chart-tooltip-panel-background, var(--chart-tooltip-glass-face));
+  min-width: min(var(--chart-tooltip-min-width), var(--chart-tooltip-viewport-width, var(--chart-tooltip-min-width)));
+  border: var(--aml-stroke-control) solid var(--glass-surface-edge);
+  border-radius: var(--chart-tooltip-panel-radius, var(--aml-radius-card));
+  transform: var(--chart-tooltip-panel-scale, none);
+  transform-origin: left top;
+}
+.bklit-tooltip-panel.glass[data-flipped] { transform-origin: right top }
 .bklit-tooltip-panel .border-b { border-color: var(--glass-edge) }
-.bklit-tooltip-clip { border-radius: calc(var(--aml-radius-card) - var(--aml-stroke-control)) }
+.bklit-tooltip-clip {
+  border-radius: var(--chart-tooltip-clip-radius, calc(var(--aml-radius-card) - var(--aml-stroke-control)));
+  transform: var(--chart-tooltip-clip-scale, none);
+  transform-origin: left top;
+}
+.bklit-tooltip-content {
+  transform: var(--chart-tooltip-content-scale, none);
+  transform-origin: left top;
+}
+.bklit-tooltip-series-dot { background-color: var(--chart-tooltip-series-color) }
+
+.chart-surface {
+  aspect-ratio: var(--chart-surface-aspect-ratio);
+  touch-action: var(--chart-surface-touch-action, none);
+}
+
+.chart-surface[data-fixed-height] { height: var(--chart-surface-height) }
+
+.chart-parent-size {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.chart-parent-size-content {
+  position: absolute;
+  inset: 0;
+}
+
+.chart-interaction { cursor: default; touch-action: none }
+.chart-interaction[data-interactive] { cursor: crosshair }
+
+.chart-marker-dimming {
+  filter: var(--chart-marker-dim-filter, none);
+  transition: opacity var(--aml-duration-highlight-fade) ease-in-out,
+    filter var(--aml-duration-highlight-fade) ease-in-out;
+}
+
+.chart-marker-entered { opacity: 1; filter: blur(0) }
+
+.chart-loading-label {
+  filter: blur(calc(var(--chart-loading-label-blur, 0) * var(--aml-space-1)));
+}
+
+.chart-shimmering-text {
+  --chart-shimmer-base: var(--color, var(--muted-text));
+  background-image: linear-gradient(to right, var(--chart-shimmer-base) 0%,
+    var(--chart-shimmer-base) var(--chart-shimmer-band-start), var(--shimmering-color, var(--text)) 50%,
+    var(--chart-shimmer-base) var(--chart-shimmer-band-end), var(--chart-shimmer-base) 100%);
+  background-size: var(--chart-shimmer-background-width) 100%;
+  background-repeat: no-repeat;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}

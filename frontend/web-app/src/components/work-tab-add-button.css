@@ -13,7 +13,7 @@
 
 [data-verdict] .button.work-tab-add[data-add-work-tab] {
   --glass-surface-face: var(--panel-material-solid, var(--record-verdict-surface));
-  --button-hover-bg: color-mix(in srgb, var(--record-verdict-accent) 72%, var(--record-verdict-surface));
+  --button-hover-bg: color-mix(in srgb, var(--record-verdict-accent) var(--work-tab-verdict-hover-accent-share), var(--record-verdict-surface));
   --button-active-bg: var(--record-verdict-accent);
 }
 [data-verdict] .button.work-tab-add[data-add-work-tab]:enabled:is(:hover, :active) {
