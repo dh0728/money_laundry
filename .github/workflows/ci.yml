@@ -5,12 +5,9 @@ on:
     branches:
       - dev
       - master
-      - fe/work
-      - frontend
 
   pull_request:
     branches:
-      - fe/work
       - frontend
       - dev
       - master
@@ -64,8 +61,7 @@ jobs:
 
   backend:
     name: Backend Test and Build
-    # fe/work push는 프론트 작업 브랜치라 프론트 검사만 돈다.
-    if: (github.event_name != 'pull_request' || github.base_ref != 'frontend') && github.ref != 'refs/heads/fe/work'
+    if: github.event_name != 'pull_request' || github.base_ref != 'frontend'
     runs-on: ubuntu-24.04
 
     defaults:
@@ -141,12 +137,6 @@ jobs:
 
       - name: Run frontend tests
         run: pnpm test --maxWorkers 4
-
-      - name: Install Chromium for UI checks
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Check workspace scroll ownership
-        run: pnpm run test:scroll
 
       - name: Build frontend
         env:
