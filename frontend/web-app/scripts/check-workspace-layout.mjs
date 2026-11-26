@@ -251,6 +251,37 @@ async function checkWorkspaceQueryTools(page, { pathname, table, list }) {
   });
 }
 
+async function checkClosedSectionExport(page) {
+  const header = page.locator('.dashboard-work-details .dashboard-section-header');
+  const toggle = header.getByRole('button', { name: '업무 현황', exact: true });
+  await toggle.click();
+  await header.evaluate(element => element.scrollIntoView({ block: 'center' }));
+  const capture = await page.evaluateHandle(() => {
+    const original = window.print;
+    const result = { correct: false, restore: () => { window.print = original; } };
+    window.print = () => {
+      const section = document.querySelector('[data-page-print-section]');
+      const content = section?.querySelector('[data-dashboard-section-content]');
+      const metrics = document.querySelector('.dashboard-institution-metrics');
+      result.correct = section?.getAttribute('aria-label') === '업무 현황' &&
+        getComputedStyle(content).visibility === 'visible' && getComputedStyle(metrics).display === 'none';
+      window.dispatchEvent(new Event('afterprint'));
+    };
+    return result;
+  });
+  try {
+    await header.getByRole('button', { name: '업무 현황 전체 다운로드' }).click();
+    await page.emulateMedia({ media: 'print' });
+    await page.getByRole('button', { name: /PDF로 저장/ }).last().click();
+    if (!await capture.evaluate(result => result.correct)) throw new Error('The closed work section PDF must include only its own contents.');
+  } finally {
+    await capture.evaluate(result => result.restore());
+    await capture.dispose();
+    await page.emulateMedia({ media: 'screen' });
+    await toggle.click();
+  }
+}
+
 export async function checkWorkspaceLayout(page, { path, viewport }) {
   const { pathname, searchParams } = new URL(path, page.url());
   const list = investigationLists.includes(pathname);
@@ -283,6 +314,9 @@ export async function checkWorkspaceLayout(page, { path, viewport }) {
   }
   try {
     await checkWorkspaceQueryTools(page, { pathname, table, list });
+    if (pathname === '/dashboard/all' && searchParams.get('data') === 'sample' && viewport.width === 1440) {
+      await checkClosedSectionExport(page);
+    }
   } catch (error) {
     failures.push('Query controls: ' + error.message);
   }

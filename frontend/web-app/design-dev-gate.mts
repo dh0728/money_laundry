@@ -1,3 +1,4 @@
+import { statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { ESLint } from 'eslint'
@@ -32,10 +33,17 @@ export function designDevGate(): Plugin {
   const format = (file: string, diagnostics: Diagnostic[]) => diagnostics.map(({ line, column, message }) =>
     `${sourcePath(file)}:${line ?? 1}:${column ?? 1} ${message}`).join('\n')
 
+  const designModuleUrl = () => {
+    const file = join(root, 'scripts/design-lint-plugin.mjs')
+    const url = pathToFileURL(file)
+    url.searchParams.set('version', String(statSync(file).mtimeMs))
+    return url.href
+  }
+
   const load = () => engines ??= Promise.all([
     import('eslint'),
     import('stylelint'),
-    import(pathToFileURL(join(root, 'scripts/design-lint-plugin.mjs')).href),
+    import(designModuleUrl()),
   ]).then(([{ ESLint }, { default: stylelint }, design]) => ({
     eslint: new ESLint({ cwd: root, allowInlineConfig: false }), stylelint, design,
   }))
@@ -84,20 +92,27 @@ export function designDevGate(): Plugin {
       order: 'pre',
       async handler({ type, file, read }) {
         if (this.environment.name !== 'client' || !isGuarded(file)) return
-        updated.add(file)
-        const code = type === 'delete' ? undefined : await read()
-        const signature = code === undefined ? undefined : variableSignature(code)
-        if (type !== 'update' || variableSources.get(file) !== signature) {
-          if (signature === undefined) variableSources.delete(file)
-          else variableSources.set(file, signature)
-          checked.clear()
-          const { design } = await load()
-          design.invalidateDesignVariableIndex()
-        }
-        if (code === undefined) return
-        const diagnostics = await check(file, code)
-        if (diagnostics.length) {
+        try {
+          updated.add(file)
+          const code = type === 'delete' ? undefined : await read()
+          const signature = code === undefined ? undefined : variableSignature(code)
+          if (type !== 'update' || variableSources.get(file) !== signature) {
+            if (signature === undefined) variableSources.delete(file)
+            else variableSources.set(file, signature)
+            checked.clear()
+            const { design } = await load()
+            design.invalidateDesignVariableIndex()
+          }
+          if (code === undefined) return
+          const diagnostics = await check(file, code)
+          if (diagnostics.length === 0) return
           this.warn(format(file, diagnostics))
+          return []
+        } catch (error) {
+          engines = undefined
+          checked.delete(file)
+          variableSources.delete(file)
+          this.warn(`${sourcePath(file)}: 디자인 검사를 마치지 못해 이전 화면을 유지합니다. ${String(error)}`)
           return []
         }
       },

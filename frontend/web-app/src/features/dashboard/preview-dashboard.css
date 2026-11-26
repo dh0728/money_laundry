@@ -125,13 +125,15 @@
   min-inline-size: 0;
   align-content: start;
 }
-[data-dashboard-section-content][inert] {
-  position: absolute;
-  inset: 0 0 auto;
-  grid-template-columns: var(--grid-columns);
-  block-size: 0;
-  overflow: clip;
-  visibility: hidden;
+@media screen {
+  [data-dashboard-section-content][inert] {
+    position: absolute;
+    inset: 0 0 auto;
+    grid-template-columns: var(--grid-columns);
+    block-size: 0;
+    overflow: clip;
+    visibility: hidden;
+  }
 }
 .dashboard-section-heading {
   flex: 1;
