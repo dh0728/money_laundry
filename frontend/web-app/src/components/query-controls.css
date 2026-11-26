@@ -40,20 +40,28 @@
 #workspace-query-dock {
   --query-dock-padding: var(--aml-space-4);
   --query-dock-width: calc(var(--header-control-size) + 2 * var(--query-dock-padding));
+  --query-dock-inline-end: max(var(--workspace-inset), calc(var(--app-inline-gutter) - var(--query-dock-width) - var(--workspace-panel-gap)));
   position: fixed;
   inset-block-end: var(--workspace-footer-inset);
-  inset-inline-end: max(var(--workspace-inset), calc(var(--app-inline-gutter) - var(--query-dock-width) - var(--workspace-panel-gap)));
+  inset-inline-end: var(--query-dock-inline-end);
   z-index: var(--layer-shell);
   border-radius: var(--aml-radius-full);
+  transition: inset-inline-end var(--aml-duration-fast) ease-out;
 }
 #workspace-query-dock:not(:has(> .context-query-tools:not([hidden]))) { display: none }
-body:has(#inbox:not([hidden])) #workspace-query-dock { display: none }
+body:has(#inbox:not([hidden])) #workspace-query-dock {
+  inset-inline-end: max(var(--query-dock-inline-end), calc(var(--inbox-width) + var(--aml-space-8)));
+}
+:root[data-reduced-motion="true"] #workspace-query-dock { transition: none }
+@media (prefers-reduced-motion: reduce) {
+  #workspace-query-dock { transition: none }
+}
 #workspace-query-dock > .context-query-tools {
   flex-direction: column;
   gap: var(--aml-space-4);
   padding: var(--query-dock-padding);
 }
-:root[data-workspace-width="wide"] #workspace-query-dock { inset-inline-end: var(--workspace-inset) }
+:root[data-workspace-width="wide"] #workspace-query-dock { --query-dock-inline-end: var(--workspace-inset) }
 .screen-layout:has(.dashboard-work-details > [data-dashboard-section-content][inert]) {
   padding-block-end: calc(var(--workspace-footer-inset) + 4 * var(--header-control-size) + 5 * var(--aml-space-4));
 }

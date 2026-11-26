@@ -282,6 +282,25 @@ async function checkClosedSectionExport(page) {
   }
 }
 
+async function checkDockClearance(page) {
+  const trigger = page.locator('#inbox-toggle');
+  const dock = page.locator('#workspace-query-dock');
+  const before = await dock.evaluate(element => element.getBoundingClientRect().right);
+  await trigger.click();
+  try {
+    await page.waitForFunction(originalRight => {
+      const drawer = document.getElementById('inbox');
+      const dock = document.getElementById('workspace-query-dock');
+      const targetRight = Math.min(originalRight, drawer.getBoundingClientRect().left - 8);
+      return dock.checkVisibility() && Math.abs(dock.getBoundingClientRect().right - targetRight) < 1.5;
+    }, before, { timeout: 5000 });
+  } finally {
+    await trigger.click();
+  }
+  await page.waitForFunction(originalRight => Math.abs(document.getElementById('workspace-query-dock')
+    .getBoundingClientRect().right - originalRight) < 1.5, before, { timeout: 5000 });
+}
+
 export async function checkWorkspaceLayout(page, { path, viewport }) {
   const { pathname, searchParams } = new URL(path, page.url());
   const list = investigationLists.includes(pathname);
@@ -314,6 +333,7 @@ export async function checkWorkspaceLayout(page, { path, viewport }) {
   }
   try {
     await checkWorkspaceQueryTools(page, { pathname, table, list });
+    if (pathname === '/report' && table && searchParams.get('data') === 'sample') await checkDockClearance(page);
     if (pathname === '/dashboard/all' && searchParams.get('data') === 'sample' && viewport.width === 1440) {
       await checkClosedSectionExport(page);
     }
