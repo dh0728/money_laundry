@@ -39,7 +39,20 @@
   }
 }
 
-#preview-login[data-login-motion="entering"] .login-card {
+.login-preparation:not([hidden]) {
+  display: grid;
+  justify-items: center;
+  gap: var(--aml-space-12);
+  text-align: center;
+}
+.login-preparation:focus { outline: none }
+.login-preparation p { margin: 0 }
+.login-preparation-radar {
+  inline-size: var(--aml-space-64);
+  block-size: var(--aml-space-64);
+}
+
+#preview-login[data-login-motion="entering"] :is(.login-card, .login-preparation) {
   animation: preview-login-enter var(--login-travel-duration) var(--login-travel-ease) both;
 }
 
@@ -58,7 +71,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #preview-login[data-login-motion] :is(.login-card, .login-particle-layer) { animation: none }
+  #preview-login[data-login-motion] :is(.login-card, .login-preparation, .login-particle-layer) { animation: none }
 }
 
-:root[data-reduced-motion="true"] #preview-login[data-login-motion] :is(.login-card, .login-particle-layer) { animation: none }
+:root[data-reduced-motion="true"] #preview-login[data-login-motion] :is(.login-card, .login-preparation, .login-particle-layer) { animation: none }

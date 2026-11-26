@@ -35,13 +35,14 @@ import { caseRoute, frameLabel, screenFrame, ScreenLayout, ScreenNavigation, sec
 import { BoxHTML, BrandSymbol, Button, DecorativeCanvasHTML, Divider, GlassDialog, HeadingHTML, HTMLFragment, HTMLNode,
   Icon, IconButton, InputHTML, ProfileAvatarHTML, ScrollArea, Sidebar, TextHTML, Tooltip, bindTooltip, hideTooltip } from '../components/components.js';
 import { Text } from '../components/layout-primitives.jsx';
+import { RadarSweep } from '../components/radar-sweep';
 import { setupGlassMaterial } from '../components/glass-material.js';
 import { mountLoginScene } from '../features/auth/preview-login-scene.js';
 import { uiSizeOptions } from '../config/appearance-options.js';
 import { enableBackdropDismissal, setupOverlayDismissal } from '../lib/overlay-dismissal.js';
 import { SquishSwitch, bindSquishSwitch } from '../components/squish-switch.js';
 import { mountNotificationPreference, receivesSampleNotifications } from '../features/settings/notification-preference.jsx';
-import { loadLiveModelRiskThresholds } from '../features/settings/model-risk-settings.js';
+import { getModelRiskThresholds, loadLiveModelRiskThresholds } from '../features/settings/model-risk-settings.js';
 import { restoreWorkTabCodes, setWorkTabCodes } from './work-tab-state.js';
 import { benchmarkLedgerPath, dashboardRoute, initialDetail, isBenchmarkTransactionCode, isLedgerScreen, ledgerTableScreen, loginRoute, previewUrl, readPreviewRoute, validWorkCode } from './preview-route.js';
 import { appMotionPreference, appReducedMotion, systemReducedMotion } from '@/hooks/use-reduced-motion';
@@ -336,6 +337,7 @@ function LoginScreen() {
   return BoxHTML(
     BoxHTML('', 'class="login-particle-layer" aria-hidden="true"') + DecorativeCanvasHTML('class="login-scene"') +
     card +
+    BoxHTML('', 'id="preview-login-preparation" class="login-preparation" tabindex="-1" hidden') +
     PreferenceDialog('login-help', '계정 찾기', TextHTML('', 'id="login-help-instructions"', 'p')),
     'id="preview-login" aria-label="로그인" hidden', 'main',
   );
@@ -716,25 +718,32 @@ function afterWorkspacePaint(callback) {
 }
 
 function loadPreviewDashboard(mounted, source, query) {
+  const withWorkHistory = summary => {
+    if (!query.mine) return summary;
+    const username = serviceMode ? currentPreviewUser()?.username : source.staff;
+    const requests = serviceMode
+      ? (liveWorkRequestsReady() ? liveWorkRequests() : undefined)
+      : [...source.assignmentChanges, ...previewWorkRequests({ source: 'fixture', username })];
+    return { ...summary, workHistory: personalWorkHistory(source.cases, requests, username, query.range) };
+  };
   const load = () => {
     mounted.updateDashboard(undefined);
     afterWorkspacePaint(() => {
       if (mountedWorkflows !== mounted) return;
       const show = summary => {
         if (mountedWorkflows !== mounted) return;
-        if (query.mine) {
-          const username = serviceMode ? currentPreviewUser()?.username : source.staff;
-          const requests = serviceMode
-            ? (liveWorkRequestsReady() ? liveWorkRequests() : undefined)
-            : [...source.assignmentChanges, ...previewWorkRequests({ source: 'fixture', username })];
-          summary = { ...summary, workHistory: personalWorkHistory(source.cases, requests, username, query.range) };
-        }
-        mounted.updateDashboard(summary);
+        mounted.updateDashboard(withWorkHistory(summary));
         afterWorkspacePaint(() => {
           if (mountedWorkflows !== mounted) return;
           const rows = query.mine ? summary.mine : summary.cases;
           const board = dashboardFixtureBoardPage(rows, { size: Math.max(1, rows.length) });
-          mounted.updateDashboard({ ...summary, board });
+          const data = { ...summary, board };
+          mounted.updateDashboard(withWorkHistory(data));
+          if (query.mine && serviceMode && !liveWorkRequestsReady()) void liveWorkspaceRequests?.then(() => {
+            if (mountedWorkflows === mounted && liveWorkRequestsReady()) {
+              mounted.updateDashboard(current => current?.board ? withWorkHistory(current) : current);
+            }
+          });
         });
       };
       const fail = () => mounted.updateDashboard({ error: true, retry: load });
@@ -1377,11 +1386,11 @@ function renderNotifications(arrivalIds) {
   }
 }
 
-async function refreshLiveInbox(page = 0) {
+async function refreshLiveInbox(page = 0, initialRequests) {
   if (!signedIn || currentPreviewUser()?.source !== 'api') return;
   const request = ++inboxRequest;
   try {
-    const [result] = await Promise.all([fetchNotifications('', '', '', page), loadLiveWorkRequests()]);
+    const [result] = await Promise.all([fetchNotifications('', '', '', page), initialRequests ?? loadLiveWorkRequests()]);
     const content = result.content.map(item => ({ ...item, time: new Date(item.at) }));
     if (content.some(item => !Number.isFinite(+item.time))) throw new Error('Invalid notification timestamp');
     if (request !== inboxRequest || !signedIn) return;
@@ -1612,34 +1621,96 @@ function closeTransientViews() {
 }
 
 function showLogin() {
-  loginScene.cancel();
+  resetWorkspacePreparation();
   cancelAnimationFrame(navigationFrame);
   document.body.setAttribute('data-login-required', '');
   byId('preview-login').hidden = false;
   requestAnimationFrame(() => loginId.focus());
 }
 
-function showRoute(route, params, navigationMode) {
-  loginScene.cancel();
+function revealWorkspace() {
+  resetWorkspacePreparation();
   document.body.removeAttribute('data-login-required');
   byId('preview-login').hidden = true;
+}
+
+function resetWorkspacePreparation() {
+  workspacePreparation++;
+  loginScene.cancel();
+  loginCard.hidden = false;
+  loginPreparation.hidden = true;
+  loginPreparationRoot.render(null);
+}
+
+function showRoute(route, params, navigationMode) {
   if (serviceMode && !liveSourceLoaded()) {
-    const actor = previewActor;
-    const open = () => {
-      if (!signedIn || previewActor !== actor) return;
-      dashboardSource = undefined;
-      showLoadedRoute(route, params, navigationMode);
-    };
-    void Promise.all([loadLiveSource(), refreshLiveRules(), loadLiveWorkRequests().catch(() => undefined),
-      loadLiveModelRiskThresholds().catch(() => undefined)]).then(open, () => {
-      document.dispatchEvent(new CustomEvent('aml:notice', { detail: {
-        status: 'failed', title: '데이터를 불러올 수 없습니다.', description: '잠시 후 다시 시도해 주세요.',
-      } }));
-      open();
-    });
+    void prepareWorkspaceRoute(route, params, navigationMode, false);
     return;
   }
+  revealWorkspace();
   showLoadedRoute(route, params, navigationMode);
+}
+
+function preloadWorkspaceRoute({ screen }) {
+  if (screen.startsWith('dashboard/')) return import('../features/dashboard/preview-dashboard.jsx');
+  if (isLedgerScreen(screen)) return benchmarkLedgerRoute
+    ? import('../features/investigation/ibm-ledger.jsx') : import('../features/investigation/investigation-components.jsx');
+  if (/^add-tab\/(alerts|episodes)/.test(screen)) return screen.includes('-table')
+    ? import('../features/investigation/preview-case-list-table.jsx') : import('../features/investigation/investigation-components.jsx');
+  const tab = caseRoute(screen)?.tab;
+  if (tab === 'analysis' || tab === 'related') return import('../features/investigation/preview-case-graph.jsx');
+  if (tab === 'overview') return import('../features/investigation/preview-case-overview.jsx');
+  if (screen === 'rule-engine/draft-create') return import('../features/rules/rule-controls.jsx');
+}
+
+async function prepareWorkspaceRoute(route, params, navigationMode, animate) {
+  const attempt = ++workspacePreparation;
+  const current = () => attempt === workspacePreparation && signedIn;
+  const retry = () => void prepareWorkspaceRoute(route, params, navigationMode, animate);
+  showWorkspacePreparation();
+  warmLiveWorkspace();
+  try {
+    const board = serviceMode && !liveSourceLoaded() ? loadLiveSource() : undefined;
+    const knownRoute = board && route.code && !route.code.startsWith('T-') ? undefined : availableRoute(route);
+    await Promise.all([board, knownRoute && preloadWorkspaceRoute(knownRoute)]);
+    if (!current()) return;
+    if (board) dashboardSource = undefined;
+    const target = knownRoute ?? availableRoute(route);
+    if (!knownRoute) await preloadWorkspaceRoute(target);
+    if (!current()) return;
+    showLoadedRoute(target, params, navigationMode);
+    const open = animated => {
+      if (!current()) return;
+      revealWorkspace();
+      focusWorkspace(target, animated);
+    };
+    if (animate) loginScene.enter(open);
+    else open(false);
+  } catch {
+    if (current()) showWorkspacePreparation(retry);
+  }
+}
+
+function warmLiveWorkspace() {
+  if (!serviceMode || liveWorkspaceRequests) return;
+  const actor = previewActor;
+  const thresholds = getModelRiskThresholds().join();
+  liveWorkspaceRequests = loadLiveWorkRequests().catch(() => undefined);
+  void refreshLiveRules().then(() => {
+    if (!signedIn || previewActor !== actor || caseRoute(activePath)?.tab !== 'overview') return;
+    const row = dashboardSource?.cases.find(item => item.code === activeWorkCode);
+    if (row) mountedWorkflows?.updateCase(row, dashboardSource);
+  }, () => undefined);
+  void loadLiveModelRiskThresholds().then(() => {
+    if (signedIn && previewActor === actor && liveSourceLoaded() && thresholds !== getModelRiskThresholds().join()) {
+      document.dispatchEvent(new Event('aml:model-risk'));
+    }
+  }, () => undefined);
+}
+
+function availableRoute(route) {
+  return serviceMode && route.code && !route.code.startsWith('T-') && !liveSource().cases.some(row => row.code === route.code)
+    ? dashboardRoute : route;
 }
 
 function showLoadedRoute(route, params, navigationMode) {
@@ -1653,7 +1724,7 @@ function showLoadedRoute(route, params, navigationMode) {
       removed = true;
     }
     if (removed) persistWorkTabs();
-    if (route.code && !route.code.startsWith('T-') && !cases.has(route.code)) route = dashboardRoute;
+    route = availableRoute(route);
   }
   if (route.code) addWorkTab(route.code);
   showWorkspace('', route.code, route.screen, navigationMode, params);
@@ -1675,7 +1746,29 @@ function restoreLocation() {
 }
 
 const loginForm = byId('preview-login-form');
-const loginScene = mountLoginScene(byId('preview-login'), appMotionPreference);
+const loginHost = byId('preview-login');
+const loginCard = loginForm.closest('.login-card');
+const loginScene = mountLoginScene(loginHost, appMotionPreference);
+const loginPreparation = byId('preview-login-preparation');
+const loginPreparationRoot = createRoot(loginPreparation);
+let workspacePreparation = 0;
+let liveWorkspaceRequests;
+
+function showWorkspacePreparation(retry) {
+  document.body.setAttribute('data-login-required', '');
+  loginHost.hidden = false;
+  loginCard.hidden = true;
+  loginPreparation.hidden = false;
+  // Focus follows the login form into the preparation status, or to the retry action.
+  flushSync(() => loginPreparationRoot.render(retry ? [
+    createElement(Text, { key: 'message', role: 'alert' }, '작업 화면을 준비하지 못했습니다.'),
+    createElement(PrimaryButton, { key: 'retry', tone: 'brand', onClick: retry }, '다시 시도'),
+  ] : [
+    createElement(RadarSweep, { key: 'radar', className: 'login-preparation-radar' }),
+    createElement(Text, { key: 'message', role: 'status' }, '작업 화면 준비 중'),
+  ]));
+  (retry ? loginPreparation.querySelector('button') : loginPreparation).focus({ preventScroll: true });
+}
 const loginId = byId('preview-login-id');
 const loginPassword = byId('preview-login-password');
 const passwordToggle = byId('login-password-toggle');
@@ -1802,7 +1895,7 @@ if (!serviceMode) {
 }
 loginForm.addEventListener('submit', async event => {
   event.preventDefault();
-  if (signingIn || loginScene.transitioning || failedLogins >= loginFailureLimit) return;
+  if (signingIn || loginCard.hidden || loginScene.transitioning || failedLogins >= loginFailureLimit) return;
   clearLoginError();
   const id = loginId.value.trim();
   const password = loginPassword.value;
@@ -1818,7 +1911,7 @@ loginForm.addEventListener('submit', async event => {
     loginForm.setAttribute('aria-busy', 'true');
     try {
       const user = await login(id, password);
-      loginScene.enter(animated => enterWorkspace(user.username, animated, user));
+      enterWorkspace(user.username, true, user);
     } catch (error) {
       if (error instanceof ApiError && error.problem.status === 401) rejectLogin();
       else showLoginError('로그인할 수 없습니다. 서버 연결을 확인해 주세요.', []);
@@ -1836,22 +1929,25 @@ loginForm.addEventListener('submit', async event => {
   enterPreview(demoActor);
 });
 function enterPreview(actor) {
-  if (loginScene.transitioning) return;
+  if (loginCard.hidden || loginScene.transitioning) return;
   loginShake?.cancel();
-  loginScene.enter(animated => enterWorkspace(actor, animated));
+  enterWorkspace(actor, true);
 }
 
-function enterWorkspace(actor, animated, user) {
+function enterWorkspace(actor, animate, user) {
   loginForm.reset();
   failedLogins = 0;
   updateLoginButton();
   showLoginPassword(false);
   setPreviewSession(actor, user);
-  void refreshPreviewSessionUser().then(() => refreshLiveInbox());
+  void refreshPreviewSessionUser().then(() => refreshLiveInbox(0, liveWorkspaceRequests));
   const next = history.state?.previewNext;
   const previous = typeof next === 'string' && /^\/(?!\/)/.test(next) ? new URL(next, location.origin) : undefined;
   const route = previous ? readPreviewRoute(previous, { serviceMode }) : dashboardRoute;
-  showRoute(route, previous?.searchParams, 'push');
+  void prepareWorkspaceRoute(route, previous?.searchParams, 'push', animate);
+}
+
+function focusWorkspace(route, animated) {
   const workspace = byId('workspace');
   if (animated && route.screen.startsWith('dashboard/')) {
     const transformOrigin = 'var(--aml-motion-workspace-enter-origin)';
@@ -1888,6 +1984,7 @@ function clearWorkspaceSession() {
   resetPreviewCaseRead();
   resetLiveSource();
   resetLiveWorkRequests();
+  liveWorkspaceRequests = undefined;
   dashboardSource = undefined;
 }
 for (const host of document.querySelectorAll('[data-dialog-heading]')) {

@@ -464,7 +464,7 @@ export function mountWorkflows(workspace, dashboard, overview) {
   render();
   return {
     updateDashboard(data) {
-      dashboard = data;
+      dashboard = typeof data === 'function' ? data(dashboard) : data;
       render();
     },
     updateDashboardSort(rows, sort) {
