@@ -10,13 +10,13 @@ from control_panel import Controls, Replay, catalog
 
 
 class PanelTests(unittest.TestCase):
-    def test_catalog_dates_and_bank_names(self):
+    def test_catalog_takes_one_ledger_file_per_date(self):
         with tempfile.TemporaryDirectory() as name:
             folder = Path(name) / '2023-09-01'
             folder.mkdir()
-            (folder / 'bank_12_2023-09-01.csv').write_text('header')
-            self.assertEqual(catalog(name)['2023-09-01'][0][0], 12)
-            (folder / 'bank_12.csv').write_text('header')
+            (folder / 'ledger_2023-09-01.csv').write_text('header')
+            self.assertEqual(catalog(name)['2023-09-01'].name, 'ledger_2023-09-01.csv')
+            (folder / 'ledger_2023-09-02.csv').write_text('header')
             with self.assertRaises(ValueError):
                 catalog(name)
 
@@ -29,7 +29,7 @@ class PanelTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as name:
             folder = Path(name) / '2023-09-01'
             folder.mkdir()
-            (folder / 'bank_12_2023-09-01.csv').write_text('header')
+            (folder / 'ledger_2023-09-01.csv').write_text('header')
             with patch.dict('os.environ', {'AML_DEMO_DATA_DIR': name, 'AML_DEMO_API_URL': 'http://127.0.0.1:8080'}):
                 with patch('api_client.login_panel', return_value=(__import__('api_client').ApiClient('http://127.0.0.1:8080'), {'role':'ADMIN'})), patch.object(Controls, 'post') as post, patch.object(Controls, 'upload') as upload, patch('api_client.ApiClient.get', return_value={'businessAt': '2023-09-02T09:00:00+09:00', 'configured': True, 'revision': 1}), patch.object(Controls, 'prepare_day'):
                     app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / 'control_panel.py')).run(timeout=15)
@@ -57,7 +57,7 @@ class PanelTests(unittest.TestCase):
         from api_client import ApiError
         with tempfile.TemporaryDirectory() as name:
             (Path(name) / '2023-09-01').mkdir()
-            (Path(name) / '2023-09-01' / 'bank_12_2023-09-01.csv').write_text('header')
+            (Path(name) / '2023-09-01' / 'ledger_2023-09-01.csv').write_text('header')
             with patch.dict('os.environ', {'AML_DEMO_DATA_DIR': name, 'AML_DEMO_API_URL': 'http://127.0.0.1:8080'}), \
                     patch('api_client.login_panel', return_value=(__import__('api_client').ApiClient('http://127.0.0.1:8080'), {'role': 'ADMIN'})), \
                     patch('api_client.ApiClient.get', return_value={'businessAt': '2023-09-02T09:00:00+09:00', 'configured': True, 'revision': 1}):
@@ -98,7 +98,7 @@ class PanelTests(unittest.TestCase):
         control.upload.side_effect = RuntimeError('secret-url')
         replay = Replay(control)
         try:
-            replay.start(['d1', 'd2'], {'d1': [(1, Path('a'))], 'd2': [(2, Path('b'))]})
+            replay.start(['d1', 'd2'], {'d1': Path('a'), 'd2': Path('b')})
             replay.future.result(timeout=5)
             control.post.assert_not_called()
             self.assertEqual(control.upload.call_count, 1)
@@ -113,7 +113,7 @@ class PanelTests(unittest.TestCase):
         control.post.side_effect = [{'jobId': 1}, {'jobId': 2}]
         control.get.side_effect = [{'status': 'RUNNING'}, {'status': 'COMPLETED'}, {'status': 'COMPLETED'}]
         replay = Replay(control)
-        files = {'d1': [(1, Path('a'))], 'd2': [(2, Path('b'))]}
+        files = {'d1': Path('a'), 'd2': Path('b')}
         try:
             with patch('control_panel.time.sleep'):
                 replay.start(['d1', 'd2'], files)
@@ -153,7 +153,7 @@ class PanelTests(unittest.TestCase):
         control.post.return_value = {'jobId': 1}
         control.get.return_value = {'status': 'COMPLETED'}
         try:
-            replay.start(['d1', 'd2'], {'d1': [(1, Path('a'))], 'd2': [(2, Path('b'))]})
+            replay.start(['d1', 'd2'], {'d1': Path('a'), 'd2': Path('b')})
             replay.future.result(timeout=5)
             self.assertEqual(control.upload.call_count, 1)
             control.post.assert_called_once()
@@ -174,12 +174,12 @@ class PanelTests(unittest.TestCase):
         control.get.side_effect = result
         control.post.return_value = {'jobId': 3}
         replay = Replay(control)
-        files = {'d1': [(1, Path('a')), (2, Path('b'))]}
+        files = {'d1': Path('a')}
         try:
             replay.start(['d1'], files)
             self.assertTrue(entered.wait(5))
             state = replay.snapshot()
-            self.assertEqual((state['fileDone'], state['fileTotal'], state['doneDays']), (2, 2, 0))
+            self.assertEqual((state['fileDone'], state['fileTotal'], state['doneDays']), (1, 1, 0))
             release.set()
             replay.future.result(timeout=5)
             self.assertEqual(replay.snapshot()['doneDays'], 0)
@@ -188,8 +188,8 @@ class PanelTests(unittest.TestCase):
             replay.start(['d1'], files)
             replay.future.result(timeout=5)
             self.assertEqual(replay.snapshot()['doneDays'], 1)
-            self.assertEqual(replay.snapshot()['fileDone'], 2)
-            self.assertEqual(control.upload.call_count, 2)
+            self.assertEqual(replay.snapshot()['fileDone'], 1)
+            self.assertEqual(control.upload.call_count, 1)
         finally:
             release.set()
             replay.close()
@@ -199,7 +199,7 @@ class PanelTests(unittest.TestCase):
         control.post.side_effect = [{'jobId': 1}, {'jobId': 2}, {'jobId': 3}]
         control.get.return_value = {'status': 'COMPLETED'}
         replay = Replay(control)
-        files = {'d1': [(1, Path('a'))], 'd2': [(1, Path('b'))], 'd3': [(1, Path('c'))]}
+        files = {'d1': Path('a'), 'd2': Path('b'), 'd3': Path('c')}
         try:
             replay.start(['d1', 'd2'], files, backfill=True)
             replay.future.result(timeout=5)

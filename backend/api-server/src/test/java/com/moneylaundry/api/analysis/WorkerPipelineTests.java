@@ -47,7 +47,7 @@ class WorkerPipelineTests {
   @BeforeEach
   void setup() {
     Assumptions.assumeTrue(System.getenv("AML_TEST_PYTHON") != null);
-    jdbc.execute("truncate core.banks,analysis.jobs,core.owners cascade");
+    jdbc.execute("truncate core.banks,analysis.jobs,core.owners,ingest.uploads cascade");
     jdbc.update("update core.users set password_hash=repeat('0',96) where username='l1a'");
     job =
         jdbc.queryForObject(
@@ -64,9 +64,8 @@ class WorkerPipelineTests {
             UUID.randomUUID());
     long account =
         jdbc.queryForObject(
-            "insert into core.accounts(bank_id,service_account_id,owner_id) values(12,?,?) returning account_id",
+            "insert into core.accounts(bank_id,owner_id) values(12,?) returning account_id",
             Long.class,
-            UUID.randomUUID(),
             entity);
     long tx =
         jdbc.queryForObject(
@@ -83,8 +82,8 @@ class WorkerPipelineTests {
         """,
         run,
         tx,
-        UUID.randomUUID(),
-        UUID.randomUUID(),
+        "12-0001",
+        "12-0001",
         UUID.randomUUID(),
         UUID.randomUUID());
     jdbc.update("insert into analysis.target_ownership(tx_id,run_id) values(?,?)", tx, run);
@@ -148,25 +147,6 @@ class WorkerPipelineTests {
         .isInstanceOfSatisfying(
             AnalysisFailure.class,
             e -> assertThat(e.code()).isEqualTo("WORKER_PROTOCOL_NOT_CONNECTED"));
-  }
-
-  @Test
-  void cancellation_between_python_completion_and_spring_commit_is_rejected() {
-    var context = claim();
-    var executor = executor("worker/analysis_entry.py");
-    var result = executor.prepare(context);
-    runs.cancel(run, "REPORT_CORRECTED");
-    assertThatThrownBy(() -> executor.commit(context, result))
-        .isInstanceOfSatisfying(
-            AnalysisFailure.class,
-            e -> assertThat(e.code()).isEqualTo("WORKER_CHECKPOINT_MISSING"));
-    assertThat(service.job(job).status()).isEqualTo("FAILED");
-    assertThat(
-            jdbc.queryForObject(
-                "select count(*) from analysis.model_tasks where run_id=? and status='CANCELLED' and execution_id is null",
-                Integer.class,
-                run))
-        .isEqualTo(2);
   }
 
   @Test
@@ -399,9 +379,6 @@ class WorkerPipelineTests {
                   Integer.class,
                   run))
           .isZero();
-      runs.cancel(run, "REPORT_CORRECTED");
-      runner.scan();
-      assertThat(service.job(job).error()).isEqualTo("RUN_CANCELLED");
     }
   }
 

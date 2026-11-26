@@ -20,14 +20,15 @@ REPO = ROOT.parents[1]
 spec = importlib.util.spec_from_file_location("reset_dev_rds", ROOT / "reset_dev_rds.py")
 reset = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(reset)
-MIGRATION = REPO / "backend/api-server/src/main/resources/db/migration/V1__initial_schema.sql"
+MIGRATIONS = sorted((REPO / "backend/api-server/src/main/resources/db/migration").glob("V*__*.sql"),
+                    key=lambda path: int(path.name[1:].split("__")[0]))
 GRANTS = REPO / "backend/api-server/worker/analysis_permissions.sql"
 
 
 def tables(users=1):
     return {"users": [dict(user_id=1, username="admin", name="관리자", role="ADMIN", password_hash="hash",
                            last_assigned_at=None, created_at="2026-10-13T00:00:00+00:00")][:users],
-            "banks": [], "bank_reporting_periods": [], "fx_rates": []}
+            "fx_rates": []}
 
 
 class BackupFileTests(unittest.TestCase):
@@ -116,9 +117,11 @@ class InnerSqlTests(unittest.TestCase):
 
     def migrate(self):
         with self.admin.transaction():
-            self.admin.execute(MIGRATION.read_text(encoding="utf-8-sig"))
             self.admin.execute("CREATE TABLE public.flyway_schema_history(installed_rank int, version text, success bool)")
-            self.admin.execute("INSERT INTO public.flyway_schema_history VALUES(1,'1',true)")
+            for rank, migration in enumerate(MIGRATIONS, 1):
+                self.admin.execute(migration.read_text(encoding="utf-8-sig"))
+                self.admin.execute("INSERT INTO public.flyway_schema_history VALUES(%s,%s,true)",
+                                   (rank, migration.name[1:].split("__")[0]))
 
     def run_inner(self, action, payload=None, database=reset.DATABASE):
         source = reset.INNER.replace('.endswith(".rds.amazonaws.com")', '== "127.0.0.1"').replace(
@@ -138,21 +141,22 @@ class InnerSqlTests(unittest.TestCase):
     def test_backup_drop_migrate_restore_grant(self):
         self.migrate()
         self.admin.execute("UPDATE core.users SET password_hash='kept-hash' WHERE username='admin'")
-        self.admin.execute("INSERT INTO core.banks(bank_id,name,is_reporting) VALUES(12,'Germany Bank #12',true)")
-        self.admin.execute("INSERT INTO core.bank_reporting_periods(bank_id,effective_from_date) VALUES(12,'2023-08-31')")
+        # Banks are ledger data: they are neither backed up nor restored.
+        self.admin.execute("INSERT INTO core.banks(bank_id,name) VALUES(12,'Germany Bank #12')")
         report = json.loads(self.run_inner("inspect"))
         self.assertEqual(report["unexpected_schemas"], [])
-        self.assertEqual(report["flyway_versions"], ["1"])
+        self.assertEqual(report["flyway_versions"], [m.name[1:].split("__")[0] for m in MIGRATIONS])
         saved = json.loads(self.run_inner("backup"), parse_float=str)
-        self.assertEqual(len(saved["banks"]), 1)
+        self.assertEqual(set(saved), {"users", "fx_rates"})
+        self.assertEqual(len(saved["fx_rates"]), 15)
         self.assertEqual(self.run_inner("drop"), "EMPTIED")
         self.assertIsNone(self.admin.execute("SELECT to_regclass('core.users')").fetchone()[0])
         self.assertIsNone(self.admin.execute("SELECT to_regclass('public.flyway_schema_history')").fetchone()[0])
         self.migrate()
         counts = json.loads(self.run_inner("restore", saved))
-        self.assertEqual(counts["banks"], 1)
+        self.assertEqual(counts["fx_rates"], 15)
         self.assertEqual(self.admin.execute("SELECT password_hash FROM core.users WHERE username='admin'").fetchone()[0], "kept-hash")
-        self.assertEqual(self.admin.execute("SELECT name FROM core.banks").fetchone()[0], "Germany Bank #12")
+        self.assertEqual(self.admin.execute("SELECT count(*) FROM core.banks").fetchone()[0], 0)
         self.admin.execute("CREATE ROLE aml_dev_analysis LOGIN")
         self.assertEqual(self.run_inner("grant"), "GRANTED")
         self.assertTrue(self.admin.execute("SELECT has_table_privilege('aml_dev_analysis','analysis.jobs','SELECT')").fetchone()[0])

@@ -6,7 +6,7 @@ EC2 host from a dev release folder, which also holds reset_dev_rds.py.
   (no flags)            inspect only: schemas, Flyway versions, row counts
   --apply               stop the current production API and drop every aml_prod schema
   --copy-config-from-dev  after the new production release migrated the empty DB: copy dev's
-                        users, banks, reporting periods and FX rates, then grant the analysis login
+                        users and FX rates, then grant the analysis login
 
 SQL runs inside the release API containers through deploy.py's Compose environment, so DB
 credentials never reach this process, its arguments or output. aml_dev_v3 is only read.

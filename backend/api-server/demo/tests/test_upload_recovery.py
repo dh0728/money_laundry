@@ -1,14 +1,14 @@
-import io
-import json
 import sys
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
-from urllib.error import HTTPError, URLError
+
+import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from control_panel import Controls
 from api_client import ApiError
+from ledger_upload import UploadHttpError
 
 
 class UploadRecoveryTests(unittest.TestCase):
@@ -20,12 +20,15 @@ class UploadRecoveryTests(unittest.TestCase):
         self.report = Mock()
 
     def upload(self):
-        with patch('control_panel.bank_module', return_value=self.mock), patch('control_panel.build_opener'), patch('control_panel.time.sleep'):
-            return self.controls.upload('2023-09-04', 28, Path('bank_28_2023-09-04.csv'), self.report)
+        with patch('control_panel.ledger_upload', self.mock), patch('control_panel.time.sleep'):
+            return self.controls.upload('2023-09-04', Path('ledger_2023-09-04.csv'), self.report)
+
+    def lost(self):
+        return httpx.ConnectError('secret')
 
     def test_lost_get_is_retried_without_reupload(self):
         self.mock.request_status.side_effect = [
-            {'status': 'RUNNING'}, URLError('secret'), {'status': 'COMPLETED'}]
+            {'status': 'RUNNING'}, self.lost(), {'status': 'COMPLETED'}]
         self.assertEqual(self.upload(), 670)
         self.assertEqual(self.mock.request_upload.call_count, 1)
         self.assertEqual(self.mock.upload_file.call_count, 1)
@@ -33,7 +36,7 @@ class UploadRecoveryTests(unittest.TestCase):
         self.assertNotIn('secret', str(self.report.call_args_list))
 
     def test_exhausted_get_can_resume_same_id_without_post_or_put(self):
-        self.mock.request_status.side_effect = [{'status': 'RUNNING'}] + [URLError('secret')] * 6
+        self.mock.request_status.side_effect = [{'status': 'RUNNING'}] + [self.lost() for _ in range(6)]
         with self.assertRaises(ApiError):
             self.upload()
         self.mock.request_status.side_effect = [{'status': 'COMPLETED'}]
@@ -43,15 +46,16 @@ class UploadRecoveryTests(unittest.TestCase):
         self.assertFalse(self.mock.request_status.call_args.kwargs.get('complete', False))
 
     def test_lost_complete_response_is_reconciled_by_get(self):
-        self.mock.request_status.side_effect = [URLError('secret'), {'status': 'COMPLETED'}]
+        self.mock.request_status.side_effect = [self.lost(), {'status': 'COMPLETED'}]
         self.assertEqual(self.upload(), 670)
         self.assertEqual(self.mock.request_status.call_count, 2)
         self.assertTrue(self.mock.request_status.call_args_list[0].kwargs['complete'])
         self.assertFalse(self.mock.request_status.call_args_list[1].kwargs.get('complete', False))
 
-    def test_server_failure_never_counts_as_completed(self):
-        self.mock.request_status.return_value = {'status': 'VALIDATION_FAILED'}
-        with self.assertRaises(ApiError):
+    def test_load_failure_never_counts_as_completed(self):
+        self.mock.request_status.return_value = {
+            'status': 'VALIDATION_FAILED', 'errors': [{'row': 3, 'reason': 'BUSINESS_DATE_MISMATCH'}]}
+        with self.assertRaisesRegex(ApiError, 'BUSINESS_DATE_MISMATCH'):
             self.upload()
 
     def test_changed_file_does_not_reuse_old_upload(self):
@@ -63,8 +67,7 @@ class UploadRecoveryTests(unittest.TestCase):
         self.assertEqual(self.mock.upload_file.call_count, 2)
 
     def conflict(self, code='DUPLICATE_FILE', upload=670):
-        return HTTPError('https://hidden', 409, 'hidden', {},
-                         io.BytesIO(json.dumps({'code': code, 'uploadId': upload}).encode()))
+        return UploadHttpError(409, code, upload)
 
     def test_restart_recovers_completed_duplicate_without_put(self):
         self.mock.request_upload.side_effect = self.conflict()
@@ -75,7 +78,7 @@ class UploadRecoveryTests(unittest.TestCase):
         self.assertFalse(self.mock.request_status.call_args.kwargs.get('complete', False))
 
     def test_lost_issue_response_reconciles_in_progress_and_waits(self):
-        self.mock.request_upload.side_effect = [URLError('hidden'), self.conflict('UPLOAD_IN_PROGRESS')]
+        self.mock.request_upload.side_effect = [self.lost(), self.conflict('UPLOAD_IN_PROGRESS')]
         self.mock.request_status.side_effect = [
             {'status': 'RUNNING', 'businessDate': '2023-09-04', 'sizeBytes': 100},
             {'status': 'COMPLETED'}]
@@ -90,19 +93,24 @@ class UploadRecoveryTests(unittest.TestCase):
             self.upload()
         self.mock.upload_file.assert_not_called()
 
-    def test_old_server_without_id_does_not_skip_file(self):
+    def test_conflict_without_id_does_not_skip_file(self):
         self.mock.request_upload.side_effect = self.conflict(upload=None)
         with self.assertRaises(ApiError):
             self.upload()
         self.mock.request_status.assert_not_called()
         self.mock.upload_file.assert_not_called()
 
+    def test_already_loaded_date_is_reported_with_its_code(self):
+        self.mock.request_upload.side_effect = self.conflict('DATE_ALREADY_LOADED', None)
+        with self.assertRaisesRegex(ApiError, 'DATE_ALREADY_LOADED'):
+            self.upload()
+        self.mock.upload_file.assert_not_called()
+
     def test_url_only_recovery_verifies_object_before_accepting(self):
         self.mock.request_upload.side_effect = self.conflict('UPLOAD_IN_PROGRESS')
         self.mock.request_status.side_effect = [
             {'status': 'URL_ISSUED', 'businessDate': '2023-09-04', 'sizeBytes': 100},
-            HTTPError('https://hidden', 400, 'hidden', {},
-                      io.BytesIO(b'{"code":"UPLOAD_MISMATCH"}'))]
+            UploadHttpError(400, 'UPLOAD_MISMATCH')]
         with self.assertRaisesRegex(ApiError, 'UPLOAD_MISMATCH'):
             self.upload()
         self.mock.upload_file.assert_not_called()

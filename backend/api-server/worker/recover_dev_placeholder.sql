@@ -28,9 +28,7 @@ BEGIN
         AND t.execution_id IS NULL AND t.finished_at IS NULL) <> 2
      OR EXISTS(SELECT 1 FROM analysis.stage_results WHERE run_id=target_run
                AND stage IN ('INFERENCE','SCORES','ALERTS'))
-     OR EXISTS(SELECT 1 FROM analysis.scores WHERE run_id=target_run)
-     OR EXISTS(SELECT 1 FROM analysis.cancel_outbox c JOIN analysis.model_requests r
-               USING(request_id,execution_round) WHERE r.run_id=target_run) THEN
+     OR EXISTS(SELECT 1 FROM analysis.scores WHERE run_id=target_run) THEN
     RAISE EXCEPTION 'RECOVERY_REFUSED: expected two unaccepted example.com requests';
   END IF;
   UPDATE analysis.model_tasks

@@ -1,4 +1,4 @@
-"""Categories derived from plaintext names while they are visible in 거래 통합.
+"""Categories derived from plaintext names while they are visible in ledger loading.
 
 Only the category is kept; names, numbers and identifiers are not. Values follow the
 source spelling and are None when the name does not carry one. Model-specific

@@ -29,16 +29,15 @@ def main():
                     raise ValueError("TLS connection required")
                 if label == "app" and os.environ.get("AML_REQUIRE_INFERENCE_IDLE") == "true":
                     # A freshly recreated business DB has no schema before the new image migrates it;
-                    # it holds no analysis or cancellation work, so it is idle.
+                    # it holds no analysis work, so it is idle.
                     cursor.execute("SELECT to_regclass('analysis.jobs') IS NOT NULL")
                     migrated = cursor.fetchone() == (True,)
                 if label == "app" and os.environ.get("AML_REQUIRE_INFERENCE_IDLE") == "true" and migrated:
                     cursor.execute("""SELECT
                         EXISTS(SELECT 1 FROM analysis.jobs WHERE status IN ('QUEUED','RUNNING','RETRY_WAIT'))
-                        OR EXISTS(SELECT 1 FROM analysis.runs WHERE status IN ('READY','ACTIVE','CANCEL_REQUESTED'))
-                        OR EXISTS(SELECT 1 FROM analysis.cancel_outbox WHERE acknowledged_at IS NULL)""")
+                        OR EXISTS(SELECT 1 FROM analysis.runs WHERE status IN ('READY','ACTIVE'))""")
                     if cursor.fetchone() != (False,):
-                        raise ValueError("Inference target switch requires idle analysis and cancellation queues")
+                        raise ValueError("Inference target switch requires idle analysis")
         print(label + " RDS TLS connection OK")
 
 
@@ -47,5 +46,5 @@ if __name__ == "__main__":
         main()
     except Exception:
         # Driver diagnostics can contain connection details; keep deployment logs generic.
-        print("RDS preflight failed. Check TLS/roles and drain analysis/cancellation before switching inference.", file=sys.stderr)
+        print("RDS preflight failed. Check TLS/roles and drain analysis before switching inference.", file=sys.stderr)
         sys.exit(1)

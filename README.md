@@ -18,8 +18,7 @@
 money_laundry/
 ├── backend/
 │   ├── api-server/        # Spring API + Python 분석 워커(worker/). API.md·ERD.md가 계약 문서
-│   ├── inference-server/  # 모델을 실행하는 추론 서버. KubeSphere에서 이 폴더를 그대로 실행
-│   └── bank-mock/         # 은행 쪽 파일 전송 목업
+│   └── inference-server/  # 모델을 실행하는 추론 서버. KubeSphere에서 이 폴더를 그대로 실행
 ├── frontend/
 │   ├── web-app/           # React·TypeScript 웹 화면
 │   └── prototype/         # 화면 시안

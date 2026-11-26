@@ -103,8 +103,7 @@ public class RuleRunStep {
             """
             select distinct i.business_date::text from analysis.input_transactions i
             where i.run_id=? and i.input_role='TARGET'
-              and i.business_date >= (select min(business_date) from ledger.transactions
-                                      where integration_status='ACTIVE') + ?
+              and i.business_date >= (select min(business_date) from ledger.transactions) + ?
             order by 1
             """,
             String.class,

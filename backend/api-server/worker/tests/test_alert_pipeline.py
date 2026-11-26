@@ -37,7 +37,7 @@ class AlertPostgresTests(unittest.TestCase):
     def coverage(self,run,complete):
         for day in ('2022-09-01','2022-09-02','2022-09-03','2022-09-04'):
             ok = day=='2022-09-02' or (day=='2022-09-03' and complete)
-            self.admin.execute("INSERT INTO analysis.input_coverage VALUES(%s,%s,2,%s,%s,'[]') ON CONFLICT(run_id,business_date) DO UPDATE SET complete=excluded.complete,complete_banks=excluded.complete_banks",(run,day,2 if ok else 0,ok))
+            self.admin.execute("INSERT INTO analysis.input_coverage VALUES(%s,%s,%s,%s) ON CONFLICT(run_id,business_date) DO UPDATE SET complete=excluded.complete,row_count=excluded.row_count",(run,day,ok,2 if ok else 0))
 
     def plans(self):
         return [json.loads(payload) for payload, in self.admin.execute(
@@ -72,7 +72,7 @@ class AlertPostgresTests(unittest.TestCase):
                 with self.assertRaises(self.psycopg.errors.InsufficientPrivilege): writer.execute(statement)
         plan, = self.plans()
         self.assertEqual(plan['action'],'NEW')
-        self.assertEqual(plan['evidence']['policyVersion'],'block-pin-4')
+        self.assertEqual(plan['evidence']['policyVersion'],'block-pin-3')
         self.assertEqual([w['kind'] for w in plan['evidence']['witnesses']],['PASS'])
         self.assertEqual(plan['evidence']['contextQuery']['focalAccounts'],[])
         self.assertEqual(self.admin.execute('SELECT count(*) FROM review.alerts').fetchone()[0],0)
@@ -473,7 +473,7 @@ class AlertExtensionTests(unittest.TestCase):
         pad = timedelta(microseconds=POLICY.context_pad_us)
         self.assertEqual(doc['contextQuery']['firstAt'], (base - pad).astimezone(timezone.utc).isoformat())
         self.assertEqual(doc['contextQuery']['lastAt'], (base + timedelta(hours=6) + pad).astimezone(timezone.utc).isoformat())
-        self.assertEqual(doc['policyVersion'], 'block-pin-4')
+        self.assertEqual(doc['policyVersion'], 'block-pin-3')
         self.assertEqual(doc['summary']['txCount'], 2)
 
     def test_links_follow_the_current_run_and_stay_out_of_the_fingerprint(self):

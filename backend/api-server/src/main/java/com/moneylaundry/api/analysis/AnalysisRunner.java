@@ -144,9 +144,6 @@ public class AnalysisRunner implements AutoCloseable {
                   waitForIngest(id);
                   return null;
                 }
-                if (job.stage() == AnalysisStage.INFERENCE
-                    && runs.current(id) != null
-                    && !runs.canInfer(runs.current(id))) return null;
                 UUID token = UUID.randomUUID();
                 service.jdbc.update(
                     """
@@ -207,7 +204,7 @@ public class AnalysisRunner implements AutoCloseable {
     flush(item);
   }
 
-  /** Moves a WAIT_INGEST job to FAILED, RETRY_WAIT or the INTEGRATE stage; never executes it. */
+  /** Moves a WAIT_INGEST job to FAILED, RETRY_WAIT or the FREEZE_INPUT stage; never executes it. */
   private void waitForIngest(long id) {
     var states =
         service.jdbc.queryForList(
@@ -230,7 +227,7 @@ public class AnalysisRunner implements AutoCloseable {
       return;
     }
     service.jdbc.update(
-        "update analysis.jobs set status='QUEUED',current_stage='INTEGRATE',retry_at=null where job_id=?",
+        "update analysis.jobs set status='QUEUED',current_stage='FREEZE_INPUT',retry_at=null where job_id=?",
         id);
   }
 
@@ -261,7 +258,7 @@ public class AnalysisRunner implements AutoCloseable {
     try {
       service.tx.executeWithoutResult(
           status -> {
-            AnalysisRunService.integrationLock(service.jdbc);
+            AnalysisRunService.ingestLock(service.jdbc);
             service.jdbc.queryForList(
                 "select pg_advisory_xact_lock(?)", AnalysisService.RECEIPT_LOCK);
             service.jdbc.queryForList("select id from ops.business_clock where id for update");
@@ -409,25 +406,7 @@ public class AnalysisRunner implements AutoCloseable {
             });
         item.result = null;
         addFailure(item, "ALERT_BASELINE_CHANGED", AnalysisFailure.Kind.COMPUTATION);
-      } else if ("INPUT_REVISION_CHANGED".equals(failure.getMessage())) {
-        service.tx.executeWithoutResult(
-            status -> {
-              service.lock(item.job.id());
-              if (service.owns(item.job))
-                service.jdbc.update(
-                    "update analysis.jobs set status='QUEUED',current_stage='INTEGRATE',execution_id=null,execution_owner=null where job_id=?",
-                    item.job.id());
-            });
-        pending.remove(item.job.id());
-      } else
-        addFailure(
-            item,
-            "CUTOFF_SUPERSEDED".equals(failure.getMessage())
-                ? "CUTOFF_SUPERSEDED"
-                : "STAGE_EXECUTION_FAILED",
-            "CUTOFF_SUPERSEDED".equals(failure.getMessage())
-                ? AnalysisFailure.Kind.PERMANENT
-                : AnalysisFailure.Kind.COMPUTATION);
+      } else addFailure(item, "STAGE_EXECUTION_FAILED", AnalysisFailure.Kind.COMPUTATION);
     }
   }
 }

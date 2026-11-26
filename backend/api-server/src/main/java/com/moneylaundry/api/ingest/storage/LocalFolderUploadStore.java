@@ -10,8 +10,8 @@ import java.util.Map;
 import java.util.OptionalLong;
 
 /**
- * local/default 환경의 백엔드 테스트용 폴더 저장소. url은 file:// 경로이며 현재 은행 목업은 파일 복사를 지원하지 않는다. 로컬 폴더에는 서명이 없으므로
- * 만료 시각을 저장하지 않는다.
+ * local/default 환경의 백엔드 테스트용 폴더 저장소. url은 file:// 경로이며 조작패널의 HTTP 업로드는 이 경로를 지원하지 않는다. 로컬 폴더에는 서명이
+ * 없으므로 만료 시각을 저장하지 않는다.
  */
 public class LocalFolderUploadStore implements UploadStore {
 

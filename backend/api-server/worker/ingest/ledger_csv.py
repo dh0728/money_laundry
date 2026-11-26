@@ -1,7 +1,6 @@
-"""Strict AML17 reader. Error messages contain locations, never source values."""
+"""Strict ledger file reader (17 columns). Error messages contain locations, never source values."""
 
 import csv
-import hashlib
 import re
 import unicodedata
 from datetime import datetime, timezone
@@ -46,7 +45,7 @@ class _Lines:
         return line
 
 
-class ReportReader:
+class LedgerReader:
     def __init__(self, stream, zone='Asia/Seoul'):
         self.lines = _Lines(stream)
         self.reader = csv.reader(self.lines, strict=True)
@@ -157,8 +156,4 @@ class ReportReader:
         if label not in ('', '0', '1'):
             raise RowError(self.start, 'Is Laundering', '라벨은 0 또는 1')
         result['isLaundering'] = None if not label else label == '1'
-        material = '|'.join(str(result[k]) for k in ('occurredAt', 'fromBank', 'fromAccount',
-            'toBank', 'toAccount', 'amountReceived', 'receivingCurrency', 'amountPaid',
-            'paymentCurrency', 'paymentFormat'))
-        result['rowHash'] = hashlib.sha256(material.encode()).hexdigest()
         return result

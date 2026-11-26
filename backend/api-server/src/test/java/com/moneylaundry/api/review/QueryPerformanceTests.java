@@ -45,7 +45,7 @@ class QueryPerformanceTests {
     jdbc.execute(
         "insert into core.owners(owner_id,service_owner_id,display_name) overriding system value select n,gen_random_uuid(),'가명#'||n from generate_series(1,50381) n");
     jdbc.execute(
-        "insert into core.accounts(account_id,service_account_id,bank_id,owner_id) overriding system value select n,gen_random_uuid(),1+(n%10),1+((n-1)%50381) from generate_series(1,76754) n");
+        "insert into core.accounts(account_id,account_no,bank_id,owner_id) overriding system value select n,n,1+(n%10),1+((n-1)%50381) from generate_series(1,76754) n");
     long ledgerStarted = System.nanoTime();
     jdbc.execute(
         "insert into ledger.transactions(tx_id,occurred_at,business_date,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version) overriding system value select n,timestamptz '2023-08-31 00:00+09'+((n-1)%864000)*interval '1 second',date '2023-08-31'+((n-1)%10),1+((n-1)%76754),1+(n%76754),100,'USD',100,'USD','ACH',100,'fx_rates_usd_v1' from generate_series(1,690519) n");

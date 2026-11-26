@@ -51,4 +51,5 @@ test('server cases become screen rows with KST display codes and three-step stat
   expect(mine.map(row => row.code)).toEqual(['E-230908-000013', 'A-230907-000008', 'A-230905-000006', 'A-230905-000009']);
   expect(liveCodes('A')).toEqual(['A-230907-000008', 'A-230906-000005', 'A-230905-000006', 'A-230905-000009']);
   expect(serverIdFromCode('A-230906-000005')).toBe(5);
-});
+  // The cold import pulls in query-controls.jsx (date picker, icons) and exceeds 5s on loaded CI runners.
+}, 30_000);

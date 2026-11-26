@@ -76,7 +76,7 @@ class RuleOperationTests {
 
   long account() {
     return jdbc.queryForObject(
-        "insert into core.accounts(bank_id,service_account_id,owner_id) values(999017,gen_random_uuid(),?) returning account_id",
+        "insert into core.accounts(bank_id,owner_id) values(999017,?) returning account_id",
         Long.class,
         owner);
   }
@@ -532,7 +532,7 @@ class RuleOperationTests {
     assertThat(card.get("subject").toString())
         .isEqualTo(
             jdbc.queryForObject(
-                "select left(service_account_id::text,8) from core.accounts where account_id=?",
+                "select service_account_id from core.accounts where account_id=?",
                 String.class,
                 six));
     assertThat(card.get("hitDates")).isEqualTo(List.of("2023-09-09"));

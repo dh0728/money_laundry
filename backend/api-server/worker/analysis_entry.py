@@ -4,7 +4,7 @@ import os
 import uuid
 
 
-# Analysis stages after 거래 통합, in pipeline order. Each module exposes
+# Analysis stages after 분석 입력 고정, in pipeline order. Each module exposes
 # run(connection, execution, context); this table is the only place that maps them.
 # (stage, operation) -> (module, needs --model-kind, talks to the inference worker, requires inference env)
 STAGES = {
@@ -19,7 +19,7 @@ STAGES = {
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--job-id", type=int, required=True)
-    parser.add_argument("--stage", choices=("INTEGRATE", "FEATURES", "INFERENCE", "SCORES", "ALERTS"), required=True)
+    parser.add_argument("--stage", choices=("FEATURES", "INFERENCE", "SCORES", "ALERTS"), required=True)
     parser.add_argument("--execution-id", type=uuid.UUID, required=True)
     parser.add_argument("--run-id", type=uuid.UUID)
     parser.add_argument("--operation", choices=("PUBLISH",))
@@ -27,10 +27,6 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.job_id < 1:
         parser.error("job-id must be positive")
-    if args.stage == 'INTEGRATE':
-        if args.run_id is not None or args.operation is not None or args.model_kind is not None:
-            return 65
-        return integrate(args.job_id,args.execution_id)
     stage = STAGES.get((args.stage, args.operation))
     if stage is not None and stage[1] != (args.model_kind is not None):
         stage = None
@@ -77,29 +73,6 @@ def main(argv=None):
         return 65
     except OSError:
         return 74
-
-
-def integrate(job_id, execution_id):
-    try:
-        import psycopg
-        from common.private_data import PrivateDataProtector
-        from integrate.report_integration import integrate_job, ReportRevisionChanged
-        from common.frozen_input import StaleExecution
-        protector = PrivateDataProtector(os.environ['INGEST_ENCRYPTION_KEY'],os.environ['INGEST_SEARCH_KEY'],os.environ['INGEST_KEY_VERSION'])
-        with psycopg.connect(os.environ['WORKER_DB_URL'],user=os.environ.get('WORKER_DB_USER'),
-                password=os.environ.get('WORKER_DB_PASSWORD'),autocommit=True,connect_timeout=10) as db:
-            integrate_job(db,job_id,execution_id,protector,os.environ['INGEST_FX_VERSION'])
-        return 0
-    except (ImportError,KeyError):
-        return 78
-    except ReportRevisionChanged:
-        return 81
-    except StaleExecution:
-        return 79
-    except psycopg.Error:
-        return 75
-    except ValueError as error:
-        return 82 if str(error) == 'CUTOFF_SUPERSEDED' else 65
 
 
 if __name__ == "__main__":

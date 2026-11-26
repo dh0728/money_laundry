@@ -278,7 +278,7 @@ def save_scores(connection, execution, storage_root, settings, s3):
         lock_stage(connection, execution, 'SCORES')
         if connection.execute('''SELECT EXISTS(SELECT 1 FROM combined_scores s JOIN ledger.transactions t USING(tx_id)
             LEFT JOIN analysis.target_ownership o USING(tx_id)
-            WHERE t.integration_status<>'ACTIVE' OR o.run_id IS DISTINCT FROM %s
+            WHERE o.run_id IS DISTINCT FROM %s
             OR EXISTS(SELECT 1 FROM analysis.input_transactions i JOIN analysis.runs r USING(run_id)
               WHERE i.tx_id=t.tx_id AND i.input_role='TARGET' AND r.status='COMPLETED'))''',
             (execution.run_id,)).fetchone()[0]:

@@ -23,7 +23,7 @@ public class LedgerController {
       @RequestParam(required = false) LocalDate from,
       @RequestParam(required = false) LocalDate to,
       @RequestParam(required = false) UUID owner,
-      @RequestParam(required = false) UUID account,
+      @RequestParam(required = false) String account,
       @RequestParam(required = false) List<String> judgement,
       @RequestParam(required = false) List<String> payments,
       @RequestParam(required = false) String query,

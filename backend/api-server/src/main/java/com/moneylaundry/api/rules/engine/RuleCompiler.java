@@ -147,14 +147,12 @@ public final class RuleCompiler {
         return """
             not exists (select 1 from ledger.transactions p
               where p.from_account_id = t.from_account_id and p.to_account_id = t.to_account_id
-                and p.integration_status = 'ACTIVE'
                 and (p.occurred_at, p.tx_id) < (t.occurred_at, t.tx_id))""";
       }
       case "FX_FOLLOW" -> {
         return """
             exists (select 1 from ledger.transactions s
               where s.from_account_id = t.from_account_id and s.to_account_id = t.from_account_id
-                and s.integration_status = 'ACTIVE'
                 and s.payment_currency <> s.receiving_currency and s.amount_received > 0
                 and s.occurred_at >= date_trunc('minute', t.occurred_at)
                 and s.occurred_at < date_trunc('minute', t.occurred_at) + interval '1 minute'

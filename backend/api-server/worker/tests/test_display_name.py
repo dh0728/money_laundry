@@ -1,6 +1,6 @@
 import unittest
 
-from integrate.identity_store import display_name
+from ingest.ledger_ingest import display_name
 
 
 class DisplayNameTests(unittest.TestCase):

@@ -1,9 +1,8 @@
 import io
 import unittest
 from decimal import Decimal
-from pathlib import Path
 
-from ingest.report_csv import REQUIRED, ReportReader, RowError
+from ingest.ledger_csv import REQUIRED, LedgerReader, RowError
 
 HEADER = ','.join(REQUIRED) + '\n'
 ROW = '2023/09/01 09:00,10,001,20,002,100,US Dollar,100,US Dollar,ACH,Bank10,Bank20,E1,Alice,E2,Bob\n'
@@ -11,7 +10,7 @@ ROW = '2023/09/01 09:00,10,001,20,002,100,US Dollar,100,US Dollar,ACH,Bank10,Ban
 
 class CsvTests(unittest.TestCase):
     def reader(self, body=ROW, header=HEADER):
-        return ReportReader(io.StringIO(header + body, newline=''))
+        return LedgerReader(io.StringIO(header + body, newline=''))
 
     def test_normalized_exact_values_and_no_numeric_account_conversion(self):
         row = self.reader().next()
@@ -83,12 +82,6 @@ class CsvTests(unittest.TestCase):
                 row=self.reader(','.join(fields)+'\n').next()
                 self.assertEqual(Decimal(value),Decimal(row['amountReceived' if index==5 else 'amountPaid']))
 
-    def test_original_hash_is_preserved_for_equivalent_amounts(self):
-        base='2024/02/29 12:34,70,A,12,B,123.123456,US Dollar,1,US Dollar,ACH,Bank70,Bank12,E1,Alice,E2,Bob\n'
-        first=self.reader(base).next()['rowHash']
-        self.assertEqual('5fd92448c2b1f6ada227f099c789d87b0e2082f087c8c7c399164db89f0cf23b',first)
-        self.assertEqual(first,self.reader(base.replace('123.123456','123.1234560').replace(',1,',',1.0000000,')).next()['rowHash'])
-
     def test_limits_count_unicode_codepoints_after_trim(self):
         for index,limit in ((2,100),(4,100),(9,30)):
             for unit in ('A','한','😀'):
@@ -98,16 +91,6 @@ class CsvTests(unittest.TestCase):
                 fields[index]=unit*(limit+1)
                 with self.assertRaises(RowError):
                     self.reader(','.join(fields)+'\n').next()
-
-    def test_bank_mock_smoke_fixture(self):
-        fixture=Path(__file__).resolve().parents[3]/'bank-mock/fixtures/kubesphere_smoke.csv'
-        with fixture.open(encoding='utf-8',newline='') as stream:
-            reader=ReportReader(stream)
-            row=reader.next()
-            self.assertEqual('SMOKE260917A',row['fromAccount'])
-            self.assertEqual('SMOKE260917B',row['toAccount'])
-            self.assertEqual('2022-09-01T03:34:00Z',row['occurredAt'])
-            self.assertIsNone(reader.next())
 
 
 if __name__ == '__main__':

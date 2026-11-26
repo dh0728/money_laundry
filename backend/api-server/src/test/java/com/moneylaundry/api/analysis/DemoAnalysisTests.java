@@ -48,7 +48,7 @@ class DemoAnalysisTests {
   /** received_at is business time: before the cutoff of the clock the test runs on. */
   void upload(LocalDate date, String state, String receivedAt) {
     jdbc.update(
-        "insert into ingest.uploads(bank_id,file_name,file_hash,size_bytes,status,business_date,received_at) values(12,'fixture.csv',repeat('a',64),1,?,?,?::timestamptz)",
+        "insert into ingest.uploads(file_name,file_hash,size_bytes,status,business_date,received_at) values('fixture.csv',repeat('a',64),1,?,?,?::timestamptz)",
         state,
         date,
         receivedAt);
@@ -108,9 +108,9 @@ class DemoAnalysisTests {
   void configured_business_clock_is_the_cutoff_and_receipts_compare_business_time() {
     jdbc.update("update ops.business_clock set business_at='2023-09-02T09:00:00+09' where id");
     jdbc.update(
-        "insert into ingest.uploads(bank_id,file_name,file_hash,size_bytes,status,business_date,received_at) values"
-            + "(12,'in.csv',repeat('a',64),1,'COMPLETED',?,'2023-09-02T08:59:00+09'),"
-            + "(12,'late.csv',repeat('b',64),1,'COMPLETED',?,'2023-09-02T09:01:00+09')",
+        "insert into ingest.uploads(file_name,file_hash,size_bytes,status,business_date,received_at) values"
+            + "('in.csv',repeat('a',64),1,'COMPLETED',?,'2023-09-02T08:59:00+09'),"
+            + "('late.csv',repeat('b',64),1,'RECEIVED',?,'2023-09-02T09:01:00+09')",
         day,
         day);
     long id = service.registerDemo(day);
