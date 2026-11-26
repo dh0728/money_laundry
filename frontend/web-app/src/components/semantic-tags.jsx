@@ -53,8 +53,8 @@ export function StatusTag({ preset, className = '', emphasis = 'solid', children
     data-tone={statusTones[preset] ?? 'neutral'}>{Icon && <Icon className="semantic-tag-icon" aria-hidden="true" />}{children}</span>;
 }
 
-export function CaseAgeTag({ days }) {
-  if (!(days >= cautionAgeDays)) return null;
+export function CaseAgeTag({ days, showRecent = false }) {
+  if (days == null || !(days >= (showRecent ? 0 : cautionAgeDays))) return null;
   return <StatusTag preset={isOverdueCaseAge(days) ? 'elapsedOverdue' : 'elapsed'}>{days}일 경과</StatusTag>;
 }
 

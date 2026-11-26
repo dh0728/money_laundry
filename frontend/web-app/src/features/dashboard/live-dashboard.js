@@ -2,7 +2,7 @@ import { getJson } from '@/api/common';
 import { fetchReviewUsers } from '@/api/liveReview';
 import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings.js';
 import { isOverdueCaseAge } from '../investigation/case-age.js';
-import { alertEvidenceCodes, dashboardDateKey as dateKey, investigationDashboard } from './dashboard-investigation.js';
+import { alertEvidenceCodes, caseLifecycleByDay, dashboardBusinessDate, dashboardDateKey as dateKey, investigationDashboard } from './dashboard-investigation.js';
 
 // 서비스 모드 대시보드 숫자. 화면이 읽는 모양은 mocks/dashboard-fixtures.js의 dashboardFixtureResponse와 같다.
 // 업무 지표는 서버에서 받은 Alert·Episode로 계산한다. 전체 거래 수·의심 거래 수·유형별 수는 서버 집계를 읽고,
@@ -14,6 +14,21 @@ const kstDate = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul', year:
 const sum = (rows, key) => rows.reduce((total, row) => total + row[key], 0);
 
 export const liveDashboardAsOf = source => new Date(`${kstDate.format(new Date(source.businessAt))}T00:00:00`);
+
+async function loadTodayDetection(date) {
+  if (!date) return null;
+  try {
+    const summary = await getJson('/api/v1/dashboard/summary', { from: date, to: date });
+    const detection = summary?.pipeline?.data?.detection;
+    if (!detection || dashboardBusinessDate(summary.businessAt) !== date) return null;
+    const { received, analyzed, suspicious } = detection;
+    if (![received, analyzed, suspicious].every(Number.isSafeInteger) || suspicious < 0 || suspicious > analyzed || analyzed > received) return null;
+    return { received, analyzed, suspicious, basis: 'analysis-day' };
+  } catch {
+    // The review board and period charts remain available while the pipeline projection is unavailable.
+    return null;
+  }
+}
 
 export async function liveDashboardResponse(source, { mine, rows, population, range, sort } = {}) {
   const scopeCases = mine ? source.mine : source.cases;
@@ -33,10 +48,11 @@ export async function liveDashboardResponse(source, { mine, rows, population, ra
   const members = source.transactions.filter(row => includesDate(row) && evidence.has(row.code));
   const flagged = members.filter(row => row.suspicious);
   const coveredEvidence = partial ? alertEvidenceCodes(population ?? rows ?? scopeCases) : undefined;
-  const [ledger, roster] = await Promise.all([
+  const [ledger, roster, todayDetection] = await Promise.all([
     partial ? undefined : getJson(`/api/v1/dashboard/transaction-days?from=${from}&to=${to}`),
     mine ? undefined : fetchReviewUsers().then(users => Array.isArray(users)
       ? users.filter(user => user.role === 'STAFF') : undefined).catch(() => undefined),
+    mine ? null : loadTodayDetection(dashboardBusinessDate(source.businessAt)),
   ]);
   const ledgerDays = new Map(ledger?.days.map(day => [day.date, day]));
   const ledgerHours = new Map(ledger?.hours.map(hour => [hour.hour, hour]));
@@ -44,10 +60,7 @@ export async function liveDashboardResponse(source, { mine, rows, population, ra
   const alertCases = cases.filter(row => row.kind === 'Alert');
   const byDay = Map.groupBy(cases, row => dateKey(row.date));
   const membersByDay = Map.groupBy(members, row => dateKey(row.date));
-  const completions = Map.groupBy(completedPopulation.filter(row => row.kind === 'Alert' && row.completedAt),
-    row => kstDate.format(new Date(row.completedAt)));
   const operationalDaily = [];
-  const daily = [];
   for (const day = new Date(start); day <= end; day.setDate(day.getDate() + 1)) {
     const date = dateKey(day);
     const dayCases = byDay.get(date) ?? [];
@@ -61,7 +74,6 @@ export async function liveDashboardResponse(source, { mine, rows, population, ra
     const linked = partial
       ? suspiciousEvidence.filter(row => coveredEvidence.has(row.code)).length
       : linkedSuspicious;
-    daily.push({ day: date, incoming: alerts.length, completed: completions.get(date)?.length ?? 0 });
     operationalDaily.push({
       date, label: `${day.getMonth() + 1}/${day.getDate()}`,
       total: counted?.total ?? transfers.length,
@@ -98,6 +110,8 @@ export async function liveDashboardResponse(source, { mine, rows, population, ra
     }
   }
   const labels = modelRiskLabels();
+  const dates = operationalDaily.map(day => day.date);
+  const dailyCaseEvents = caseLifecycleByDay(dates, { created: cases, completed: completedPopulation });
   const linked = operationalDaily.some(day => day.linked === null) ? null : sum(operationalDaily, 'linked');
   const unlinked = linked === null ? null : sum(operationalDaily, 'unlinked');
   return {
@@ -125,9 +139,9 @@ export async function liveDashboardResponse(source, { mine, rows, population, ra
     newAccounts: sum(operationalDaily, 'newAccounts'), newOwners: sum(operationalDaily, 'newOwners'),
     linked, unlinked, coverageScope: partial ? 'case-evidence' : 'institution',
     patterns: [...patternCounts].map(([label, count]) => ({ label, count })),
-    daily, operationalDaily,
-    ...investigationDashboard(source.cases, cases, operationalDaily.map(day => day.date), {
-      assignmentRows: completedPopulation, roster,
+    daily: dailyCaseEvents.Alert, dailyCaseEvents, operationalDaily,
+    ...investigationDashboard(source.cases, cases, dates, {
+      assignmentRows: completedPopulation, roster, businessAt: mine ? undefined : source.businessAt, todayDetection,
     }),
     hourly: kpiHours.map((label, i) => ({
       label,

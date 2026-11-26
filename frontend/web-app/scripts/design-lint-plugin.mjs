@@ -273,6 +273,11 @@ const eslintRules = {
         if (local?.startsWith('src/')) {
           if (!local.startsWith('src/components/')) return
           const module = local.slice('src/components/'.length).replace(/\.[cm]?[jt]sx?$/, '')
+          if (module === 'ui/table' && (node.type !== 'ImportDeclaration' || node.specifiers.some(specifier =>
+            specifier.type !== 'ImportSpecifier' || (specifier.imported.name ?? specifier.imported.value) === 'Table'))) {
+            report(node, '화면에 보이는 표는 WorkflowTable, 스크린 리더용 차트 표는 AccessibleChartTable을 쓴다.')
+            return
+          }
           if (dashboardUiCatalog.has(module) || legacyDashboardUiImports.get(path) === module) return
           report(node, '승인된 공용 컴포넌트만 사용한다. 선택은 GlideSelect, 버튼은 ActionButton을 먼저 확인한다.')
           return
@@ -445,6 +450,8 @@ const eslintRules = {
       ['전체 거래', 'transactionTotalColor'],
       ['새 계좌', 'dataSeriesColors.teal'],
       ['새 소유주', 'dataSeriesColors.pink'],
+      ['생성 Alert', 'caseCreatedSeriesColor'],
+      ['생성 Episode', 'caseCreatedSeriesColor'],
     ])
     const reference = node => {
       if (node.type === 'Identifier') return node.name

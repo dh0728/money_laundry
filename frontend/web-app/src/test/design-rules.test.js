@@ -229,6 +229,22 @@ describe('dashboard design boundaries', () => {
     expect(newControl.messages.some(ownerRule)).toBe(true);
     expect(owner.messages.some(ownerRule)).toBe(false);
   }, 30000);
+
+  it('requires the workspace table shell and the created Alert color', async () => {
+    const { ESLint } = await import('eslint');
+    const code = [
+      "import { WorkflowTable } from '@/components/workflow-table';",
+      "import { TableCell } from '@/components/ui/table';",
+      "import { Table as OtherTable } from '../../components/ui/table';",
+      "export const bad = { label: '생성 Alert', color: dataSeriesColors.teal };",
+      "export const good = { label: '생성 Episode', color: caseCreatedSeriesColor };",
+    ].join('\n');
+    const [result] = await new ESLint({ cwd: app }).lintText(code, { filePath: resolve(app, 'src/features/dashboard/example.tsx') });
+    const designMessages = result.messages.filter(message => message.ruleId?.startsWith('aml/'));
+    expect(designMessages.map(message => [message.ruleId, message.line])).toEqual([
+      ['aml/component-dashboard-ui-source', 3], ['aml/token-series-color', 4],
+    ]);
+  }, 30000);
 });
 
 describe('token/inline-style', () => {

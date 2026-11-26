@@ -18,7 +18,7 @@ const episodeTable = ['/investigate/episodes?view=table', '[data-case-list-table
 const reportCards = ['/report?view=cards', '.workflow-report-lane [data-glow-surface]'];
 const reportTable = ['/report?view=table', '.workflow-report tbody tr'];
 const myDashboard = ['/dashboard/mine', '.dashboard-personal-flow .staged-sankey-chart'];
-const allDashboard = ['/dashboard/all', '.dashboard-analytics:has(.dashboard-staff-scroll) .dashboard-investigation-flow .staged-sankey-chart'];
+const allDashboard = ['/dashboard/all', '.dashboard-board .preview-case-card'];
 const moreCompletedAlerts = [...alertCards, async page => {
   await page.locator('#footer-actions button').first().waitFor();
   const completed = page.getByRole('region', { name: '처리 완료', exact: true });
@@ -187,6 +187,7 @@ const matrix = regression ? [{ width: 1440, height: 960, routes: [myDashboard] }
 process.env.VITE_API_MODE = 'fixture';
 const server = await createServer({
   root,
+  mode: 'test', // Design rules run in their own check, outside this browser matrix.
   cacheDir: 'node_modules/.vite-scroll-check',
   logLevel: 'warn',
   server: { host: '127.0.0.1', port: 0, hmr: false, watch: null },

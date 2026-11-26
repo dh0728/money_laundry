@@ -16,7 +16,6 @@ export function AlertStatusBars<Key extends string>({ data, series, formatDay, t
     tickMargin: readChartNumber('--aml-space-8', 8),
     tickGap: readChartNumber('--alert-status-axis-tick-gap', 28),
     axisWidth: readChartNumber('--alert-status-value-axis-width', 36),
-    cursorOpacity: readChartNumber('--alert-status-cursor-opacity', 0.5),
     barRadius: readChartNumber('--alert-status-bar-top-radius', 3),
     segmentGap: readChartNumber('--aml-space-2', 2),
     groupGap: readChartNumber('--aml-space-4', 4),
@@ -28,7 +27,7 @@ export function AlertStatusBars<Key extends string>({ data, series, formatDay, t
       <CartesianGrid vertical={false} />
       <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={design.tickMargin} minTickGap={design.tickGap} tickFormatter={formatDay} />
       <YAxis width={design.axisWidth} tickLine={false} axisLine={false} allowDecimals={false} />
-      <ChartTooltip cursor={{ fill: 'var(--muted)', opacity: design.cursorOpacity }} content={tooltip} />
+      <ChartTooltip cursor={false} content={tooltip} />
       {series.map(({ key, label, color, stackId = 'status' }, index) => {
         const neighbors = series.slice(index + 1).filter(item => (item.stackId ?? 'status') === stackId)
         const segment = separated ? ({ x, y, width, height, payload }: BarShapeProps) => {

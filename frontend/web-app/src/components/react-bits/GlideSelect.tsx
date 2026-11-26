@@ -93,6 +93,7 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
   const [inner, setInner] = useState(defaultValue ?? '');
   const current = value ?? inner;
   const selected = items.findIndex(it => it.value === current);
+  const Option = expandInline ? 'button' : 'div';
   const [phase, setPhase] = useState<Phase>(inlineList ? 'open' : 'closed');
   const [active, setActive] = useState<number | null>(inlineList ? Math.max(0, selected) : null);
   if (disabled && phase !== 'closed') {
@@ -114,9 +115,9 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
     if (phase !== 'open') return;
     const el = menuRef.current;
     const trigger = triggerRef.current;
-    if (!el) return;
+    if (!el || expandInline) return;
     const place = () => {
-      if (expandInline || !trigger || !el.showPopover) return;
+      if (!trigger || !el.showPopover) return;
       const r = trigger.getBoundingClientRect();
       const style = getComputedStyle(el);
       const gap = Number.parseFloat(style.getPropertyValue('--aml-space-6'));
@@ -134,7 +135,7 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
       el.style.setProperty('--gs-positioned-top', nextSide === 'bottom' ? `${r.bottom + gap}px` : 'auto');
       el.style.setProperty('--gs-positioned-bottom', nextSide === 'top' ? `${window.innerHeight - r.top + gap}px` : 'auto');
     };
-    if (!expandInline && trigger && el.showPopover && !el.matches(':popover-open')) el.showPopover();
+    if (trigger && el.showPopover && !el.matches(':popover-open')) el.showPopover();
     place();
     el.toggleAttribute('data-instant', instant.current);
     el.dataset.state = 'closed';
@@ -183,7 +184,8 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
     if (disabled) return;
     clearTimeout(closeTimer.current);
     instant.current = true;
-    setActive(expandInline ? items.findIndex((_, index) => index !== selected) : selected >= 0 ? selected : viaKey ? 0 : null);
+    const firstAlternative = items.findIndex((_, index) => index !== selected);
+    setActive(expandInline ? (viaKey && firstAlternative >= 0 ? firstAlternative : null) : selected >= 0 ? selected : viaKey ? 0 : null);
     setPhase('open');
   };
   const close = (mode: 'instant' | 'pop') => {
@@ -222,7 +224,8 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
     if (disabled) return;
     const k = e.key;
     const n = items.length;
-    const cur = active ?? Math.max(0, selected);
+    const first = expandInline ? items.findIndex((_, index) => index !== selected) : 0;
+    const cur = active ?? (expandInline ? first : Math.max(0, selected));
     if (phase !== 'open') {
       if (k === 'Enter' || k === ' ' || k === 'ArrowDown' || k === 'ArrowUp') {
         e.preventDefault();
@@ -234,10 +237,12 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
       e.preventDefault();
       instant.current = true;
       const index = Math.min(n - 1, Math.max(0, i));
-      setActive(expandInline && index === selected ? cur : index);
+      const step = i > cur ? 1 : -1;
+      const next = expandInline && index === selected ? index + step : index;
+      if (next >= 0 && next < n) setActive(next);
     };
     if (k === 'ArrowDown' || k === 'ArrowUp') go(active === null ? cur : cur + (k === 'ArrowDown' ? 1 : -1));
-    else if (k === 'Home' || k === 'End') go(k === 'Home' ? 0 : n - 1);
+    else if (k === 'Home' || k === 'End') go(k === 'Home' ? Math.max(0, first) : n - 1 - Number(expandInline && selected === n - 1));
     else if (k === 'Enter' || k === ' ') {
       e.preventDefault();
       pick(cur, true);
@@ -264,13 +269,6 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
   const rowAt = (y: number) => {
     const list = menuRef.current?.firstElementChild;
     if (!scrub.current || !list) return null;
-    if (expandInline) {
-      const row = [...list.querySelectorAll<HTMLElement>('[data-index]:not([hidden])')].find(option => {
-        const { top, bottom } = option.getBoundingClientRect();
-        return y >= top && y < bottom;
-      });
-      return row ? Number(row.dataset.index) : null;
-    }
     const option = list.querySelector<HTMLElement>('[data-index]');
     if (!option) return null;
     const step = option.offsetHeight + Number.parseFloat(getComputedStyle(list).rowGap);
@@ -338,6 +336,9 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
         if (e.animationName === 'gs-swap' && rootRef.current) delete rootRef.current.dataset.swap;
       }}
     >
+      {expandInline && <span className="glide-select__sizer" aria-hidden="true">
+        {items.map(item => <span key={item.value}>{item.label}</span>)}
+      </span>}
       {!inlineList && <button
         ref={triggerRef}
         type="button"
@@ -349,7 +350,8 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
         aria-label={ariaLabel}
         disabled={disabled}
         className="glide-select__trigger"
-        onPointerDown={e => {
+        onClick={expandInline ? () => { if (phase === 'open') close('instant'); else open(false); } : undefined}
+        onPointerDown={expandInline ? undefined : e => {
           if (e.button !== 0 || disabled) return;
           e.currentTarget.focus({ preventScroll: true });
           if (phase === 'open') close('pop');
@@ -374,34 +376,38 @@ const GlideSelect: React.FC<GlideSelectProps> = ({
             aria-activedescendant={inlineList && active !== null ? `${id}-${active}` : undefined}
             className="glide-select__list"
             data-live={active !== null ? '' : undefined}
-            onPointerOver={onListOver}
-            onPointerLeave={() => {
+            onPointerOver={expandInline ? undefined : onListOver}
+            onPointerLeave={expandInline ? undefined : () => {
               if (!scrub.current && !rememberPosition) setActive(null);
             }}
-            onPointerDown={onListDown}
-            onPointerMove={onListMove}
-            onPointerUp={onListUp}
-            onPointerCancel={onListUp}
-            onLostPointerCapture={onListUp}
+            onPointerDown={expandInline ? undefined : onListDown}
+            onPointerMove={expandInline ? undefined : onListMove}
+            onPointerUp={expandInline ? undefined : onListUp}
+            onPointerCancel={expandInline ? undefined : onListUp}
+            onLostPointerCapture={expandInline ? undefined : onListUp}
             onKeyDown={inlineList ? onTriggerKey : undefined}
           >
-            <span ref={pillRef} className="glide-select__pill" aria-hidden="true" />
+            {!expandInline && <span ref={pillRef} className="glide-select__pill" aria-hidden="true" />}
             {items.map((it, i) => (
-              <div
+              <Option
                 key={it.value}
                 id={`${id}-${i}`}
                 role="option"
+                type={expandInline ? 'button' : undefined}
+                tabIndex={expandInline ? -1 : undefined}
                 hidden={expandInline && i === selected}
+                data-active={expandInline && i === active || undefined}
                 aria-selected={i === selected}
                 data-index={i}
                 className="glide-select__option"
+                onClick={expandInline ? () => pick(i, false) : undefined}
               >
                 <span className="glide-select__name">{it.label}</span>
                 {showTags && it.tag ? <span className="glide-select__tag">{it.tag}</span> : null}
                 <span className="glide-select__check" data-on={i === selected ? '' : undefined} aria-hidden="true">
                   <Check className="icon icon-compact" aria-hidden="true" />
                 </span>
-              </div>
+              </Option>
             ))}
           </div>
         </div>

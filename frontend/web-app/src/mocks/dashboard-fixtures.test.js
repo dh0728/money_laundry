@@ -39,6 +39,21 @@ it('derives multi-day KPI, charts and board from the same identifiable records',
   expect(dashboardFixtureBoardPage(data.cases, { page: 1 }).content).toEqual(data.cases.slice(20, 40));
 });
 
+it('keeps sample today metrics independent of the date filter and ranks only open work without duplicating Episode members', () => {
+  const full = dashboardFixtureResponse(source);
+  const day = new Date('2026-11-11T00:00:00');
+  const filtered = dashboardFixtureResponse(source, { range: { from: day, to: day } });
+  expect(full.todaySnapshot).toMatchObject({ date: '2026-11-18', openAlerts: 53, openEpisodes: 27,
+    detection: { basis: 'transaction-day' } });
+  expect(filtered.todaySnapshot).toEqual(full.todaySnapshot);
+  expect(full.priorityCases).toHaveLength(8);
+  expect(full.priorityCases.every(row => row.open && !row.episodeCode && row.priorityScore === row.score * row.elapsed)).toBe(true);
+  expect(full.priorityCases.map(row => row.priorityScore)).toEqual(full.priorityCases.map(row => row.priorityScore).toSorted((a, b) => b - a));
+  expect(filtered.priorityCases.every(row => row.code.includes('-261111-'))).toBe(true);
+  expect(sum(full.patternAlertCounts, 'count')).toBe(full.alertCases.length);
+  expect(sum(filtered.patternAlertCounts, 'count')).toBe(filtered.alertCases.length);
+});
+
 it('shows three leading sample recipient banks and keeps the remainder in a single node', () => {
   const data = dashboardFixtureResponse(source);
   const recipients = flow => flow.nodes.filter(node => node.stage === 0).map(({ name, count }) => [name, count]);
@@ -155,6 +170,11 @@ it('preserves true zero dates and scopes transactions to included case evidence 
     dayInKst.format(new Date(row.completedAt)) === '2026-11-12');
   expect(scoped.daily[0].completed).toBe(directCompletions.length);
   expect(directCompletions.some(row => !scoped.alertCases.includes(row))).toBe(true);
+  const episodeCompletions = source.cases.filter(row => row.kind === 'Episode' && row.completedAt &&
+    dayInKst.format(new Date(row.completedAt)) === '2026-11-12');
+  expect(scoped.dailyCaseEvents.Episode).toEqual([{
+    day: '2026-11-12', incoming: scoped.cases.filter(row => row.kind === 'Episode').length, completed: episodeCompletions.length,
+  }]);
   const [match] = scoped.cases;
   const filtered = dashboardFixtureResponse(source, { rows: [match], population: [match], range });
   expect(filtered.cases).toEqual([match]);

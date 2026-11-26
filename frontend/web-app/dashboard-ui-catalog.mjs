@@ -39,6 +39,7 @@ export const dashboardUiCatalog = new Set([
   'ui/switch',
   'ui/table',
   'ui/tooltip',
+  'workflow-table',
 ])
 
 export const legacyDashboardUiImports = new Map([

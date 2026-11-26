@@ -111,9 +111,41 @@ test('institution case filters keep both coverage counts in the same evidence su
   const data = await liveDashboardResponse(
     { ...source, cases: [alert, other, episode] }, { rows: [episode], population: [alert, episode], range },
   );
-  expect(getJson.mock.calls).toEqual([['/api/v1/demo/users']]);
+  expect(getJson.mock.calls).toEqual([['/api/v1/demo/users'], ['/api/v1/dashboard/summary', { from: '2023-09-08', to: '2023-09-08' }]]);
   expect(data.suspicious).toEqual([transfer]);
   expect(data).toMatchObject({ dataSource: 'live', linked: 1, unlinked: 0, coverageScope: 'case-evidence' });
+});
+
+test('today uses the full KST business-day snapshot while queue and patterns follow the selected range', async () => {
+  const { liveDashboardResponse } = await import('./live-dashboard.js');
+  const cases = [
+    { ...alert, elapsed: 7, createdAt: '2023-09-06T01:00:00Z' },
+    { ...other, code: 'A-member', elapsed: 12, createdAt: '2023-09-07T15:00:00Z', date: day('2023-09-08') },
+    { ...alert, kind: 'Episode', code: 'E-member', score: 60, elapsed: 6,
+      createdAt: '2023-09-06T02:00:00Z', linkedAlertCodes: ['A-member'] },
+    { ...other, code: 'A-created', elapsed: 0, createdAt: '2023-09-08T00:00:00Z', date: day('2023-09-08') },
+    { ...other, code: 'A-closed', status: '처리 완료', open: false, createdAt: '2023-09-07T16:00:00Z',
+      completedAt: '2023-09-07T17:00:00Z', date: day('2023-09-08') },
+  ];
+  const projection = { businessAt: source.businessAt,
+    pipeline: { data: { detection: { received: 10, analyzed: 8, suspicious: 3 } } } };
+  getJson.mockResolvedValueOnce(ledger).mockResolvedValueOnce([]).mockResolvedValueOnce(projection);
+  const dashboard = await liveDashboardResponse({ ...source, cases }, { range: { from: day('2023-09-05'), to: day('2023-09-06') } });
+  expect(dashboard.todaySnapshot).toEqual({
+    date: '2023-09-08', openAlerts: 2, openEpisodes: 1, createdAlerts: 3, overdue3Days: 2, overdue7Days: 1,
+    createdCases: 2, completedCreatedCases: 1, completedCases: 1, completionSampleCount: 1, averageCompletionSeconds: 3600,
+    detection: { received: 10, analyzed: 8, suspicious: 3, basis: 'analysis-day' },
+  });
+  expect(dashboard.priorityCases.map(row => [row.code, row.priorityScore])).toEqual([[alert.code, 665], ['E-member', 360]]);
+  expect(dashboard.patternAlertCounts).toEqual([{ label: 'Cycle', count: 1 }]);
+});
+
+test('today leaves the detection ratio unavailable when its projection fails', async () => {
+  const { liveDashboardResponse } = await import('./live-dashboard.js');
+  getJson.mockResolvedValueOnce(ledger).mockResolvedValueOnce([]).mockRejectedValueOnce(new Error('projection unavailable'));
+  const data = await liveDashboardResponse(source);
+  expect(data.todaySnapshot.detection).toBeNull();
+  expect(data.transactions.length).toBe(50);
 });
 
 test('creation-day charts use explicit membership and current Episode verdicts outside the date range', async () => {
@@ -143,6 +175,23 @@ test('creation-day charts use explicit membership and current Episode verdicts o
   expect(result.alertCases[0].status).toBe('처리 완료');
   const both = await liveDashboardResponse({ ...source, cases });
   expect(both.dailyEpisodeStatus.at(-1)).toEqual({ date: '2023-09-08', pending: 0, inProgress: 1, done: 1 });
+});
+
+test('case lifecycle uses KST creation and closure event dates separately for Alert and Episode', async () => {
+  const { liveDashboardResponse } = await import('./live-dashboard.js');
+  const cases = [
+    { ...alert, createdAt: '2023-09-06T10:00:00Z', completedAt: '2023-09-06T15:00:00Z', open: false },
+    { ...other, kind: 'Episode', code: 'E-before', date: day('2023-09-05'), open: false,
+      createdAt: '2023-09-05T14:59:59Z', completedAt: '2023-09-05T15:00:00Z' },
+    { ...other, kind: 'Episode', code: 'E-created', createdAt: '2023-09-06T15:00:00Z', open: false,
+      status: '처리 완료', completedAt: 'invalid' },
+  ];
+  const dashboard = await liveDashboardResponse({ ...source, cases }, { range: { from: day('2023-09-06'), to: day('2023-09-07') } });
+  expect(dashboard.dailyCaseEvents).toEqual({
+    Alert: [{ day: '2023-09-06', incoming: 1, completed: 0 }, { day: '2023-09-07', incoming: 0, completed: 1 }],
+    Episode: [{ day: '2023-09-06', incoming: 0, completed: 1 }, { day: '2023-09-07', incoming: 1, completed: 0 }],
+  });
+  expect(dashboard.daily).toBe(dashboard.dailyCaseEvents.Alert);
 });
 
 test('elapsed work uses live case ages and the linked Episode status', async () => {

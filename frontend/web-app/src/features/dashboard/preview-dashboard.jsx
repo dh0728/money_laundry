@@ -13,10 +13,10 @@ import { benchmarkDashboardMetrics } from './benchmark-dashboard-metrics';
 import { ActionButton } from '../../components/primary-button';
 import { caseCsvDownloadEntry, csvDownloadEntry } from '../../components/query-controls';
 import { BoardSectionDownload, SectionDownloadHeading } from '../../components/section-download';
-import { Box, Heading, Stack, Text } from '../../components/layout-primitives';
+import { Box, Grid, Heading, Stack, Text } from '../../components/layout-primitives';
 import { LinkTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
 import { AccountTrailGraph } from '../../components/charts/charts/account-trail-graph';
-import { dataSeriesColors, transactionTotalColor } from '../../components/charts/charts/chart-context';
+import { caseCreatedSeriesColor, transactionTotalColor } from '../../components/charts/charts/chart-context';
 import { StagedSankey } from '../../components/charts/charts/sankey/staged-sankey';
 import { useElementSize } from '../../components/charts/charts/use-element-size';
 import { AreaSparkline } from '../../components/charts/sparkline';
@@ -24,8 +24,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../
 import { previewJudgmentReason } from '../investigation/case-judgment-data';
 import { workRequestUserName } from '../investigation/preview-work-requests';
 import { flowColors, personalInvestigationFlow, reviewStatusTotals, share as compactShare } from './dashboard-flows';
+import { DashboardRuleHits } from './dashboard-rule-hits';
+import './dashboard-today-summary.css';
 
 const formatter = new Intl.NumberFormat('ko-KR');
+const durationFormatter = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 });
 const count = value => `${formatter.format(value)}건`;
 const smallPercent = new Intl.NumberFormat('ko-KR', { style: 'percent', maximumFractionDigits: 3 });
 const share = (value, total) => total ? smallPercent.format(value / total) : '—';
@@ -106,13 +109,18 @@ function MetricTrendPlot({ label, trend, known, reduced }) {
 }
 
 function MetricComparison({ comparison, relation }) {
-  const { numerator, denominator, numeratorRelation, denominatorRelation } = comparison;
-  return <Text as="strong" className="dashboard-metric-value dashboard-metric-comparison"
-    data-dashboard-metric-source={denominatorRelation ? undefined : relation}>
-    <Text as="span" data-kpi-tone="suspect" data-dashboard-metric-source={numeratorRelation}>{formatter.format(numerator)}</Text>/
-    <Text as="span" data-dashboard-metric-source={denominatorRelation}>{formatter.format(denominator)}</Text>
-    {denominator > 0 && <Text as="span" data-kpi-tone="suspect">{' '}({compactShare(numerator, denominator)})</Text>}
-  </Text>;
+  const { numerator, denominator, numeratorRelation, denominatorRelation, describeCounts } = comparison;
+  const numeratorValue = <Text as="span" data-kpi-tone="suspect" data-dashboard-metric-source={numeratorRelation}>{formatter.format(numerator)}</Text>;
+  const denominatorValue = <Text as="span" data-dashboard-metric-source={denominatorRelation}>{formatter.format(denominator)}</Text>;
+  return <Box className="dashboard-metric-comparison">
+    <Text as="strong" className="dashboard-metric-value" data-kpi-tone={denominator > 0 ? 'suspect' : undefined}
+      data-dashboard-metric-source={denominatorRelation ? undefined : relation}>
+      {compactShare(numerator, denominator)}
+    </Text>
+    <Text as="span" className="dashboard-metric-fraction">
+      {describeCounts ? describeCounts(numeratorValue, denominatorValue) : <>{numeratorValue}/{denominatorValue}건</>}
+    </Text>
+  </Box>;
 }
 
 function Metric({ item, reduced, control, downloadable = false, uniformValueSize = false }) {
@@ -146,45 +154,52 @@ function Metrics({ items, appearance }) {
   }))} appearance={appearance} />;
 }
 
-// Applying a date filter remounts the dashboard; keep the choice for this page session.
-let unfinishedMetricKind = 'alert';
-const unfinishedMetricOptions = [
-  { value: 'alert', label: '미처리 Alert' },
-  { value: 'episode', label: '미완료 Episode' },
-];
+// Query changes remount the cards. Retain selections for this page session.
+const caseMetricKinds = { created: 'Alert', unfinished: 'Alert' };
 
-function UnfinishedMetricCard({ dailyAlertStatus, dailyEpisodeStatus, reduced }) {
-  const [kind, setKind] = React.useState(unfinishedMetricKind);
-  const isAlert = kind === 'alert';
-  const label = isAlert ? 'Alert' : 'Episode';
-  const daily = isAlert ? dailyAlertStatus : dailyEpisodeStatus;
+function CaseMetricCard({ data, mode, reduced }) {
+  const [kind, setKind] = React.useState(caseMetricKinds[mode]);
+  const isAlert = kind === 'Alert';
+  const created = mode === 'created';
+  const title = value => created ? `생성 ${value}` : `${value} 미처리율`;
+  const daily = isAlert ? data.dailyAlertStatus : data.dailyEpisodeStatus;
   const { unfinished, total } = reviewStatusTotals(daily);
-  const control = <ChartTopicSelect label="미처리 상태 업무 종류" value={kind} options={unfinishedMetricOptions} onChange={next => {
-    unfinishedMetricKind = next;
-    setKind(next);
-  }} />;
-  const item = {
-    label: isAlert ? '미처리 Alert' : '미완료 Episode',
+  const label = title(kind);
+  const generated = isAlert ? data.investigation?.totalAlerts : daily ? total : undefined;
+  const item = created ? {
+    key: `institution-created-${kind}`,
+    label,
+    value: generated ?? '—',
+    unit: generated == null ? undefined : '건',
+    tone: 'pending',
+    relation: isAlert && generated > 0 ? 'created-alerts' : undefined,
+    trend: dailyTrend(daily, row => row.pending + row.inProgress + row.done, caseCreatedSeriesColor),
+  } : {
+    label,
     value: compactShare(unfinished, total),
-    detail: daily ? `${label} ${count(total)} 중 ${count(unfinished)} · ${isAlert ? '검토 대기와 처리 중' : '처리 중'}`
-      : `${label} 상태 집계 미제공`,
+    detail: daily ? `${kind} ${count(total)} 중 ${count(unfinished)} · ${isAlert ? '검토 대기와 처리 중' : '처리 중'}`
+      : `${kind} 상태 집계 미제공`,
     tone: 'in-progress',
     trend: unfinishedStatusTrend(daily),
-    relation: (isAlert ? unfinished > 0 : total > 0) ? `open-${kind}s` : undefined,
+    relation: (isAlert ? unfinished > 0 : total > 0) ? `open-${kind.toLowerCase()}s` : undefined,
   };
+  const control = <ChartTopicSelect label={created ? '생성 건수 업무 종류' : '미처리율 업무 종류'} value={kind}
+    options={['Alert', 'Episode'].map(value => ({ value, label: title(value) }))} onChange={next => {
+      caseMetricKinds[mode] = next;
+      setKind(next);
+    }} />;
   return <Panel as="article" data-compact-kpi>
     <Metric control={control} item={item} reduced={reduced} downloadable uniformValueSize />
   </Panel>;
 }
 
 function institutionMetricCards(data, reduced) {
-  const { coverageScope, investigation, linked, operationalDaily, dailyAlertStatus, dailyEpisodeStatus } = data;
+  const { coverageScope, linked, operationalDaily } = data;
   const total = data.transactions.length;
   const suspicious = data.suspicious.length;
   const institution = coverageScope === 'institution';
-  const alertTotal = investigation?.totalAlerts;
   const metrics = [
-    { label: '의심 거래 / 들어온 거래', value: total,
+    { label: '전체 거래의 의심 거래율', value: total,
       relation: total > 0 ? 'transactions' : undefined,
       detail: institution ? undefined : '선택 업무의 근거 거래',
       tone: 'neutral',
@@ -193,23 +208,53 @@ function institutionMetricCards(data, reduced) {
       }),
       comparison: { numerator: suspicious, denominator: total,
         numeratorRelation: suspicious > 0 ? 'suspicious' : undefined,
-        denominatorRelation: total > 0 ? 'transactions' : undefined } },
-    { label: '생성 Alert', value: alertTotal ?? '—', unit: alertTotal == null ? undefined : '건',
-      relation: alertTotal > 0 ? 'created-alerts' : undefined,
-      trend: dailyTrend(operationalDaily, row => row.alerts, dataSeriesColors.teal) },
-    { label: '의심 거래 중 Alert 편입', value: linked == null ? '—' : compactShare(linked, suspicious),
-      detail: linked == null ? 'Alert 연결 집계 미제공' : undefined,
+        denominatorRelation: total > 0 ? 'transactions' : undefined,
+        describeCounts: (suspected, all) => <>전체 거래 {all}건 중 {suspected}건 의심</> } },
+    { label: '의심 거래의 Alert 편입률', value: linked == null ? '—' : compactShare(linked, suspicious),
+      detail: linked == null ? '의심 거래 편입 집계 미제공' : undefined,
       tone: 'suspect',
       trend: dailyTrend(operationalDaily, row => dailyRate(row.linked, row.suspicious), flowColors.suspect, { rate: true }),
-      comparison: linked == null ? null : { numerator: linked, denominator: suspicious },
+      comparison: linked == null ? null : { numerator: linked, denominator: suspicious,
+        describeCounts: (included, total) => <>의심 거래 {total}건 중 {included}건 편입</> },
       relation: linked > 0 ? 'linked' : undefined },
   ];
   return [
     ...metrics.map(item => <Panel as="article" key={item.label}>
       <Metric item={{ ...item, key: `institution-${item.label}` }} reduced={reduced} downloadable uniformValueSize />
     </Panel>),
-    <UnfinishedMetricCard key="unfinished" dailyAlertStatus={dailyAlertStatus} dailyEpisodeStatus={dailyEpisodeStatus} reduced={reduced} />,
+    <CaseMetricCard key="created" mode="created" data={data} reduced={reduced} />,
+    <CaseMetricCard key="unfinished" mode="unfinished" data={data} reduced={reduced} />,
   ];
+}
+
+function DashboardTodaySummary({ snapshot, dataSource }) {
+  if (!snapshot?.date) return null;
+  const { detection, date, openAlerts, openEpisodes, createdAlerts, overdue3Days, overdue7Days,
+    createdCases, completedCreatedCases, averageCompletionSeconds } = snapshot;
+  const average = averageCompletionSeconds == null ? '평균 처리 시간 미집계'
+    : `오늘 완료 평균 ${durationFormatter.format(averageCompletionSeconds / 86400)}일`;
+  const detectionLabel = detection?.basis === 'transaction-day' ? '거래일 기준' : '오늘 분석 완료 거래 기준';
+  const items = [
+    { title: '개별 미처리 Alert', value: count(openAlerts), detail: `오늘 생성 ${count(createdAlerts)}`, tone: 'in-progress' },
+    { title: '장기 미처리', value: count(overdue3Days), detail: `3일 초과 · 7일 이상 ${count(overdue7Days)}`, tone: overdue3Days > 0 ? 'suspect' : undefined },
+    { title: '진행 Episode', value: count(openEpisodes), tone: 'in-progress' },
+    { title: '오늘 유입 업무 처리율', value: compactShare(completedCreatedCases, createdCases), detail: average, tone: 'done' },
+    { title: '오늘 의심 비율', value: detection ? compactShare(detection.suspicious, detection.analyzed) : '—',
+      tone: 'suspect',
+      detail: detection ? `${formatter.format(detection.suspicious)}/${count(detection.analyzed)} · ${detectionLabel}` : '탐지 집계 미제공' },
+  ];
+
+  return <Panel as="article" className="dashboard-today-summary">
+    <SectionDownloadHeading as="h3" printLabel="오늘의 업무">오늘의 업무</SectionDownloadHeading>
+    <Text className="dashboard-note">{dataSource === 'sample' ? '샘플 업무일' : '업무일'} · {date} KST</Text>
+    <Grid columns={12} className="dashboard-today-metrics">
+      {items.map(({ title, value, detail, tone }) => <Stack key={title}>
+        <Text as="span">{title}</Text>
+        <Text as="strong" data-kpi-tone={value === '—' ? undefined : tone}>{value}</Text>
+        {detail && <Text className="dashboard-note">{detail}</Text>}
+      </Stack>)}
+    </Grid>
+  </Panel>;
 }
 
 const personalStages = ['배정된 업무', '현재 상태', '완료 판정'];
@@ -366,8 +411,10 @@ export function PreviewDashboard({ mine, data, appearance }) {
         renderEntry={entry => <><LinkTag code={entry.code} /><VerdictTag verdict={entry.verdict} /></>} />
     </PersonalDashboardOverview> : (
       <React.Suspense fallback={<DashboardAnalyticsSkeleton reduced={appearance.reduced} />}>
-        <Analytics data={data} reduced={appearance.reduced} summary={summary} metrics={institutionMetricCards(data, appearance.reduced)}
-          board={board} boardEntries={boardEntries} />
+        <Analytics data={data} reduced={appearance.reduced} summary={summary}
+          today={<DashboardTodaySummary snapshot={data.todaySnapshot} dataSource={data.dataSource} />}
+          metrics={institutionMetricCards(data, appearance.reduced)}
+          detectionSources={<DashboardRuleHits dataSource={data.dataSource} />} board={board} boardEntries={boardEntries} />
       </React.Suspense>
     )}
     {mine && board}

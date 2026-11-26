@@ -186,9 +186,9 @@ export function WorkflowQueryHeading({ title, summary, tools = true }) {
   </header>;
 }
 
-export function WorkflowTable({ label, title = label, summary, className = '', tableClassName = 'workflow-data-table',
-  tools = true, selection, compact, hierarchy, scrollRef, scrollbarGutter = 'stable', cellAlignment,
-  invertSelectedControls, children }) {
+export function WorkflowTable({ label, title = label, summary = undefined, className = '', tableClassName = 'workflow-data-table',
+  tools = true, selection = undefined, compact = undefined, hierarchy = undefined, scrollRef = undefined, scrollbarGutter = 'stable',
+  cellAlignment = undefined, invertSelectedControls = undefined, children }) {
   return <div className="data-table-frame" data-hierarchy={hierarchy || undefined}
     data-cell-alignment={cellAlignment} data-invert-selected-controls={invertSelectedControls || undefined}>
     <WorkflowQueryHeading title={title} summary={summary} tools={tools} />
@@ -200,6 +200,11 @@ export function WorkflowTable({ label, title = label, summary, className = '', t
       </div>
     </div>
   </div>;
+}
+
+/** @param {{ label?: string, children: import('react').ReactNode }} props */
+export function AccessibleChartTable({ label, children }) {
+  return <Table containerClassName="visually-hidden" aria-label={label}>{children}</Table>;
 }
 
 export function TableBranchToggle({ label, expanded, onClick, children }) {

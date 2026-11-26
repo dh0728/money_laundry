@@ -1,0 +1,17 @@
+.dashboard-today-metrics { gap: var(--workspace-panel-gap) }
+.dashboard-today-metrics > * { grid-column: span 2; gap: var(--aml-space-4) }
+.dashboard-today-metrics > :nth-child(-n+2) { grid-column: span 3 }
+.dashboard-today-metrics strong {
+  color: var(--dashboard-metric-ink, inherit);
+  font-size: var(--workspace-kpi-value-size);
+  line-height: var(--metric-value-line-height);
+  font-weight: var(--aml-type-metric-weight);
+  font-variant-numeric: tabular-nums;
+}
+@media (width < 930px) {
+  .dashboard-today-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)) }
+  .dashboard-today-metrics > :nth-child(n) { grid-column: auto }
+}
+@media (width < 660px) {
+  .dashboard-today-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+}

@@ -142,21 +142,12 @@
   font-weight: var(--aml-type-panel-title-weight);
   line-height: var(--aml-type-panel-title-lineHeight);
 }
-.dashboard-focus-grid > [data-dashboard-section-content] > .dashboard-sla-donut { grid-column: span 4 }
-.dashboard-focus-grid > [data-dashboard-section-content] > .dashboard-priority-panel { grid-column: span 8 }
-@media (width >= 68rem) {
-  .dashboard-focus-grid .dashboard-account-trail {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-content: start;
-    column-gap: var(--aml-space-16);
-  }
-  .dashboard-focus-grid .dashboard-trail-reason { grid-column: 1 / -1 }
-  .dashboard-focus-grid .account-trail-network { grid-column: 1; grid-row: 2 / span 2 }
-  .dashboard-focus-grid :is(.dashboard-trail-step-heading, .dashboard-trail-records) { grid-column: 2 }
-}
-@media (width < 68rem) {
-  .dashboard-focus-grid > [data-dashboard-section-content] > :is(.dashboard-sla-donut, .dashboard-priority-panel) { grid-column: 1 / -1 }
+.dashboard-focus-grid { container: dashboard-focus / inline-size }
+.dashboard-focus-grid > [data-dashboard-section-content] > * { grid-column: 1 / -1 }
+@container dashboard-focus (width >= 68rem) {
+  .dashboard-focus-grid > [data-dashboard-section-content] > .dashboard-sla-donut { grid-column: span 3 }
+  .dashboard-focus-grid > [data-dashboard-section-content] > .dashboard-priority-queue { grid-column: span 5 }
+  .dashboard-focus-grid > [data-dashboard-section-content] > .dashboard-priority-panel { grid-column: span 4 }
 }
 .dashboard-staff-scroll[data-scroll-exception="long-chart"] {
   max-block-size: calc(var(--aml-space-24) * var(--dashboard-staff-visible-rows));
@@ -290,19 +281,7 @@
   font-weight: var(--aml-type-body-strong-weight);
 }
 .staged-sankey-labels tspan { fill: var(--muted-text) }
-.staged-sankey-relations {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  color: var(--muted-text);
-}
-.staged-sankey-relations path { fill: none; stroke: currentColor; stroke-width: var(--aml-stroke-divider) }
-.staged-sankey-relations circle { fill: currentColor }
 .staged-sankey-relations[data-metric-relations] { color: var(--text) }
-.staged-sankey-relations[data-metric-relations] path { stroke-width: var(--aml-stroke-focus) }
-.staged-sankey-relations [data-partial] path { stroke-dasharray: var(--aml-space-4) var(--aml-space-4) }
 @container (inline-size < 60rem) {
   .staged-sankey-relations { display: none }
 }
@@ -351,8 +330,8 @@
 }
 .dashboard-metric h3, .dashboard-metric p { overflow-wrap: anywhere }
 .dashboard-metric h3 { font: inherit; font-weight: var(--aml-type-body-strong-weight) }
-.dashboard-institution-metrics > [data-dashboard-section-content] > article { grid-column: span 3; min-inline-size: 0 }
-.dashboard-institution-metrics > [data-dashboard-section-content] > article:has(> .dashboard-metric) { display: flex; flex-direction: column }
+.dashboard-institution-metrics > article { grid-column: span 3; min-inline-size: 0 }
+.dashboard-institution-metrics > article:has(> .dashboard-metric) { display: flex; flex-direction: column }
 .dashboard-institution-metrics .dashboard-metric h3,
 .dashboard-work-details .dashboard-completion h3,
 .dashboard-focus-grid .dashboard-priority-heading {
@@ -362,9 +341,10 @@
 }
 .dashboard-metric p { color: var(--muted-text); font-size: var(--aml-type-caption-size) }
 .dashboard-metric-reading { display: flex; align-items: center; flex-wrap: wrap; gap: var(--aml-space-4) }
-.dashboard-institution-metrics [data-kpi-tone="suspect"] { --dashboard-metric-ink: var(--chart-suspect) }
-.dashboard-institution-metrics [data-kpi-tone="in-progress"] { --dashboard-metric-ink: var(--review-status-inProgress-accent) }
-.dashboard-metric[data-uniform-value-size] { container-type: inline-size }
+.dashboard-institution-relations [data-kpi-tone="suspect"] { --dashboard-metric-ink: var(--chart-suspect) }
+.dashboard-institution-relations [data-kpi-tone="pending"] { --dashboard-metric-ink: var(--status-pending-accent) }
+.dashboard-institution-relations [data-kpi-tone="in-progress"] { --dashboard-metric-ink: var(--review-status-inProgress-accent) }
+.dashboard-institution-relations [data-kpi-tone="done"] { --dashboard-metric-ink: var(--review-status-done-accent) }
 .dashboard-metric-value {
   color: var(--dashboard-metric-ink, inherit);
   font-size: var(--metric-value-size);
@@ -374,7 +354,14 @@
   overflow-wrap: anywhere;
 }
 .dashboard-metric-value[data-wide-value] { font-size: var(--metric-wide-value-size) }
-.dashboard-metric[data-uniform-value-size] .dashboard-metric-value { font-size: var(--metric-uniform-value-size, var(--workspace-kpi-value-size)) }
+.dashboard-metric[data-uniform-value-size] .dashboard-metric-value { font-size: var(--workspace-kpi-value-size) }
+.dashboard-metric-comparison { display: grid; gap: var(--aml-space-4) }
+.dashboard-metric-fraction {
+  font-size: var(--aml-type-panel-title-size);
+  line-height: var(--aml-type-panel-title-lineHeight);
+  font-weight: var(--aml-type-panel-title-weight);
+  font-variant-numeric: tabular-nums;
+}
 .dashboard-metric-comparison [data-kpi-tone] { color: var(--dashboard-metric-ink, inherit) }
 .dashboard-metric-value[data-composite] {
   display: flex;
@@ -645,7 +632,7 @@
 }
 
 @media (max-width: 930px) {
-  .dashboard-institution-metrics > [data-dashboard-section-content] > article { grid-column: span 6 }
+  .dashboard-institution-metrics > article { grid-column: span 6 }
   .preview-dashboard[data-mine] .dashboard-top { grid-template-columns: minmax(0, 1fr) }
   .preview-dashboard .dashboard-top { grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto }
   .preview-dashboard .dashboard-top > * { grid-column: auto; grid-row: auto }
@@ -654,7 +641,7 @@
   .dashboard-analytics-row,
   .dashboard-institution-metrics,
   .dashboard-transaction-details:has(> :nth-child(2)) { grid-template-columns: minmax(0, 1fr) }
-  .dashboard-institution-metrics > [data-dashboard-section-content] > :is(article, [data-compact-kpi]) { grid-column: 1 / -1 }
+  .dashboard-institution-metrics > article { grid-column: 1 / -1 }
 }
 @media (max-width: 359px) {
   .dashboard-metrics-box .dashboard-metrics.magic-bento {

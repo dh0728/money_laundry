@@ -114,6 +114,9 @@ function layoutFailures({ pathname, table, selected, list, pageButtons }) {
 
   if (pathname === '/dashboard/all') {
     const workSection = workspace.querySelector('.dashboard-work-details');
+    if (!findVisible('.dashboard-investigation-flow .staged-sankey-chart', workspace).length) {
+      failures.push('The overall dashboard investigation flow chart is missing.');
+    }
     if (workSection?.querySelector('.dashboard-section-heading')?.textContent !== '업무 현황' ||
         workSection.querySelectorAll('.dashboard-board .case-progress-lane').length !== 3) {
       failures.push('The overall dashboard work section must include all three work board lanes under its shared title.');
@@ -258,22 +261,32 @@ async function checkClosedSectionExport(page) {
   await header.evaluate(element => element.scrollIntoView({ block: 'center' }));
   const capture = await page.evaluateHandle(() => {
     const original = window.print;
-    const result = { correct: false, restore: () => { window.print = original; } };
+    const result = { section: null, restore: () => { window.print = original; } };
     window.print = () => {
-      const section = document.querySelector('[data-page-print-section]');
-      const content = section?.querySelector('[data-dashboard-section-content]');
-      const metrics = document.querySelector('.dashboard-institution-metrics');
-      result.correct = section?.getAttribute('aria-label') === '업무 현황' &&
-        getComputedStyle(content).visibility === 'visible' && getComputedStyle(metrics).display === 'none';
+      result.section = document.querySelector('[data-page-print-section]');
       window.dispatchEvent(new Event('afterprint'));
     };
     return result;
   });
   try {
     await header.getByRole('button', { name: '업무 현황 전체 다운로드' }).click();
+    await page.getByRole('button', { name: 'PDF로 저장 · 업무 현황 전체', exact: true }).dispatchEvent('click');
     await page.emulateMedia({ media: 'print' });
-    await page.getByRole('button', { name: /PDF로 저장/ }).last().click();
-    if (!await capture.evaluate(result => result.correct)) throw new Error('The closed work section PDF must include only its own contents.');
+    const correct = await capture.evaluate(({ section }) => {
+      if (section?.getAttribute('aria-label') !== '업무 현황') return false;
+      const workspace = section.closest('#workspace');
+      workspace.setAttribute('data-page-print', '');
+      section.setAttribute('data-page-print-section', '');
+      try {
+        const content = section.querySelector('[data-dashboard-section-content]');
+        const otherSection = document.querySelector('.dashboard-flow-family');
+        return content.checkVisibility({ visibilityProperty: true }) && !otherSection.checkVisibility();
+      } finally {
+        workspace.removeAttribute('data-page-print');
+        section.removeAttribute('data-page-print-section');
+      }
+    });
+    if (!correct) throw new Error('The closed work section PDF must include only its own contents.');
   } finally {
     await capture.evaluate(result => result.restore());
     await capture.dispose();

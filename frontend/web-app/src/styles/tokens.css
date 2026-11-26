@@ -211,7 +211,6 @@
   --alert-status-category-gap: 18%;
   --alert-status-axis-tick-gap: 28px;
   --alert-status-value-axis-width: 36px;
-  --alert-status-cursor-opacity: 0.5;
   --alert-status-bar-top-radius: 3px;
   --transaction-flow-columns: minmax(0, 1fr) 96px minmax(0, 1fr);
   --transaction-stage-connector-origin: 110px;

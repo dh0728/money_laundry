@@ -10,8 +10,18 @@
 
 .sankey-node-name { font-size: var(--chart-sankey-name-size) }
 .sankey-node-value { font-size: var(--chart-sankey-value-size) }
-.staged-sankey-labels [data-sankey-anchor] { r: var(--aml-stroke-divider) }
-.staged-sankey-relations circle { r: var(--chart-sankey-connector-radius) }
+.staged-sankey-labels :is([data-sankey-anchor], [data-sankey-top-anchor]) { r: var(--aml-stroke-divider) }
+.staged-sankey-relations {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  color: var(--muted-text);
+}
+.staged-sankey-relations path { fill: none; stroke: currentColor; stroke-width: var(--aml-stroke-divider) }
+.staged-sankey-relations circle { fill: currentColor; r: var(--chart-sankey-connector-radius) }
+.staged-sankey-relations [data-partial] path { stroke-dasharray: var(--aml-space-4) var(--aml-space-4) }
 .staged-sankey-relations [data-relation] {
   color: var(--staged-sankey-relation-color, inherit);
   opacity: 0;

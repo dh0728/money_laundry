@@ -38,6 +38,7 @@ export const dataSeriesColors = {
   teal: "var(--palette-teal-500, var(--aml-sky-070))",
 } as const;
 export const transactionTotalColor = "var(--aml-gray-050)";
+export const caseCreatedSeriesColor = "var(--status-pending-accent)";
 export const dataSeriesPalette = Object.values(dataSeriesColors);
 
 // CSS variable references for theming

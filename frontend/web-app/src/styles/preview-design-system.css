@@ -389,7 +389,6 @@
   --metric-value-size-min: 1.5rem;
   --metric-value-size: clamp(var(--metric-value-size-min), 30cqi, var(--workspace-kpi-value-size));
   --metric-wide-value-size: clamp(var(--metric-value-size-min), 20cqi, var(--workspace-kpi-value-size));
-  --metric-uniform-value-size: clamp(var(--metric-value-size-min), 10cqi, var(--workspace-kpi-value-size));
   --metric-composite-value-size: clamp(var(--metric-value-size-min), 18cqi, var(--workspace-kpi-value-size));
   --metric-value-line-height: 1.1;
   --loading-placeholder-title-width: min(60%, calc(2 * var(--aml-space-64)));

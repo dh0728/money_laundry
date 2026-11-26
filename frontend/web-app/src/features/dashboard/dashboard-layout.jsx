@@ -36,7 +36,11 @@ function DashboardSectionGrid({ title, children, loading = false, downloadEntrie
 }
 
 export function DashboardTransactionGrid(props) {
-  return <DashboardSectionGrid title="거래·위험 분석" className="dashboard-flow-family" {...props} />;
+  return <DashboardSectionGrid title="탐지 흐름" className="dashboard-flow-family" {...props} />;
+}
+
+export function DashboardDetectionGrid(props) {
+  return <DashboardSectionGrid title="탐지 출처·위험 분석" className="dashboard-detection-grid" {...props} />;
 }
 
 export function DashboardWorkGrid(props) {
@@ -44,11 +48,11 @@ export function DashboardWorkGrid(props) {
 }
 
 export function InstitutionMetricsGrid(props) {
-  return <DashboardSectionGrid title="핵심 지표" className="dashboard-institution-metrics" {...props} />;
+  return <Grid columns={12} className="dashboard-institution-metrics" {...props} />;
 }
 
 export function DashboardFocusGrid(props) {
-  return <DashboardSectionGrid title="우선 확인" className="dashboard-focus-grid" {...props} />;
+  return <DashboardSectionGrid title="오늘 할 일" className="dashboard-focus-grid" {...props} />;
 }
 
 export function ChartTopicSelect({ label, value, options, onChange }) {
@@ -103,10 +107,10 @@ function LoadingMetric({ detail, trend }) {
 }
 
 function LoadingInstitutionMetrics() {
-  return <InstitutionMetricsGrid loading>
+  return <InstitutionMetricsGrid>
     {Array.from({ length: 4 }, (_, index) =>
-      <Panel as="article" key={index} data-compact-kpi={index >= 3 || undefined}>
-        <LoadingMetric detail={index >= 3} trend />
+      <Panel as="article" key={index} data-compact-kpi={index === 3 || undefined}>
+        <LoadingMetric detail={index !== 1} trend />
       </Panel>)}
   </InstitutionMetricsGrid>;
 }
@@ -138,16 +142,21 @@ export function DashboardAnalyticsSkeleton({ reduced }) {
   return <Box className="dashboard-analytics dashboard-loading dashboard-workflow-charts" aria-busy="true">
     <Text as="span" className="visually-hidden" role="status">대시보드 차트 불러오는 중</Text>
     <Box aria-hidden="true" className="dashboard-analytics dashboard-institution-relations">
-      <LoadingInstitutionMetrics />
       <DashboardFocusGrid loading>
+        <LoadingChart className="dashboard-today-summary" chartClass="dashboard-loading-value" />
         <LoadingChart className="dashboard-sla-donut" chartClass="dashboard-loading-donut" />
+        <LoadingChart className="dashboard-priority-queue" chartClass="dashboard-series-plot" />
         <LoadingRecommendation reduced={reduced} />
       </DashboardFocusGrid>
       <DashboardTransactionGrid loading>
-        <LoadingChart className="dashboard-transaction-flow" chartClass="staged-sankey-chart" />
         <LoadingSeries className="dashboard-flow-volume" showTools />
-        <LoadingChart className="dashboard-flow-risk" chartClass="dashboard-score-band" showNote={false} />
+        <LoadingSeries className="dashboard-alert-lifecycle" showTools />
+        <LoadingInstitutionMetrics />
+        <LoadingChart className="dashboard-transaction-flow" chartClass="staged-sankey-chart" />
       </DashboardTransactionGrid>
+      <DashboardDetectionGrid loading>
+        <LoadingChart className="dashboard-flow-risk" chartClass="dashboard-score-band" showNote={false} />
+      </DashboardDetectionGrid>
       <DashboardWorkGrid loading>
         <LoadingCompletion />
         <LoadingStaffChart />

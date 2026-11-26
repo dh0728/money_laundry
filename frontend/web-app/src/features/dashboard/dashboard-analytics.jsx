@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
+import { TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
+import { AccessibleChartTable } from '../../components/workflow-table';
 import { Panel } from '../../components/panel';
 import { LinkTag, PatternTag, ReviewStatusTag } from '../../components/semantic-tags';
 import { BarChart } from '../../components/charts/charts/bar-chart';
@@ -17,9 +18,11 @@ import { dashboardPattern } from '../../mocks/dashboard-patterns';
 import { Box, Heading, Text } from '../../components/layout-primitives';
 import { SankeyDetailsLinks, StagedSankey } from '@/components/charts/charts/sankey/staged-sankey';
 import { flowColors, investigationFlow, reviewStatusTotals, share as compactShare, statusLabels, transactionFlow } from './dashboard-flows';
-import { dataSeriesColors, transactionTotalColor } from '@/components/charts/charts/chart-context';
-import { ChartTopicSelect, DashboardFocusGrid, DashboardTransactionGrid, DashboardWorkGrid, InstitutionMetricsGrid } from './dashboard-layout';
+import { caseCreatedSeriesColor, dataSeriesColors, transactionTotalColor } from '@/components/charts/charts/chart-context';
+import { ChartTopicSelect, DashboardDetectionGrid, DashboardFocusGrid, DashboardTransactionGrid, DashboardWorkGrid, InstitutionMetricsGrid } from './dashboard-layout';
+import { DashboardPriorityQueue } from './dashboard-priority-queue';
 import { DashboardSlaDonut } from './dashboard-sla-donut';
+import './dashboard-team-sections.css';
 
 const integer = new Intl.NumberFormat('ko-KR');
 const count = value => `${integer.format(value)}건`;
@@ -30,7 +33,7 @@ function volumeAxisLabel(point, label) {
   return <Text as="span" className="dashboard-volume-axis">{label}<Text as="small">{share(point.labeled, point.total)}</Text></Text>;
 }
 
-function DailySeries({ rows, series, reduced, label, showShare = false, detail, stacked = true, separatedStack = false, tooltipTitle }) {
+function DailySeries({ rows, series, reduced, label, showShare = false, detail, stacked = true, separatedStack = false, tooltipTitle, maxLabels }) {
   const columns = detail ?? series.map(item => ({ label: item.label, value: row => count(row[item.key]), color: item.color }));
   const tooltipRows = point => columns.map(column => ({ label: column.label, color: column.color, value: column.value(point) }));
   const barGap = readChartNumber('--aml-space-2', 2);
@@ -52,20 +55,18 @@ function DailySeries({ rows, series, reduced, label, showShare = false, detail, 
         {series.map(item => <Bar key={item.key} dataKey={item.key} fill={item.color}
           lineCap={cap} roundStack={stacked && !separatedStack} groupGap={barGap}
           stackGap={separatedStack ? barGap : undefined} animate={!reduced} />)}
-        <BarXAxis maxLabels={showShare ? { base: 4, sm: 10, lg: 18 } : 14} tickerHalfWidth={0}
+        <BarXAxis maxLabels={maxLabels ?? (showShare ? { base: 4, sm: 10, lg: 18 } : 14)} tickerHalfWidth={0}
           formatLabel={showShare ? volumeAxisLabel : undefined} />
         <ChartTooltip showCrosshair showDatePill={false} showDots={false} damping={reduced ? 0 : 25}
           rows={tooltipRows} content={tooltipTitle && (({ point }) => <TooltipContent title={tooltipTitle(point)} rows={tooltipRows(point)} />)} />
       </BarChart>
     </Box>
-    <Box className="visually-hidden">
-      <Table>
+      <AccessibleChartTable>
         <TableCaption>일별 수치</TableCaption>
         <TableHeader><TableRow><TableHead scope="col">일자</TableHead>{columns.map(column => <TableHead scope="col" key={column.label}>{column.label}</TableHead>)}</TableRow></TableHeader>
         <TableBody>{rows.map(row => <TableRow key={row.label}><TableHead scope="row">{row.label}</TableHead>
           {columns.map(column => <TableCell key={column.label}>{column.value(row)}</TableCell>)}</TableRow>)}</TableBody>
-      </Table>
-    </Box>
+      </AccessibleChartTable>
   </Box>;
 }
 
@@ -144,13 +145,13 @@ function TransactionComposition({ total, labeled }) {
 const patternRows = [...ibmPatterns, ...ibmRemaining];
 
 function TransactionPatterns({ reduced, label = '의심 거래 유형별 건수', rows = patternRows,
-  total = ibmLaundering, seriesLabel = '원본 세탁 라벨 거래' }) {
+  total = ibmLaundering, seriesLabel = '원본 세탁 라벨 거래', markUnmodeled = true }) {
   const patternId = React.useId();
   const points = rows.map(({ label, value }) => {
     const { name, supported } = dashboardPattern(label);
-    return { label: name, value, supported };
-  }).sort((left, right) => Number(right.supported) - Number(left.supported) || right.value - left.value);
-  const hasReference = points.some(row => !row.supported);
+    return { label: name, value, supported, reference: markUnmodeled && !supported };
+  }).sort((left, right) => Number(left.reference) - Number(right.reference) || right.value - left.value);
+  const hasReference = points.some(row => row.reference);
   const barGap = readChartNumber('--chart-pattern-bar-gap-ratio', 0.28);
   const enterDuration = reduced ? 0 : readChartNumber('--chart-dashboard-enter-duration', 340);
   return <Box as="section" className="dashboard-transaction-breakdown" aria-label={label}>
@@ -158,15 +159,15 @@ function TransactionPatterns({ reduced, label = '의심 거래 유형별 건수'
     {!rows.length ? <Text className="dashboard-note">조회 조건에 해당하는 유형이 없습니다.</Text> :
     <Box className="dashboard-pattern-chart" style={{ '--dashboard-pattern-count': rows.length }}>
       <Box as="ul" className="dashboard-pattern-labels">
-        {points.map(({ label, value, supported }) => <Box as="li" key={label} data-reference={!supported || undefined}>
+        {points.map(({ label, value, supported, reference }) => <Box as="li" key={label} data-reference={reference || undefined}>
           {supported ? <PatternTag>{label}</PatternTag> : <Text as="span">{label}</Text>}
           <Text as="strong">{count(value)}</Text>
         </Box>)}
       </Box>
       <BarChart className="dashboard-pattern-bars" data={points} xDataKey="label" orientation="horizontal"
         margin={noMargin} barGap={barGap} animationDuration={enterDuration}>
-        <BarHatch id={patternId} fill="var(--chart-pattern)" stroke="var(--information-panel-surface)" />
-        <Bar dataKey="value" getFill={point => point.supported ? 'var(--chart-pattern)' : `url(#${patternId})`}
+        {hasReference && <BarHatch id={patternId} fill="var(--chart-pattern)" stroke="var(--information-panel-surface)" />}
+        <Bar dataKey="value" getFill={point => point.reference ? `url(#${patternId})` : 'var(--chart-pattern)'}
           lineCap="round" animate={!reduced} />
         <ChartTooltip showDatePill={false} showDots={false} damping={reduced ? 0 : 25}
           rows={point => [{ label: point.label, color: 'var(--chart-pattern)',
@@ -217,27 +218,35 @@ const newEntitySeries = [
 ];
 
 const meanCount = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 });
+const staffTopics = [
+  { value: 'unfinished', label: '분석가별 현재 미처리' },
+  { value: 'assignments', label: '분석가별 최근 배정' },
+];
 
-function StaffWorkloadMetric({ workload, reduced, showAssignments }) {
+function StaffWorkloadMetric({ workload, reduced }) {
+  const [topic, setTopic] = useState('unfinished');
+  const showAssignments = topic === 'assignments';
   const { byAssignee, equalAssignments, staffCount, total, overdue } = workload;
   const rows = byAssignee.map(person => ({ ...person,
     value: showAssignments ? person.assignments : person.total - person.overdue,
     count: showAssignments ? person.assignments : person.total,
-  }));
+  })).sort((left, right) => right.count - left.count || left.name.localeCompare(right.name, 'ko'));
   const baseline = showAssignments ? equalAssignments : null;
   const visibleRowLimit = readChartNumber('--dashboard-staff-visible-rows', 7);
   const longChart = rows.length >= 2 * visibleRowLimit;
   const upperBound = Math.max(1, ...rows.map(row => row.count)) + 1;
-  const title = showAssignments ? '분석가별 최근 배정' : '분석가별 현재 미완료';
+  const title = staffTopics.find(option => option.value === topic).label;
   const note = showAssignments
     ? baseline == null ? '기간 내 마지막 배정 기록 · 분석가 명단 미제공'
       : `기간 내 마지막 배정 기록 · 등록 분석가 ${integer.format(staffCount)}명`
-    : `전체 미완료 ${count(total)} · 선택 기간 생성 업무`;
+    : `전체 미처리 ${count(total)} · 선택 기간 생성 업무`;
   const color = showAssignments ? transactionTotalColor : 'var(--risk-medium)';
   const stackGap = readChartNumber('--aml-space-2', 2);
   const cornerRadius = readChartNumber('--aml-radius-small', 4);
   const animationDuration = reduced ? 0 : readChartNumber('--chart-dashboard-enter-duration', 340);
-  return <ChartPanel title={title} note={note} className="dashboard-priority-metric dashboard-staff-metric" hasChart={rows.length > 0}>
+  return <ChartPanel title={title} note={note} className="dashboard-priority-metric dashboard-staff-metric dashboard-staff-workload"
+    hasChart={rows.length > 0} topicPicker={<ChartTopicSelect label="분석가별 업무 지표 변경"
+      value={topic} onChange={setTopic} options={staffTopics} />}>
     {baseline != null && <Box className="dashboard-staff-reference-key">
       <Text as="span">균등 기준 {meanCount.format(baseline)}건/명</Text>
     </Box>}
@@ -333,19 +342,62 @@ function TransactionTrend({ data, flow, reduced }) {
   </ChartPanel>;
 }
 
-function TransactionDetails({ data, flow, reduced, scope }) {
+const lifecycleTopics = ['Alert', 'Episode'].map(value => ({ value, label: `일별 ${value} 생성·종결` }));
+let lifecycleKind = 'Alert';
+
+function CaseLifecycleChart({ dailyByKind, reduced }) {
+  const [kind, setKind] = useState(lifecycleKind);
+  const title = `일별 ${kind} 생성·종결`;
+  const daily = dailyByKind[kind];
+  const series = [
+    { key: 'incoming', label: `생성 ${kind}`, color: caseCreatedSeriesColor },
+    { key: 'completed', label: `종결 ${kind}`, color: flowColors.done },
+  ];
+  const spansYears = daily?.[0]?.day.slice(0, 4) !== daily?.at(-1)?.day.slice(0, 4);
+  const rows = (daily ?? []).map(({ day, ...events }) => ({
+    ...events, date: day, label: day.slice(spansYears ? 2 : 5).replaceAll('-', '/'),
+  }));
+  const hasChart = rows.some(row => row.incoming > 0 || row.completed > 0);
+  const entries = hasChart ? [csvDownloadEntry(title, `daily-${kind.toLowerCase()}-events`, ['날짜 (KST)', ...series.map(item => item.label)],
+    rows.map(({ date, incoming, completed }) => [date, incoming, completed]))] : [];
+  return <ChartPanel title={title} className="dashboard-alert-lifecycle" note="생성·종결 발생일 기준 · 한국 표준시"
+    hasChart={hasChart} entries={entries} topicPicker={<ChartTopicSelect label="생성·종결 업무 유형 변경"
+      value={kind} options={lifecycleTopics} onChange={next => { lifecycleKind = next; setKind(next); }} />}>
+    {hasChart ? <>
+      <SeriesLegend series={series} />
+      <DailySeries key={kind} rows={rows} series={series} reduced={reduced} label={title} stacked={false}
+        maxLabels={{ base: 4, sm: 6, lg: 10 }} tooltipTitle={point => `${point.date} KST`} />
+    </> : <Text className="dashboard-note">{daily ? `조회 기간에 생성 또는 종결된 ${kind}가 없습니다.` : `${kind} 생성·종결 집계가 없습니다.`}</Text>}
+  </ChartPanel>;
+}
+
+function AlertPatterns({ counts, reduced }) {
+  const title = '패턴별 Alert';
+  const rows = (counts ?? []).map(({ label, count: value }) => ({ label, value }));
+  const total = rows.reduce((sum, row) => sum + row.value, 0);
+  const entries = total ? [csvDownloadEntry(title, 'alert-patterns', ['패턴', 'Alert 건수'],
+    rows.map(({ label, value }) => [label, value]))] : [];
+  return <ChartPanel title={title} className="dashboard-alert-patterns" hasChart={total > 0} entries={entries}>
+    {total > 0 ? <TransactionPatterns label="Alert 패턴별 건수" rows={rows} total={total} seriesLabel="선택 기간 생성 Alert"
+      reduced={reduced} markUnmodeled={false} />
+      : <Text className="dashboard-note">{counts ? '조회 기간에 생성된 Alert가 없습니다.' : 'Alert 패턴 집계가 없습니다.'}</Text>}
+  </ChartPanel>;
+}
+
+function TransactionDetails({ data, flow, reduced, scope, metrics }) {
   const { scale } = flow;
   const badge = [flow.sample ? '은행별 건수는 예시' : null,
     scale > 1 ? '이상 띠 두께 ×' + scale + ' · 건수·비율 원본' : null].filter(Boolean).join(' · ');
-  return <DashboardTransactionGrid aria-label="거래·위험 분석">
+  return <DashboardTransactionGrid>
     {scope && <Text className="dashboard-note dashboard-transaction-scope">거래 집계 범위 · {scope}</Text>}
+    <TransactionTrend data={data} flow={flow} reduced={reduced} />
+    <CaseLifecycleChart dailyByKind={data.dailyCaseEvents ?? { Alert: data.daily }} reduced={reduced} />
+    <InstitutionMetricsGrid aria-label="조회 기간 핵심 지표">{metrics}</InstitutionMetricsGrid>
     <ChartPanel title="거래 분류" note={badge} className="dashboard-transaction-flow" hasChart={flow.hasData}>
       {flow.hasData ? <StagedSankey data={flow} stages={transactionStages} label="거래 분류 흐름" reduced={reduced} />
         : <Text className="dashboard-note">조회 기간에 거래가 없습니다.</Text>}
       {import.meta.env.DEV && data.dataSource === 'sample' && <LinkTag href="/dashboard/all?data=ibm">IBM 원본 거래 집계</LinkTag>}
     </ChartPanel>
-    <TransactionTrend data={data} flow={flow} reduced={reduced} />
-    <RiskSegments data={data} />
   </DashboardTransactionGrid>;
 }
 
@@ -399,8 +451,7 @@ function InvestigationStatus({ data, reduced }) {
     {hasChart ? <>
       <AlertStatusBars data={rows} series={series} formatDay={day => day.slice(5).replace('-', '/')} separated reduced={reduced}
         tooltip={<StatusComparisonTooltip series={series} />} />
-      <Box className="visually-hidden">
-        <Table>
+        <AccessibleChartTable>
           <TableCaption>일별 Alert·Episode 처리 상태 건수</TableCaption>
           <TableHeader><TableRow><TableHead scope="col">생성일 (KST)</TableHead>
             {series.map(({ key, label }) => <TableHead scope="col" key={key}>{label}</TableHead>)}
@@ -408,8 +459,7 @@ function InvestigationStatus({ data, reduced }) {
           <TableBody>{rows.map(row => <TableRow key={row.date}><TableHead scope="row">{row.date}</TableHead>
             {series.map(({ key }) => <TableCell key={key}>{count(row[key])}</TableCell>)}
           </TableRow>)}</TableBody>
-        </Table>
-      </Box>
+        </AccessibleChartTable>
     </> : <Text className="dashboard-note">{available.length ? '조회 기간에 생성된 업무가 없습니다.' : '표시할 처리 상태가 없습니다.'}</Text>}
   </ChartPanel>;
 }
@@ -448,7 +498,7 @@ function CaseCompletion({ data, reduced }) {
   </ChartPanel>;
 }
 
-export function Analytics({ data, reduced, summary, metrics, board, boardEntries }) {
+export function Analytics({ data, reduced, summary, today, metrics, board, boardEntries, detectionSources }) {
   const hostRef = useRef(null);
   const transactions = transactionFlow(data);
   const investigation = investigationFlow(data);
@@ -461,17 +511,21 @@ export function Analytics({ data, reduced, summary, metrics, board, boardEntries
     ? ` · Alert의 Episode 편입 ${count(episodeAlerts)} / ${count(totalAlerts)} (${compactShare(episodeAlerts, totalAlerts)})` : '';
   return <Box as="section" className="dashboard-analytics dashboard-workflow-charts dashboard-institution-relations"
     aria-label="기관 탐지 현황" ref={hostRef}>
-    <InstitutionMetricsGrid aria-label="전체 대시보드 요약 지표">
-      {metrics}
-    </InstitutionMetricsGrid>
     <DashboardFocusGrid>
+      {today}
+      <Text className="dashboard-note">아래 우선 확인 패널은 선택한 조회 기간 기준</Text>
       <DashboardSlaDonut data={data} reduced={reduced} />
+      <DashboardPriorityQueue rows={data.priorityCases} />
       {summary}
     </DashboardFocusGrid>
-    <TransactionDetails data={data} flow={transactions} reduced={reduced} scope={scope} />
+    <TransactionDetails data={data} flow={transactions} reduced={reduced} scope={scope} metrics={metrics} />
+    <DashboardDetectionGrid>
+      <AlertPatterns counts={data.patternAlertCounts} reduced={reduced} />
+      <RiskSegments data={data} />
+      {detectionSources}
+    </DashboardDetectionGrid>
     <DashboardWorkGrid downloadEntries={boardEntries}>
       <CaseCompletion data={data} reduced={reduced} />
-      <StaffWorkloadMetric workload={data.institutionWorkload} reduced={reduced} showAssignments />
       <StaffWorkloadMetric workload={data.institutionWorkload} reduced={reduced} />
       <ChartPanel title="조사 처리 흐름" note={investigationNote + episodeNote} className="dashboard-investigation-flow" hasChart={investigation.hasData}>
         {investigation.hasData ? <StagedSankey data={investigation} stages={investigationStages} label="조사 처리 흐름" reduced={reduced} />

@@ -3,7 +3,8 @@
 import type { DashboardRequested } from '@/api/dashboard'
 import { AlertStatusBars } from '@/components/charts/alert-status-bars'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { AccessibleChartTable } from '@/components/workflow-table'
 import { fmt } from '@/lib/format'
 import { Box, Text } from '@/components/layout-primitives'
 
@@ -58,10 +59,10 @@ export function AlertStatusChart({ data, unavailable = false }: { data: DailySta
       <CardContent className="min-w-0 px-2 pt-2 sm:px-6">
         <AlertStatusBars data={data} series={series} formatDay={md} tooltip={<StatusTooltip />} />
         <StatusLegend />
-        <Table className="sr-only" containerClassName="sr-only" aria-label="일별 Alert 현재 처리 상태 집계">
+        <AccessibleChartTable label="일별 Alert 현재 처리 상태 집계">
           <TableHeader><TableRow><TableHead>생성일</TableHead>{series.map(s => <TableHead key={s.key}>{s.label}</TableHead>)}<TableHead>유입</TableHead></TableRow></TableHeader>
           <TableBody>{data.map(day => <TableRow key={day.date}><TableHead scope="row">{day.date}</TableHead>{series.map(s => <TableCell key={s.key}>{day[s.key]}</TableCell>)}<TableCell>{day.pending + day.inProgress + day.done}</TableCell></TableRow>)}</TableBody>
-        </Table>
+        </AccessibleChartTable>
       </CardContent>
     </Card>
   )

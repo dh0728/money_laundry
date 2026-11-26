@@ -4,7 +4,8 @@ import type { EpisodeRow } from '@/api/episodes'
 import { AgeBadge, RiskBadge } from '@/components/badges'
 import { SectionTitle } from '@/components/page'
 import { Card, CardContent } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { WorkflowTable } from '@/components/workflow-table'
 import { Box, Heading, Text } from '@/components/layout-primitives'
 
 const ageDays = (iso: string, today: Date) => Math.max(0, Math.floor((today.getTime() - Date.parse(iso)) / 864e5))
@@ -25,11 +26,11 @@ export function EpisodeWork({ episodes, today }: { episodes: EpisodeRow[]; today
     <Box><Heading id="episode-work-title" className="text-base font-semibold tracking-tight">Episode 업무</Heading><Text className="mt-1.5 text-xs text-muted-foreground">기관 전체 · 어디가 밀려 있는지</Text></Box>
     <Box className="grid grid-cols-2 gap-3 @3xl:grid-cols-5">{metrics.map(([l, v, s]) => <Card key={l} className="shadow-none"><CardContent className="px-4"><Text className="text-xs text-muted-foreground">{l}</Text><Text className="mt-2 text-lg font-semibold tabular-nums">{v}</Text><Text className="mt-1 text-xs text-muted-foreground">{s}</Text></CardContent></Card>)}</Box>
     <Card className="shadow-none"><CardContent><SectionTitle title="오래 열린 Episode" description="배정 후 오래된 순 · 최대 20건 · 행을 누르면 Episode 상세" />
-      {oldest.length ? <Table><TableHeader><TableRow><TableHead>Episode</TableHead><TableHead>담당</TableHead><TableHead>경과</TableHead><TableHead>위험</TableHead><TableHead className="text-right">연결 Alert</TableHead><TableHead>상태</TableHead></TableRow></TableHeader>
+      {oldest.length ? <WorkflowTable label="오래 열린 Episode" title={null} tools={false}><TableHeader><TableRow><TableHead>Episode</TableHead><TableHead>담당</TableHead><TableHead>경과</TableHead><TableHead>위험</TableHead><TableHead className="text-right">연결 Alert</TableHead><TableHead>상태</TableHead></TableRow></TableHeader>
         <TableBody>{oldest.map(e => <TableRow key={e.episodeId} className="cursor-pointer" onClick={() => { window.location.hash = `episodes/${e.episodeId}` }}>
           <TableCell className="font-mono text-xs">E-{e.episodeId}</TableCell><TableCell className="text-xs">{e.assignee.name}</TableCell><TableCell><AgeBadge days={ageDays(e.createdAt, today)} /></TableCell>
           <TableCell><RiskBadge score={e.riskScore} /></TableCell><TableCell className="text-right tabular-nums">{e.alertCount}건</TableCell><TableCell className="text-xs">{e.updatedAt === e.createdAt ? '검토 전' : '조사 중'}</TableCell>
-        </TableRow>)}</TableBody></Table> : <Text className="text-xs text-muted-foreground">열린 Episode가 없습니다.</Text>}
+        </TableRow>)}</TableBody></WorkflowTable> : <Text className="text-xs text-muted-foreground">열린 Episode가 없습니다.</Text>}
     </CardContent></Card>
   </Box>
 }

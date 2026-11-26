@@ -20,7 +20,7 @@ export const designRuleTree = [
         // 0건이 된 폴더는 여기 더해 바로 오류로 막는다(pnpm lint·커밋 전 검사).
         errorIn: ['src/features/alerts/', 'src/features/dashboard/', 'src/features/investigation/', 'src/features/notifications/', 'src/lib/', 'src/pages/'] },
       { id: 'component/dom-api', title: '화면 파일에서 createElement·innerHTML로 태그를 만들지 않는다', engine: 'eslint', level: 'ratchet' },
-      { id: 'component/dashboard-ui-source', title: '대시보드는 공용 UI를 사용하고 외부 UI 패키지·원시 HTML로 우회하지 않는다', engine: 'eslint', level: 'error' },
+      { id: 'component/dashboard-ui-source', title: '대시보드는 승인된 공용 UI와 WorkflowTable을 사용한다', engine: 'eslint', level: 'error' },
       { id: 'component/control-owner', title: '공용 폴더에서도 기본 버튼·입력·선택의 구현은 지정된 소유 컴포넌트에만 둔다', engine: 'eslint', level: 'error' },
       { id: 'component/form-control', title: '화면 파일에 맨 input·select·textarea 금지, 공용 입력 부품 사용', engine: 'eslint', level: 'ratchet' },
     ],
@@ -38,7 +38,7 @@ export const designRuleTree = [
       { id: 'token/fixed-number', title: '고정 숫자 금지(크기·선·그림자·투명도·z-index·시간·변형·JSX 크기 prop·문자열 단위). 0·100%·50%·fr·flex·auto 등 채우기·맞추기 값만 허용', engine: 'eslint+stylelint', level: 'ratchet' },
       { id: 'token/inline-var-number', title: '인라인 style·setProperty로 넘기는 CSS 변수 값에 숫자 금지(토큰 var만)', engine: 'eslint', level: 'error' },
       { id: 'token/palette-direct', title: '화면 파일(src/components·src/styles 밖)에서 원시 색(--palette-*·--aml-색이름-숫자) 직접 사용 금지', engine: 'eslint+stylelint', level: 'ratchet' },
-      { id: 'token/series-color', title: '전체 거래는 회색, 새 계좌는 청록, 새 소유주는 분홍. 회색과 상태 색은 해당 의미에만 사용', engine: 'eslint', level: 'error' },
+      { id: 'token/series-color', title: '전체 거래는 회색, 새 계좌는 청록, 새 소유주는 분홍, 생성 Alert·Episode는 보라', engine: 'eslint', level: 'error' },
       { id: 'token/undefined-var', title: '정의 없는 CSS 변수 참조 금지(대체값 없는 var)', engine: 'eslint+stylelint', level: 'error' },
       { id: 'token/dashboard-usage', title: '대시보드에서 공용 토큰을 재정의하지 않고 글자 크기와 단일 색상은 토큰으로 지정한다', engine: 'eslint+stylelint', level: 'error' },
     ],
