@@ -75,8 +75,10 @@ function DashboardTodaySummary({ snapshot, dataSource }) {
   ];
 
   return <Panel as="article" className="dashboard-today-summary">
-    <SectionDownloadHeading as="h3" printLabel="오늘의 업무">오늘의 업무</SectionDownloadHeading>
-    {dataSource === 'sample' && <Text className="dashboard-note">샘플 · {date}</Text>}
+    <SectionDownloadHeading as="h3" printLabel="오늘의 업무">
+      오늘의 업무
+      {dataSource === 'sample' && <Text as="span" className="dashboard-note dashboard-today-date">샘플 · {date}</Text>}
+    </SectionDownloadHeading>
     <Grid columns={5} className="dashboard-today-metrics">
       {items.map(({ title, value, detail, tone, chartValue, chartTotal, basis }) => <Stack key={title} data-kpi-tone={value === '—' ? undefined : tone}>
         <Text as="span">{title}</Text>

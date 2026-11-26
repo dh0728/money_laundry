@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { AccessibleChartTable } from '../../components/workflow-table';
 import { Panel } from '../../components/panel';
-import { LinkTag, PatternTag, ReviewStatusTag, reviewStates } from '../../components/semantic-tags';
+import { PatternTag, ReviewStatusTag, reviewStates } from '../../components/semantic-tags';
 import { BarChart } from '../../components/charts/charts/bar-chart';
 import { AlertStatusBars } from '../../components/charts/alert-status-bars';
 import { Bar, BarHatch } from '../../components/charts/charts/bar';
@@ -389,7 +389,6 @@ function TransactionDetails({ data, flow, reduced, scope }) {
     <ChartPanel title="거래 분류" note={note} className="dashboard-transaction-flow" hasChart={flow.hasData}>
       {flow.hasData ? <StagedSankey data={flow} stages={transactionStages} label="거래 분류 흐름" reduced={reduced} />
         : <Text className="dashboard-note">조회 기간에 거래가 없습니다.</Text>}
-      {import.meta.env.DEV && data.dataSource === 'sample' && <LinkTag href="/dashboard/all?data=ibm">IBM 원본 거래 집계</LinkTag>}
     </ChartPanel>
     <TransactionTrend data={data} flow={flow} reduced={reduced} />
     <CaseLifecycleChart dailyByKind={data.dailyCaseEvents ?? { Alert: data.daily }} reduced={reduced} />

@@ -1,3 +1,8 @@
+.dashboard-today-date {
+  margin-inline-start: var(--aml-space-12);
+  font-weight: normal;
+  white-space: nowrap;
+}
 .dashboard-today-metrics > * { gap: var(--aml-space-4) }
 .dashboard-today-metrics .meter {
   --meter-fill: var(--dashboard-metric-ink, var(--muted-text));
