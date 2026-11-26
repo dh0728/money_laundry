@@ -252,7 +252,7 @@ class DevControlTests(unittest.TestCase):
         puts = []
 
         def put(url, content, headers, timeout):
-            puts.append((url, content.read(), {k.lower(): v for k, v in headers.items()}))
+            puts.append((url, b''.join(content), {k.lower(): v for k, v in headers.items()}))
             return httpx.Response(200)
 
         with tempfile.TemporaryDirectory() as root:

@@ -105,6 +105,39 @@ def upload_failure(error, day, stage):
     return ApiError(prefix + message)
 
 
+def load_estimate(size):
+    """Rough rows and load-time range for a ledger file; the server reports no row progress.
+
+    HI-Medium daily files average about 204 bytes per row. Local loads after the 2026-11-25 tuning
+    took 455-582 s per million rows, so the range is an estimate, not a measurement on dev.
+    """
+    rows = size / 204
+    return int(rows), (rows / 1e6 * 450, rows / 1e6 * 600)
+
+
+def load_progress(state, now):
+    """Progress bars for the S3 transfer (measured) and the server load (elapsed against an estimate)."""
+    bars = []
+    total = state.get('transferTotal')
+    if total:
+        sent = state.get('transferSent') or 0
+        bars.append((min(sent / total, 1.0),
+                     f'S3 전송 · {sent / 2**20:,.0f} / {total / 2**20:,.0f} MB ({sent / total:.0%})'))
+    started = state.get('loadStarted')
+    if started:
+        elapsed = max(0.0, now - started)
+        low, high = state.get('loadLow') or 0, state.get('loadHigh') or 0
+        status = {'RECEIVED': '적재 대기', 'RUNNING': '적재 중'}.get(state.get('loadStatus'), state.get('loadStatus') or '확인 중')
+        checked = state.get('loadCheckedAt')
+        seen = f' · 서버 확인 {max(0, now - checked):.0f}초 전' if checked else ''
+        over = ' · 예상보다 오래 걸리는 중' if high and elapsed > high else ''
+        # Capped below 100%: the bar is elapsed time against an estimate, not a server row count.
+        bars.append((min(elapsed / high, 0.99) if high else 0.0,
+                     f'서버 {status} · 경과 {elapsed / 60:.0f}분 · 예상 {low / 60:.0f}~{high / 60:.0f}분 '
+                     f'(약 {state.get("loadRows", 0):,}건 추정){seen}{over}'))
+    return bars
+
+
 class Controls:
     # A whole day's ledger is loaded in one worker run; the largest day took minutes, not seconds.
     LOAD_WAIT_SECONDS = 3 * 3600
@@ -206,8 +239,11 @@ class Controls:
                     # Forget URL-only lookup so a later retry can obtain a new URL after expiry.
                     self.uploads.pop(key, None)
                 if not pending['uploaded'] and not target.get('existing'):
-                    progress('S3 전송', uploadId=upload)
-                    ledger_upload.upload_file(file, target, size)
+                    progress('S3 전송', uploadId=upload, transferSent=0, transferTotal=size)
+                    ledger_upload.upload_file(
+                        file, target, size,
+                        on_progress=lambda sent, total: report(f'{day} 원장 파일: S3 전송',
+                                                               transferSent=sent, transferTotal=total))
                     pending['uploaded'] = True
                 progress('업로드 완료 통지', uploadId=upload)
                 try:
@@ -218,13 +254,19 @@ class Controls:
                         raise
                     # Reconcile a lost POST response by GET; never blindly repeat upload.
                     result = self._upload_status(upload, progress)
-            progress('원장 적재 결과 조회', uploadId=upload)
+            rows, (low, high) = load_estimate(size)
+            progress('원장 적재 결과 조회', uploadId=upload, transferTotal=None, loadStarted=time.time(),
+                     loadRows=rows, loadLow=low, loadHigh=high, loadStatus=result['status'],
+                     loadCheckedAt=time.time())
             deadline = time.monotonic() + self.LOAD_WAIT_SECONDS
             while result['status'] in ('RECEIVED', 'RUNNING'):
                 if time.monotonic() >= deadline:
                     raise ApiError(f'{day} 원장 적재 관찰 시간 초과: uploadId {upload}. 다시 실행하면 상태 조회부터 이어갑니다.')
                 time.sleep(2)
                 result = self._upload_status(upload, progress)
+                report(f'{day} 원장 파일: 원장 적재 결과 조회', loadStatus=result['status'],
+                       loadCheckedAt=time.time())
+            report(f'{day} 원장 파일: 원장 적재 결과 조회', loadStarted=None)
             if result['status'] != 'COMPLETED':
                 errors = result.get('errors') or []
                 reason = errors[0].get('reason') if errors and isinstance(errors[0], dict) else None
@@ -288,7 +330,7 @@ class Replay:
                 key = (day, str(files[day]))
                 self.report(f'{day}: 처리 시작', currentDay=day,
                             fileDone=int(key in self.sent), fileTotal=1 if upload else 0,
-                            uploadId=None, jobId=None)
+                            uploadId=None, jobId=None, transferTotal=None, loadStarted=None)
                 if upload and key not in self.sent:
                     self.report(f'{day} 원장 파일: 전송 준비', uploadId=None)
                     stage = '원장 파일 전송·적재'
@@ -323,7 +365,7 @@ class Replay:
                 kind = next((cls.__name__ for cls in (KeyError, TypeError, ValueError, OSError, RuntimeError)
                              if isinstance(error, cls)), '내부 오류')
                 message = f'{day or "날짜 미확인"} · {stage} 실패 ({kind}). 패널 코드 버전과 API 응답 형식을 확인하세요.'
-            self.report('중단', error=message)
+            self.report('중단', error=message, transferTotal=None, loadStarted=None)
 
     def wait_job(self, job, day):
         deadline = time.monotonic() + 6 * 3600
@@ -532,6 +574,8 @@ def render():
                 if state.get('fileTotal'):
                     st.progress(state['fileDone'] / state['fileTotal'],
                                 text=f'현재 날짜 원장 전송·적재 · {state["fileDone"]}/{state["fileTotal"]}개 파일 완료')
+                for value, text in load_progress(state, time.time()):
+                    st.progress(value, text=text)
                 st.caption('날짜 진행률은 분석 완료 기준입니다. 전송만 실행하면 적재 완료 기준입니다.')
             st.write(state['message'])
             st.write({key: state[key] for key in ('uploadId', 'jobId') if state.get(key) is not None})
