@@ -63,7 +63,7 @@ class RuleBacktestTests {
 
   long account() {
     return jdbc.queryForObject(
-        "insert into core.accounts(bank_id,service_account_id,owner_id) values(999017,gen_random_uuid(),?) returning account_id",
+        "insert into core.accounts(bank_id,owner_id) values(999017,?) returning account_id",
         Long.class,
         owner);
   }
@@ -384,7 +384,7 @@ class RuleBacktestTests {
     assertThat(cases.get(0).get("subject").toString())
         .isEqualTo(
             jdbc.queryForObject(
-                "select left(service_account_id::text,8) from core.accounts where account_id=?",
+                "select service_account_id from core.accounts where account_id=?",
                 String.class,
                 six));
 
@@ -460,7 +460,7 @@ class RuleBacktestTests {
     assertThat(cases.get(0).get("subject").toString())
         .isEqualTo(
             jdbc.queryForObject(
-                "select left(service_account_id::text,8) from core.accounts where account_id=?",
+                "select service_account_id from core.accounts where account_id=?",
                 String.class,
                 split));
     // 돌아본 범위: 룰의 기간이 7일이라 검사 첫날에서 7일 앞인 09-03 부터 읽는다. 바쁜 계좌는 검사 마지막 날까지의 거래로 센다
@@ -476,7 +476,7 @@ class RuleBacktestTests {
     assertThat(rows(before.get("cases")).get(0).get("subject").toString())
         .isEqualTo(
             jdbc.queryForObject(
-                "select left(service_account_id::text,8) from core.accounts where account_id=?",
+                "select service_account_id from core.accounts where account_id=?",
                 String.class,
                 six));
     assertThat(part(before, "lookback").get("from")).isEqualTo("2023-09-02");

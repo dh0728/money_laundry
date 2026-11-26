@@ -52,7 +52,7 @@ public class RuleHitQuery {
             select m.alert_id, h.hit_id, h.version_id, h.subject_type, h.subject_id, h.hit_date::text as hit_date,
                    h.measured::text as measured, v.version_no, v.status as version_status, v.summary,
                    v.definition::text as definition, r.rule_id, r.name, r.template,
-                   left(a.service_account_id::text, 8) as subject,
+                   a.service_account_id as subject,
                    array_to_string(array_agg(distinct m.tx_id), ',') as matched,
                    (select array_to_string(array_agg(x.tx_id), ',') from rules.hit_transactions x
                     where x.hit_id = h.hit_id) as evidence
@@ -219,7 +219,7 @@ public class RuleHitQuery {
     var rows =
         jdbc.queryForList(
             """
-            select t.from_account_id, t.to_account_id, left(a.service_account_id::text, 8) as sender
+            select t.from_account_id, t.to_account_id, a.service_account_id as sender
             from ledger.transactions t join core.accounts a on a.account_id = t.from_account_id
             where t.tx_id = any(?::bigint[])
             order by t.occurred_at, t.tx_id

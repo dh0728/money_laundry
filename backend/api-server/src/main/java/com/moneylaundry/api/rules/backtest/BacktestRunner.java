@@ -226,12 +226,11 @@ public class BacktestRunner implements SmartInitializingSingleton, DisposableBea
           result.put(
               "ledgerFrom",
               jdbc.queryForObject(
-                  "select min(business_date)::text from ledger.transactions where integration_status='ACTIVE'",
-                  String.class));
+                  "select min(business_date)::text from ledger.transactions", String.class));
           result.put(
               "txCount",
               jdbc.queryForObject(
-                  "select count(*) from ledger.transactions where integration_status='ACTIVE' and from_account_id<>to_account_id and business_date between ?::date and ?::date",
+                  "select count(*) from ledger.transactions where from_account_id<>to_account_id and business_date between ?::date and ?::date",
                   Long.class,
                   from,
                   to));

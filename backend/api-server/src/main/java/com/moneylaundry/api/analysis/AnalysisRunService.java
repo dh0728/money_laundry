@@ -7,25 +7,22 @@ import java.util.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
-import tools.jackson.databind.ObjectMapper;
 
-/** Durable input generations and cancellation fencing; transport is an explicit seam. */
+/** Durable input generations of analysis runs and the fencing of their stages. */
 @Service
 public class AnalysisRunService {
   private final JdbcTemplate jdbc;
   private final TransactionTemplate tx;
   private final Clock clock;
-  private final ObjectMapper mapper;
 
-  public AnalysisRunService(
-      JdbcTemplate jdbc, TransactionTemplate tx, Clock clock, ObjectMapper mapper) {
+  public AnalysisRunService(JdbcTemplate jdbc, TransactionTemplate tx, Clock clock) {
     this.jdbc = jdbc;
     this.tx = tx;
     this.clock = clock;
-    this.mapper = mapper;
   }
 
-  public static void integrationLock(JdbcTemplate jdbc) {
+  /** Serializes ledger loading, FREEZE_INPUT and the fenced stage writes. */
+  public static void ingestLock(JdbcTemplate jdbc) {
     jdbc.query("select pg_advisory_xact_lock(17004000)", rs -> {});
   }
 
@@ -35,7 +32,7 @@ public class AnalysisRunService {
   }
 
   private Map<String, Object> lock(UUID run) {
-    integrationLock(jdbc);
+    ingestLock(jdbc);
     var rows = jdbc.queryForList("select * from analysis.runs where run_id=? for update", run);
     if (rows.isEmpty()) throw new IllegalArgumentException("RUN_NOT_FOUND");
     return rows.getFirst();
@@ -49,86 +46,6 @@ public class AnalysisRunService {
             id));
   }
 
-  public void cancel(UUID run, String reason) {
-    if (!"REPORT_CORRECTED".equals(reason))
-      throw new IllegalArgumentException("INVALID_CANCEL_REASON");
-    tx.executeWithoutResult(
-        s -> {
-          var r = lock(run);
-          if ("COMPLETED".equals(r.get("status")))
-            throw new IllegalStateException("RUN_ALREADY_COMPLETED");
-          if (!List.of("CANCEL_REQUESTED", "CANCELLED").contains(r.get("status"))) {
-            jdbc.update(
-                "update analysis.runs set status='CANCEL_REQUESTED',cancel_requested_at=?,cancel_reason=? where run_id=?",
-                Timestamp.from(clock.instant()),
-                reason,
-                run);
-            jdbc.update(
-                "update analysis.jobs set status='FAILED',error_code='RUN_CANCELLED',error_message='정정으로 실행이 취소되었습니다.',execution_id=null,execution_owner=null,retry_at=null where current_run_id=?",
-                run);
-          }
-          jdbc.update(
-              """
-              update analysis.model_tasks set status='CANCELLED',execution_id=null,
-                execution_owner=null,retry_at=null,next_poll_at=null,error_code='RUN_CANCELLED',
-                action_required=false,updated_at=?,finished_at=coalesce(finished_at,?)
-              where run_id=? and status<>'CANCELLED'
-              """,
-              Timestamp.from(clock.instant()),
-              Timestamp.from(clock.instant()),
-              run);
-          for (var request :
-              jdbc.queryForList("select * from analysis.model_requests where run_id=?", run))
-            enqueueCancel(r, request, reason);
-          jdbc.update(
-              "update analysis.runs set status='CANCELLED' where run_id=? and not exists(select 1 from analysis.model_requests where run_id=? and status not in ('STOPPED','ALREADY_FINISHED','BLOCKED'))",
-              run,
-              run);
-        });
-  }
-
-  private void enqueueCancel(Map<String, Object> run, Map<String, Object> request, String reason) {
-    UUID requestId = (UUID) request.get("request_id");
-    int round = (Integer) request.get("execution_round");
-    if ("REGISTERED".equals(request.get("status"))) {
-      jdbc.update(
-          "update analysis.model_requests set status='BLOCKED' where request_id=? and execution_round=?",
-          requestId,
-          round);
-      return;
-    }
-    if (!"PUBLISHED".equals(request.get("status"))) return;
-    UUID cancel = UUID.randomUUID();
-    Instant now = clock.instant();
-    var payload =
-        Map.of(
-            "contract_version",
-            2,
-            "job_id",
-            run.get("job_id"),
-            "model_kind",
-            request.get("model_kind"),
-            "request_id",
-            requestId,
-            "execution_round",
-            round,
-            "run_id",
-            run.get("run_id"),
-            "cancel_id",
-            cancel,
-            "reason_code",
-            reason,
-            "requested_at",
-            now);
-    jdbc.update(
-        "insert into analysis.cancel_outbox(cancel_id,request_id,execution_round,payload,requested_at) values(?,?,?,?::jsonb,?) on conflict(request_id,execution_round) do nothing",
-        cancel,
-        requestId,
-        round,
-        mapper.writeValueAsString(payload),
-        Timestamp.from(now));
-  }
-
   public void registerRequest(UUID run, UUID request, int round, String kind) {
     if (round < 1 || !List.of("BINARY", "TYPE").contains(kind))
       throw new IllegalArgumentException("INVALID_REQUEST");
@@ -136,7 +53,6 @@ public class AnalysisRunService {
         s -> {
           var r = lock(run);
           requireUsable(r);
-          if (!canInfer(run)) throw new IllegalStateException("PREVIOUS_RUN_NOT_STOPPED");
           var prior =
               jdbc.queryForList(
                   "select run_id,model_kind from analysis.model_requests where request_id=?",
@@ -161,7 +77,6 @@ public class AnalysisRunService {
         s -> {
           var r = lock(run);
           requireUsable(r);
-          if (!canInfer(run)) throw new IllegalStateException("PREVIOUS_RUN_NOT_STOPPED");
           if (jdbc.update(
                   "update analysis.model_requests set status='PUBLISHED' where run_id=? and request_id=? and execution_round=? and status in ('REGISTERED','PUBLISHED')",
                   run,
@@ -177,136 +92,19 @@ public class AnalysisRunService {
       throw new IllegalStateException("RUN_FENCED");
   }
 
-  public boolean canInfer(UUID run) {
-    return jdbc.queryForObject(
-        "with recursive predecessors(run_id) as (select replaces_run_id from analysis.run_replacements where run_id=? union select x.replaces_run_id from analysis.run_replacements x join predecessors p on x.run_id=p.run_id) select not exists(select 1 from analysis.model_requests m join predecessors p using(run_id) where m.status not in ('STOPPED','ALREADY_FINISHED','BLOCKED'))",
-        Boolean.class,
-        run);
-  }
-
-  public interface CancelTransport {
-    void publish(UUID cancelId, String payload);
-
-    String acknowledgement(UUID cancelId, String payload);
-  }
-
-  /** Each immutable record retries independently; no configured transport implies no success. */
-  public void deliverCancellations(CancelTransport transport) {
-    for (var out :
-        jdbc.queryForList(
-            "select * from analysis.cancel_outbox where acknowledged_at is null and (retry_at is null or retry_at<=?) order by requested_at",
-            Timestamp.from(clock.instant()))) {
-      UUID cancel = (UUID) out.get("cancel_id");
-      String payload = out.get("payload").toString();
-      int attempts = (Integer) out.get("attempts");
-      try {
-        String ack = transport.acknowledgement(cancel, payload);
-        if (ack != null) {
-          acknowledge(cancel, ack);
-          continue;
-        }
-        if (attempts >= 3) continue;
-        transport.publish(cancel, payload);
-        jdbc.update(
-            "update analysis.cancel_outbox set delivered_at=coalesce(delivered_at,?),attempts=attempts+1,error_code=null,retry_at=? where cancel_id=?",
-            Timestamp.from(clock.instant()),
-            Timestamp.from(clock.instant().plusSeconds(attempts == 0 ? 30 : 120)),
-            cancel);
-      } catch (RuntimeException e) {
-        jdbc.update(
-            "update analysis.cancel_outbox set attempts=least(3,attempts+1),error_code='CANCEL_DELIVERY_FAILED',retry_at=? where cancel_id=?",
-            Timestamp.from(clock.instant().plusSeconds(attempts == 0 ? 30 : 120)),
-            cancel);
-      }
-    }
-  }
-
-  public void acknowledge(UUID cancel, String response) {
-    if (!List.of("STOPPED", "ALREADY_FINISHED").contains(response))
-      throw new IllegalArgumentException("INVALID_CANCEL_ACK");
-    tx.executeWithoutResult(
-        s -> {
-          integrationLock(jdbc);
-          var rows =
-              jdbc.queryForList(
-                  "select o.*,m.run_id from analysis.cancel_outbox o join analysis.model_requests m using(request_id,execution_round) where cancel_id=? for update",
-                  cancel);
-          if (rows.isEmpty()) throw new IllegalArgumentException("CANCEL_NOT_FOUND");
-          var out = rows.getFirst();
-          jdbc.update(
-              "update analysis.model_requests set status=? where request_id=? and execution_round=?",
-              response,
-              out.get("request_id"),
-              out.get("execution_round"));
-          jdbc.update(
-              "update analysis.cancel_outbox set acknowledged_at=coalesce(acknowledged_at,?),error_code=null where cancel_id=?",
-              Timestamp.from(clock.instant()),
-              cancel);
-          jdbc.update(
-              "update analysis.runs set status='CANCELLED' where run_id=? and status='CANCEL_REQUESTED' and not exists(select 1 from analysis.model_requests where run_id=? and status not in ('STOPPED','ALREADY_FINISHED','BLOCKED'))",
-              out.get("run_id"),
-              out.get("run_id"));
-        });
-  }
-
   public UUID freeze(long job, Instant cutoff) {
     return tx.execute(
         s -> {
-          integrationLock(jdbc);
+          ingestLock(jdbc);
           UUID existing = current(job);
           if (existing != null) return existing;
-          if (jdbc.queryForObject(
-                  "select count(*) from analysis.selected_versions a join ingest.report_sets s using(set_id) where a.job_id=? and (a.generation<>s.generation or a.version_id<>s.current_version_id)",
-                  Integer.class,
-                  job)
-              > 0) throw new IllegalStateException("INPUT_REVISION_CHANGED");
-          Set<Long> selectedSets =
-              new HashSet<>(
-                  jdbc.queryForList(
-                      "select set_id from analysis.selected_versions where job_id=?",
-                      Long.class,
-                      job));
-          Set<Long> blockedSets =
-              new HashSet<>(
-                  jdbc.queryForList(
-                      "select distinct v.set_id from ingest.report_versions v join analysis.receipts a on a.upload_id=v.upload_id where a.job_id=? and v.self_valid and v.stage_status in ('WAITING_COUNTERPART','WAITING_ANALYSIS_RELEASE') and not exists(select 1 from ingest.report_versions newer join analysis.receipts newerReceipt on newerReceipt.upload_id=newer.upload_id where newerReceipt.job_id=a.job_id and newer.set_id=v.set_id and newer.self_valid and newer.version_no>v.version_no)",
-                      Long.class,
-                      job));
-          List<UUID> previous = new ArrayList<>();
-          for (UUID prior :
-              jdbc.queryForList(
-                  "select r.run_id from analysis.runs r where r.status in ('CANCEL_REQUESTED','CANCELLED') and not exists(select 1 from analysis.run_replacements x where x.replaces_run_id=r.run_id) order by r.run_id",
-                  UUID.class)) {
-            Set<Long> origins =
-                new HashSet<>(
-                    jdbc.queryForList(
-                        "select set_id from analysis.input_report_sets where run_id=?",
-                        Long.class,
-                        prior));
-            boolean ready = !origins.isEmpty() && selectedSets.containsAll(origins);
-            for (long set : origins) {
-              var latest =
-                  jdbc.queryForList(
-                      "select v.stage_status from ingest.report_versions v join analysis.receipts a on a.upload_id=v.upload_id where a.job_id=? and v.set_id=? and v.self_valid order by v.version_no desc limit 1",
-                      String.class,
-                      job,
-                      set);
-              if (!latest.isEmpty()
-                  && !List.of("ACTIVE", "PARTIALLY_HELD").contains(latest.getFirst()))
-                ready = false;
-            }
-            if (ready) previous.add(prior);
-            else blockedSets.addAll(origins);
-          }
           UUID run = UUID.randomUUID();
           jdbc.update(
               "insert into analysis.runs(run_id,job_id,status) values(?,?,'READY')", run, job);
-          for (UUID old : previous)
-            jdbc.update("insert into analysis.run_replacements values(?,?)", run, old);
           var snapshot = new AlertInputSnapshot(jdbc);
-          long seq = snapshot.prepare(run, cutoff, blockedSets);
-          int targetCount = freezeTargets(run, job, cutoff, blockedSets);
-          snapshot.complete(run, cutoff, blockedSets, seq);
+          long seq = snapshot.prepare(run, cutoff);
+          int targetCount = freezeTargets(run, job, cutoff);
+          snapshot.complete(run, cutoff, seq);
           jdbc.update(
               "update analysis.jobs set current_run_id=?,row_count=? where job_id=?",
               run,
@@ -318,22 +116,11 @@ public class AnalysisRunService {
 
   /**
    * A transaction can newly qualify as TARGET only if its eligibility could differ from the
-   * previous freeze (changed_input, prepared by the snapshot) or a run this one replaces held it.
+   * previous freeze (changed_input, prepared by the snapshot): a transaction of a file the job
+   * received (its receipts) that is in the run's manifest (loaded by the cutoff), occurred by the
+   * cutoff, and not scored or owned by another run.
    */
-  private int freezeTargets(UUID run, long job, Instant cutoff, Set<Long> blockedSets) {
-    var args = new ArrayList<Object>(List.of(run, run, job, Timestamp.from(cutoff)));
-    String blocked = "";
-    if (!blockedSets.isEmpty()) {
-      blocked =
-          """
-          and (select count(*) from (select 1 from ledger.transaction_reports tr
-            join private.bank_reports br using(report_id) join ingest.report_versions v using(version_id)
-            where tr.tx_id=k.tx_id and v.set_id in (%s) limit 1) hit)=0
-          """
-              .formatted(String.join(",", Collections.nCopies(blockedSets.size(), "?")));
-      args.addAll(blockedSets);
-    }
-    args.add(run);
+  private int freezeTargets(UUID run, long job, Instant cutoff) {
     AlertInputSnapshot.openFrozen(jdbc, run);
     int count =
         jdbc.update(
@@ -344,29 +131,27 @@ public class AnalysisRunService {
           t.from_account_id,t.to_account_id,t.from_owner_id,t.to_owner_id,
           t.amount_received,t.receiving_currency,t.amount_paid,t.payment_currency,
           t.payment_format,t.amount_usd,t.fx_rate_version
-        from (select tx_id from changed_input
-          union select i.tx_id from analysis.run_replacements x
-            join analysis.input_transactions i on i.run_id=x.replaces_run_id
-            where x.run_id=? and i.input_role='TARGET') k
+        from changed_input k
         cross join lateral (%s k.tx_id offset 0) t
-        cross join lateral (select 1 from ledger.transaction_reports tr
-          join private.bank_reports br using(report_id) join ingest.report_versions v using(version_id)
-          join analysis.selected_versions sv on sv.set_id=v.set_id and sv.version_id=v.version_id
-          where tr.tx_id=k.tx_id and sv.job_id=? and v.received_at<=? limit 1) selected
+        cross join lateral (select 1 from ledger.transactions x
+          join analysis.source_manifest m on m.upload_id=x.upload_id and m.run_id=?
+          join analysis.receipts a on a.upload_id=x.upload_id and a.job_id=?
+          where x.tx_id=k.tx_id and x.occurred_at<=? offset 0) selected
         left join lateral (select true as hit from analysis.input_transactions scored
           join analysis.runs completed using(run_id)
           where scored.tx_id=k.tx_id and scored.input_role='TARGET' and completed.status='COMPLETED'
           limit 1) scored on true
         left join lateral (select o.run_id from analysis.target_ownership o
           where o.tx_id=k.tx_id offset 0) o on true
-        where scored.hit is null
-          %s
-          and (o.run_id is null or exists(select 1 from analysis.run_replacements x where x.run_id=? and x.replaces_run_id=o.run_id))
+        where scored.hit is null and o.run_id is null
         order by t.tx_id returning run_id,tx_id,business_date)
         insert into frozen_input select * from frozen
         """
-                .formatted(AlertInputSnapshot.LEDGER_ROW, blocked),
-            args.toArray());
+                .formatted(AlertInputSnapshot.LEDGER_ROW),
+            run,
+            run,
+            job,
+            Timestamp.from(cutoff));
     // Only TARGET rows of this run exist yet, so the frozen mirror is exactly the TARGET set.
     jdbc.execute("analyze frozen_input");
     jdbc.update(
@@ -385,10 +170,6 @@ public class AnalysisRunService {
         run,
         role,
         id);
-    jdbc.update(
-        "insert into analysis.input_report_sets select distinct ?,s.set_id from ledger.transaction_reports tr join private.bank_reports br using(report_id) join ingest.report_sets s on s.current_version_id=br.version_id where tr.tx_id=? on conflict do nothing",
-        run,
-        id);
   }
 
   public void complete(UUID run) {
@@ -406,8 +187,6 @@ public class AnalysisRunService {
               select s.tx_id,s.run_id from analysis.scores s
               cross join lateral (select 1 from analysis.input_transactions i
                 where i.run_id=s.run_id and i.tx_id=s.tx_id and i.input_role='TARGET' offset 0) i
-              cross join lateral (select 1 from ledger.transactions t
-                where t.tx_id=s.tx_id and t.integration_status='ACTIVE' offset 0) t
               where s.run_id=?
               order by s.tx_id
               on conflict(tx_id) do update set run_id=excluded.run_id
@@ -421,8 +200,7 @@ public class AnalysisRunService {
     jdbc.execute(
         """
         analyze analysis.runs, analysis.input_transactions, analysis.input_ledger,
-          analysis.input_report_sets, analysis.score_ledger,
-          analysis.alert_origin_ledger, analysis.fact_ledger
+          analysis.source_manifest, analysis.score_ledger, analysis.alert_origin_ledger
         """);
   }
 

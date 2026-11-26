@@ -54,10 +54,6 @@ public class Upload {
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
-  // INGEST 전용
-  @Column(name = "bank_id")
-  private Integer bankId;
-
   @Column(name = "business_date")
   private LocalDate businessDate;
 
@@ -98,7 +94,6 @@ public class Upload {
   private String validationErrors;
 
   public static Upload urlIssued(
-      int bankId,
       String fileName,
       String fileHash,
       long sizeBytes,
@@ -109,7 +104,6 @@ public class Upload {
     Upload job = new Upload();
     job.status = UploadStatus.URL_ISSUED;
     job.createdAt = issuedAt;
-    job.bankId = bankId;
     job.fileName = fileName;
     job.fileHash = fileHash;
     job.sizeBytes = sizeBytes;

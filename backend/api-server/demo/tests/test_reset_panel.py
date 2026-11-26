@@ -82,7 +82,7 @@ class ResetPanelTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             folder = Path(root) / '2023-09-01'
             folder.mkdir()
-            (folder / 'bank_12.csv').write_text('header')
+            (folder / 'ledger_2023-09-01.csv').write_text('header')
             runtime = SimpleNamespace(base=controls.base, root=root, replay=replay)
             try:
                 with patch.object(operator_session, 'runtime', runtime):
@@ -113,14 +113,14 @@ class ResetPanelTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             folder = Path(root) / '2023-09-01'
             folder.mkdir()
-            (folder / 'bank_12.csv').write_text('header')
+            (folder / 'ledger_2023-09-01.csv').write_text('header')
             try:
                 with patch.object(operator_session, 'runtime', SimpleNamespace(base=controls.base, root=root, replay=replay)):
                     app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / 'control_panel.py')).run(timeout=15)
                     self.assertFalse(app.exception)
                     self.assertTrue(any('파일 정리 실패' in x.value for x in app.error))
                     self.assertFalse(app.success)
-                    self.assertTrue(next(b for b in app.button if b.label == '전송 → 분석 자동 재생').disabled)
+                    self.assertTrue(next(b for b in app.button if b.label.startswith('▶ 전송')).disabled)
                     controls.post.assert_not_called()
             finally:
                 replay.close()

@@ -1,13 +1,13 @@
-import io
-import json
 import sys
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
-from urllib.error import HTTPError, URLError
+
+import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from control_panel import Controls, Replay, upload_failure
+from ledger_upload import UploadHttpError
 
 
 class UploadDiagnosticsTests(unittest.TestCase):
@@ -16,7 +16,7 @@ class UploadDiagnosticsTests(unittest.TestCase):
         controls.prepare_day.side_effect = KeyError('secret-token')
         replay = Replay(controls)
         try:
-            replay.start(['2023-08-31'], {'2023-08-31': [(10, Path('file.csv'))]})
+            replay.start(['2023-08-31'], {'2023-08-31': Path('ledger_2023-08-31.csv')})
             replay.future.result(timeout=5)
             state = replay.snapshot()
             self.assertEqual(state['currentDay'], '2023-08-31')
@@ -27,29 +27,23 @@ class UploadDiagnosticsTests(unittest.TestCase):
         finally:
             replay.close()
 
-    def http_error(self, status, body):
-        return HTTPError('https://secret-url?token=secret', status, 'secret', {},
-                         io.BytesIO(json.dumps(body).encode()))
-
-    def test_first_bank_registration_error_keeps_bank_and_stage_without_starting_analysis(self):
+    def test_rejected_issue_keeps_stage_without_starting_analysis(self):
         controls = Controls('http://localhost:8080')
         controls.prepare_day = Mock()
         controls.post = Mock()
         mock = Mock()
         mock.inspect_file.return_value = (10, 'checksum')
-        mock.request_upload.side_effect = self.http_error(403, {'code': 'REPORTING_NOT_REGISTERED', 'detail': 'secret'})
+        mock.request_upload.side_effect = UploadHttpError(409, 'DATE_ALREADY_LOADED')
         replay = Replay(controls)
         try:
-            with patch('control_panel.bank_module', return_value=mock), patch('control_panel.build_opener'):
-                replay.start(['2023-08-31'], {'2023-08-31': [(10, Path('file.csv'))]})
+            with patch('control_panel.ledger_upload', mock):
+                replay.start(['2023-08-31'], {'2023-08-31': Path('ledger_2023-08-31.csv')})
                 replay.future.result(timeout=5)
             state = replay.snapshot()
-            self.assertEqual(state['bankId'], 10)
             self.assertIsNone(state['uploadId'])
             self.assertEqual(state['fileDone'], 0)
             self.assertIn('업로드 URL 발급', state['error'])
-            self.assertIn('HTTP 403 · REPORTING_NOT_REGISTERED', state['error'])
-            self.assertNotIn('secret', state['error'])
+            self.assertIn('HTTP 409 · DATE_ALREADY_LOADED', state['error'])
             controls.post.assert_not_called()
             mock.upload_file.assert_not_called()
         finally:
@@ -61,27 +55,24 @@ class UploadDiagnosticsTests(unittest.TestCase):
         mock = Mock()
         mock.inspect_file.return_value = (10, 'checksum')
         mock.request_upload.return_value = {'uploadId': 87}
-        mock.upload_file.side_effect = self.http_error(403, {'code': 'AccessDenied', 'detail': 'secret'})
+        mock.upload_file.side_effect = UploadHttpError(403)
         replay = Replay(controls)
         try:
-            with patch('control_panel.bank_module', return_value=mock), patch('control_panel.build_opener'):
-                replay.start(['2023-08-31'], {'2023-08-31': [(12, Path('file.csv'))]})
+            with patch('control_panel.ledger_upload', mock):
+                replay.start(['2023-08-31'], {'2023-08-31': Path('ledger_2023-08-31.csv')})
                 replay.future.result(timeout=5)
             state = replay.snapshot()
             self.assertEqual(state['uploadId'], 87)
             self.assertIn('S3 전송 실패', state['error'])
-            self.assertNotIn('secret', state['error'])
             mock.request_status.assert_not_called()
         finally:
             replay.close()
 
-    def test_redirect_unknown_html_and_timeout_are_safe(self):
-        for error in [self.http_error(302, {'detail': 'secret'}),
-                      self.http_error(500, {'code': ['secret']}),
-                      HTTPError('https://secret', 403, 'secret', {}, io.BytesIO(b'<html>secret</html>')),
-                      URLError('secret'), ValueError('secret')]:
-            result = str(upload_failure(error, 12, '업로드 URL 발급'))
-            self.assertIn('은행 12', result)
+    def test_redirect_unknown_and_transport_errors_are_safe(self):
+        for error in [UploadHttpError(302), UploadHttpError(500, 'secret-code'),
+                      UploadHttpError(403), httpx.ConnectError('secret'), ValueError('secret')]:
+            result = str(upload_failure(error, '2023-08-31', '업로드 URL 발급'))
+            self.assertIn('2023-08-31 원장 파일', result)
             self.assertIn('업로드 URL 발급', result)
             self.assertNotIn('secret', result)
 
@@ -90,8 +81,8 @@ class UploadDiagnosticsTests(unittest.TestCase):
         report = Mock()
         mock = Mock()
         mock.inspect_file.side_effect = FileNotFoundError('secret-path')
-        with patch('control_panel.bank_module', return_value=mock), patch('control_panel.build_opener'):
+        with patch('control_panel.ledger_upload', mock):
             with self.assertRaisesRegex(Exception, '파일 확인 실패') as error:
-                controls.upload('2023-08-31', 12, Path('missing.csv'), report)
+                controls.upload('2023-08-31', Path('missing.csv'), report)
         self.assertNotIn('secret', str(error.exception))
         mock.request_upload.assert_not_called()

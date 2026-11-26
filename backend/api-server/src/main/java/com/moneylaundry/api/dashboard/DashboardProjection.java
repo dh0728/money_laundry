@@ -40,7 +40,7 @@ public class DashboardProjection {
         select s.type_class::bigint as type_class
         where s.job_id is not null
       ) w on true
-      where t.integration_status='ACTIVE'
+      where true
       """;
 
   private final JdbcTemplate jdbc;
@@ -225,26 +225,25 @@ public class DashboardProjection {
     var days =
         all
             ? jdbc.queryForList(
-                "select distinct business_date from ledger.transactions where integration_status='ACTIVE'",
-                java.sql.Date.class)
+                "select distinct business_date from ledger.transactions", java.sql.Date.class)
             : buckets.stream().map(java.sql.Date::valueOf).toList();
     for (var day : days)
       jdbc.update(
           """
           insert into ops.dashboard_first_seen
           with seen as (
-            select from_account_id as account_id from ledger.transactions where business_date=? and integration_status='ACTIVE'
-            union select to_account_id from ledger.transactions where business_date=? and integration_status='ACTIVE'
+            select from_account_id as account_id from ledger.transactions where business_date=?
+            union select to_account_id from ledger.transactions where business_date=?
           ), fresh as (
             select a.account_id,a.owner_id from seen join core.accounts a using(account_id)
-            where not exists(select 1 from ledger.transactions p where p.from_account_id=a.account_id and p.business_date<? and p.integration_status='ACTIVE')
-              and not exists(select 1 from ledger.transactions p where p.to_account_id=a.account_id and p.business_date<? and p.integration_status='ACTIVE')
+            where not exists(select 1 from ledger.transactions p where p.from_account_id=a.account_id and p.business_date<?)
+              and not exists(select 1 from ledger.transactions p where p.to_account_id=a.account_id and p.business_date<?)
           )
           select ?,(select count(*) from fresh),
             (select count(*) from (select distinct owner_id from fresh) o
              where not exists(select 1 from core.accounts k join ledger.transactions p
                on p.from_account_id=k.account_id or p.to_account_id=k.account_id
-               where k.owner_id=o.owner_id and p.business_date<? and p.integration_status='ACTIVE'))
+               where k.owner_id=o.owner_id and p.business_date<?))
           where exists(select 1 from seen)
           """,
           day,
@@ -331,9 +330,7 @@ public class DashboardProjection {
         """
       insert into ops.dashboard_report_counts
       select b.business_date,count(*) from ingest.uploads b
-      left join ingest.report_versions v on v.upload_id=b.upload_id
-      where b.status<>'EXPIRED' and v.stage_status is distinct from 'SUPERSEDED'
-        and (b.status<>'COMPLETED' or v.stage_status is distinct from 'ACTIVE')
+      where b.status not in ('EXPIRED','COMPLETED')
       """
             + (all
                 ? ""

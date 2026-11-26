@@ -68,7 +68,7 @@ public class BacktestService {
   private LocalDate[] ledger() {
     var ledger =
         jdbc.queryForMap(
-            "select min(business_date)::text as first, max(business_date)::text as last from ledger.transactions where integration_status='ACTIVE'");
+            "select min(business_date)::text as first, max(business_date)::text as last from ledger.transactions");
     if (ledger.get("first") == null) throw invalid("원장에 거래가 없어 백테스트를 돌릴 수 없습니다.");
     return new LocalDate[] {
       LocalDate.parse(ledger.get("first").toString()),
@@ -281,7 +281,7 @@ public class BacktestService {
     for (var row :
         jdbc.queryForList(
             """
-            select s.subject_type, s.subject_id, left(a.service_account_id::text, 8) as account,
+            select s.subject_type, s.subject_id, a.service_account_id as account,
                    t.occurred_at, s.in_new, s.in_base, s.measured::text as measured,
                    cardinality(s.tx_ids) as tx_count, s.alert_id, s.judgement
             from rules.backtest_subjects s

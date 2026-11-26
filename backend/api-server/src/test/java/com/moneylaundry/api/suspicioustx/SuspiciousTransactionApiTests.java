@@ -35,12 +35,12 @@ class SuspiciousTransactionApiTests {
             Long.class);
     long from =
         jdbc.queryForObject(
-            "insert into core.accounts(bank_id,service_account_id,owner_id) values(991,gen_random_uuid(),?) returning account_id",
+            "insert into core.accounts(bank_id,owner_id) values(991,?) returning account_id",
             Long.class,
             owner);
     long to =
         jdbc.queryForObject(
-            "insert into core.accounts(bank_id,service_account_id,owner_id) values(992,gen_random_uuid(),?) returning account_id",
+            "insert into core.accounts(bank_id,owner_id) values(992,?) returning account_id",
             Long.class,
             owner);
     analysis =

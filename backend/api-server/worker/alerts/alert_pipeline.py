@@ -382,9 +382,9 @@ def save_alerts(connection, execution):
         raise ProtocolError('Every frozen TARGET requires current-run scores')
     scores = _Scores(connection, execution.run_id, frozenset(decisions))
     del current, targets
-    days = {day.isoformat(): dict(complete=complete, expectedBanks=expected, completeBanks=received, reports=reports)
-            for day, expected, received, complete, reports in connection.execute(
-                "SELECT business_date,expected_banks,complete_banks,complete,reports FROM analysis.input_coverage"
+    days = {day.isoformat(): dict(complete=complete, rowCount=rows)
+            for day, complete, rows in connection.execute(
+                "SELECT business_date,complete,row_count FROM analysis.input_coverage"
                 " WHERE run_id=%s AND business_date>=(%s::timestamptz AT TIME ZONE 'Asia/Seoul')::date",
                 (execution.run_id, scope.start)).fetchall()}
     timings['inputRead'] = (perf_counter() - started) * 1000

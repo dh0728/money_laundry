@@ -95,8 +95,6 @@ def psql(sql, database="postgres"):
 
 CONFIGURATION = {
     "users": "user_id,username,name,role,password_hash,last_assigned_at,created_at",
-    "banks": "bank_id,name,country,is_reporting,report_format,created_at,updated_at",
-    "bank_reporting_periods": "period_id,bank_id,effective_from_date,effective_to_date",
     "fx_rates": "fx_rate_version,currency,units_per_usd",
 }
 
@@ -105,7 +103,7 @@ def configuration_backup(path):
     schema = psql("SELECT CASE WHEN to_regclass('core.users') IS NOT NULL THEN 'core' ELSE 'public' END;", DATABASE).strip()
     if schema not in ("core", "public"):
         raise RuntimeError("Unknown configuration schema")
-    # A single SELECT gives all four configuration tables one MVCC snapshot.
+    # A single SELECT gives both configuration tables one MVCC snapshot.
     pairs = [f"'{table}',(SELECT coalesce(json_agg(t),'[]'::json) FROM (SELECT {columns} FROM {schema}.{table}) t)"
              for table, columns in CONFIGURATION.items()]
     # Preserve NUMERIC exchange rates exactly; binary floating point can lose digits.
@@ -142,14 +140,14 @@ def restore_configuration(path):
     # Assignment rotation is business state, never restored as account configuration.
     for user in payload["tables"]["users"]:
         user["last_assigned_at"] = None
-    sql = ["BEGIN;", "LOCK TABLE core.users,core.banks,core.bank_reporting_periods,core.fx_rates IN ACCESS EXCLUSIVE MODE;",
+    sql = ["BEGIN;", "LOCK TABLE core.users,core.fx_rates IN ACCESS EXCLUSIVE MODE;",
            "DO $$ BEGIN IF EXISTS(SELECT FROM ingest.uploads) OR EXISTS(SELECT FROM analysis.jobs) OR EXISTS(SELECT FROM ledger.transactions) OR EXISTS(SELECT FROM review.alerts) OR EXISTS(SELECT FROM review.episodes) THEN RAISE EXCEPTION 'RESTORE_REQUIRES_EMPTY_BUSINESS_DATA'; END IF; END $$;",
-           "DELETE FROM core.bank_reporting_periods; DELETE FROM core.banks; DELETE FROM core.users; DELETE FROM core.fx_rates;"]
+           "DELETE FROM core.users; DELETE FROM core.fx_rates;"]
     for table, columns in CONFIGURATION.items():
         data = json.dumps(payload["tables"][table], ensure_ascii=False).replace("'", "''")
-        overriding = " OVERRIDING SYSTEM VALUE" if table in ("users", "bank_reporting_periods") else ""
+        overriding = " OVERRIDING SYSTEM VALUE" if table == "users" else ""
         sql.append(f"INSERT INTO core.{table}({columns}){overriding} SELECT {columns} FROM json_populate_recordset(NULL::core.{table},'{data}'::json);")
-    for table, column in (("users", "user_id"), ("bank_reporting_periods", "period_id")):
+    for table, column in (("users", "user_id"),):
         sql.append(f"SELECT setval(pg_get_serial_sequence('core.{table}','{column}'),coalesce(max({column}),1),max({column}) IS NOT NULL) FROM core.{table};")
     sql.append("COMMIT;")
     psql("\n".join(sql), DATABASE)

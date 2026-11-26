@@ -14,7 +14,7 @@ if (-not (Get-Command $Docker -ErrorAction SilentlyContinue)) {
 }
 $composePath = Join-Path $PSScriptRoot 'compose.demo.yaml'
 if ($Action -eq 'start') {
-    if (-not $DataDir) { throw 'Supply -DataDir with the prepared daily bank file directory.' }
+    if (-not $DataDir) { throw 'Supply -DataDir with the prepared daily ledger file directory.' }
     $resolvedData = (Resolve-Path -LiteralPath $DataDir).Path
     if (-not (Test-Path -LiteralPath $resolvedData -PathType Container)) { throw 'DataDir must be a directory.' }
     $env:AML_DEMO_DATA_DIR = $resolvedData.Replace('\', '/')

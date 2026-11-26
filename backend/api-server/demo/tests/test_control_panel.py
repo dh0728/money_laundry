@@ -10,13 +10,13 @@ from control_panel import Controls, Replay, catalog
 
 
 class PanelTests(unittest.TestCase):
-    def test_catalog_dates_and_bank_names(self):
+    def test_catalog_takes_one_ledger_file_per_date(self):
         with tempfile.TemporaryDirectory() as name:
             folder = Path(name) / '2023-09-01'
             folder.mkdir()
-            (folder / 'bank_12_2023-09-01.csv').write_text('header')
-            self.assertEqual(catalog(name)['2023-09-01'][0][0], 12)
-            (folder / 'bank_12.csv').write_text('header')
+            (folder / 'ledger_2023-09-01.csv').write_text('header')
+            self.assertEqual(catalog(name)['2023-09-01'].name, 'ledger_2023-09-01.csv')
+            (folder / 'ledger_2023-09-02.csv').write_text('header')
             with self.assertRaises(ValueError):
                 catalog(name)
 
@@ -29,13 +29,13 @@ class PanelTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as name:
             folder = Path(name) / '2023-09-01'
             folder.mkdir()
-            (folder / 'bank_12_2023-09-01.csv').write_text('header')
+            (folder / 'ledger_2023-09-01.csv').write_text('header')
             with patch.dict('os.environ', {'AML_DEMO_DATA_DIR': name, 'AML_DEMO_API_URL': 'http://127.0.0.1:8080'}):
                 with patch('api_client.login_panel', return_value=(__import__('api_client').ApiClient('http://127.0.0.1:8080'), {'role':'ADMIN'})), patch.object(Controls, 'post') as post, patch.object(Controls, 'upload') as upload, patch('api_client.ApiClient.get', return_value={'businessAt': '2023-09-02T09:00:00+09:00', 'configured': True, 'revision': 1}), patch.object(Controls, 'prepare_day'):
                     app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / 'control_panel.py')).run(timeout=15)
                     self.assertFalse(app.exception)
                     self.assertFalse(app.error)
-                    self.assertIn('전송 → 분석 자동 재생', [b.label for b in app.button])
+                    self.assertTrue(any(b.label.startswith('▶ 전송') for b in app.button))
                     post.assert_not_called()
                     upload.assert_not_called()
                     actual = app.session_state.replay.controls
@@ -43,7 +43,7 @@ class PanelTests(unittest.TestCase):
                     actual.prepare_day = Mock()
                     actual.post = Mock(return_value={'jobId': 5})
                     actual.get = Mock(side_effect=lambda path: {'status': 'COMPLETED'} if path.startswith('batch-jobs') else {'businessAt': '2023-09-02T09:00:00+09:00', 'configured': True, 'revision': 1})
-                    next(b for b in app.button if b.label == '전송 → 분석 자동 재생').click().run()
+                    next(b for b in app.button if b.label.startswith('▶ 전송')).click().run()
                     self.assertFalse(app.exception)
                     app.session_state.replay.future.result(timeout=10)
                     self.assertIsNone(app.session_state.replay.snapshot()['error'])
@@ -57,7 +57,7 @@ class PanelTests(unittest.TestCase):
         from api_client import ApiError
         with tempfile.TemporaryDirectory() as name:
             (Path(name) / '2023-09-01').mkdir()
-            (Path(name) / '2023-09-01' / 'bank_12_2023-09-01.csv').write_text('header')
+            (Path(name) / '2023-09-01' / 'ledger_2023-09-01.csv').write_text('header')
             with patch.dict('os.environ', {'AML_DEMO_DATA_DIR': name, 'AML_DEMO_API_URL': 'http://127.0.0.1:8080'}), \
                     patch('api_client.login_panel', return_value=(__import__('api_client').ApiClient('http://127.0.0.1:8080'), {'role': 'ADMIN'})), \
                     patch('api_client.ApiClient.get', return_value={'businessAt': '2023-09-02T09:00:00+09:00', 'configured': True, 'revision': 1}):
@@ -98,7 +98,7 @@ class PanelTests(unittest.TestCase):
         control.upload.side_effect = RuntimeError('secret-url')
         replay = Replay(control)
         try:
-            replay.start(['d1', 'd2'], {'d1': [(1, Path('a'))], 'd2': [(2, Path('b'))]})
+            replay.start(['d1', 'd2'], {'d1': Path('a'), 'd2': Path('b')})
             replay.future.result(timeout=5)
             control.post.assert_not_called()
             self.assertEqual(control.upload.call_count, 1)
@@ -113,7 +113,7 @@ class PanelTests(unittest.TestCase):
         control.post.side_effect = [{'jobId': 1}, {'jobId': 2}]
         control.get.side_effect = [{'status': 'RUNNING'}, {'status': 'COMPLETED'}, {'status': 'COMPLETED'}]
         replay = Replay(control)
-        files = {'d1': [(1, Path('a'))], 'd2': [(2, Path('b'))]}
+        files = {'d1': Path('a'), 'd2': Path('b')}
         try:
             with patch('control_panel.time.sleep'):
                 replay.start(['d1', 'd2'], files)
@@ -153,7 +153,7 @@ class PanelTests(unittest.TestCase):
         control.post.return_value = {'jobId': 1}
         control.get.return_value = {'status': 'COMPLETED'}
         try:
-            replay.start(['d1', 'd2'], {'d1': [(1, Path('a'))], 'd2': [(2, Path('b'))]})
+            replay.start(['d1', 'd2'], {'d1': Path('a'), 'd2': Path('b')})
             replay.future.result(timeout=5)
             self.assertEqual(control.upload.call_count, 1)
             control.post.assert_called_once()
@@ -174,12 +174,12 @@ class PanelTests(unittest.TestCase):
         control.get.side_effect = result
         control.post.return_value = {'jobId': 3}
         replay = Replay(control)
-        files = {'d1': [(1, Path('a')), (2, Path('b'))]}
+        files = {'d1': Path('a')}
         try:
             replay.start(['d1'], files)
             self.assertTrue(entered.wait(5))
             state = replay.snapshot()
-            self.assertEqual((state['fileDone'], state['fileTotal'], state['doneDays']), (2, 2, 0))
+            self.assertEqual((state['fileDone'], state['fileTotal'], state['doneDays']), (1, 1, 0))
             release.set()
             replay.future.result(timeout=5)
             self.assertEqual(replay.snapshot()['doneDays'], 0)
@@ -188,8 +188,8 @@ class PanelTests(unittest.TestCase):
             replay.start(['d1'], files)
             replay.future.result(timeout=5)
             self.assertEqual(replay.snapshot()['doneDays'], 1)
-            self.assertEqual(replay.snapshot()['fileDone'], 2)
-            self.assertEqual(control.upload.call_count, 2)
+            self.assertEqual(replay.snapshot()['fileDone'], 1)
+            self.assertEqual(control.upload.call_count, 1)
         finally:
             release.set()
             replay.close()
@@ -199,7 +199,7 @@ class PanelTests(unittest.TestCase):
         control.post.side_effect = [{'jobId': 1}, {'jobId': 2}, {'jobId': 3}]
         control.get.return_value = {'status': 'COMPLETED'}
         replay = Replay(control)
-        files = {'d1': [(1, Path('a'))], 'd2': [(1, Path('b'))], 'd3': [(1, Path('c'))]}
+        files = {'d1': Path('a'), 'd2': Path('b'), 'd3': Path('c')}
         try:
             replay.start(['d1', 'd2'], files, backfill=True)
             replay.future.result(timeout=5)
@@ -210,6 +210,56 @@ class PanelTests(unittest.TestCase):
                 ('demo/analysis', {'businessDate': 'd1', 'backfill': True}),
                 ('demo/analysis', {'businessDate': 'd2', 'backfill': True}),
                 ('demo/analysis', {'businessDate': 'd3'})])
+        finally:
+            replay.close()
+
+    def test_one_run_backfills_up_to_the_boundary_then_analyses_and_resumes_after_failure(self):
+        control = Mock()
+        control.post.side_effect = [{'jobId': n} for n in range(1, 5)]
+        control.get.side_effect = [{'status': 'COMPLETED'}, {'status': 'COMPLETED'}, {'status': 'FAILED'},
+                                   {'status': 'COMPLETED'}, {'status': 'COMPLETED'}]
+        replay = Replay(control)
+        days = ['2023-08-31', '2023-09-01', '2023-09-02', '2023-09-03']
+        files = {day: Path(day) for day in days}
+        try:
+            replay.start(days, files, backfill_until='2023-09-01')
+            replay.future.result(timeout=5)
+            self.assertIn('분석 실패: jobId 3', replay.snapshot()['error'])
+            # Pressing the same button again skips finished days and keeps the same boundary.
+            replay.start(days, files, backfill_until='2023-09-01')
+            replay.future.result(timeout=5)
+            self.assertEqual([c.args for c in control.post.call_args_list], [
+                ('demo/analysis', {'businessDate': '2023-08-31', 'backfill': True}),
+                ('demo/analysis', {'businessDate': '2023-09-01', 'backfill': True}),
+                ('demo/analysis', {'businessDate': '2023-09-02'}),
+                ('demo/analysis', {'businessDate': '2023-09-03'})])
+            self.assertEqual([(item['date'], item['result']) for item in replay.snapshot()['history']], [
+                ('2023-08-31', '백필 완료'), ('2023-09-01', '백필 완료'),
+                ('2023-09-02', '분석 완료'), ('2023-09-03', '분석 완료')])
+        finally:
+            replay.close()
+
+    def test_boundary_helpers_split_label_and_mark_days(self):
+        from control_panel import NO_BACKFILL, run_label, span_text, split_days, timeline_html
+        days = ['2023-08-31', '2023-09-01', '2023-09-02']
+        self.assertEqual(split_days(days, NO_BACKFILL), ([], days))
+        self.assertEqual(split_days(days, '2023-09-01'), (days[:2], days[2:]))
+        self.assertEqual(split_days(days, '2023-09-02'), (days, []))
+        self.assertEqual(run_label(days[:2], days[2:]), '▶ 전송 → 백필 2일 → 분석 1일 자동 재생')
+        self.assertEqual(run_label(days, []), '▶ 전송 → 백필 3일')
+        self.assertEqual(run_label([], days), '▶ 전송 → 분석 3일 자동 재생')
+        self.assertEqual(span_text(days[:2]), '8/31~9/1 (2일)')
+        self.assertEqual(span_text([]), '없음')
+        html = timeline_html(days[:1], days[1:], {'2023-08-31'})
+        self.assertIn('8/31 ✓', html)
+        self.assertEqual(html.count('#3b82f6'), 1)
+        self.assertEqual(html.count('#ea580c'), 2)
+
+    def test_boundary_requires_an_analysing_run(self):
+        replay = Replay(Mock())
+        try:
+            with self.assertRaises(ValueError):
+                replay.start(['d1'], {'d1': Path('a')}, analyze=False, backfill_until='d1')
         finally:
             replay.close()
 

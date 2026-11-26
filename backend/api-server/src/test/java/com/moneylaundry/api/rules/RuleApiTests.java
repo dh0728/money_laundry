@@ -294,7 +294,7 @@ class RuleApiTests {
     for (int i = 0; i < 2; i++)
       accounts.add(
           jdbc.queryForObject(
-              "insert into core.accounts(bank_id,service_account_id,owner_id) values(999017,gen_random_uuid(),?) returning account_id",
+              "insert into core.accounts(bank_id,owner_id) values(999017,?) returning account_id",
               Long.class,
               owner));
     for (String at : List.of("2023-09-01 10:00+09", "2023-09-03 11:00+09"))

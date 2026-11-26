@@ -144,7 +144,7 @@ class DevControlTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             folder = Path(root) / '2023-09-01'
             folder.mkdir()
-            (folder / 'bank_12.csv').write_text('header')
+            (folder / 'ledger_2023-09-01.csv').write_text('header')
             controls = Mock(base='https://dev.example')
             controls.get.return_value = {'businessAt': '2023-09-02T09:00:00+09:00', 'configured': True, 'revision': 1}
             replay = Replay(controls)
@@ -158,7 +158,7 @@ class DevControlTests(unittest.TestCase):
                     login.assert_not_called()
                     controls.post.assert_not_called()
                     controls.upload.assert_not_called()
-                    self.assertIn('전송 → 분석 자동 재생', [b.label for b in app.button])
+                    self.assertTrue(any(b.label.startswith('▶ 전송') for b in app.button))
             finally:
                 replay.close()
 
@@ -166,7 +166,7 @@ class DevControlTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             folder = Path(root) / '2023-09-01'
             folder.mkdir()
-            (folder / 'bank_12.csv').write_text('header')
+            (folder / 'ledger_2023-09-01.csv').write_text('header')
             client = Mock(base_url='https://dev.example')
             client.get.return_value = {'businessAt': '2023-09-02T09:00:00+09:00'}
             with patch.object(sys, 'argv', ['dev_control.py', '--api-url', client.base_url, '--data-dir', root]), \
@@ -233,41 +233,42 @@ class DevControlTests(unittest.TestCase):
         self.assertNotIn('hidden', str(error.exception))
         self.assertNotIn(b'password', seen[0].content)
 
-    def test_bank_api_gets_cloudflare_headers_but_s3_does_not(self):
+    def test_ledger_api_gets_cloudflare_headers_but_s3_does_not(self):
+        import httpx
         seen = []
-        def handle(request, **kwargs):
+
+        def api(request):
             seen.append(request)
-            if request.full_url.endswith('/uploads'):
-                body = json.loads(request.data)
-                result, status = {'uploadId': 1, 'bankId': 12, 'method': 'PUT',
-                                  'url': 'https://bucket.s3.example/input.csv',
-                                  'expiresAt': '2026-09-29T18:00:00+09:00',
-                                  'headers': {'Content-Type': 'text/csv',
-                                              'x-amz-checksum-sha256': body['checksumSha256']}}, 201
-            elif request.get_method() == 'PUT':
-                result, status = {}, 200
-                self.assertEqual(request.data.read(), b'header\nrow\n')
-            else:
-                result = {'uploadId': 1, 'bankId': 12,
-                          'status': 'RUNNING' if request.get_method() == 'POST' else 'COMPLETED'}
-                status = 202 if request.get_method() == 'POST' else 200
-            response = io.BytesIO(json.dumps(result).encode())
-            response.status = status
-            return response
+            if request.url.path.endswith('/ledger-uploads'):
+                body = json.loads(request.content)
+                return httpx.Response(201, json={
+                    'uploadId': 1, 'method': 'PUT', 'url': 'https://bucket.s3.example/input.csv',
+                    'expiresAt': '2026-09-29T18:00:00+09:00',
+                    'headers': {'Content-Type': 'text/csv', 'x-amz-checksum-sha256': body['checksumSha256']}})
+            complete = request.method == 'POST'
+            return httpx.Response(202 if complete else 200, json={
+                'uploadId': 1, 'status': 'RUNNING' if complete else 'COMPLETED'})
+
+        puts = []
+
+        def put(url, content, headers, timeout):
+            puts.append((url, b''.join(content), {k.lower(): v for k, v in headers.items()}))
+            return httpx.Response(200)
+
         with tempfile.TemporaryDirectory() as root:
-            source = Path(root) / 'bank_12.csv'
+            source = Path(root) / 'ledger_2023-09-01.csv'
             source.write_bytes(b'header\nrow\n')
-            controls = Controls('https://dev.example', allow_remote=True,
-                                cf_headers=cloudflare_headers('test-id', 'test-secret'))
-            with patch('control_panel.build_opener', return_value=Mock(open=handle)), patch('time.sleep'):
-                self.assertEqual(controls.upload('2023-09-01', 12, source, Mock()), 1)
-        self.assertEqual(len(seen), 4)
+            headers = cloudflare_headers('test-id', 'test-secret')
+            client = ApiClient('https://dev.example', headers=headers, transport=httpx.MockTransport(api))
+            controls = Controls('https://dev.example', client, allow_remote=True, cf_headers=headers)
+            with patch('ledger_upload.httpx.put', side_effect=put), patch('time.sleep'):
+                self.assertEqual(controls.upload('2023-09-01', source, Mock()), 1)
+        self.assertEqual(len(seen), 3)
         for request in seen:
-            headers = {k.lower(): v for k, v in request.header_items()}
-            if request.get_method() == 'PUT':
-                self.assertFalse(any(k in headers for k in ['cf-access-client-id', 'cf-access-client-secret', 'cookie', 'authorization', 'x-bank-id']))
-            else:
-                self.assertEqual(headers['cf-access-client-secret'], 'test-secret')
+            self.assertEqual(request.headers['cf-access-client-secret'], 'test-secret')
+        (url, body, sent), = puts
+        self.assertEqual(body, b'header\nrow\n')
+        self.assertFalse(any(k in sent for k in ['cf-access-client-id', 'cf-access-client-secret', 'cookie', 'authorization']))
 
     def test_launcher_hidden_cloudflare_input(self):
         client = Mock(base_url='https://dev.example')

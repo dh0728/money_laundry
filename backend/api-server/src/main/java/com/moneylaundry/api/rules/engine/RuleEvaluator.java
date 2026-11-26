@@ -121,12 +121,12 @@ public class RuleEvaluator {
           from (
             select from_account_id as account_id, 0 as side, date_trunc('minute', occurred_at) as at, count(*) as n
             from ledger.transactions
-            where integration_status = 'ACTIVE' and from_account_id <> to_account_id%2$s
+            where from_account_id <> to_account_id%2$s
             group by from_account_id, date_trunc('minute', occurred_at)
             union all
             select to_account_id, 1, date_trunc('minute', occurred_at), count(*)
             from ledger.transactions
-            where integration_status = 'ACTIVE' and from_account_id <> to_account_id%2$s
+            where from_account_id <> to_account_id%2$s
             group by to_account_id, date_trunc('minute', occurred_at)
           ) per_minute
         ) windowed
@@ -153,14 +153,14 @@ public class RuleEvaluator {
           select min(occurred_at) - make_interval(mins => ?) - interval '1 minute' as lo,
                  max(occurred_at) + interval '1 minute' as hi
           from ledger.transactions
-          where integration_status = 'ACTIVE' and business_date between ?::date and ?::date
+          where business_date between ?::date and ?::date
         )
         select t.tx_id, date_trunc('minute', t.occurred_at) as at, t.business_date,
                t.from_account_id, t.to_account_id, t.amount_usd,
                not exists (select 1 from rule_busy x
                            where x.account_id in (t.from_account_id, t.to_account_id)) as clean
         from ledger.transactions t, bounds b
-        where t.integration_status = 'ACTIVE' and t.from_account_id <> t.to_account_id
+        where t.from_account_id <> t.to_account_id
           and t.occurred_at >= b.lo and t.occurred_at < b.hi
           and %s
         """

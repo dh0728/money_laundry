@@ -39,7 +39,7 @@ class DashboardScoreQueryTests {
             Long.class);
     long account =
         jdbc.queryForObject(
-            "insert into core.accounts(bank_id,service_account_id,owner_id) values(999019,gen_random_uuid(),?) returning account_id",
+            "insert into core.accounts(bank_id,owner_id) values(999019,?) returning account_id",
             Long.class,
             entity);
     transactions =
@@ -180,15 +180,6 @@ class DashboardScoreQueryTests {
     assertThat(result).containsAllEntriesOf(dashboard.modelDistribution(day, day));
     assertThat(result.get("detection"))
         .isEqualTo(Map.of("received", 3L, "analyzed", 1L, "suspicious", 1L));
-    jdbc.update(
-        "update ledger.transactions set integration_status='HELD' where tx_id=?",
-        transactions.get(0));
-    result =
-        refreshedDashboard(null)
-            .scoreWidgets(day, day, day, List.of(java.sql.Date.valueOf("2023-09-01")));
-    assertThat(result.get("detection"))
-        .isEqualTo(Map.of("received", 2L, "analyzed", 0L, "suspicious", 0L));
-    assertThat(result.get("agreements")).isEqualTo(List.of());
   }
 
   @Test
@@ -203,13 +194,6 @@ class DashboardScoreQueryTests {
     assertThat(result.get("agreements"))
         .isEqualTo(List.of(Map.of("agreement", "WEAK", "count", 1L)));
     assertThat(result.get("types")).isEqualTo(List.of());
-    jdbc.update(
-        "update ledger.transactions set integration_status='HELD' where tx_id=?",
-        transactions.get(1));
-    result =
-        refreshedDashboard(null)
-            .modelDistribution(LocalDate.parse("2023-09-02"), LocalDate.parse("2023-09-02"));
-    assertThat(result.get("agreements")).isEqualTo(List.of());
   }
 
   @Test
@@ -227,12 +211,6 @@ class DashboardScoreQueryTests {
     jdbc.update("update analysis.jobs set status='COMPLETED' where job_id=?", job);
     jdbc.update(
         "update analysis.scores set p_laundering=.95 where tx_id=?", transactions.getFirst());
-    assertThat(refreshedDashboard(null).modelDistribution(day, day).get("types"))
-        .isNotEqualTo(List.of());
-    jdbc.update("update analysis.runs set status='CANCELLED' where job_id=?", job);
-    assertThat(refreshedDashboard(null).modelDistribution(day, day).get("agreements"))
-        .isEqualTo(List.of());
-    jdbc.update("update analysis.runs set status='COMPLETED' where job_id=?", job);
     assertThat(refreshedDashboard(null).modelDistribution(day, day).get("types"))
         .isNotEqualTo(List.of());
     jdbc.update("delete from analysis.current_scores where tx_id=?", transactions.getFirst());
@@ -303,7 +281,7 @@ class DashboardScoreQueryTests {
             Long.class);
     long account =
         jdbc.queryForObject(
-            "insert into core.accounts(bank_id,service_account_id,owner_id) values(999019,gen_random_uuid(),?) returning account_id",
+            "insert into core.accounts(bank_id,owner_id) values(999019,?) returning account_id",
             Long.class,
             entity);
     jdbc.update(

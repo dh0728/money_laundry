@@ -72,12 +72,12 @@ class FlywayMigrationTests {
             Long.class);
     long first =
         jdbc.queryForObject(
-            "insert into core.accounts(bank_id,service_account_id,owner_id) values(999001,gen_random_uuid(),?) returning account_id",
+            "insert into core.accounts(bank_id,owner_id) values(999001,?) returning account_id",
             Long.class,
             owner);
     long second =
         jdbc.queryForObject(
-            "insert into core.accounts(bank_id,service_account_id,owner_id) values(999001,gen_random_uuid(),?) returning account_id",
+            "insert into core.accounts(bank_id,owner_id) values(999001,?) returning account_id",
             Long.class,
             owner);
     jdbc.update(
@@ -143,9 +143,6 @@ class FlywayMigrationTests {
           List.of(
               "private.owner_identities",
               "private.account_identities",
-              "private.bank_reports",
-              "private.bank_report_payloads",
-              "evaluation.report_labels",
               "evaluation.transaction_labels")) {
         assertThatThrownBy(
                 () ->

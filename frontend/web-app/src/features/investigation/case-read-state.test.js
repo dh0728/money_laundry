@@ -39,7 +39,8 @@ test('first opening a case updates only its unread flag across fixture rebuild a
   resetPreviewCaseRead();
   expect(storage.size).toBe(0);
   expect(restored.dashboardFixtures(fixture).cases[0].unread).toBe(true);
-});
+  // The first cold import pulls in query-controls.jsx (date picker, icons) and exceeds 5s on loaded CI runners.
+}, 30_000);
 
 test('opening a transaction, an already-read case or an unknown code stores nothing', async () => {
   const { markPreviewCaseRead } = await import('./case-read-state.js');

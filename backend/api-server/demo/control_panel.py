@@ -1,20 +1,18 @@
-"""Local operator controls. Uses the bank mock and the real analysis API."""
-import importlib.util
-import json
-import re
+"""Local operator controls. Sends each date's ledger file and runs the real analysis API."""
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, time as day_time, timedelta, timezone
 from pathlib import Path
-from types import SimpleNamespace
-from urllib.request import build_opener
-from urllib.error import HTTPError, URLError
 
+import httpx
+
+import ledger_upload
 from api_client import ApiClient, ApiError
+from ledger_upload import TRANSIENT, UploadHttpError
 
 STAGE_NAMES = {
-    'WAIT_INGEST': '적재 완료 대기', 'INTEGRATE': '거래 통합', 'FREEZE_INPUT': '분석 입력 고정',
+    'WAIT_INGEST': '원장 적재 대기', 'FREEZE_INPUT': '분석 입력 고정',
     'FEATURES': '모델 입력 준비', 'INFERENCE': '모델 추론', 'SCORES': '점수 저장',
     'ALERTS': 'Alert 구성', 'COMPLETE': 'Alert 공개',
 }
@@ -47,6 +45,7 @@ def describe(detail):
 
 
 def catalog(root):
+    """Date folders, each with exactly one ledger_<date>.csv."""
     root = Path(root).expanduser().resolve(strict=True)
     result = {}
     for folder in sorted(root.iterdir()):
@@ -56,78 +55,136 @@ def catalog(root):
             day = date.fromisoformat(folder.name).isoformat()
         except ValueError:
             continue
-        files = []
-        for file in sorted(folder.glob('*.csv')):
-            match = re.fullmatch(r'bank_(\d+)(?:_' + re.escape(day) + r')?\.csv', file.name)
-            if not match or not file.resolve().is_relative_to(root):
-                raise ValueError('날짜 폴더의 은행 파일명 또는 경로를 확인하세요.')
-            files.append((int(match[1]), file))
-        if len({bank for bank, _ in files}) != len(files):
-            raise ValueError('한 날짜에 같은 은행 파일이 여러 개 있습니다.')
-        if files:
-            result[day] = files
+        files = sorted(folder.glob('*.csv'))
+        if not files:
+            continue
+        if len(files) != 1 or files[0].name != f'ledger_{day}.csv' or not files[0].resolve().is_relative_to(root):
+            raise ValueError(f'{day} 폴더에는 ledger_{day}.csv 파일 하나만 두세요.')
+        result[day] = files[0]
     if not result:
-        raise ValueError('YYYY-MM-DD 폴더와 bank_은행번호_날짜.csv 파일이 필요합니다.')
+        raise ValueError('YYYY-MM-DD 폴더와 ledger_날짜.csv 파일이 필요합니다.')
     return result
 
 
-def bank_module():
-    source = Path(__file__).resolve().parents[2] / 'bank-mock/bank_mock.py'
-    spec = importlib.util.spec_from_file_location('aml_panel_bank_mock', source)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+MESSAGES = {
+    'DATE_ALREADY_LOADED': '이 거래 기준일의 원장은 이미 적재되었습니다.',
+    'DUPLICATE_FILE': '이미 처리한 동일 파일입니다. 기존 업로드 상태를 확인하세요.',
+    'UPLOAD_IN_PROGRESS': '동일 파일의 업로드가 이미 진행 중입니다. 기존 업로드 상태를 확인하세요.',
+    'UPLOAD_URL_EXPIRED': '업로드 URL이 만료됐습니다.',
+    'UPLOAD_MISMATCH': 'S3 객체가 없거나 파일 크기·체크섬이 일치하지 않습니다.',
+    'UPLOAD_SUPERSEDED': '새 업로드가 발급됐습니다. 최신 업로드 번호를 확인하세요.',
+    'FILE_TOO_LARGE': '서버가 허용한 파일 크기를 초과했습니다.',
+    'VALIDATION_FAILED': '업로드 요청의 파일명·기준일·체크섬 등 입력을 확인하세요.',
+}
 
 
-def upload_failure(error, bank, stage):
+def upload_failure(error, day, stage):
     """Map known errors without disclosing response bodies, signed URLs or tokens."""
-    prefix = f'은행 {bank} · {stage} 실패: '
-    if isinstance(error, HTTPError):
-        messages = {
-            'REPORTING_NOT_REGISTERED': '해당 은행·거래 기준일·AML17 양식의 사전 등록이 없습니다.',
-            'DUPLICATE_FILE': '이미 처리한 동일 파일입니다. 기존 업로드 상태를 확인하세요.',
-            'UPLOAD_IN_PROGRESS': '동일 파일의 업로드가 이미 진행 중입니다. 기존 업로드 상태를 확인하세요.',
-            'UPLOAD_URL_EXPIRED': '업로드 URL이 만료됐습니다.',
-            'UPLOAD_MISMATCH': 'S3 객체가 없거나 파일 크기·체크섬이 일치하지 않습니다.',
-            'UPLOAD_SUPERSEDED': '새 업로드가 발급됐습니다. 최신 업로드 번호를 확인하세요.',
-            'FILE_TOO_LARGE': '서버가 허용한 파일 크기를 초과했습니다.',
-            'VALIDATION_FAILED': '업로드 요청의 파일명·기준일·체크섬 등 입력을 확인하세요.',
-            'BANK_IDENTITY_DISABLED': '현재 서버 환경에서 목업 은행 식별을 허용하지 않습니다.',
-        }
-        code = None
-        try:
-            body = json.loads(error.read(8192))
-            candidate = body.get('code') if isinstance(body, dict) else None
-            if isinstance(candidate, str) and candidate in messages:
-                code = candidate
-        except (ValueError, OSError):
-            pass
-        finally:
-            error.close()
-        if code:
-            return ApiError(prefix + f'HTTP {error.code} · {code} — {messages[code]}', error.code)
-        if 300 <= error.code < 400:
+    prefix = f'{day} 원장 파일 · {stage} 실패: '
+    if isinstance(error, UploadHttpError):
+        if error.code in MESSAGES:
+            return ApiError(prefix + f'HTTP {error.status} · {error.code} — {MESSAGES[error.code]}', error.status)
+        if 300 <= error.status < 400:
             message = '다른 페이지로 이동하는 응답입니다. Cloudflare 접근 정책과 API 주소를 확인하세요.'
-        elif stage == 'S3 전송' and error.code == 403:
+        elif stage == 'S3 전송' and error.status == 403:
             message = 'S3가 업로드를 거절했습니다. 서명 URL 만료·서명 헤더·저장소 권한을 확인하세요.'
-        elif error.code in (401, 403):
-            message = '접근이 거절됐습니다. 이 요청 경로의 Cloudflare 서비스 토큰 정책과 서버 권한을 확인하세요.'
+        elif error.status in (401, 403):
+            message = '접근이 거절됐습니다. 관리자 로그인 세션과 Cloudflare 서비스 토큰 정책을 확인하세요.'
         else:
             message = '서버가 요청을 거절했습니다. 해당 단계의 서버 상태를 확인하세요.'
-        return ApiError(prefix + f'HTTP {error.code} — {message}', error.code)
-    if isinstance(error, (TimeoutError, URLError)):
+        return ApiError(prefix + f'HTTP {error.status} — {message}', error.status)
+    if isinstance(error, (TimeoutError, httpx.TransportError)):
         message = '연결·응답 확인에 실패했습니다. 처리 여부를 확인하기 전 재전송을 반복하지 마세요.'
-    elif isinstance(error, OSError) and stage in ('목업 모듈 준비', '파일 확인'):
+    elif isinstance(error, OSError) and stage == '파일 확인':
         message = '로컬 파일을 읽을 수 없습니다. 파일 존재 여부와 읽기 권한을 확인하세요.'
     elif isinstance(error, (ValueError, KeyError, TypeError)):
         message = ('CSV가 비어 있거나 파일을 확인할 수 없습니다.' if stage == '파일 확인'
                    else '서버 응답이 예상한 업로드 계약과 다릅니다. API 응답 형식을 확인하세요.')
     else:
-        message = '처리 중 내부 오류가 발생했습니다. 실패 단계와 은행 번호를 전달하세요.'
+        message = '처리 중 내부 오류가 발생했습니다. 실패 단계와 날짜를 전달하세요.'
     return ApiError(prefix + message)
 
 
+def load_estimate(size):
+    """Rough rows and load-time range for a ledger file; the server reports no row progress.
+
+    HI-Medium daily files average about 204 bytes per row. Local loads after the 2026-11-25 tuning
+    took 455-582 s per million rows, so the range is an estimate, not a measurement on dev.
+    """
+    rows = size / 204
+    return int(rows), (rows / 1e6 * 450, rows / 1e6 * 600)
+
+
+NO_BACKFILL = '백필 없음'
+BACKFILL_DEFAULT_DAYS = 7
+
+
+def short_day(day):
+    return f'{int(day[5:7])}/{int(day[8:10])}'
+
+
+def split_days(days, last_backfill):
+    """Days up to last_backfill are backfilled, the rest analysed; NO_BACKFILL analyses them all."""
+    if last_backfill in (None, NO_BACKFILL):
+        return [], list(days)
+    return [day for day in days if day <= last_backfill], [day for day in days if day > last_backfill]
+
+
+def span_text(days):
+    if not days:
+        return '없음'
+    return f'{short_day(days[0])}~{short_day(days[-1])} ({len(days)}일)' if len(days) > 1 else f'{short_day(days[0])} (1일)'
+
+
+def run_label(backfill_days, analysis_days):
+    if backfill_days and analysis_days:
+        return f'▶ 전송 → 백필 {len(backfill_days)}일 → 분석 {len(analysis_days)}일 자동 재생'
+    if backfill_days:
+        return f'▶ 전송 → 백필 {len(backfill_days)}일'
+    return f'▶ 전송 → 분석 {len(analysis_days)}일 자동 재생'
+
+
+def timeline_html(backfill_days, analysis_days, done):
+    """One chip per day: blue = backfill, orange = analysis, ✓ = finished in this panel."""
+    from html import escape
+
+    def chip(day, background, color):
+        mark = ' ✓' if day in done else ''
+        return (f'<span style="display:inline-block;margin:2px;padding:3px 9px;border-radius:999px;'
+                f'background:{background};color:{color};font-size:0.85rem;white-space:nowrap">'
+                f'{escape(short_day(day))}{mark}</span>')
+    chips = [chip(day, 'rgba(59,130,246,0.16)', '#3b82f6') for day in backfill_days]
+    chips += [chip(day, 'rgba(234,88,12,0.16)', '#ea580c') for day in analysis_days]
+    return '<div style="line-height:2">' + ''.join(chips) + '</div>'
+
+
+def load_progress(state, now):
+    """Progress bars for the S3 transfer (measured) and the server load (elapsed against an estimate)."""
+    bars = []
+    total = state.get('transferTotal')
+    if total:
+        sent = state.get('transferSent') or 0
+        bars.append((min(sent / total, 1.0),
+                     f'S3 전송 · {sent / 2**20:,.0f} / {total / 2**20:,.0f} MB ({sent / total:.0%})'))
+    started = state.get('loadStarted')
+    if started:
+        elapsed = max(0.0, now - started)
+        low, high = state.get('loadLow') or 0, state.get('loadHigh') or 0
+        status = {'RECEIVED': '적재 대기', 'RUNNING': '적재 중'}.get(state.get('loadStatus'), state.get('loadStatus') or '확인 중')
+        checked = state.get('loadCheckedAt')
+        seen = f' · 서버 확인 {max(0, now - checked):.0f}초 전' if checked else ''
+        over = ' · 예상보다 오래 걸리는 중' if high and elapsed > high else ''
+        # Capped below 100%: the bar is elapsed time against an estimate, not a server row count.
+        bars.append((min(elapsed / high, 0.99) if high else 0.0,
+                     f'서버 {status} · 경과 {elapsed / 60:.0f}분 · 예상 {low / 60:.0f}~{high / 60:.0f}분 '
+                     f'(약 {state.get("loadRows", 0):,}건 추정){seen}{over}'))
+    return bars
+
+
 class Controls:
+    # A whole day's ledger is loaded in one worker run; the largest day took minutes, not seconds.
+    LOAD_WAIT_SECONDS = 3 * 3600
+
     def __init__(self, base, client=None, *, allow_remote=False, cf_headers=None):
         ApiClient(base)  # Apply the existing URL rules before any request.
         from urllib.parse import urlsplit
@@ -160,115 +217,111 @@ class Controls:
     def post(self, path, payload=None, **options):
         return self.client.post(path, payload, **options)
 
-    def _issue_upload(self, mock, opener, args, size, checksum, progress):
+    def _issue_upload(self, day, file, size, checksum, progress):
         for attempt in range(6):
             try:
-                return mock.request_upload(opener, args, size, checksum)
-            except HTTPError as error:
-                if error.code == 409:
-                    try:
-                        body = json.loads(error.read(8192))
-                    except (ValueError, OSError):
-                        body = {}
-                    finally:
-                        error.close()
-                    if (isinstance(body, dict)
-                            and body.get('code') in ('DUPLICATE_FILE', 'UPLOAD_IN_PROGRESS')
-                            and type(body.get('uploadId')) is int and body['uploadId'] > 0):
-                        return {'uploadId': body['uploadId'], 'existing': True}
-                    raise ApiError('기존 업로드 번호를 확인할 수 없습니다. 서버의 업로드 복구 API 배포 여부를 확인하세요.', 409) from None
-                if error.code not in (408, 429, 500, 502, 503, 504, 520, 522, 524) or attempt == 5:
+                return ledger_upload.request_upload(self.client, day, file, size, checksum,
+                                                    cf_headers=self.cf_headers)
+            except UploadHttpError as error:
+                if error.status == 409 and error.code in ('DUPLICATE_FILE', 'UPLOAD_IN_PROGRESS'):
+                    if error.upload_id is None or error.upload_id <= 0:
+                        raise ApiError('기존 업로드 번호를 확인할 수 없습니다. 서버의 업로드 복구 API 배포 여부를 확인하세요.', 409) from None
+                    return {'uploadId': error.upload_id, 'existing': True}
+                if error.status not in TRANSIENT or attempt == 5:
                     raise
-                error.close()
-            except (URLError, TimeoutError):
+            except (httpx.TransportError, TimeoutError):
                 if attempt == 5:
                     raise
             delay = min(5 * 2 ** attempt, 30)
             progress(f'업로드 접수 확인 재시도 {attempt + 1}회 · {delay}초 후')
             time.sleep(delay)
 
-    def _upload_status(self, mock, opener, args, upload, progress):
+    def _upload_status(self, upload, progress):
         for attempt in range(6):
             try:
-                return mock.request_status(opener, args, upload)
-            except (HTTPError, URLError, TimeoutError) as error:
-                transient = not isinstance(error, HTTPError) or error.code in (408, 429, 500, 502, 503, 504, 520, 522, 524)
+                return ledger_upload.request_status(self.client, upload, cf_headers=self.cf_headers)
+            except (UploadHttpError, httpx.TransportError, TimeoutError) as error:
+                transient = not isinstance(error, UploadHttpError) or error.status in TRANSIENT
                 if not transient or attempt == 5:
                     raise
-                if isinstance(error, HTTPError):
-                    error.close()
                 delay = min(5 * 2 ** attempt, 30)
-                progress(f'검수 결과 조회 재시도 {attempt + 1}회 · {delay}초 후', uploadId=upload)
+                progress(f'적재 결과 조회 재시도 {attempt + 1}회 · {delay}초 후', uploadId=upload)
                 time.sleep(delay)
 
-    def upload(self, day, bank, file, report):
-        stage = '목업 모듈 준비'
+    def upload(self, day, file, report):
+        stage = '파일 확인'
         def progress(value, **values):
             nonlocal stage
             stage = value
-            report(f'{day} 은행 {bank}: {stage}', bankId=bank, **values)
+            report(f'{day} 원장 파일: {stage}', **values)
         try:
             progress(stage, uploadId=None)
-            mock = bank_module()
-            args = SimpleNamespace(api_url=self.base, bank_id=bank, file=file,
-                                   business_date=day, correction_request_id=None, cf_headers=self.cf_headers)
-            opener = build_opener(mock.NoRedirect())
-            progress('파일 확인')
-            size, checksum = mock.inspect_file(file)
-            key = (day, bank, file.name, size, checksum)
+            size, checksum = ledger_upload.inspect_file(file)
+            key = (day, file.name, size, checksum)
             pending = self.uploads.get(key)
             if pending is None:
                 progress('업로드 URL 발급')
-                target = self._issue_upload(mock, opener, args, size, checksum, progress)
+                target = self._issue_upload(day, file, size, checksum, progress)
                 pending = {'target': target, 'uploaded': False}
                 self.uploads[key] = pending
                 if target.get('existing'):
                     progress('기존 업로드 상태 확인', uploadId=target['uploadId'])
-                    result = self._upload_status(mock, opener, args, target['uploadId'], progress)
+                    result = self._upload_status(target['uploadId'], progress)
                 else:
                     result = {'status': 'URL_ISSUED'}
             else:
                 progress('기존 업로드 상태 확인', uploadId=pending['target']['uploadId'])
-                result = self._upload_status(mock, opener, args, pending['target']['uploadId'], progress)
+                result = self._upload_status(pending['target']['uploadId'], progress)
             target = pending['target']
             upload = target['uploadId']
             if target.get('existing') and (result.get('businessDate') != day or result.get('sizeBytes') != size):
-                raise ApiError(f'은행 {bank} 기존 파일의 기준일·크기가 다릅니다. uploadId {upload}. 자동으로 건너뛰지 않습니다.')
+                raise ApiError(f'{day} 기존 파일의 기준일·크기가 다릅니다. uploadId {upload}. 자동으로 건너뛰지 않습니다.')
             if result['status'] == 'URL_ISSUED':
                 if target.get('existing'):
                     # The existing object may already be stored; completion verifies its hash and size.
                     # Forget URL-only lookup so a later retry can obtain a new URL after expiry.
                     self.uploads.pop(key, None)
                 if not pending['uploaded'] and not target.get('existing'):
-                    progress('S3 전송', uploadId=upload)
-                    mock.upload_file(opener, file, target, size)
+                    progress('S3 전송', uploadId=upload, transferSent=0, transferTotal=size)
+                    ledger_upload.upload_file(
+                        file, target, size,
+                        on_progress=lambda sent, total: report(f'{day} 원장 파일: S3 전송',
+                                                               transferSent=sent, transferTotal=total))
                     pending['uploaded'] = True
                 progress('업로드 완료 통지', uploadId=upload)
                 try:
-                    result = mock.request_status(opener, args, upload, complete=True)
-                except (HTTPError, URLError, TimeoutError) as error:
-                    if isinstance(error, HTTPError) and error.code not in (408, 429, 500, 502, 503, 504, 520, 522, 524):
+                    result = ledger_upload.request_status(self.client, upload, complete=True,
+                                                          cf_headers=self.cf_headers)
+                except (UploadHttpError, httpx.TransportError, TimeoutError) as error:
+                    if isinstance(error, UploadHttpError) and error.status not in TRANSIENT:
                         raise
-                    if isinstance(error, HTTPError):
-                        error.close()
                     # Reconcile a lost POST response by GET; never blindly repeat upload.
-                    result = self._upload_status(mock, opener, args, upload, progress)
-            progress('검수 결과 조회', uploadId=upload)
-            deadline = time.monotonic() + 1800
+                    result = self._upload_status(upload, progress)
+            rows, (low, high) = load_estimate(size)
+            progress('원장 적재 결과 조회', uploadId=upload, transferTotal=None, loadStarted=time.time(),
+                     loadRows=rows, loadLow=low, loadHigh=high, loadStatus=result['status'],
+                     loadCheckedAt=time.time())
+            deadline = time.monotonic() + self.LOAD_WAIT_SECONDS
             while result['status'] in ('RECEIVED', 'RUNNING'):
                 if time.monotonic() >= deadline:
-                    raise ApiError(f'은행 {bank} 검수 관찰 시간 초과: uploadId {upload}. 다시 실행하면 상태 조회부터 이어갑니다.')
+                    raise ApiError(f'{day} 원장 적재 관찰 시간 초과: uploadId {upload}. 다시 실행하면 상태 조회부터 이어갑니다.')
                 time.sleep(2)
-                result = self._upload_status(mock, opener, args, upload, progress)
+                result = self._upload_status(upload, progress)
+                report(f'{day} 원장 파일: 원장 적재 결과 조회', loadStatus=result['status'],
+                       loadCheckedAt=time.time())
+            report(f'{day} 원장 파일: 원장 적재 결과 조회', loadStarted=None)
             if result['status'] != 'COMPLETED':
-                raise ApiError(f'은행 {bank} 검수 미완료: uploadId {upload}. 업로드 상태를 확인하세요.')
+                errors = result.get('errors') or []
+                reason = errors[0].get('reason') if errors and isinstance(errors[0], dict) else None
+                detail = f' (첫 오류: {reason})' if isinstance(reason, str) and reason.isupper() else ''
+                raise ApiError(f'{day} 원장 적재 미완료: uploadId {upload} · {result["status"]}{detail}. 업로드 상태를 확인하세요.')
             # Do not retain signed URLs after completion. Recheck server state on replay.
             self.uploads[key] = {'target': {'uploadId': upload}, 'uploaded': True}
             return upload
         except ApiError:
             raise
         except Exception as error:
-            raise upload_failure(error, bank, stage) from None
+            raise upload_failure(error, day, stage) from None
 
 
 class Replay:
@@ -292,19 +345,26 @@ class Replay:
         with self.lock:
             return dict(self.state, history=list(self.state['history']))
 
-    def start(self, days, files, *, analyze=True, upload=True, interval=0, backfill=False):
+    def start(self, days, files, *, analyze=True, upload=True, interval=0, backfill=False, backfill_until=None):
+        """backfill=True backfills every day; backfill_until backfills the days up to it, then analyses."""
         with self.lock:
             if self.future is not None and not self.future.done():
                 raise ValueError('현재 작업이 끝날 때까지 기다리세요.')
+            if backfill_until is not None and not analyze:
+                raise ValueError('백필 후 분석은 분석을 포함한 재생에서만 씁니다.')
             self.pause.clear()
             days = sorted(set(days))
             self.report('시작', error=None, totalDays=len(days),
                         doneDays=sum(day in self.completed for day in days) if analyze else 0,
                         currentDay=None, fileDone=0, fileTotal=0,
-                        bankId=None, uploadId=None, jobId=None)
+                        uploadId=None, jobId=None)
+            if backfill_until is not None:
+                backfill = frozenset(day for day in days if day <= backfill_until)
             self.future = self.pool.submit(self._run, days, files, analyze, upload, interval, backfill)
 
     def _run(self, days, files, analyze, upload, interval, backfill=False):
+        # backfill is True (every day) or the set of days to backfill before the analysed ones.
+        backfilled = (lambda day: True) if backfill is True else (lambda day: bool(backfill) and day in backfill)
         stage = '날짜 준비'
         day = None
         try:
@@ -314,39 +374,34 @@ class Replay:
                 if analyze and day in self.completed:
                     continue
                 stage = '업무 시각 준비'
-                self.report(f'{day}: {stage}', currentDay=day, bankId=None, uploadId=None, jobId=None)
+                self.report(f'{day}: {stage}', currentDay=day, uploadId=None, jobId=None)
                 self.controls.prepare_day(day)
-                stage = '전송 파일 목록 확인'
-                file_done = sum((day, bank, str(file)) in self.sent for bank, file in files[day])
+                stage = '전송 파일 확인'
+                key = (day, str(files[day]))
                 self.report(f'{day}: 처리 시작', currentDay=day,
-                            fileDone=file_done, fileTotal=len(files[day]) if upload else 0,
-                            bankId=None, uploadId=None, jobId=None)
-                if upload:
-                    for bank, file in files[day]:
-                        key = (day, bank, str(file))
-                        if key in self.sent:
-                            continue
-                        self.report(f'{day} 은행 {bank}: 전송 준비', bankId=bank, uploadId=None)
-                        stage = '은행 파일 전송·검수'
-                        self.controls.upload(day, bank, file, self.report)
-                        self.sent.add(key)
-                        file_done += 1
-                        self.report(f'{day} 은행 {bank}: 전송·검수 완료', fileDone=file_done)
+                            fileDone=int(key in self.sent), fileTotal=1 if upload else 0,
+                            uploadId=None, jobId=None, transferTotal=None, loadStarted=None)
+                if upload and key not in self.sent:
+                    self.report(f'{day} 원장 파일: 전송 준비', uploadId=None)
+                    stage = '원장 파일 전송·적재'
+                    self.controls.upload(day, files[day], self.report)
+                    self.sent.add(key)
+                    self.report(f'{day} 원장 파일: 전송·적재 완료', fileDone=1)
                 if analyze:
                     stage = '분석 시작 요청'
                     self.report(f'{day}: 분석 시작 요청')
                     if day not in self.jobs:
-                        # A backfill day is integrated as history only: no scores, no Alerts.
-                        payload = {'businessDate': day, 'backfill': True} if backfill else {'businessDate': day}
+                        # A backfill day is frozen as history only: no scores, no Alerts.
+                        payload = {'businessDate': day, 'backfill': True} if backfilled(day) else {'businessDate': day}
                         self.jobs[day] = self.controls.post('demo/analysis', payload)['jobId']
                     job = self.jobs[day]
-                    self.report(f'{day}: 분석 대기', jobId=job, bankId=None, uploadId=None)
+                    self.report(f'{day}: 분석 대기', jobId=job, uploadId=None)
                     stage = '분석 결과 조회'
                     self.wait_job(job, day)
                     self.completed.add(day)
                 with self.lock:
                     self.state['doneDays'] += 1
-                    result = '백필 완료' if backfill else '분석 완료' if analyze else '전송·검수 완료'
+                    result = ('백필 완료' if backfilled(day) else '분석 완료') if analyze else '전송·적재 완료'
                     self.state['history'].append({'date': day, 'result': result})
                 if self.pause.wait(interval):
                     break
@@ -360,7 +415,7 @@ class Replay:
                 kind = next((cls.__name__ for cls in (KeyError, TypeError, ValueError, OSError, RuntimeError)
                              if isinstance(error, cls)), '내부 오류')
                 message = f'{day or "날짜 미확인"} · {stage} 실패 ({kind}). 패널 코드 버전과 API 응답 형식을 확인하세요.'
-            self.report('중단', error=message)
+            self.report('중단', error=message, transferTotal=None, loadStarted=None)
 
     def wait_job(self, job, day):
         deadline = time.monotonic() + 6 * 3600
@@ -377,7 +432,7 @@ class Replay:
                 self.report(
                     f'{day}: 분석 상태 확인 대기 · 마지막 확인 {last_stage} · '
                     f'조회 재시도 {failures}회 · {delay}초 후 다시 확인 (서버 작업 취소 아님)',
-                    jobId=job, bankId=None, uploadId=None)
+                    jobId=job, uploadId=None)
                 time.sleep(min(delay, max(0, deadline - time.monotonic())))
                 continue
             failures = 0
@@ -430,7 +485,7 @@ def render_reset(replay):
     pending = latest.get('status', 'NONE') in ('FILES_PENDING', 'FILES_FAILED')
     running = replay.future is not None and not replay.future.done()
     with st.expander('시연 데이터 초기화'):
-        st.warning('거래·업로드·분석·Alert/Episode·조사 이력과 관련 S3 파일을 삭제합니다. PC의 CSV, 직원 계정, 은행 등록, 환율은 보존합니다.')
+        st.warning('거래·업로드·분석·Alert/Episode·조사 이력과 관련 S3 파일을 삭제합니다. PC의 CSV, 직원 계정, 환율은 보존합니다.')
         if st.button('초기화 대상 확인', disabled=running or pending):
             st.session_state.reset_preview = replay.controls.get('demo/reset/preview', timeout=RESET_TIMEOUT)
             st.session_state.reset_request = str(uuid4())
@@ -439,7 +494,7 @@ def render_reset(replay):
             counts = preview['counts']
             st.write({label: counts.get(table, 0) for label, table in (
                 ('거래', 'ledger.transactions'), ('업로드', 'ingest.uploads'), ('분석 작업', 'analysis.jobs'),
-                ('Alert', 'review.alerts'), ('Episode', 'review.episodes'), ('은행 보고', 'ingest.report_versions'))})
+                ('Alert', 'review.alerts'), ('Episode', 'review.episodes'))})
             confirmation = st.text_input('확인 문구: 시연 데이터 초기화', key='reset_confirmation')
             if st.button('DB 및 관련 파일 초기화', disabled=running or pending or confirmation != '시연 데이터 초기화'):
                 result = replay.reset_demo({'requestId': st.session_state.reset_request,
@@ -484,16 +539,16 @@ def render():
     import streamlit as st
     st.set_page_config(page_title='AML 시연 조작패널', layout='wide')
     st.title('시연 조작패널')
-    st.caption('예약 시각 대기만 생략합니다. 파일 검수와 실제 분석 완료를 기다린 뒤 다음 날짜로 진행합니다.')
+    st.caption('예약 시각 대기만 생략합니다. 원장 적재와 실제 분석 완료를 기다린 뒤 다음 날짜로 진행합니다.')
     import operator_session
     runtime = operator_session.runtime
     if runtime is not None:
         base, root = runtime.base, runtime.root
         st.info(f'dev 연결: {base} · ADMIN 세션 자동 갱신')
-        st.caption(f'은행 파일 폴더: {root}')
+        st.caption(f'원장 파일 폴더: {root}')
     else:
         base = st.text_input('로컬 백엔드', os.getenv('AML_DEMO_API_URL', 'http://127.0.0.1:8080'))
-        root = st.text_input('날짜별 은행 파일 폴더', os.getenv('AML_DEMO_DATA_DIR', ''))
+        root = st.text_input('날짜별 원장 파일 폴더', os.getenv('AML_DEMO_DATA_DIR', ''))
     try:
         if runtime is not None:
             replay = runtime.replay
@@ -520,7 +575,7 @@ def render():
                 replay.controls.client = client
         files = catalog(root) if root else {}
         if not files:
-            st.info('준비된 날짜별 은행 파일의 상위 폴더를 지정하세요.')
+            st.info('날짜별 원장 파일(YYYY-MM-DD/ledger_날짜.csv)의 상위 폴더를 지정하세요.')
             return
         clock = replay.controls.get('demo/clock')
         st.metric('시연 업무 시각 (KST)', clock['businessAt'])
@@ -537,27 +592,43 @@ def render():
             if st.button('다음 날로 이동', disabled=busy or not clock['configured']):
                 replay.controls.set_clock((current + timedelta(days=1)).isoformat())
                 st.rerun()
-        days = st.multiselect('진행할 날짜 (날짜순)', list(files), default=[next(iter(files))])
-        st.write({day: f'은행 파일 {len(files[day])}개' for day in sorted(days)})
+        all_days = list(files)
+        st.subheader('진행할 날짜')
+        if len(all_days) > 1:
+            start, end = st.select_slider('진행 기간 (양끝을 끌어 범위 지정)', options=all_days,
+                                          value=(all_days[0], all_days[-1]), format_func=short_day)
+        else:
+            start = end = all_days[0]
+        days = [day for day in all_days if start <= day <= end]
+        default = days[BACKFILL_DEFAULT_DAYS - 1] if len(days) > BACKFILL_DEFAULT_DAYS else NO_BACKFILL
+        # The key follows the range, so a stale boundary outside a new range never sticks.
+        last_backfill = st.select_slider(
+            '백필 / 분석 경계 (이 날짜까지 백필, 다음 날부터 분석)', options=[NO_BACKFILL, *days], value=default,
+            format_func=lambda day: day if day == NO_BACKFILL else short_day(day), key=f'split:{start}:{end}',
+            help='백필은 점수·Alert 없이 거래를 이력으로만 쌓습니다. 분석을 한 번이라도 한 뒤에는 서버가 백필을 거절합니다.')
+        backfill_days, analysis_days = split_days(days, last_backfill)
+        st.markdown(timeline_html(backfill_days, analysis_days, replay.completed), unsafe_allow_html=True)
+        # Markdown reads a pair of "~" as strikethrough, so the ranges escape it.
+        st.caption(f'백필 {span_text(backfill_days)} → 분석 {span_text(analysis_days)} · ✓ 이 패널에서 끝낸 날짜'
+                   .replace('~', '\\~'))
         interval = st.number_input('날짜 사이 대기(초)', min_value=0, max_value=300, value=5)
 
         @st.fragment(run_every='1s')
         def actions():
             running = reset_pending or (replay.future is not None and not replay.future.done())
-            cols = st.columns(4)
-            if cols[0].button('선택 날짜 전송', disabled=running or len(days) != 1):
-                replay.start(sorted(days), files, analyze=False)
+            if st.button(run_label(backfill_days, analysis_days), type='primary', disabled=running or not days,
+                         use_container_width=True):
+                replay.start(days, files, interval=interval,
+                             backfill_until=backfill_days[-1] if backfill_days else None)
                 st.rerun()
-            if cols[1].button('분석 트리거', disabled=running or len(days) != 1):
-                replay.start(days, files, upload=False)
-                st.rerun()
-            if cols[2].button('전송 → 분석 자동 재생', disabled=running or not days):
-                replay.start(sorted(days), files, interval=interval)
-                st.rerun()
-            if cols[3].button('전송 → 백필', disabled=running or not days,
-                              help='분석을 시작하기 전 앞 날짜에만 씁니다. 거래를 이력으로만 쌓고 점수·Alert는 만들지 않습니다.'):
-                replay.start(sorted(days), files, interval=interval, backfill=True)
-                st.rerun()
+            with st.expander('하루만 따로 실행 (진행 기간을 하루로 좁힌 뒤)'):
+                cols = st.columns(2)
+                if cols[0].button('선택 날짜 전송만', disabled=running or len(days) != 1):
+                    replay.start(days, files, analyze=False)
+                    st.rerun()
+                if cols[1].button('선택 날짜 분석만', disabled=running or len(days) != 1):
+                    replay.start(days, files, upload=False, backfill=bool(backfill_days))
+                    st.rerun()
             if st.button('현재 날짜 완료 후 일시정지', disabled=not running):
                 replay.pause.set()
             state = replay.snapshot()
@@ -568,10 +639,12 @@ def render():
                     st.caption(f'현재 처리 날짜: {state["currentDay"]}')
                 if state.get('fileTotal'):
                     st.progress(state['fileDone'] / state['fileTotal'],
-                                text=f'현재 날짜 전송·검수 · {state["fileDone"]}/{state["fileTotal"]}개 파일 완료')
-                st.caption('날짜 진행률은 분석 완료 기준입니다. 전송만 실행하면 검수 완료 기준입니다.')
+                                text=f'현재 날짜 원장 전송·적재 · {state["fileDone"]}/{state["fileTotal"]}개 파일 완료')
+                for value, text in load_progress(state, time.time()):
+                    st.progress(value, text=text)
+                st.caption('날짜 진행률은 분석 완료 기준입니다. 전송만 실행하면 적재 완료 기준입니다.')
             st.write(state['message'])
-            st.write({key: state[key] for key in ('bankId', 'uploadId', 'jobId') if state.get(key) is not None})
+            st.write({key: state[key] for key in ('uploadId', 'jobId') if state.get(key) is not None})
             if state['error']:
                 st.error(state['error'])
             if state['history']:

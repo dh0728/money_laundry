@@ -89,7 +89,7 @@ public class RuleService {
   public RuleValidator.Result check(String template, Object definition, Long ruleId) {
     Integer ledgerDays =
         jdbc.queryForObject(
-            "select max(business_date)-min(business_date)+1 from ledger.transactions where integration_status='ACTIVE'",
+            "select max(business_date)-min(business_date)+1 from ledger.transactions",
             Integer.class);
     Number window =
         definition instanceof Map<?, ?> map
