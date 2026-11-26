@@ -12,8 +12,6 @@ function getGroup(host) {
   const group = { bindings: 0, pending: null, active: null, api: null, dismissing: false };
   let restoreFrame = 0;
   const attach = api => { group.api = api; };
-  const render = () => root.render(<WarmTooltipGroup ref={attach} portalTarget={host} delay={delay}
-    reduceMotion={document.documentElement.dataset.reducedMotion === 'true'} />);
   const outside = event => {
     if ((group.active && !group.active.trigger.contains(event.target)) ||
       (group.pending && !group.pending.trigger.contains(event.target))) hideTooltip(host);
@@ -26,12 +24,10 @@ function getGroup(host) {
     cancelAnimationFrame(restoreFrame);
     restoreFrame = requestAnimationFrame(() => { group.dismissing = false; });
   };
-  document.addEventListener('aml:appearance', render);
   document.addEventListener('pointerdown', outside, true);
   document.addEventListener('keydown', escape, true);
   group.dispose = () => {
     cancelAnimationFrame(restoreFrame);
-    document.removeEventListener('aml:appearance', render);
     document.removeEventListener('pointerdown', outside, true);
     document.removeEventListener('keydown', escape, true);
     root.unmount();
@@ -39,7 +35,7 @@ function getGroup(host) {
     groups.delete(host);
   };
   groups.set(host, group);
-  render();
+  root.render(<WarmTooltipGroup ref={attach} portalTarget={host} delay={delay} />);
   return group;
 }
 
@@ -82,9 +78,7 @@ export function bindTooltip(trigger, host, { instantOnHover = false, hover = tru
     const rect = trigger.getBoundingClientRect();
     const side = rect.top < 42 && window.innerHeight - rect.bottom > rect.top ? 'bottom' : 'top';
     api.show({
-      id, trigger, content, side, gap: 8, arrow: true,
-      surfaceColor: 'var(--chart-tooltip-background)', inkColor: 'var(--text)',
-      radius: 8, font: 12.5, px: 10, py: 6, popDuration: 160, popScale: 0.94, popBlur: 4,
+      id, trigger, content, side,
       warmWindow: api.warmWindow,
     }, mode);
   }

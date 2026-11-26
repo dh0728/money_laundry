@@ -1,0 +1,44 @@
+@import "../../styles/review-shell-tokens.css";
+
+:root { color-scheme: light }
+:root.dark { color-scheme: dark }
+
+.review-shell { min-block-size: 100svh }
+.review-shell .review-shell-rail {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-start: 0;
+  overflow: auto;
+  border-inline-end: var(--aml-stroke-divider) solid var(--review-shell-border);
+}
+.review-rail-menu {
+  inline-size: 100%;
+  align-items: center;
+  padding-block: var(--aml-space-16);
+}
+.review-rail-icon {
+  inline-size: var(--aml-size-icon);
+  block-size: var(--aml-size-icon);
+}
+.review-shell-body { margin-inline-start: var(--review-rail-width) }
+.review-shell .review-shell-header {
+  block-size: auto;
+  padding: var(--aml-space-16);
+  background: var(--review-shell-header-surface);
+}
+.review-shell-header .review-shell-header-content {
+  display: flex;
+  justify-content: space-between;
+}
+.review-theme-icon {
+  inline-size: var(--review-theme-icon-size);
+  block-size: var(--review-theme-icon-size);
+}
+.review-shell .review-shell-content {
+  min-inline-size: 0;
+  padding: var(--aml-space-24);
+}
+.review-stack { inline-size: 100% }
+.ant-typography.review-case-title { margin: var(--aml-space-0) }
+.review-owner-filter { min-inline-size: var(--review-owner-filter-min-width) }
+.review-account-filter { min-inline-size: var(--review-account-filter-min-width) }

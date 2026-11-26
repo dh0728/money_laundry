@@ -1,13 +1,19 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { cancelBacktest, fetchBacktest, fetchBacktests, fetchRule, requestBacktest } from '@/api/rules';
-import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
+import { cancelBacktest, fetchBacktest, fetchBacktestPeriod, fetchBacktests, fetchRule, requestBacktest } from '@/api/rules';
+import { Box, Heading, Text } from '@/components/layout-primitives';
+import { Input } from '@/components/ui/input';
+import { FormDropdown, FormDropdownItem } from '../../components/form-dropdown';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
 import { Panel } from '../../components/panel';
+import { Progress } from '../../components/progress';
+import { activateRecordCard } from '../../components/record-card';
 import { ScreenActions } from '../../components/screen-actions';
 import { StatusTag } from '../../components/semantic-tags';
-import { downloadCsv } from '../../components/query-controls';
+import { csvDownloadEntry, TableQueryTools } from '../../components/query-controls';
 import { SortableTableHead, tableCount, useTableSort, WorkflowTable } from '../../components/workflow-table';
-import { sidedText, sideOf, templateOf } from './rule-definition';
+import { chosenPeriod, lookbackFrom, periodText } from './backtest-period';
+import { sidedText, sideOf, templateOf, windowLabel } from './rule-definition';
 import { transactionCode } from '../investigation/live-data.js';
 import {
   codeToRuleId, loadRuleCatalog, problemText, refreshLiveRules, ruleStatusNames, ruleStatusPresets,
@@ -17,6 +23,7 @@ import './live-rule-engine.css';
 
 // 백테스트. 룰을 고르면 그 룰의 작업 중 버전(없으면 운영 버전)을 과거 원장에 돌린다.
 // 운영 버전이 따로 있으면 서버가 같은 기간에 같이 돌려 새로 걸림 · 빠짐을 낸다. 실행은 서버가 하고 화면은 2초마다 상태를 읽는다.
+// 검사 기간은 타겟 날(검사하는 마지막 날)과 검사 일수로 고른다. 타겟 날 뒤의 거래는 서버가 읽지 않는다.
 
 const POLL_MS = 2000;
 /** 사례 표에 한 번에 보여 주는 줄 수 */
@@ -27,6 +34,8 @@ const CASE_PAGE = 20;
  * "처음 거래하는 상대" 필터 없이 건 일반 룰은 넷 중 셋이 10% 이상이었다(룰-템플릿-정의 5.3). 그 사이의 값으로 잡았다.
  */
 const WIDE_SHARE = 1;
+/** 검사 일수 선택지(일). 룰의 기간 선택지 1일 · 3일 · 7일에 맞췄다. 이 밖에 "전체"가 있다. */
+const SPAN_DAYS = [1, 3, 7];
 
 const countFormat = new Intl.NumberFormat('ko-KR');
 const decimalFormat = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 2 });
@@ -50,17 +59,24 @@ const caseStates = {
 const judgements = { SUSPICIOUS: '의심', NORMAL: '정상' };
 const active = status => status === 'QUEUED' || status === 'RUNNING';
 const windowText = minutes => (minutes % 60 === 0 ? `${minutes / 60}시간` : `${minutes}분`);
+/** 룰의 기간만큼 돌아보는 범위를 적는 글자. 기간이 없는 템플릿(단건 고액거래)은 돌아보지 않는다. */
+const lookbackText = (from, windowMinutes) => (from && windowMinutes ? `${from}부터 (룰의 기간 ${windowLabel(windowMinutes)})` : '없음 (기간 없이 거래 1건씩 봅니다)');
+
+function runTimeText(value) {
+  const date = new Date(value);
+  return value && Number.isFinite(date.getTime()) ? `${timeFormat.format(date)} KST` : '';
+}
 
 function RunTime({ value }) {
-  const date = new Date(value);
-  return value && Number.isFinite(date.getTime()) ? <time dateTime={value}>{timeFormat.format(date)} KST</time> : '—';
+  const text = runTimeText(value);
+  return text ? <Text as="time" dateTime={value}>{text}</Text> : '—';
 }
 
 function Metric({ label, value, unit, note }) {
   return <Panel as="div" className="backtest-metric">
-    <dt>{label}</dt>
-    <dd><strong>{value}</strong>{unit && <> <span>{unit}</span></>}</dd>
-    {note && <dd className="backtest-meta">{note}</dd>}
+    <Box as="dt">{label}</Box>
+    <Box as="dd"><Text as="strong">{value}</Text>{unit && <> <Text as="span">{unit}</Text></>}</Box>
+    {note && <Box as="dd" className="backtest-meta">{note}</Box>}
   </Panel>;
 }
 
@@ -88,23 +104,56 @@ function subjectText(item) {
   return item.subjectType === 'TX' && item.txId != null && item.occurredAt ? transactionCode(item) : item.subject;
 }
 
+/**
+ * 검사 기간. 타겟 날과 검사 일수를 고르면 실행하기 전에 무엇을 읽을지 보여 준다.
+ * @param range 서버가 준 고를 수 있는 범위. 못 읽었으면 null 이고 failure 에 사유가 있다
+ * @param chosen 고른 타겟 날 · 검사 일수로 정한 검사 날짜(chosenPeriod 의 결과)
+ * @param windowMinutes 돌릴 버전의 룰 기간. 기간이 없는 템플릿은 없다
+ */
+function Period({ range, failure, day, span, chosen, windowMinutes, disabled, onDay, onSpan }) {
+  return <Panel className="backtest-card" aria-label="검사 기간">
+    <Box as="header" className="backtest-card-heading"><Heading>검사 기간</Heading></Box>
+    {range ? <>
+      <Box className="rule-backtest-period">
+        <Box as="label">타겟 날
+          <Input type="date" value={day} min={range.earliest} max={range.ledgerTo} disabled={disabled}
+            aria-invalid={chosen.error ? true : undefined} onChange={event => onDay(event.target.value)} />
+        </Box>
+        <Box as="label">검사 일수
+          <FormDropdown label="검사 일수" value={span} onValueChange={onSpan} disabled={disabled}>
+            {SPAN_DAYS.map(days => <FormDropdownItem key={days} value={String(days)}>{days}일</FormDropdownItem>)}
+            <FormDropdownItem value="ALL">전체</FormDropdownItem>
+          </FormDropdown>
+        </Box>
+      </Box>
+      {chosen.error ? <Text role="alert" data-rule-block-error>{chosen.error}</Text> : <Box as="dl" className="rule-condition-facts rule-backtest-preview">
+        <Box><Box as="dt">검사하는 날짜</Box><Box as="dd">{periodText(chosen)}
+          {chosen.clipped && <Text as="span" className="workflow-rule-note"> 원장 첫 {count(range.warmupDays)}일은 검사하지 않아 {span}일을 채우지 못합니다.</Text>}</Box></Box>
+        <Box><Box as="dt">돌아보는 거래</Box><Box as="dd">{lookbackText(lookbackFrom(chosen.from, windowMinutes, range.ledgerFrom), windowMinutes)}</Box></Box>
+        <Box><Box as="dt">처음 거래하는 상대 · 바쁜 계좌</Box><Box as="dd">{range.ledgerFrom} ~ {chosen.to} 기준</Box></Box>
+      </Box>}
+      <Text className="backtest-meta">타겟 날 뒤의 거래는 읽지 않습니다. 원장은 {range.ledgerFrom} ~ {range.ledgerTo} 이고 첫 {count(range.warmupDays)}일은 이력으로만 씁니다.</Text>
+    </> : <Text className="backtest-meta" role={failure ? 'status' : undefined}>{failure || '원장의 날짜 범위를 불러오는 중입니다.'}</Text>}
+  </Panel>;
+}
+
 function Notices({ run, wholePath }) {
   const wide = run.evidenceShare != null && run.evidenceShare >= WIDE_SHARE;
   if (run.currentDefinition && !wide && !run.skippedBusySubjects && !run.chunkedCount) return null;
-  return <ul className="rule-check-warnings rule-backtest-notices" aria-label="알아 둘 것">
-    {!run.currentDefinition && <li>이 결과는 조건을 고치기 전의 것입니다. 지금 조건으로 보려면 다시 실행해 주세요.</li>}
-    {wide && <li>근거 거래가 검사한 거래의 {percent(run.evidenceShare)} 입니다({count(run.evidenceTxCount)}건). 조건이 원장을 넓게 덮습니다. 세는 거래 조건을 좁히거나 적중 조건의 값을 올려 보세요.</li>}
-    {run.skippedBusySubjects > 0 && <li>바쁜 계좌 {count(run.skippedBusySubjects)}개는 평가하지 않았습니다(
+  return <Box as="ul" className="rule-check-warnings rule-backtest-notices" aria-label="알아 둘 것">
+    {!run.currentDefinition && <Box as="li">이 결과는 조건을 고치기 전의 것입니다. 지금 조건으로 보려면 다시 실행해 주세요.</Box>}
+    {wide && <Box as="li">근거 거래가 검사한 거래의 {percent(run.evidenceShare)} 입니다({count(run.evidenceTxCount)}건). 조건이 원장을 넓게 덮습니다. 세는 거래 조건을 좁히거나 적중 조건의 값을 올려 보세요.</Box>}
+    {run.skippedBusySubjects > 0 && <Box as="li">바쁜 계좌 {count(run.skippedBusySubjects)}개는 평가하지 않았습니다(
       {windowText(run.busy.windowMinutes)} 안 같은 방향 거래 {count(run.busy.maxTransactions)}건 초과).
-      {wholePath && ' 이 템플릿은 대상뿐 아니라 경유 · 경로 자리에 바쁜 계좌가 있는 거래도 잇지 않습니다.'}</li>}
-    {run.chunkedCount > 0 && <li>근거 거래가 32건을 넘는 대상이 {count(run.chunkedCount)}개 있습니다. Alert 로 묶이면 여러 개로 나뉩니다.</li>}
-  </ul>;
+      {wholePath && ' 이 템플릿은 대상뿐 아니라 경유 · 경로 자리에 바쁜 계좌가 있는 거래도 잇지 않습니다.'}</Box>}
+    {run.chunkedCount > 0 && <Box as="li">근거 거래가 32건을 넘는 대상이 {count(run.chunkedCount)}개 있습니다. Alert 로 묶이면 여러 개로 나뉩니다.</Box>}
+  </Box>;
 }
 
 function Kpis({ run, noun }) {
   const { kpis } = run;
   const compared = run.baseline != null;
-  return <dl className="backtest-grid backtest-comparison" aria-label="백테스트 결과">
+  return <Box as="dl" className="backtest-grid backtest-comparison" aria-label="백테스트 결과">
     <Metric label={`적중 ${noun.name}`} value={count(kpis.hits)} unit={noun.unit}
       note={compared ? `운영 v${run.baseline.versionNo} 은 ${count(kpis.baseHits)}${noun.unit}`
         : noun.name === '대상' ? `대상 × 날짜로는 ${count(run.hitDays)}건` : undefined} />
@@ -115,39 +164,40 @@ function Kpis({ run, noun }) {
     <Metric label="사람 판정 기준 정확도" value={percent(kpis.precision)}
       note={kpis.judged ? `판정 ${count(kpis.judged)}건 기준${compared && kpis.baseJudged ? ` · 운영 v${run.baseline.versionNo} 은 ${percent(kpis.basePrecision)}` : ''}`
         : `적중 ${noun.name}${noun.name === '거래' ? '와' : '과'} 겹치는 Alert 가운데 사람이 종결한 것이 없습니다`} />
-  </dl>;
+  </Box>;
 }
 
 /** @param noAlert 이 템플릿의 룰은 Alert 를 만들 수 없다(카탈로그의 alert.allowed). "예상 새 Alert" 를 보여 주지 않는다. */
 function Sweep({ sweep, noun, noAlert }) {
-  return <Panel className="rule-backtest-sweep" aria-label="값을 바꾸면">
-    <h2>값을 바꾸면</h2>
-    <p className="workflow-rule-note">{sweep.label}만 바꿔 같은 기간에 다시 돌린 결과입니다.</p>
-    <table className="rule-backtest-table">
-      <thead><tr>
-        <th scope="col">{sweep.label}</th><th scope="col">적중 {noun.name}</th><th scope="col">근거 거래</th>
-        <th scope="col">Alert 와 겹침</th>{!noAlert && <th scope="col">예상 새 Alert</th>}
-      </tr></thead>
-      <tbody>{sweep.rows.map(row => <tr key={row.value} data-current={row.current || undefined}>
-        <th scope="row">{decimalFormat.format(row.value)}{sweep.unit?.length > 1 ? ` ${sweep.unit}` : sweep.unit}{row.current && <span className="rule-backtest-current"> 이번 값</span>}</th>
-        <td>{count(row.hits)}</td><td>{count(row.txCount)}</td><td>{count(row.alertOverlap)}</td>{!noAlert && <td>{count(row.expectedNewAlerts)}</td>}
-      </tr>)}</tbody>
-    </table>
-  </Panel>;
+  return <Box as="section" className="rule-backtest-sweep" aria-label="값을 바꾸면">
+    <WorkflowTable label="값을 바꾸면" tableClassName="rule-backtest-table" tools={false}
+      summary={<>{tableCount(sweep.rows.length)} <Text as="span">{sweep.label}만 바꿔 같은 기간에 다시 돌린 결과입니다.</Text></>}>
+      <TableHeader><TableRow>
+        <TableHead scope="col">{sweep.label}</TableHead><TableHead scope="col">적중 {noun.name}</TableHead><TableHead scope="col">근거 거래</TableHead>
+        <TableHead scope="col">Alert 와 겹침</TableHead>{!noAlert && <TableHead scope="col">예상 새 Alert</TableHead>}
+      </TableRow></TableHeader>
+      <TableBody>{sweep.rows.map(row => <TableRow key={row.value} data-current={row.current || undefined}>
+        <TableRowHead>{decimalFormat.format(row.value)}{sweep.unit?.length > 1 ? ` ${sweep.unit}` : sweep.unit}{row.current && <Text as="span" className="rule-backtest-current"> 이번 값</Text>}</TableRowHead>
+        <TableCell>{count(row.hits)}</TableCell><TableCell>{count(row.txCount)}</TableCell><TableCell>{count(row.alertOverlap)}</TableCell>{!noAlert && <TableCell>{count(row.expectedNewAlerts)}</TableCell>}
+      </TableRow>)}</TableBody>
+    </WorkflowTable>
+  </Box>;
 }
 
 function Scope({ run, noun, noAlert }) {
   return <Panel className="rule-backtest-scope" aria-label="검사 범위">
-    <h2>검사 범위</h2>
-    <dl className="rule-condition-facts rule-backtest-facts">
-      <div><dt>기간</dt><dd>{run.period.from} ~ {run.period.to} ({count(run.period.days)}일)</dd></div>
-      <div><dt>검사한 거래</dt><dd>{count(run.txCount)}건</dd></div>
-      <div><dt>근거 거래</dt><dd>{count(run.evidenceTxCount)}건 · 검사한 거래의 {percent(run.evidenceShare)}</dd></div>
-      <div><dt>이미 있는 Alert 와 겹침</dt><dd>{noun.name} {count(run.alertOverlap)}{noun.unit}</dd></div>
-      {!noAlert && <div><dt>예상 새 Alert</dt><dd>대상 {count(run.expectedNewAlerts)}개 <span className="workflow-rule-note">추정</span></dd></div>}
-    </dl>
-    <p className="workflow-rule-note">{noAlert ? '이 템플릿의 룰은 Alert 를 만들지 않고 근거로만 표시합니다.'
-      : '예상 새 Alert 는 어느 Alert 와도 겹치지 않고 근거 거래가 2건 이상인 대상 수입니다. 실제로 몇 개로 묶일지는 Alert 생성을 돌려야 압니다.'}</p>
+    <Heading>검사 범위</Heading>
+    <Box as="dl" className="rule-condition-facts rule-backtest-facts">
+      <Box><Box as="dt">검사한 날짜</Box><Box as="dd">{periodText(run.period)}</Box></Box>
+      {run.lookback && <Box><Box as="dt">돌아본 거래</Box><Box as="dd">{lookbackText(run.lookback.from, run.lookback.windowMinutes)}</Box></Box>}
+      {run.lookback?.ledgerFrom && <Box><Box as="dt">처음 거래하는 상대 · 바쁜 계좌</Box><Box as="dd">{run.lookback.ledgerFrom} ~ {run.busy?.until ?? run.period.to} 기준</Box></Box>}
+      <Box><Box as="dt">검사한 거래</Box><Box as="dd">{count(run.txCount)}건</Box></Box>
+      <Box><Box as="dt">근거 거래</Box><Box as="dd">{count(run.evidenceTxCount)}건 · 검사한 거래의 {percent(run.evidenceShare)}</Box></Box>
+      <Box><Box as="dt">이미 있는 Alert 와 겹침</Box><Box as="dd">{noun.name} {count(run.alertOverlap)}{noun.unit}</Box></Box>
+      {!noAlert && <Box><Box as="dt">예상 새 Alert</Box><Box as="dd">대상 {count(run.expectedNewAlerts)}개 <Text as="span" className="workflow-rule-note">추정</Text></Box></Box>}
+    </Box>
+    <Text className="workflow-rule-note">{noAlert ? '이 템플릿의 룰은 Alert 를 만들지 않고 근거로만 표시합니다.'
+      : '예상 새 Alert 는 어느 Alert 와도 겹치지 않고 근거 거래가 2건 이상인 대상 수입니다. 실제로 몇 개로 묶일지는 Alert 생성을 돌려야 압니다.'}</Text>
   </Panel>;
 }
 
@@ -157,12 +207,12 @@ function Cases({ run, catalog, side, order, templateKey, noun, registerTableTool
   const [shown, setShown] = useState(CASE_PAGE);
   const total = run.kpis.hits + (run.kpis.dropped ?? 0);
   useEffect(() => registerTableTools?.({
-    entries: [{ label: '백테스트 사례', format: 'CSV', count: sorting.rows.length,
-      download: () => downloadCsv('rule-backtest-cases', ['대상', '구분', '근거 거래', '측정값', '연결 Alert', '사람 판정'],
-        sorting.rows.map(item => [subjectText(item), caseStates[item.state].label, item.txCount, measuredOf(item),
-          item.alertId ?? '', judgements[item.judgement] ?? ''])) }],
+    panelDownload: false,
+    entries: [csvDownloadEntry('백테스트 사례', 'rule-backtest-cases', ['대상', '구분', '근거 거래', '측정값', '연결 Alert', '사람 판정'],
+      sorting.rows.map(item => [subjectText(item), caseStates[item.state].label, item.txCount, measuredOf(item),
+        item.alertId ?? '', judgements[item.judgement] ?? '']))],
   }));
-  return <Panel className="rule-backtest-cases" aria-label="사례">
+  return <Box as="section" className="rule-backtest-cases" aria-label="사례">
     <WorkflowTable label="사례" summary={tableCount(Math.min(shown, run.cases.length), total, noun.unit)}>
       <TableHeader><TableRow>
         <SortableTableHead sorting={sorting} column="account" value={subjectText}>{noun.name === '거래' ? '대상 거래' : '대상 계좌'}</SortableTableHead>
@@ -173,7 +223,7 @@ function Cases({ run, catalog, side, order, templateKey, noun, registerTableTool
         <SortableTableHead sorting={sorting} column="verdict" value={item => judgements[item.judgement] ?? ''}>사람 판정</SortableTableHead>
       </TableRow></TableHeader>
       <TableBody>{sorting.rows.slice(0, shown).map(item => <TableRow key={`${item.subjectType}-${item.subject}`}>
-        <th scope="row"><code>{subjectText(item)}</code></th>
+        <TableRowHead><Text as="code">{subjectText(item)}</Text></TableRowHead>
         <TableCell><StatusTag preset={caseStates[item.state].preset}>{caseStates[item.state].label}</StatusTag></TableCell>
         <TableCell>{count(item.txCount)}건</TableCell>
         <TableCell className="workflow-rule-summary">{measuredOf(item)}</TableCell>
@@ -186,26 +236,55 @@ function Cases({ run, catalog, side, order, templateKey, noun, registerTableTool
     {shown < run.cases.length && <ActionButton className="rule-backtest-more" shape="pill" surface="floating"
       onClick={() => setShown(value => value + CASE_PAGE)}>더 보기 ({count(run.cases.length - shown)}{noun.unit} 남음)</ActionButton>}
     {run.cases.length < total
-      && <p className="workflow-rule-note">서버는 새로 걸린 {noun.name}, 빠진 {noun.name}, 근거 거래가 많은 {noun.name} 순으로 {count(run.cases.length)}{noun.unit}까지만 보냅니다.</p>}
-  </Panel>;
+      && <Text className="workflow-rule-note">서버는 새로 걸린 {noun.name}, 빠진 {noun.name}, 근거 거래가 많은 {noun.name} 순으로 {count(run.cases.length)}{noun.unit}까지만 보냅니다.</Text>}
+  </Box>;
 }
 
-function History({ rows, selectedId, onOpen }) {
-  return <Panel className="rule-backtest-history" aria-label="실행 기록">
-    <h2>실행 기록</h2>
-    {rows.length ? <ol className="workflow-rule-history">
-      {rows.map(row => <li key={row.backtestId}>
-        <div>
-          <ActionButton className="workflow-rule-select" aria-pressed={row.backtestId === selectedId} onClick={() => onOpen(row.backtestId)}>
-            v{row.versionNo} · {statusNames[row.status]}{row.baseline ? ` · 운영 v${row.baseline.versionNo} 과 비교` : ''}
-          </ActionButton>
-          <span>{row.requestedBy} · <RunTime value={row.requestedAt} /></span>
-        </div>
-        <p>{row.period.from} ~ {row.period.to}{row.txCount != null ? ` · 거래 ${count(row.txCount)}건` : ''}
-          {row.currentDefinition ? '' : ' · 조건을 고치기 전'}</p>
-      </li>)}
-    </ol> : <p>아직 돌린 백테스트가 없습니다.</p>}
-  </Panel>;
+const historyComparison = row => row.baseline ? `운영 v${row.baseline.versionNo} 과 비교` : '';
+const historyPeriod = row => periodText(row.period);
+const previousConditions = '조건을 고치기 전';
+
+function History({ rows, selectedId, onOpen, unavailableText }) {
+  const sorting = useTableSort(rows);
+  const download = csvDownloadEntry('실행 기록', 'rule-backtest-history',
+    ['버전', '상태', '비교 기준', '검사 기간', '검사한 거래', '요청자', '요청 시각'], sorting.rows.map(row => [
+      `v${row.versionNo}`, statusNames[row.status], historyComparison(row),
+      row.currentDefinition ? historyPeriod(row) : `${historyPeriod(row)} · ${previousConditions}`,
+      row.txCount ?? '', row.requestedBy, runTimeText(row.requestedAt),
+    ]));
+  return <Box as="section" className="rule-backtest-history" aria-label="실행 기록">
+    <WorkflowTable label="실행 기록" summary={unavailableText ? undefined : tableCount(rows.length)}
+      tools={rows.length > 0 && <TableQueryTools actions={{ entries: [download] }} />}>
+      <TableHeader><TableRow>
+        <SortableTableHead sorting={sorting} column="version" value={row => row.versionNo}>버전</SortableTableHead>
+        <SortableTableHead sorting={sorting} column="status" value={row => statusNames[row.status]}>상태</SortableTableHead>
+        <SortableTableHead sorting={sorting} column="kind" value={row => row.baseline?.versionNo}>비교 기준</SortableTableHead>
+        <SortableTableHead sorting={sorting} column="거래 기간" value={row => `${row.period.from}/${row.period.to}`}>검사 기간</SortableTableHead>
+        <SortableTableHead sorting={sorting} column="거래 건수" value={row => row.txCount}>검사한 거래</SortableTableHead>
+        <SortableTableHead sorting={sorting} column="author" value={row => row.requestedBy}>요청자</SortableTableHead>
+        <SortableTableHead sorting={sorting} column="시각" value={row => row.requestedAt}>요청 시각</SortableTableHead>
+      </TableRow></TableHeader>
+      <TableBody>{sorting.rows.map(row => {
+        const selected = row.backtestId === selectedId;
+        const comparison = historyComparison(row);
+        const period = historyPeriod(row);
+        const openRun = () => onOpen(row.backtestId);
+        const label = [`v${row.versionNo}`, statusNames[row.status], comparison, period, runTimeText(row.requestedAt)].filter(Boolean).join(' · ');
+        return <TableRow key={row.backtestId} data-selected={selected} onClick={event => activateRecordCard(event, openRun)}>
+          <TableRowHead><ActionButton className="workflow-rule-select" aria-pressed={selected} aria-label={label}
+            onClick={openRun}>v{row.versionNo}</ActionButton></TableRowHead>
+          <TableCell><StatusTag preset={statusPresets[row.status]}>{statusNames[row.status]}</StatusTag></TableCell>
+          <TableCell>{comparison || '—'}</TableCell>
+          <TableCell>{period}{!row.currentDefinition && <> · <Text as="span" className="workflow-rule-note">{previousConditions}</Text></>}</TableCell>
+          <TableCell numeric>{row.txCount == null ? '—' : `${count(row.txCount)}건`}</TableCell>
+          <TableCell>{row.requestedBy}</TableCell>
+          <TableCell><RunTime value={row.requestedAt} /></TableCell>
+        </TableRow>;
+      })}
+        {!rows.length && <TableRow><TableCell colSpan={7}>{unavailableText ?? '아직 돌린 백테스트가 없습니다.'}</TableCell></TableRow>}
+      </TableBody>
+    </WorkflowTable>
+  </Box>;
 }
 
 export function LiveRuleBacktest({ initialRule, registerTableTools, actionsHost }) {
@@ -219,9 +298,21 @@ export function LiveRuleBacktest({ initialRule, registerTableTools, actionsHost 
   const [run, setRun] = useState(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  // 검사 기간: 서버가 준 고를 수 있는 범위, 타겟 날(검사하는 마지막 날), 검사 일수('1' · '3' · '7' · 'ALL')
+  const [range, setRange] = useState(null);
+  const [rangeFailure, setRangeFailure] = useState('');
+  const [day, setDay] = useState('');
+  const [span, setSpan] = useState('ALL');
 
   useEffect(() => {
     let current = true;
+    // 범위를 못 읽어도(원장이 비었을 때 등) 화면은 뜬다. 그때는 기간을 고르지 못하고 서버의 기본 기간으로 돌린다.
+    fetchBacktestPeriod().then(loaded => {
+      if (!current) return;
+      setRange(loaded);
+      setRangeFailure('');
+      setDay(chosen => chosen || loaded.to);
+    }, error => { if (current) setRangeFailure(problemText(error, '원장의 날짜 범위를 불러오지 못했습니다.')); });
     Promise.all([refreshLiveRules(), loadRuleCatalog()]).then(([list, loaded]) => {
       if (!current) return;
       setRules(list.content);
@@ -271,14 +362,14 @@ export function LiveRuleBacktest({ initialRule, registerTableTools, actionsHost 
     fetchBacktest(backtestId).then(setRun, error => setMessage(problemText(error, '백테스트를 불러오지 못했습니다.')));
   }, []);
 
-  if (failure) return <Panel className="glass rule-load-failure">
-    <h2>백테스트를 열 수 없습니다.</h2>
-    <p role="alert">{failure}</p>
+  if (failure) return <Panel className="rule-load-failure">
+    <Heading>백테스트를 열 수 없습니다.</Heading>
+    <Text role="alert">{failure}</Text>
     <ActionButton shape="pill" surface="floating" onClick={() => setAttempt(value => value + 1)}>다시 시도</ActionButton>
   </Panel>;
-  if (!rules || !catalog) return <Panel className="glass" aria-busy="true"><h2>백테스트를 불러오는 중입니다.</h2></Panel>;
-  if (!rules.length) return <Panel className="glass"><h2>등록된 룰이 없습니다.</h2>
-    <p>룰 만들기에서 룰을 만든 뒤에 백테스트할 수 있습니다.</p>
+  if (!rules || !catalog) return <Panel aria-busy="true"><Heading>백테스트를 불러오는 중입니다.</Heading></Panel>;
+  if (!rules.length) return <Panel><Heading>등록된 룰이 없습니다.</Heading>
+    <Text>룰 만들기에서 룰을 만든 뒤에 백테스트할 수 있습니다.</Text>
     <ScreenActions host={actionsHost}><PrimaryButton tone="inverse" as="a" href="/rules/new">룰 만들기</PrimaryButton></ScreenActions>
   </Panel>;
 
@@ -296,12 +387,17 @@ export function LiveRuleBacktest({ initialRule, registerTableTools, actionsHost 
   const blocked = !detail ? '' : !target ? '돌릴 버전이 없습니다.'
     : !supported ? `${detail.templateName} 템플릿의 백테스트는 아직 제공하지 않습니다.${supportedNames ? ` 지금은 ${supportedNames} 만 됩니다.` : ''}` : '';
 
+  // 고른 타겟 날과 검사 일수로 정한 검사 날짜. 전체 기간 그대로면 기간을 보내지 않는다(서버의 기본 기간과 같다).
+  const chosen = range ? chosenPeriod(range, day, span === 'ALL' ? 'ALL' : Number(span)) : null;
+  const periodError = chosen?.error ?? '';
+
   async function start() {
-    if (!target || blocked || busy || running) return;
+    if (!target || blocked || periodError || busy || running) return;
     setBusy(true);
     setMessage('');
     try {
-      const accepted = await requestBacktest({ versionId: target.versionId });
+      const accepted = await requestBacktest(chosen && !chosen.whole
+        ? { versionId: target.versionId, from: chosen.from, to: chosen.to } : { versionId: target.versionId });
       setRun(await fetchBacktest(accepted.backtestId));
       setHistory(await fetchBacktests(detail.ruleId));
     } catch (error) {
@@ -321,59 +417,62 @@ export function LiveRuleBacktest({ initialRule, registerTableTools, actionsHost 
   }
 
   const done = run?.status === 'COMPLETED' && run.kpis ? run : null;
-  return <section className="screen-section workflow-panel workflow-backtest rule-backtest" aria-label="백테스트">
-    <div className="backtest-grid">
+  return <Box as="section" className="screen-section workflow-panel workflow-backtest rule-backtest" aria-label="백테스트">
+    <Box className="backtest-grid">
       <Panel className="backtest-card" aria-label="백테스트 대상 룰">
-        <header className="backtest-card-heading"><h2>백테스트 대상 룰</h2>
-          {target && <StatusTag preset={ruleStatusPresets[target.status]}>{ruleStatusNames[target.status]}</StatusTag>}</header>
-        <select className="rule-select rule-backtest-rule" aria-label="룰" value={code ?? ''} disabled={running || busy}
-          onChange={event => setCode(event.target.value)}>
-          {rules.map(rule => <option key={rule.ruleId} value={rule.code}>{rule.code} · {rule.name}</option>)}
-        </select>
+        <Box as="header" className="backtest-card-heading"><Heading>백테스트 대상 룰</Heading>
+          {target && <StatusTag preset={ruleStatusPresets[target.status]}>{ruleStatusNames[target.status]}</StatusTag>}</Box>
+        <FormDropdown label="룰" triggerClassName="rule-backtest-rule" value={code ?? ''}
+          onValueChange={setCode} disabled={running || busy}>
+          {rules.map(rule => <FormDropdownItem key={rule.code} value={rule.code}>{rule.code} · {rule.name}</FormDropdownItem>)}
+        </FormDropdown>
         {detail && target ? <>
-          <p className="backtest-meta">{detail.templateName} · v{target.versionNo}</p>
-          <p>{target.sentence || target.summary}</p>
-        </> : <p className="backtest-meta">{message ? '' : '룰을 불러오는 중입니다.'}</p>}
+          <Text className="backtest-meta">{detail.templateName} · v{target.versionNo}</Text>
+          <Text>{target.sentence || target.summary}</Text>
+        </> : <Text className="backtest-meta">{message ? '' : '룰을 불러오는 중입니다.'}</Text>}
       </Panel>
       <Panel className="backtest-card" aria-label="비교 기준">
-        <header className="backtest-card-heading"><h2>비교 기준</h2></header>
+        <Box as="header" className="backtest-card-heading"><Heading>비교 기준</Heading></Box>
         {baseline ? <>
-          <p className="backtest-meta">운영 버전 · v{baseline.versionNo}</p>
-          <p>{baseline.sentence || baseline.summary}</p>
-        </> : <p className="backtest-meta">{detail?.operating ? '운영 버전 그대로 돌립니다. 비교할 새 버전이 없습니다.' : '운영 버전이 없어 비교하지 않습니다.'}</p>}
+          <Text className="backtest-meta">운영 버전 · v{baseline.versionNo}</Text>
+          <Text>{baseline.sentence || baseline.summary}</Text>
+        </> : <Text className="backtest-meta">{detail?.operating ? '운영 버전 그대로 돌립니다. 비교할 새 버전이 없습니다.' : '운영 버전이 없어 비교하지 않습니다.'}</Text>}
       </Panel>
+      <Period range={range} failure={rangeFailure} day={day} span={span} chosen={chosen} windowMinutes={target?.definition?.windowMinutes}
+        disabled={running || busy} onDay={setDay} onSpan={setSpan} />
       <Panel className="backtest-card" aria-label="실행 상태">
-        <header className="backtest-card-heading"><h2>실행 상태</h2>
-          {run && <StatusTag preset={statusPresets[run.status]}>{statusNames[run.status]}</StatusTag>}</header>
+        <Box as="header" className="backtest-card-heading"><Heading>실행 상태</Heading>
+          {run && <StatusTag preset={statusPresets[run.status]}>{statusNames[run.status]}</StatusTag>}</Box>
         {run ? <>
-          {running && <progress className="rule-backtest-progress" max={100} value={run.progress} aria-label="진행률" />}
-          <p className="backtest-meta">v{run.versionNo} · {run.period.from} ~ {run.period.to} ({count(run.period.days)}일)</p>
-          <p className="backtest-meta">{run.requestedBy} · <RunTime value={run.requestedAt} /></p>
-          {running && <p>{run.status === 'QUEUED' ? '앞선 백테스트가 끝나기를 기다립니다.' : `${run.progress}% · 쿼리가 하나 끝날 때마다 올라갑니다.`}
-            {run.cancelRequested ? ' 취소를 요청했습니다.' : ''}</p>}
-          {run.status === 'FAILED' && <p role="alert" data-rule-block-error>{errorTexts[run.errorCode] ?? errorTexts.INTERNAL}</p>}
-        </> : <p className="backtest-meta">아직 돌린 백테스트가 없습니다. 원장 첫 7일은 이력으로만 쓰고 그 뒤 날짜를 검사합니다.</p>}
+          {running && <Progress className="rule-backtest-progress" max={100} value={run.progress} aria-label="진행률" />}
+          <Text className="backtest-meta">v{run.versionNo} · {periodText(run.period)}</Text>
+          <Text className="backtest-meta">{run.requestedBy} · <RunTime value={run.requestedAt} /></Text>
+          {running && <Text>{run.status === 'QUEUED' ? '앞선 백테스트가 끝나기를 기다립니다.' : `${run.progress}% · 쿼리가 하나 끝날 때마다 올라갑니다.`}
+            {run.cancelRequested ? ' 취소를 요청했습니다.' : ''}</Text>}
+          {run.status === 'FAILED' && <Text role="alert" data-rule-block-error>{errorTexts[run.errorCode] ?? errorTexts.INTERNAL}</Text>}
+        </> : <Text className="backtest-meta">아직 돌린 백테스트가 없습니다.</Text>}
       </Panel>
-    </div>
-    {blocked && <p role="status" className="rule-backtest-blocked">{blocked}</p>}
-    {message && <p role="alert" data-rule-block-error>{message}</p>}
+    </Box>
+    {blocked && <Text role="status" className="rule-backtest-blocked">{blocked}</Text>}
+    {message && <Text role="alert" data-rule-block-error>{message}</Text>}
     {done && <>
       <Notices run={done} wholePath={template?.evaluator === 'TWO_HOP' || template?.evaluator === 'PATH'} />
       <Kpis run={done} noun={noun} />
-      <div className="screen-row rule-backtest-detail">
+      <Box className="screen-row rule-backtest-detail">
         {done.sweep && <Sweep sweep={done.sweep} noun={noun} noAlert={noAlert} />}
         <Scope run={done} noun={noun} noAlert={noAlert} />
-      </div>
+      </Box>
       <Cases run={done} catalog={catalog} side={side} order={template?.metrics} templateKey={done.template} noun={noun} registerTableTools={registerTableTools} />
     </>}
-    <History rows={history} selectedId={run?.backtestId} onOpen={open} />
+    <History rows={history} selectedId={run?.backtestId} onOpen={open}
+      unavailableText={!detail ? (message ? '실행 기록을 불러오지 못했습니다.' : '실행 기록을 불러오는 중입니다.') : undefined} />
     <ScreenActions host={actionsHost} stackOnNarrow>
       {running && <PrimaryButton tone="negative" disabled={run.cancelRequested} onClick={() => void cancel()}>취소</PrimaryButton>}
       <PrimaryButton tone="inverse" as="a" href={code ? `/rules?rule=${code}` : '/rules'}>룰 목록</PrimaryButton>
       {detail?.working?.editable
         && <PrimaryButton tone="inverse" as="a" href={`/rules/new?rule=${detail.code}`}>조건 고치기</PrimaryButton>}
-      <PrimaryButton tone="brand" disabled={!target || Boolean(blocked) || busy || running} title={blocked || undefined}
+      <PrimaryButton tone="brand" disabled={!target || Boolean(blocked) || Boolean(periodError) || busy || running} title={blocked || periodError || undefined}
         onHold={() => void start()}>{run && !running ? '다시 실행' : '백테스트 실행'}</PrimaryButton>
     </ScreenActions>
-  </section>;
+  </Box>;
 }

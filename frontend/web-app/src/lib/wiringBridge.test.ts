@@ -44,7 +44,6 @@ it('pairs only with the expected session and preserves ordinary app clicks and s
     expect(postMessage).not.toHaveBeenCalled()
     message('http://127.0.0.1:5182', { channel: 'AML_WIRING_V1', action: 'hello', session: 'abcdefghijklmnop' })
     expect(document.body.classList.contains('aml-wiring-select')).toBe(true)
-    expect([...document.querySelectorAll('style')].some(style => style.textContent?.includes('[data-wiring-id="case.overview.model"]'))).toBe(true)
     expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ action: 'hello-ready', session: 'abcdefghijklmnop' }), 'http://127.0.0.1:5182')
     expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
       action: 'data-status', mode: 'fixture', liveApiVerified: false, savingAvailable: false,
@@ -53,6 +52,8 @@ it('pairs only with the expected session and preserves ordinary app clicks and s
       action: 'rects', hash: '#alerts/1', inputVersion: 'middle-shift-v1',
       rects: { 'case.overview.model': { x: 24, y: 48, width: 240, height: 120 } },
     }), 'http://127.0.0.1:5182'))
+    expect(model.hasAttribute('data-wiring-selectable')).toBe(true)
+    expect(document.querySelector('[data-wiring-id="case.overview.seed"]')?.hasAttribute('data-wiring-selectable')).toBe(false)
 
     let clicks = 0
     const button = document.querySelector('button')!

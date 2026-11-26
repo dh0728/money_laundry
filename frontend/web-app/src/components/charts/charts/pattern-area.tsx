@@ -1,7 +1,8 @@
 "use client";
 
 import { type CurveFactory, curveMonotoneX } from "d3-shape";
-import { useId, useMemo } from "react";
+import { useId, useMemo, useState } from "react";
+import { readChartNumber } from "../chart-design-values";
 import { useChartStable } from "./chart-context";
 import {
   areaVerticalFadeStops,
@@ -51,6 +52,7 @@ export function PatternArea({
   const { renderData, xScale, yScale, xAccessor, innerWidth, innerHeight } =
     useChartStable();
   const uid = useId();
+  const [maskBoxSize] = useState(() => readChartNumber("--chart-mask-box-size", 1));
 
   const d = useMemo(
     () =>
@@ -115,7 +117,7 @@ export function PatternArea({
               ))}
             </linearGradient>
             <mask id={verticalMaskId} maskContentUnits="objectBoundingBox">
-              <rect fill={`url(#${verticalMaskId}-g)`} height="1" width="1" />
+              <rect fill={`url(#${verticalMaskId}-g)`} height={maskBoxSize} width={maskBoxSize} />
             </mask>
           </>
         ) : null}

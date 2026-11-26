@@ -1,0 +1,33 @@
+@media print {
+  :root:has(#workspace[data-page-print]) {
+    overflow: visible;
+    print-color-adjust: exact;
+  }
+
+  body:has(> #workspace[data-page-print]) > :not(#workspace) { display: none }
+
+  #workspace[data-page-print] {
+    inline-size: 100%;
+    max-inline-size: none;
+    overflow: visible;
+    padding: 0;
+  }
+
+  #workspace[data-page-print] .screen-layout {
+    margin: 0;
+    padding: 0;
+    min-block-size: 0;
+    grid-template-rows: none;
+    overflow: visible;
+  }
+
+  #workspace[data-page-print] :is(.screen-layout, [data-page-print-scroll]) {
+    block-size: auto;
+    max-block-size: none;
+    overflow: visible;
+  }
+
+  #workspace[data-page-print] :has([data-page-print-section]) > :not([data-page-print-section], :has([data-page-print-section])),
+  #workspace[data-page-print] [data-page-print-section] .section-download-tools { display: none }
+
+}

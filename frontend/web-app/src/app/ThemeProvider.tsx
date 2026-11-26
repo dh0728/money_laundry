@@ -41,7 +41,6 @@ export function ThemeProvider({ children, defaultTheme = 'system', enableSystem 
   useLayoutEffect(() => {
     document.documentElement.classList.remove('light', 'dark')
     document.documentElement.classList.add(resolvedTheme)
-    document.documentElement.style.colorScheme = resolvedTheme
   }, [resolvedTheme])
 
   useEffect(() => {

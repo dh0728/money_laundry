@@ -1,0 +1,7 @@
+.area-value-label {
+  font-size: var(--chart-area-value-label-size);
+  font-weight: var(--aml-type-label-weight);
+  paint-order: stroke;
+  stroke: var(--information-panel-surface);
+  stroke-width: var(--chart-area-value-label-outline);
+}

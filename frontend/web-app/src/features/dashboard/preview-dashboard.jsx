@@ -4,151 +4,203 @@ import { AISummaryPanel } from '../../components/ai-summary-panel';
 import { ArrowUpRight, Sparkles } from 'lucide-react';
 import CountUp from '../../components/react-bits/CountUp';
 import { CaseProgressBoard } from '../investigation/preview-case-card';
-import { DashboardAnalyticsSkeleton, DashboardBoardSkeleton, DashboardMetricGrid } from './dashboard-layout';
-import { AreaSparkline, BarSparkline, LineSparkline } from '../../components/charts/sparkline';
+import {
+  BenchmarkAnalyticsSkeleton, DashboardAnalyticsSkeleton, DashboardBoardSkeleton,
+  DashboardMetricGrid, PersonalDashboardOverview,
+} from './dashboard-layout';
 import { ibmLaundering, ibmTotal } from '../investigation/ibm-hi-small-aggregate';
 import { benchmarkDashboardMetrics } from './benchmark-dashboard-metrics';
 import { ActionButton } from '../../components/primary-button';
-import { exportCases } from '../../components/query-controls';
+import { caseCsvDownloadEntry, csvDownloadEntry } from '../../components/query-controls';
 import { BoardSectionDownload, SectionDownloadHeading } from '../../components/section-download';
-import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings';
+import { Box, Grid, Heading, Stack, Text } from '../../components/layout-primitives';
+import { LinkTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
+import { AccountTrailGraph, AccountTrailOmittedEvidence } from '../../components/charts/charts/account-trail-graph';
+import { StagedSankey } from '../../components/charts/charts/sankey/staged-sankey';
+import { previewJudgmentReason } from '../investigation/case-judgment-data';
+import { workRequestUserName } from '../investigation/preview-work-requests';
+import { personalInvestigationFlow, share as compactShare, statusLabels } from './dashboard-flows';
+import { DashboardRuleHits } from './dashboard-rule-hits';
+import { Meter } from '../../components/meter';
+import './dashboard-today-summary.css';
 
 const formatter = new Intl.NumberFormat('ko-KR');
-const percent = (count, total) => `${total ? Math.round(count / total * 1000) / 10 : 0}%`;
 const count = value => `${formatter.format(value)}건`;
 const smallPercent = new Intl.NumberFormat('ko-KR', { style: 'percent', maximumFractionDigits: 3 });
 const share = (value, total) => total ? smallPercent.format(value / total) : '—';
 const animated = new Set();
 const Analytics = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.Analytics })));
 const BenchmarkCharts = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.BenchmarkCharts })));
-const sparklines = { area: AreaSparkline, line: LineSparkline, bar: BarSparkline };
-
-function usePlotHeight(enabled, initialHeight) {
-  const plot = React.useRef(null);
-  const [height, setHeight] = React.useState(initialHeight);
-  React.useLayoutEffect(() => {
-    const host = plot.current;
-    if (!enabled || !host) return;
-    const measure = () => {
-      if (host.clientHeight > 0) setHeight(host.clientHeight);
-    };
-    measure();
-    if (typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(measure);
-    observer.observe(host);
-    return () => observer.disconnect();
-  }, [enabled]);
-  return [plot, height];
-}
-
-function CompletionBar({ label, value, total }) {
-  return <div className="dashboard-completion-plot">
-    <svg role="img" aria-label={`${label} · 전체 ${count(total)} 중 ${count(value)} 완료`} width="100%" height="20">
-      <rect fill="var(--chart-total)" width="100%" height="100%" rx="10" />
-      {value > 0 && <rect fill="var(--chart-completion)" width={`${value / total * 100}%`} height="100%" rx="10" />}
-    </svg>
-  </div>;
-}
 
 function Metric({ item, reduced }) {
-  const { label, value, unit, detail, key, completion } = item;
-  const trend = item.trend?.rows.some(row => row[item.trend.key] > 0) ? item.trend : undefined;
-  const Sparkline = sparklines[trend?.type] ?? BarSparkline;
-  const [hoverIndex, setHoverIndex] = React.useState(null);
-  const hoveredHour = hoverIndex === null ? undefined : trend?.rows[hoverIndex];
-  const wideValue = (typeof value === 'number' ? formatter.format(value).length : value.length) >= 8;
-  const hasChart = Boolean(trend || completion?.total);
-  const [plot, plotHeight] = usePlotHeight(Boolean(trend), 48);
-  return <div className="dashboard-metric" data-export-visualization={hasChart || undefined}>
-    <SectionDownloadHeading as="h3" downloadLabel={hasChart ? label : undefined}>{label}</SectionDownloadHeading>
-    <div className="dashboard-metric-reading">
-      <strong className="dashboard-metric-value" data-composite={Array.isArray(value) || undefined} data-wide-value={wideValue || undefined}>
+  const { label, value, unit, detail, key } = item;
+  const formatted = typeof value === 'number' ? formatter.format(value) : value;
+  return <Box className="dashboard-metric">
+    <Heading level={3}>{label}</Heading>
+    <Box className="dashboard-metric-reading">
+      <Text as="strong" className="dashboard-metric-value" data-wide-value={formatted.length >= 8 || undefined}>
         {typeof value === 'number' && !reduced && !animated.has(key)
-          ? <CountUp to={value} duration={0.45} trigger="view" separator="," onEnd={() => animated.add(key)} />
-          : typeof value === 'number' ? formatter.format(value)
-            : Array.isArray(value) ? value.map(({ amount, unit: partUnit }, index) =>
-              <React.Fragment key={index}>
-                {index > 0 && <small aria-hidden="true">{item.separator}</small>}
-                <span>{formatter.format(amount)}{partUnit && <small>{partUnit}</small>}</span>
-              </React.Fragment>) : value}
-        {unit && <small>{unit}</small>}
-      </strong>
-    </div>
-    {detail && <p>{detail}</p>}
-    {completion?.total > 0 && <CompletionBar label={label} {...completion} />}
-    {trend && <div className="dashboard-metric-trend">
-      <div className="dashboard-metric-plot" ref={plot}>
-        <Sparkline data={trend.rows} dataKey={trend.key} color={trend.color} height={plotHeight}
-          {...(Sparkline === BarSparkline ? { barRadius: 6 } : { curve: 'monotone', strokeWidth: 2, fillOpacity: 0.38 })}
-          onHoverChange={setHoverIndex} crosshair="dashed" dot={false} animate={!reduced}
-          aria-label={`${label} · ${trend.caption} · ${trend.rows.map(row => `${row.label} ${count(row[trend.key])}`).join(', ')}`} />
-      </div>
-      <span className="dashboard-note">{hoveredHour
-        ? `${hoveredHour.label} KST · ${count(hoveredHour[trend.key])}`
-        : trend.caption}</span>
-    </div>}
-  </div>;
+          ? <CountUp to={value} className="count-up-fast" trigger="view" separator="," onEnd={() => animated.add(key)} />
+          : formatted}
+        {unit && <Text as="small">{unit}</Text>}
+      </Text>
+    </Box>
+    {detail && <Text>{detail}</Text>}
+  </Box>;
 }
 
-function Metrics({ items, wide, appearance }) {
+function Metrics({ items, appearance }) {
   return <DashboardMetricGrid items={items.map(item => ({
     id: item.key,
     content: <Metric item={item} reduced={appearance.reduced} />,
-  }))} wide={wide} appearance={appearance} />;
+  }))} appearance={appearance} />;
 }
 
-function DashboardAISummary({ headline, alertRows, timeSlots, period, reduced, benchmarkLink, children }) {
-  const [hovered, setHovered] = React.useState(null);
-  const hasChart = alertRows.length > 0;
-  const [plot, plotHeight] = usePlotHeight(hasChart, 96);
-  const trend = timeSlots.map(({ label }, hour) => ({ label, value: alertRows.filter(row => row.hour === hour).length }));
-  return <AISummaryPanel as="article" reduced={reduced} data-export-visualization={alertRows.length > 0 || undefined}>
-    <SectionDownloadHeading className="dashboard-summary-heading" downloadLabel={hasChart ? 'AI 요약' : undefined}>
-      <Sparkles className="icon" aria-hidden="true" /> AI 요약
+function DashboardTodaySummary({ snapshot, dataSource }) {
+  if (!snapshot?.date) return null;
+  const { detection, date, openAlerts, openEpisodes, createdAlerts, overdue3Days, overdue7Days,
+    createdCases, completedCreatedCases } = snapshot;
+  const openWork = openAlerts + openEpisodes;
+  const detectionLabel = detection?.basis === 'transaction-day' ? '거래일 기준' : '오늘 분석 완료 거래 기준';
+  const items = [
+    { title: '개별 미처리 Alert', value: count(openAlerts), detail: `오늘 생성 ${count(createdAlerts)}`, tone: 'in-progress',
+      chartValue: openAlerts, chartTotal: openWork },
+    { title: '장기 미처리', value: count(overdue3Days), detail: `3일 초과 · 7일 이상 ${count(overdue7Days)}`, tone: overdue3Days > 0 ? 'suspect' : undefined,
+      chartValue: overdue3Days, chartTotal: openWork },
+    { title: '진행 Episode', value: count(openEpisodes), tone: 'in-progress', chartValue: openEpisodes, chartTotal: openWork },
+    { title: '오늘 처리율', value: compactShare(completedCreatedCases, createdCases),
+      tone: 'done', chartValue: completedCreatedCases, chartTotal: createdCases },
+    { title: '오늘 의심 비율', value: detection ? compactShare(detection.suspicious, detection.analyzed) : '—',
+      tone: 'suspect', chartValue: detection?.suspicious, chartTotal: detection?.analyzed, basis: detectionLabel },
+  ];
+
+  return <Panel as="article" className="dashboard-today-summary">
+    <SectionDownloadHeading as="h3" printLabel="오늘의 업무">
+      오늘의 업무
+      {dataSource === 'sample' && <Text as="span" className="dashboard-note dashboard-today-date">샘플 · {date}</Text>}
     </SectionDownloadHeading>
-    <strong>{headline}</strong>
-    {children}
-    {hasChart && <figure className="dashboard-summary-trend">
-      <figcaption>생성 시간대 · KST</figcaption>
-      <div className="dashboard-summary-plot" ref={plot}>
-        <BarSparkline data={trend} dataKey="value"
-          aria-label={`우선 확인 Alert 생성 시간대 · KST · ${trend.map(row => `${row.label} ${count(row.value)}`).join(', ')}`}
-          height={plotHeight} color="var(--chart-risk-high)" barRadius={6} dot={false} crosshair="dashed" animate={!reduced}
-          onHoverChange={(_, point) => setHovered(point)} />
-      </div>
-      <div className="dashboard-summary-trend-axis">
-        <span>{hovered ? `${hovered.label} · ${count(hovered.value)}` : trend[0]?.label}</span>
-        {!hovered && <span>{trend.at(-1)?.label}</span>}
-      </div>
-    </figure>}
-    <div className="dashboard-summary-footer">
-      <p className="dashboard-note">{period.from} ~ {period.to} · KST</p>
-      {benchmarkLink && <ActionButton as="a" className="dashboard-summary-link" href="/dashboard/all?data=ibm" surface="ghost" shape="pill">
-        IBM 원본 거래 집계 <ArrowUpRight className="icon icon-compact" aria-hidden="true" />
-      </ActionButton>}
-    </div>
+    <Grid columns={5} className="dashboard-today-metrics">
+      {items.map(({ title, value, detail, tone, chartValue, chartTotal, basis }) => <Stack key={title} data-kpi-tone={value === '—' ? undefined : tone}>
+        <Text as="span">{title}</Text>
+        <Text as="strong">{value}</Text>
+        {chartTotal > 0 && <Meter min={0} max={chartTotal} value={chartValue}
+          aria-label={basis ? `${title} · ${basis}` : title} aria-valuetext={`${count(chartTotal)} 중 ${count(chartValue)}`} />}
+        {detail && <Text className="dashboard-note">{detail}</Text>}
+      </Stack>)}
+    </Grid>
+  </Panel>;
+}
+
+const personalStages = ['배정된 업무', '현재 상태', '완료 판정'];
+const historyClock = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Asia/Seoul', dateStyle: 'short', timeStyle: 'short',
+});
+
+function PersonalInvestigation({ data, reduced }) {
+  const flow = personalInvestigationFlow(data.mine, data.investigation);
+  return <Panel as="article" className="dashboard-chart dashboard-personal-flow">
+    <SectionDownloadHeading downloadLabel={flow.hasData ? '내 담당 업무 처리 흐름' : undefined}>내 담당 업무 처리 흐름</SectionDownloadHeading>
+    {flow.hasData ? <StagedSankey data={flow} stages={personalStages} label="내 담당 업무 처리 흐름" reduced={reduced} />
+      : <Text className="dashboard-note">조회 조건에 맞는 배정 업무가 없습니다.</Text>}
+  </Panel>;
+}
+
+function WorkHistoryPanel({ title, entries, empty, renderEntry, exportFile, exportColumns, exportRow }) {
+  const downloads = entries?.length ? [csvDownloadEntry(title, exportFile, ['시각 (KST)', '업무 ID', ...exportColumns],
+    entries.map(entry => [historyClock.format(new Date(entry.at)), entry.code, ...exportRow(entry)]))] : [];
+  return <Panel as="section" className="dashboard-chart dashboard-personal-history">
+    <SectionDownloadHeading entries={downloads}>{title}</SectionDownloadHeading>
+    {entries?.length ? <>
+      <Text className="dashboard-note">한국 표준시</Text>
+      <Box as="ol" className="dashboard-work-history" aria-label={title} tabIndex={0}>
+        {entries.map(entry => <Box as="li" key={entry.id}>
+          <Stack>
+            <Stack direction="row" wrap align="center">
+              {renderEntry(entry)}
+              <Text as="time" className="dashboard-note dashboard-history-time" dateTime={entry.at}>
+                {historyClock.format(new Date(entry.at))}
+              </Text>
+            </Stack>
+            {entry.judgment?.reason && <Text as="span">{previewJudgmentReason(entry.judgment)}</Text>}
+          </Stack>
+        </Box>)}
+      </Box>
+    </> : <Text className="dashboard-note">{entries === null ? '담당 변경 기록을 불러오지 못했습니다.' : empty}</Text>}
+  </Panel>;
+}
+
+function AssignmentHistoryEntry({ entry }) {
+  const { code, incoming, previous, next } = entry;
+  const sender = incoming ? workRequestUserName(previous) : '나';
+  const recipient = incoming ? '나' : workRequestUserName(next);
+
+  return <>
+    <Text as="strong">{incoming ? '받음' : '넘김'}</Text>
+    <Stack direction="row" wrap align="center">
+      <Text as="span">{sender} →</Text>
+      <LinkTag code={code} />
+      <Text as="span">→ {recipient}</Text>
+    </Stack>
+  </>;
+}
+
+function EvidenceRecord({ evidence, direction }) {
+  const { record, transaction } = evidence;
+  const amount = Number.isFinite(transaction.amount) && transaction.currency
+    ? `${formatter.format(transaction.amount)} ${transaction.currency}` : undefined;
+  return <Box as="li" className="dashboard-trail-record">
+    <Stack>
+      <Text as="strong">{direction}</Text>
+      <Stack direction="row" wrap align="center">
+        <LinkTag code={record.code} />
+        <LinkTag code={transaction.code} />
+      </Stack>
+      <Text as="span">{[`${transaction.from.code} → ${transaction.to.code}`, transaction.timestamp.slice(5), amount]
+        .filter(Boolean).join(' · ')}</Text>
+    </Stack>
+  </Box>;
+}
+
+function timeBetweenTransactions(trail) {
+  const minutes = Math.floor((trail.sent.time - trail.received.time) / 60_000);
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor(minutes % 1440 / 60);
+  const remainder = minutes % 60;
+  return [days && `${days}일`, hours && `${hours}시간`, remainder && `${remainder}분`]
+    .filter(Boolean).join(' ') || '1분 이내';
+}
+
+function DashboardSummary({ trail, reduced, showContext }) {
+  const downloads = trail ? [csvDownloadEntry('분석 추천 근거 거래', 'recommendation-evidence',
+    ['순서', '업무 ID', '거래 ID', '송금 계좌', '수취 계좌', '시각 (KST)', '금액', '통화'],
+    [trail.received, trail.sent].map(({ record, transaction }, index) => [
+      index + 1, record.code, transaction.code, transaction.from.code, transaction.to.code,
+      transaction.timestamp, transaction.amount, transaction.currency,
+    ]))] : [];
+  return <AISummaryPanel as="section" reduced={reduced} className="dashboard-priority-panel">
+    <SectionDownloadHeading headingClassName="dashboard-priority-heading" downloadLabel={trail ? '분석 추천' : undefined}
+      printLabel={showContext && !trail ? '분석 추천' : undefined}
+      entries={downloads} readRoot={host => host.closest('.dashboard-priority-panel').querySelector('.account-trail-network')}>
+      <Sparkles className="icon" aria-hidden="true" />분석 추천
+    </SectionDownloadHeading>
+    {trail ? <Stack as="figure" className="dashboard-account-trail">
+      <Text as="figcaption" className="dashboard-trail-reason">
+        공유 계좌 {trail.account}에서 수취 후 {timeBetweenTransactions(trail)} 만에
+        {trail.returned ? ' 원 송금 계좌로 다시 송금' : ' 후속 송금'}
+        {trail.sameAmount ? ' · 같은 통화와 금액' : ''}
+      </Text>
+      <AccountTrailGraph key={`${trail.received.transaction.code}/${trail.sent.transaction.code}`} comparison={trail.comparison} focus={trail.account}
+        alwaysShowContext={showContext} showOmittedEvidence={!showContext} />
+      <Stack className="dashboard-trail-evidence">
+        {showContext && <AccountTrailOmittedEvidence count={trail.comparison.omittedTransfers} />}
+        <Heading level={3} className="dashboard-trail-step-heading">먼저 확인할 거래</Heading>
+        <Box as="ol" className="dashboard-trail-records" aria-label="권장 확인 순서">
+          <EvidenceRecord evidence={trail.received} direction="공유 계좌 수취 확인" />
+          <EvidenceRecord evidence={trail.sent} direction={trail.returned ? '원 송금 계좌로 향한 후속 거래 확인' : '공유 계좌 후속 송금 확인'} />
+        </Box>
+      </Stack>
+    </Stack> : <Text className="dashboard-trail-empty">조회 범위에서 함께 확인할 Alert·Episode 관계가 없습니다.</Text>}
   </AISummaryPanel>;
-}
-
-const priorityAlerts = rows => rows.filter(row => row.open && modelRiskBand(row.score) === 'high' && row.elapsed >= 3);
-
-function MineSummary({ data, reduced }) {
-  const { high } = modelRiskLabels();
-  return <DashboardAISummary headline={`내 담당 미완료 ${count(data.unfinished)}`}
-    alertRows={priorityAlerts(data.alertCases.filter(row => row.assigned))} timeSlots={data.hourly} period={data.period} reduced={reduced}>
-    {data.unfinished > 0 && <p>{data.urgent > 0
-      ? `위험 점수 ${high}이고 3일 이상 경과한 미완료 Alert ${count(data.urgent)}부터 확인하세요.`
-      : `위험 점수 ${high}이며 3일 이상 경과한 미완료 Alert가 없습니다.`}</p>}
-  </DashboardAISummary>;
-}
-
-function DashboardSummary({ data, reduced }) {
-  const alerts = priorityAlerts(data.alertCases);
-  return <DashboardAISummary headline={alerts.length
-    ? `우선 확인할 장기 미처리 고위험 Alert ${count(alerts.length)}` : '장기 미처리 고위험 Alert 없음'}
-    alertRows={alerts} timeSlots={data.hourly} period={data.period} reduced={reduced} benchmarkLink>
-    {alerts.length > 0 && <p>{modelRiskLabels().high} · 3일 이상 경과</p>}
-  </DashboardAISummary>;
 }
 
 function interleaveCaseKinds(records) {
@@ -158,56 +210,52 @@ function interleaveCaseKinds(records) {
     [alerts[index], episodes[index]].filter(Boolean)).flat();
 }
 
-function WorkBoard({ records, mine, sort, appearance }) {
-  return <section className="dashboard-board" aria-label={mine ? '내 담당 업무' : '업무 현황'}>
-    <header className="dashboard-board-heading">
-      <h2>업무 현황</h2>
-      <div data-dashboard-sort-tags></div>
-      <div className="dashboard-board-actions">
-        <div data-dashboard-sort></div>
-        <BoardSectionDownload records={records} label="업무 현황" onDownload={rows => exportCases(rows, 'work-board')} />
-      </div>
-    </header>
-    <div className="dashboard-board-scroll">
-      <CaseProgressBoard rows={records} reduced={appearance.reduced} theme={appearance.theme} showAssignee={!mine} pageSize={8}
+function WorkBoard({ rows, mine, sort, appearance }) {
+  return <Box as="section" className="dashboard-board" aria-label={mine ? '내 담당 업무' : '업무 상태 보드'}>
+    {mine && <Box as="header" className="dashboard-board-heading">
+      <Heading id="dashboard-work-title" tabIndex={-1}>내 업무 현황</Heading>
+      <Box data-dashboard-sort-tags></Box>
+      <Box className="dashboard-board-actions">
+        <BoardSectionDownload records={rows} label="내 업무 현황" file="work-board" />
+      </Box>
+    </Box>}
+    <Box className="dashboard-board-scroll">
+      <CaseProgressBoard rows={rows} reduced={appearance.reduced} theme={appearance.theme} showAssignee={!mine}
+        plainCount pageSize={8}
         orderRows={mine && !sort ? interleaveCaseKinds : undefined} />
-    </div>
-  </section>;
+    </Box>
+  </Box>;
 }
 
 export function PreviewDashboard({ mine, data, appearance }) {
-  const metric = (label, value, detail, unit = '건') => ({ label, value, unit, detail, key: `${mine}-${label}` });
-  const trend = (key, color, type = 'line', rows = data.operationalDaily) =>
-    ({ rows, key, color: `var(--chart-${color})`, type, caption: rows === data.hourly ? '생성 시간대 · KST' : '일별 · KST' });
-  const kpis = mine ? [
-    { ...metric(`위험 점수 ${modelRiskLabels().high}`, data.highRisk, '내 담당 미처리 Alert'), trend: trend('highRisk', 'risk-high', 'bar', data.hourly) },
-    { ...metric('3일 이상 경과', data.overdue, '내 담당 미완료 Alert·Episode'), trend: trend('overdue', 'risk-medium', 'bar', data.hourly) },
-  ] : [
-    { ...metric('들어온 거래 수', data.transactions.length), trend: trend('total', 'arrival', 'area') },
-    { ...metric('의심 거래 / 전체 거래', [{ amount: data.suspicious.length }, { amount: data.transactions.length }],
-      `의심 비율 ${percent(data.suspicious.length, data.transactions.length)}`, ''), separator: '/', trend: trend('suspicious', 'suspect', 'area') },
-    { ...metric('새 계좌 · 새 소유주', [{ amount: data.newAccounts, unit: '개' }, { amount: data.newOwners, unit: '명' }],
-      '거래 이력 기준', ''), separator: '·', trend: { ...trend('newAccounts', 'arrival', 'bar'), caption: '일별 최초 등장 계좌 · KST' } },
-    { ...metric('생성 Alert', data.alertCases.length), trend: trend('alerts', 'arrival', 'area') },
-    { ...metric('업무 처리율', percent(data.settled, data.cases.length), `${count(data.cases.length)} 중 ${count(data.settled)} 완료`, ''),
-      completion: { value: data.settled, total: data.cases.length } },
-    { ...metric('미처리 Alert', data.alertCases.filter(row => row.open).length, '검토 대기·처리 중'), trend: trend('openAlerts', 'neutral') },
-    { ...metric('의심 거래 중 Alert 편입', percent(data.linked, data.suspicious.length), `${count(data.suspicious.length)} 중 ${count(data.linked)}`, ''),
-      trend: trend('linked', 'suspect') },
-    { ...metric('미완료 Episode', data.cases.filter(row => row.kind === 'Episode' && row.open).length, '검토 대기·처리 중'), trend: trend('openEpisodes', 'neutral') },
-  ];
-  return <div className="preview-dashboard" data-mine={mine}>
-    <section className="dashboard-top" aria-label="요약 및 주요 지표">
-      {mine ? <MineSummary data={data} reduced={appearance.reduced} /> : <DashboardSummary data={data} reduced={appearance.reduced} />}
-      <Metrics items={kpis} wide={!mine} appearance={appearance} />
-    </section>
-    {!mine && <React.Suspense fallback={<DashboardAnalyticsSkeleton />}>
-      <Analytics data={data} reduced={appearance.reduced} />
-    </React.Suspense>}
-    {data.board
-      ? <WorkBoard records={data.board.content} mine={mine} sort={data.sort} appearance={appearance} />
-      : <DashboardBoardSkeleton />}
-  </div>;
+  const rows = data.board?.content.map(row => {
+    const status = data.investigation.statusByCode?.[row.code] ?? row.status;
+    return status === row.status ? row : { ...row, status };
+  });
+  const summary = <DashboardSummary trail={data.accountRecommendation} reduced={appearance.reduced} showContext={!mine} />;
+  const board = rows ? <WorkBoard rows={rows} mine={mine} sort={data.sort} appearance={appearance} />
+    : <DashboardBoardSkeleton showTitle={mine} />;
+  const boardEntries = rows?.length ? [caseCsvDownloadEntry('업무 상태 보드', 'work-board', rows)] : [];
+  return <Box className="preview-dashboard" data-mine={mine}>
+    {mine ? <PersonalDashboardOverview recommendation={summary}>
+      <PersonalInvestigation data={data} reduced={appearance.reduced} />
+      <WorkHistoryPanel title="내 담당 변경 기록" entries={data.workHistory?.assignments} empty="담당자가 바뀐 기록이 없습니다."
+        exportFile="assignment-history" exportColumns={['방향', '보낸 담당자', '받은 담당자']}
+        exportRow={entry => [entry.incoming ? '받음' : '넘김', workRequestUserName(entry.previous), workRequestUserName(entry.next)]}
+        renderEntry={entry => <AssignmentHistoryEntry entry={entry} />} />
+      <WorkHistoryPanel title="내 담당 판정 기록" entries={data.workHistory?.judgments} empty="기록된 판정이 없습니다."
+        exportFile="personal-judgment-history" exportColumns={['판정', '판정 사유']}
+        exportRow={entry => [verdictLabels[entry.verdict], entry.judgment?.reason ? previewJudgmentReason(entry.judgment) : '']}
+        renderEntry={entry => <><LinkTag code={entry.code} /><VerdictTag verdict={entry.verdict} /></>} />
+    </PersonalDashboardOverview> : (
+      <React.Suspense fallback={<DashboardAnalyticsSkeleton reduced={appearance.reduced} />}>
+        <Analytics data={data} reduced={appearance.reduced} summary={summary}
+          today={<DashboardTodaySummary snapshot={data.todaySnapshot} dataSource={data.dataSource} />}
+          detectionSources={<DashboardRuleHits dataSource={data.dataSource} />} board={board} boardEntries={boardEntries} />
+      </React.Suspense>
+    )}
+    {mine && board}
+  </Box>;
 }
 
 export function BenchmarkDashboard({ mine, dataset, range, appearance }) {
@@ -228,29 +276,33 @@ export function BenchmarkDashboard({ mine, dataset, range, appearance }) {
       `${count(totals.labeled)} ÷ ${count(totals.transactions)}`, ''),
     metric('처음 등장한 계좌', totals.newAccounts, `최초 등장 은행 코드 ${formatter.format(totals.newBanks)}개`, '개'),
   ];
-  return <div className="preview-dashboard preview-benchmark-dashboard" data-mine={mine}>
-    {mine && <Panel as="article" className="glass dashboard-personal-status">
-      <h2>내 담당 업무</h2>
-      <p className="dashboard-note">개인 담당 업무를 표시하려면 기관의 업무 데이터 연결이 필요합니다.</p>
+  return <Box className="preview-dashboard preview-benchmark-dashboard" data-mine={mine}>
+    {mine && <Panel as="article" className="dashboard-personal-status">
+      <Heading>내 담당 업무</Heading>
+      <Text className="dashboard-note">개인 담당 업무를 표시하려면 기관의 업무 데이터 연결이 필요합니다.</Text>
     </Panel>}
-    <section className="dashboard-top" aria-label="원본 거래 요약 및 주요 지표">
-      <Panel as="article" className="glass dashboard-summary-card">
-        <h2>원본 거래 요약</h2>
-        <strong>{peak ? `${peak.date} · 세탁 라벨 ${count(peak.labeled)}`
-          : (totals.transactions ? '조회 기간에 세탁 라벨 거래가 없습니다.' : '조회 기간에 거래가 없습니다.')}</strong>
-        {peak && <p>기간 내 최다 · 라벨 거래의 {peakShare}</p>}
-        <p className="dashboard-note">{dataset.source} · {period} · 원본 거래 일자 기준</p>
-        <div className="dashboard-summary-links">
+    <Box as="section" className="dashboard-top" aria-label="원본 거래 요약 및 주요 지표">
+      <Panel as="article" className="dashboard-summary-card">
+        <SectionDownloadHeading entries={totals.transactions ? [csvDownloadEntry('원본 거래 요약', 'ibm-hi-small-summary',
+          ['시작일', '종료일', '전체 거래 수', '세탁 라벨 거래 수', '최초 등장 계좌 수', '최초 등장 은행 코드 수', '세탁 라벨 최다 일자', '당일 건수'],
+          [[from, to, totals.transactions, totals.labeled, totals.newAccounts, totals.newBanks, peak?.date, peak?.labeled]])] : []}>
+          원본 거래 요약
+        </SectionDownloadHeading>
+        <Text as="strong">{peak ? `${peak.date} · 세탁 라벨 ${count(peak.labeled)}`
+          : (totals.transactions ? '조회 기간에 세탁 라벨 거래가 없습니다.' : '조회 기간에 거래가 없습니다.')}</Text>
+        {peak && <Text>기간 내 최다 · 라벨 거래의 {peakShare}</Text>}
+        <Text className="dashboard-note">{dataset.source} · {period} · 원본 거래 일자 기준</Text>
+        <Box className="dashboard-summary-links">
           <ActionButton className="dashboard-summary-link" as="a" href="/benchmark/ledger?view=table" shape="pill" surface="floating">
             거래 원장 열기 <ArrowUpRight className="icon icon-compact" aria-hidden="true" />
           </ActionButton>
           <ActionButton className="dashboard-summary-link" as="a" href="/dashboard/all" shape="pill">업무 대시보드로 돌아가기</ActionButton>
-        </div>
+        </Box>
       </Panel>
       <Metrics items={metrics} appearance={appearance} />
-    </section>
-    {chartRows.length > 0 && <React.Suspense fallback={<DashboardAnalyticsSkeleton benchmark showPatterns={fullPatternScope} />}>
+    </Box>
+    {chartRows.length > 0 && <React.Suspense fallback={<BenchmarkAnalyticsSkeleton showPatterns={fullPatternScope} />}>
       <BenchmarkCharts chartRows={chartRows} totals={totals} period={period} fullPatternScope={fullPatternScope} reduced={appearance.reduced} />
     </React.Suspense>}
-  </div>;
+  </Box>;
 }

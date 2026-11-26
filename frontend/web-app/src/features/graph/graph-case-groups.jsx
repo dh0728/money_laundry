@@ -1,12 +1,13 @@
-import './graph-case-groups.css';
-
-const caseGroupColors = [
-  'var(--brand-accent)', 'var(--case-wrap-violet)', 'var(--case-wrap-teal)',
-  'var(--case-wrap-rose)', 'var(--case-wrap-indigo)', 'var(--case-wrap-ochre)',
+const comparisonColors = [
+  'var(--case-comparison-pink)',
+  'var(--case-comparison-teal)',
+  'var(--case-comparison-sky)',
+  'var(--case-comparison-lime)',
 ];
 
 export function caseGroupColor(index) {
-  return caseGroupColors[index % caseGroupColors.length];
+  if (index === 0) return 'var(--brand-accent)';
+  return comparisonColors[(index - 1) % comparisonColors.length];
 }
 
 export function caseMembership(groups, transactionIds) {

@@ -37,6 +37,7 @@ import {
   scatterJitterRangePadding,
 } from "./scatter-jitter";
 import { useScatterChartInteraction } from "./use-scatter-chart-interaction";
+import "../chart-utilities.css";
 import { buildYScalesForLines, getPrimaryYScale } from "./y-axis-scales";
 
 export interface ScatterChartInnerProps {
@@ -232,7 +233,6 @@ export function ScatterChartInner({
     selection,
     clearSelection,
     interactionHandlers,
-    interactionStyle,
   } = useScatterChartInteraction({
     xScale,
     yScale: yScale as ChartContextValue["yScale"],
@@ -327,7 +327,8 @@ export function ScatterChartInner({
 
           <g
             {...interactionHandlers}
-            style={interactionStyle}
+            className="chart-interaction"
+            data-interactive={canInteract || undefined}
             transform={`translate(${margin.left},${margin.top})`}
           >
             <rect

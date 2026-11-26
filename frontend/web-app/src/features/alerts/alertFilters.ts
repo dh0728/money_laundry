@@ -1,5 +1,5 @@
 import type { AlertRow } from '@/api/alerts'
-import { alertStatusLabels } from '@/components/badges'
+import { alertStatusLabels } from '@/api/codes'
 import { typeDisplay, type AlertStatus, type TypeCode } from '@/api/codes'
 
 // v24 Lists.tsx의 목록 필터. mock은 전체 행을 가지고 있어 브라우저에서 거른다.

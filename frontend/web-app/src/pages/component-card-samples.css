@@ -1,6 +1,6 @@
 .catalogue-card-samples {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--catalogue-card-min-width)), 1fr));
   align-items: start;
   gap: var(--workspace-gap);
 }

@@ -3,6 +3,7 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import LiveLedgerPage from './LiveLedgerPage'
 import { WorkspaceProvider } from '@/lib/WorkspaceProvider'
 import { WorkspaceState } from '@/lib/workspaceState'
+import { Text } from '../components/layout-primitives'
 const { owners, accounts, transactions, locate } = vi.hoisted(() => ({ owners: vi.fn(), accounts: vi.fn(), transactions: vi.fn(), locate: vi.fn() }))
 const { cases } = vi.hoisted(() => ({ cases: vi.fn() }))
 vi.mock('@/api/liveLedger', () => ({ fetchLedgerOwners: owners, fetchLedgerAccounts: accounts, fetchLedgerTransactions: transactions, locateLedgerTransaction: locate, fetchPaymentFormats: async () => [] }))
@@ -19,7 +20,7 @@ it('연결 Alert에서 같은 원장으로 돌아오면 선택했던 거래 상�
   fireEvent.click(await within(screen.getByTestId('transaction-section')).findByText('101'))
   fireEvent.click(screen.getByRole('button', { name: 'Alert · A-3001' }))
   await waitFor(() => expect(onOpen).toHaveBeenCalledWith('ALERT', 42))
-  rerender(<WorkspaceProvider><p>사건 42 확인</p></WorkspaceProvider>)
+  rerender(<WorkspaceProvider><Text>사건 42 확인</Text></WorkspaceProvider>)
   rerender(<WorkspaceProvider><LiveLedgerPage onOpen={onOpen} /></WorkspaceProvider>)
   expect(await screen.findByTestId('selected-transaction')).toHaveTextContent('거래 시각')
   expect(within(screen.getByTestId('transaction-section')).getByRole('button', { name: /101/ })).toHaveAttribute('aria-pressed', 'true')
@@ -106,7 +107,7 @@ it('조회 중 다른 화면으로 이동하면 늦은 대상 응답을 렌더�
   const { rerender } = render(<WorkspaceProvider><LiveLedgerPage transactionId={101} /></WorkspaceProvider>)
   const active = locate.mock.calls[0][2] as () => boolean
   expect(active()).toBe(true)
-  rerender(<WorkspaceProvider><p>사건으로 복귀</p></WorkspaceProvider>)
+  rerender(<WorkspaceProvider><Text>사건으로 복귀</Text></WorkspaceProvider>)
   expect(active()).toBe(false)
   finish({ txId: 101, page: 0 })
   await waitFor(() => expect(screen.getByText('사건으로 복귀')).toBeInTheDocument())
@@ -135,6 +136,6 @@ it('바로가기에서 추가한 원장 조회도 화면 이탈 시 인증 알�
   const ownerActive = owners.mock.calls[0][1] as () => boolean
   const accountActive = accounts.mock.calls[0][2] as () => boolean
   expect([transactionActive(), ownerActive(), accountActive()]).toEqual([true, true, true])
-  rerender(<WorkspaceProvider><p>기존 사건</p></WorkspaceProvider>)
+  rerender(<WorkspaceProvider><Text>기존 사건</Text></WorkspaceProvider>)
   expect([transactionActive(), ownerActive(), accountActive()]).toEqual([false, false, false])
 })

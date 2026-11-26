@@ -1,14 +1,34 @@
-.panel-inset {
-  --panel-material-solid: light-dark(var(--information-panel-surface), var(--aml-gray-020));
-  --panel-material-depth: 0 0 0 transparent;
-  min-inline-size: 0;
-  border-radius: var(--aml-radius-card);
+:is(.screen-panel, .panel-inset) > h2,
+:is(.screen-panel, .panel-inset) > h3:first-child,
+:is(.screen-panel, .panel-inset) > :where(header, div):first-child > :is(h2, h3) {
+  margin: 0;
+  font-size: var(--aml-type-panel-title-size);
+  line-height: var(--aml-type-panel-title-lineHeight);
+  font-weight: var(--aml-type-panel-title-weight);
 }
 
-:root:not([data-glassmorphism="false"]) .panel-inset {
-  --panel-material-depth:
-    inset 0 var(--aml-stroke-control) var(--aml-space-4) var(--glass-shell-highlight),
-    inset 0 0 var(--aml-space-12) light-dark(var(--aml-white-060), var(--aml-white-010));
+:is(.screen-panel, .panel-inset) > :is(h2, :where(header, div):first-child:has(> h2)):has(+ *) {
+  margin-block-end: var(--aml-space-4);
+}
+
+.screen-panel[data-panel-content-fill] {
+  display: flex;
+  flex-direction: column;
+}
+[data-panel-content-fill] > [data-panel-fill] {
+  flex: 1 1 var(--panel-fill-basis, auto);
+  min-block-size: 0;
+}
+
+.panel-disclosure {
+  --panel-disclosure-radius: calc(var(--account-control-size) / 2);
+  --panel-disclosure-inline-inset: var(--aml-panel-text-inset);
+  min-inline-size: 0;
+  border-radius: var(--panel-disclosure-radius);
+}
+
+.panel-disclosure[data-disclosure-inset="control"] {
+  --panel-disclosure-inline-inset: var(--aml-space-8);
 }
 
 .panel-disclosure-trigger {
@@ -18,7 +38,7 @@
   gap: var(--workspace-gap);
   min-block-size: var(--account-control-size);
   padding: var(--aml-space-8) var(--aml-panel-text-inset);
-  border-radius: inherit;
+  border-radius: var(--panel-disclosure-radius);
   list-style: none;
   cursor: pointer;
   font-weight: var(--aml-type-body-strong-weight);
@@ -35,5 +55,5 @@
   .panel-disclosure-trigger:hover { background-color: var(--hover) }
 }
 
-.panel-disclosure[open] > .panel-disclosure-trigger > .icon { rotate: 180deg }
-.panel-disclosure-body { padding: 0 var(--aml-panel-text-inset) var(--aml-space-8) }
+.panel-disclosure[open] > .panel-disclosure-trigger > .icon { rotate: var(--disclosure-open-angle) }
+.panel-disclosure-body { padding: 0 var(--panel-disclosure-inline-inset) var(--aml-space-8) }

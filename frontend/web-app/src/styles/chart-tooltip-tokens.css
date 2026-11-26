@@ -1,0 +1,4 @@
+:root {
+  --chart-tooltip-min-width: 160px;
+  --chart-tooltip-glass-face: color-mix(in srgb, var(--information-panel-surface) 64%, var(--glass-material-frost));
+}

@@ -6,10 +6,11 @@ import { fireEvent, render as testingRender, screen, waitFor, within } from '@te
 import { beforeEach, expect, it, vi } from 'vitest'
 import LiveCasesPage from './LiveCasesPage'
 import { ApiError } from '@/api/common'
+import { Box } from '../components/layout-primitives'
 
 const { toastSuccess, toastError } = vi.hoisted(() => ({ toastSuccess: vi.fn(), toastError: vi.fn() }))
 vi.mock('sonner', () => ({ toast: { success: toastSuccess, error: toastError } }))
-vi.mock('@/features/graph/0.24.0/Graph', () => ({ default: ({ model }: { model: { edges: unknown[] } }) => <div data-testid="live-graph">{model.edges.length} edges</div> }))
+vi.mock('@/features/graph/0.24.0/Graph', () => ({ default: ({ model }: { model: { edges: unknown[] } }) => <Box data-testid="live-graph">{model.edges.length} edges</Box> }))
 const { fetchReviewCase, fetchReviewCases, fetchReviewMoney, submitReviewCommand, setReviewMoneyScope } = vi.hoisted(() => ({
   fetchReviewCase: vi.fn(), fetchReviewCases: vi.fn(), fetchReviewMoney: vi.fn(), submitReviewCommand: vi.fn(), setReviewMoneyScope: vi.fn(),
 }))
@@ -478,7 +479,9 @@ it.each([
   fetchReviewCase.mockResolvedValue(alertCase(1, 3001, { kind, status, episodeId }))
   render(<LiveCasesPage kind={kind} caseId={1} onOpen={vi.fn()} onBack={vi.fn()} />)
   const tags = await screen.findByTestId('detail-tags')
-  expect(within(tags).getByText(label)).toHaveAttribute('data-status', displayStatus)
+  const statusBadge = within(tags).getByText(label)
+  expect(statusBadge).toHaveAttribute('data-status', displayStatus)
+  expect(statusBadge).toHaveAttribute('data-tone', displayStatus === 'CLOSED' ? 'closed' : 'working')
   expect(tags.querySelectorAll('[data-status]')).toHaveLength(1)
 })
 

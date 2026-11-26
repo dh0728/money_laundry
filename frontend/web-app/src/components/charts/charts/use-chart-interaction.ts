@@ -61,7 +61,6 @@ interface ChartInteractionResult {
     onTouchMove?: (event: React.TouchEvent<SVGGElement>) => void;
     onTouchEnd?: () => void;
   };
-  interactionStyle: React.CSSProperties;
 }
 
 /** Pixel y per line dataKey, plus band edge keys (line keys win on collisions). */
@@ -378,14 +377,8 @@ export function useChartInteraction({
       }
     : {};
 
-  const interactionStyle: React.CSSProperties = {
-    cursor: canInteract ? "crosshair" : "default",
-    touchAction: "none",
-  };
-
   return {
     hoverStore,
     interactionHandlers,
-    interactionStyle,
   };
 }

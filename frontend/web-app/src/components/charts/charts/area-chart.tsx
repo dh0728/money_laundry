@@ -27,6 +27,7 @@ import {
 } from "./chart-phase";
 import { PatternArea } from "./pattern-area";
 import { TimeSeriesChartInner } from "./time-series-chart-shell";
+import "../chart-utilities.css";
 
 /**
  * Whether a measured box is big enough to draw a time-series chart. Callers
@@ -71,8 +72,8 @@ export interface AreaChartProps {
   xDomainSlotCount?: number;
   /** Tween y-domain when brush changes the visible x-range. Default: false */
   tweenYDomainOnXDomainChange?: boolean;
-  /** Inline container styles (e.g. fixed height for brush strip). */
-  style?: CSSProperties;
+  /** Container sizing and touch behavior overrides. */
+  style?: Pick<CSSProperties, "aspectRatio" | "height" | "touchAction">;
   /** Fires when the internal chart phase changes (e.g. OG capture readiness). */
   onPhaseChange?: (phase: ChartPhase) => void;
   /** Child components (Area, Grid, ChartTooltip, etc.) */
@@ -119,7 +120,7 @@ function extractAreaConfigs(children: ReactNode): (LineConfig & AreaProps)[] {
       configs.push({
         ...props,
         dataKey: props.dataKey,
-        stroke: props.stroke || props.fill || "var(--chart-line-primary)",
+        stroke: props.stroke || props.fill || "var(--aml-sky-050)",
         strokeWidth: props.strokeWidth || 2,
         yAxisId: props.yAxisId,
       });
@@ -151,6 +152,7 @@ export function AreaChart({
   children,
 }: AreaChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const height = typeof style?.height === "number" ? `${style.height}px` : style?.height;
   const margin = useStableMargin({ ...DEFAULT_MARGIN, ...marginProp });
   const lines = useMemo(() => extractAreaConfigs(children), [children]);
   const [chartPhase, setChartPhase] = useState<ChartPhase>(() =>
@@ -175,9 +177,14 @@ export function AreaChart({
   return (
     <LazyMotion features={domAnimation}>
       <div
-        className={cn("relative w-full", className)}
+        className={cn("chart-surface relative w-full", className)}
+        data-fixed-height={height !== undefined || undefined}
         ref={containerRef}
-        style={{ aspectRatio, touchAction: "none", ...style }}
+        style={{
+          "--chart-surface-aspect-ratio": style?.aspectRatio ?? aspectRatio,
+          "--chart-surface-height": height,
+          "--chart-surface-touch-action": style?.touchAction,
+        } as CSSProperties}
       >
         <ParentSize debounceTime={10}>
           {({ width, height }) =>

@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import './AnimatedList.css';
+import { appReducedMotion } from '@/hooks/use-reduced-motion';
+import { ActionButton } from '../primary-button';
 
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
@@ -19,11 +21,20 @@ export type AnimatedListItem = string | AnimatedListEntry;
 type Animation = 'pop' | 'slide' | 'fade';
 type State = 'in' | 'above' | 'below';
 
+declare module 'react' {
+  interface CSSProperties {
+    '--al-radius-override'?: string;
+    '--al-accent-override'?: string;
+    '--al-gap'?: string;
+    '--al-width'?: string;
+    '--animated-list-maximum-height'?: string;
+  }
+}
+
 interface AnimatedListProps {
   items?: AnimatedListItem[];
   ariaLabel?: string;
   onItemSelect?: (item: AnimatedListItem, index: number) => void;
-  onItemSurfaceClick?: (event: MouseEvent<HTMLDivElement>, select: () => void) => void;
   renderItem?: (item: AnimatedListItem, index: number, isSelected: boolean) => ReactNode;
   renderItemHeader?: (item: AnimatedListItem, index: number) => ReactNode;
   trackDecoration?: ReactNode;
@@ -46,9 +57,10 @@ interface AnimatedListProps {
   maxHeight?: number | string;
   className?: string;
   itemClassName?: string;
+  viewportClassName?: string;
   itemDecoration?: ReactNode;
   itemData?: (item: AnimatedListItem, index: number) => Record<`data-${string}`, string>;
-  style?: CSSProperties;
+  surface?: 'workspace' | 'ledger';
 }
 
 interface Engine {
@@ -58,76 +70,12 @@ interface Engine {
   sync: () => void;
 }
 
-const THEMES: Record<'dark' | 'light', Record<string, string>> = {
-  dark: {
-    '--al-frame': 'rgba(38, 35, 46, 0.66)',
-    '--al-frame-edge': 'rgba(255, 255, 255, 0.08)',
-    '--al-frame-highlight': 'rgba(255, 255, 255, 0.07)',
-    '--al-frame-shadow': '0 22px 44px -20px rgba(0, 0, 0, 0.8), 0 6px 16px -8px rgba(0, 0, 0, 0.5)',
-    '--al-tile': 'linear-gradient(180deg, #3a3644 0%, #27242f 100%)',
-    '--al-tile-edge': 'rgba(255, 255, 255, 0.07)',
-    '--al-tile-highlight': 'rgba(255, 255, 255, 0.12)',
-    '--al-tile-shadow': '0 4px 10px -4px rgba(0, 0, 0, 0.7)',
-    '--al-well': 'rgba(255, 255, 255, 0.08)',
-    '--al-ink': '#f4f4f5',
-    '--al-muted': 'rgba(244, 244, 245, 0.55)',
-    '--al-thumb': 'rgba(255, 255, 255, 0.16)',
-    '--al-ring': 'rgba(244, 244, 245, 0.3)',
-    '--al-ring-fill': 'rgba(244, 244, 245, 0.05)',
-    '--al-hover': 'brightness(1.12)',
-    '--al-press': 'brightness(0.85)',
-    '--al-active': 'brightness(1.16)'
-  },
-  light: {
-    '--al-frame': 'rgba(240, 240, 243, 0.8)',
-    '--al-frame-edge': 'rgba(24, 24, 27, 0.07)',
-    '--al-frame-highlight': 'rgba(255, 255, 255, 0.95)',
-    '--al-frame-shadow': '0 22px 44px -22px rgba(24, 24, 27, 0.3), 0 6px 16px -10px rgba(24, 24, 27, 0.16)',
-    '--al-tile': 'linear-gradient(180deg, #ffffff 0%, #f6f6f8 100%)',
-    '--al-tile-edge': 'rgba(24, 24, 27, 0.08)',
-    '--al-tile-highlight': 'rgba(255, 255, 255, 1)',
-    '--al-tile-shadow': '0 4px 10px -5px rgba(24, 24, 27, 0.25)',
-    '--al-well': 'rgba(24, 24, 27, 0.05)',
-    '--al-ink': '#27272a',
-    '--al-muted': 'rgba(39, 39, 42, 0.55)',
-    '--al-thumb': 'rgba(24, 24, 27, 0.16)',
-    '--al-ring': 'rgba(24, 24, 27, 0.28)',
-    '--al-ring-fill': 'transparent',
-    '--al-hover': 'brightness(0.97)',
-    '--al-press': 'brightness(0.92)',
-    '--al-active': 'none'
-  }
-};
-
-
-
-const HIDDEN: Record<Animation, Record<'above' | 'below', string>> = {
-  pop: { above: 'translate3d(0, -12px, 0) scale(0.8)', below: 'translate3d(0, 12px, 0) scale(0.8)' },
-  slide: { above: 'translate3d(0, -28px, 0) scale(0.98)', below: 'translate3d(0, 28px, 0) scale(0.98)' },
-  fade: { above: 'translate3d(0, -4px, 0)', below: 'translate3d(0, 4px, 0)' }
-};
-
-const SPRING =
-  'linear(0, 0.0603, 0.2033, 0.3821, 0.5633, 0.7258, 0.8584, 0.9574, 1.0242, 1.0634, 1.0809, 1.0828, 1.0747, 1.0613, 1.046, 1.0313, 1.0186, 1.0085, 1.0012, 0.9965, 0.994, 0.9931, 0.9933, 0.9941, 0.9953, 0.9966, 0.9978, 0.9988, 1)';
-
-const smootherstep = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
-
-const FADE_MASK = (() => {
-  const steps = [0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1];
-  const top = steps.map(t => `rgba(0, 0, 0, ${smootherstep(t).toFixed(3)}) calc(var(--al-fade-top) * ${t})`);
-  const bottom = [...steps]
-    .reverse()
-    .map(t => `rgba(0, 0, 0, ${smootherstep(t).toFixed(3)}) calc(100% - var(--al-fade-bottom) * ${t})`);
-  return `linear-gradient(to bottom, ${[...top, ...bottom].join(', ')})`;
-})();
-
 const size = (value: number | string) => (typeof value === 'number' ? `${value}px` : value);
 
 const AnimatedList = ({
   items = [],
   ariaLabel,
   onItemSelect,
-  onItemSurfaceClick,
   renderItem,
   renderItemHeader,
   trackDecoration,
@@ -144,15 +92,16 @@ const AnimatedList = ({
   frame = true,
   theme = 'dark',
   accentColor,
-  radius = 14,
-  gap = 8,
-  width = 420,
-  maxHeight = 440,
+  radius,
+  gap,
+  width,
+  maxHeight,
   className = '',
   itemClassName = '',
+  viewportClassName = '',
   itemDecoration,
   itemData,
-  style
+  surface
 }: AnimatedListProps) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -191,11 +140,7 @@ const AnimatedList = ({
     const ring = ringRef.current;
     if (!root || !viewport || !track || !indicator || !ring) return;
 
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const springEase = CSS.supports?.('transition-timing-function', 'linear(0, 1)')
-      ? SPRING
-      : 'cubic-bezier(0.34, 1.4, 0.64, 1)';
-    const transition = `transform 620ms ${springEase}, opacity 300ms cubic-bezier(0.22, 1, 0.36, 1), filter 200ms ease`;
+    const reduced = appReducedMotion();
     const motion = { y: 0, h: 0, vy: 0, vh: 0, ty: 0, th: 0, ready: false };
     const fades = { top: '', bottom: '' };
     let boxes: (number[] | null)[] = [];
@@ -208,15 +153,8 @@ const AnimatedList = ({
 
     const mode = (): Animation | 'none' => {
       const chosen = settingsRef.current.animation;
-      if (chosen === 'none' || !HIDDEN[chosen]) return 'none';
+      if (chosen !== 'pop' && chosen !== 'slide' && chosen !== 'fade') return 'none';
       return reduced ? 'fade' : chosen;
-    };
-
-    const apply = (element: HTMLElement, state: State) => {
-      element.dataset.state = state;
-      const pose = current && current !== 'none' && state !== 'in' ? HIDDEN[current][state] : '';
-      element.style.transform = pose;
-      element.style.opacity = pose ? '0' : '';
     };
 
     const syncRing = () => {
@@ -224,13 +162,13 @@ const AnimatedList = ({
       if (!item) return;
       const state = (item.dataset.state as State | undefined) || 'in';
       if (state === ring.dataset.state) return;
-      ring.style.transitionDelay = item.style.transitionDelay;
-      apply(ring, state);
+      ring.style.setProperty('--animated-list-stagger-delay', item.style.getPropertyValue('--animated-list-stagger-delay'));
+      ring.dataset.state = state;
     };
 
     const write = () => {
-      indicator.style.transform = `translate3d(0, ${motion.y.toFixed(2)}px, 0)`;
-      indicator.style.height = `${motion.h.toFixed(2)}px`;
+      indicator.style.setProperty('--animated-list-indicator-transform', `translate3d(0, ${motion.y.toFixed(2)}px, 0)`);
+      indicator.style.setProperty('--animated-list-indicator-height', `${motion.h.toFixed(2)}px`);
     };
 
     const frame = (now: number) => {
@@ -262,12 +200,11 @@ const AnimatedList = ({
 
     const place = (snap: boolean) => {
       const item = itemRefs.current[settingsRef.current.selected];
+      indicator.toggleAttribute('data-indicator-visible', Boolean(item));
       if (!item) {
-        indicator.style.opacity = '0';
         motion.ready = false;
         return;
       }
-      indicator.style.opacity = '1';
       motion.ty = item.offsetTop;
       motion.th = item.offsetHeight;
       if (snap || reduced || !motion.ready) {
@@ -323,9 +260,9 @@ const AnimatedList = ({
         const state = hidden ? (start + box[1] / 2 < view / 2 ? 'above' : 'below') : 'in';
         if (state === item.dataset.state) return;
         const delay = entrance && !hidden ? (order++ * Math.max(0, s.stagger)).toFixed(3) : 0;
-        item.style.transitionDelay = delay ? `${delay}s, ${delay}s, 0s` : '';
+        item.style.setProperty('--animated-list-stagger-delay', delay ? `${delay}s` : '');
         if (!hidden) item.dataset.seen = 'true';
-        apply(item, state);
+        item.dataset.state = state;
       });
       syncRing();
     };
@@ -341,13 +278,15 @@ const AnimatedList = ({
       if (current === 'none') entered = true;
       if (restyle.length) {
         const elements = changed ? [...restyle, ring] : restyle;
-        for (const element of elements) element.style.transition = 'none';
+        for (const element of elements) element.dataset.listTransition = 'paused';
+        root.dataset.listMotion = current;
         for (const item of restyle)
-          apply(item, current === 'none' ? 'in' : (item.dataset.state as State | undefined) || 'below');
-        if (changed) apply(ring, (itemRefs.current[s.selected]?.dataset.state as State | undefined) || 'in');
+          item.dataset.state = current === 'none' ? 'in' : item.dataset.state || 'below';
+        if (changed) ring.dataset.state = itemRefs.current[s.selected]?.dataset.state || 'in';
         void root.offsetHeight;
-        for (const element of elements) element.style.transition = transition;
+        for (const element of elements) element.dataset.listTransition = 'ready';
       }
+      else if (changed) root.dataset.listMotion = current;
       measure();
       reveal(restyle.length > 0);
     };
@@ -508,32 +447,25 @@ const AnimatedList = ({
       ref={rootRef}
       className={`animated-list${frame ? ' animated-list--framed' : ''} ${className}`.trim()}
       data-animated={animation !== 'none' ? '' : undefined}
-      style={
-        {
-          ...(THEMES[theme] ?? THEMES.dark),
-          '--al-radius': `${Math.max(0, radius)}px`,
-          '--al-gap': `${Math.max(0, gap)}px`,
-          '--al-width': size(width),
-          '--al-accent': accentColor || 'var(--al-ink)',
-          ...(accentColor
-            ? { '--al-ring': accentColor, '--al-ring-fill': `color-mix(in srgb, ${accentColor} 8%, transparent)` }
-            : {}),
-          ...style
-        } as CSSProperties
-      }
+      data-list-theme={theme}
+      data-list-surface={surface}
+      data-list-accent={accentColor ? '' : undefined}
+      style={{
+        '--al-radius-override': radius === undefined ? undefined : `${Math.max(0, radius)}px`,
+        '--al-gap': gap === undefined ? undefined : `${Math.max(0, gap)}px`,
+        '--al-width': width === undefined ? undefined : size(width),
+        '--al-accent-override': accentColor || undefined,
+        '--animated-list-maximum-height': maxHeight === undefined ? undefined : size(maxHeight),
+      }}
     >
       <div
         ref={viewportRef}
-        className={`animated-list__viewport${displayScrollbar ? '' : ' animated-list__viewport--bare'}`}
+        className={`animated-list__viewport${displayScrollbar ? '' : ' animated-list__viewport--bare'} ${viewportClassName}`.trim()}
         role={renderItemHeader ? 'grid' : 'listbox'}
         aria-label={ariaLabel}
         tabIndex={0}
         aria-activedescendant={selected >= 0 && selected < items.length ? `${baseId}-${selected}` : undefined}
-        style={{
-          maxHeight: size(maxHeight),
-          maskImage: showGradients ? FADE_MASK : undefined,
-          WebkitMaskImage: showGradients ? FADE_MASK : undefined
-        }}
+        data-list-gradients={showGradients || undefined}
       >
         <div ref={trackRef} className="animated-list__track" role="presentation">
           {trackDecoration}
@@ -569,16 +501,21 @@ const AnimatedList = ({
                 data-index={index}
                 data-selected={isSelected ? '' : undefined}
                 onPointerEnter={selectOnHover ? () => hover(index) : undefined}
-                onClick={onItemSurfaceClick ? event => onItemSurfaceClick(event, () => choose(item, index))
-                  : renderItemHeader ? undefined : () => choose(item, index)}
               >
+                <ActionButton className="animated-list__selection-hit" shape="corner" tabIndex={-1}
+                  aria-label={typeof entry.title === 'string' ? entry.title : `항목 ${index + 1} 선택`}
+                  onMouseDown={(event: MouseEvent<HTMLButtonElement>) => {
+                    if (event.button !== 0) return;
+                    event.preventDefault();
+                    viewportRef.current?.focus({ preventScroll: true });
+                  }}
+                  onClick={() => choose(item, index)} />
                 {renderItemHeader ? (
                   <>
                     <div className="animated-list__item-header" role="gridcell">
                       {renderItemHeader(item, index)}
                     </div>
-                    <div id={id} className="animated-list__item-content" role="gridcell"
-                      onClick={onItemSurfaceClick ? undefined : () => choose(item, index)}>
+                    <div id={id} className="animated-list__item-content" role="gridcell">
                       {itemContent}
                     </div>
                   </>

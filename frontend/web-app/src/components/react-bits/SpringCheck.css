@@ -1,16 +1,18 @@
+@import '../../styles/selection-control-tokens.css';
+
 .spring-check {
-  --sc-ink: #ffffff;
-  --sc-fill: #ffffff;
-  --sc-check: #0b0b0f;
-  --sc-box: 28px;
-  --sc-radius: 9px;
-  --sc-font: 18px;
-  --sc-ring: 2px;
-  --sc-gap: 12px;
-  --sc-row: 44px;
-  --sc-rule: 1.5px;
+  --sc-ink: var(--aml-white-100);
+  --sc-fill: var(--aml-white-100);
+  --sc-check: var(--spring-check-mark-color);
+  --sc-box: var(--selection-control-height-small);
+  --sc-radius: var(--spring-check-radius);
+  --sc-font: var(--spring-check-label-size);
+  --sc-ring: var(--aml-stroke-focus);
+  --sc-gap: clamp(var(--aml-space-8), var(--sc-custom-gap, var(--aml-space-12)), var(--aml-space-16));
+  --sc-row: max(var(--selection-control-height-large), calc(var(--sc-box) + var(--aml-space-16)));
+  --sc-rule: max(var(--spring-check-strike-thickness), var(--sc-custom-strike, var(--spring-check-strike-thickness)));
   --sc-origin: left center;
-  --sc-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --sc-ease-out: var(--selection-control-ease-out);
 
   display: inline-flex;
   align-items: center;
@@ -23,9 +25,9 @@
   color: var(--sc-ink);
   font-family: inherit;
   font-size: var(--sc-font);
-  font-weight: 500;
-  line-height: 1.2;
-  letter-spacing: -0.01em;
+  font-weight: var(--aml-type-label-weight);
+  line-height: var(--selection-control-line-height);
+  letter-spacing: var(--spring-check-label-tracking);
   text-align: left;
   cursor: pointer;
   user-select: none;
@@ -36,8 +38,11 @@
   outline: none;
 }
 
+.spring-check[data-strike="center"] { --sc-origin: center }
+.spring-check[data-strike="right"] { --sc-origin: right center }
+
 .spring-check:disabled {
-  opacity: 0.5;
+  opacity: var(--selection-control-disabled-opacity);
   cursor: not-allowed;
 }
 
@@ -46,16 +51,16 @@
   width: var(--sc-box);
   height: var(--sc-box);
   border-radius: var(--sc-radius);
-  transition: transform 160ms var(--sc-ease-out);
+  transition: transform var(--selection-control-transition-duration) var(--sc-ease-out);
 }
 
 .spring-check[data-pressed] .spring-check__press {
-  transform: scale(0.95);
+  transform: scale(var(--spring-check-press-scale));
 }
 
 .spring-check:focus-visible .spring-check__press {
-  outline: 2px solid color-mix(in srgb, var(--sc-ink) 45%, transparent);
-  outline-offset: 3px;
+  outline: var(--aml-stroke-focus) solid color-mix(in srgb, var(--sc-ink) var(--spring-check-focus-strength), transparent);
+  outline-offset: var(--selection-control-focus-offset);
 }
 
 .spring-check__box {
@@ -67,6 +72,7 @@
   border-radius: inherit;
   overflow: hidden;
   transform-origin: center;
+  transform: scale(var(--sc-box-scale));
 }
 
 .spring-check__ring {
@@ -74,13 +80,13 @@
   inset: 0;
   border-radius: inherit;
   box-shadow: inset 0 0 0 var(--sc-ring) var(--sc-ink);
-  opacity: 0.28;
-  transition: opacity 120ms ease;
+  opacity: var(--spring-check-ring-opacity);
+  transition: opacity var(--aml-duration-fast) ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .spring-check:not(:disabled):hover .spring-check__ring {
-    opacity: 0.5;
+    opacity: var(--spring-check-hover-opacity);
   }
 }
 
@@ -90,18 +96,24 @@
   border-radius: inherit;
   background: var(--sc-fill);
   transform-origin: center;
+  transform: scale(var(--sc-fill-scale));
 }
 
 .spring-check__tick {
   position: relative;
-  width: var(--compact-icon-size, 12px);
-  height: var(--compact-icon-size, 12px);
+  width: var(--compact-icon-size, var(--aml-space-12));
+  height: var(--compact-icon-size, var(--aml-space-12));
   overflow: visible;
   fill: none;
   stroke: var(--sc-check);
-  stroke-width: 2.6;
+  stroke-width: var(--spring-check-mark-weight);
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.spring-check__mark {
+  stroke-dasharray: var(--spring-check-mark-length);
+  stroke-dashoffset: var(--sc-mark-offset);
 }
 
 .spring-check__label {
@@ -111,17 +123,19 @@
 
 .spring-check__word {
   display: inline-block;
+  opacity: var(--sc-label-opacity);
 }
 
 .spring-check__rule {
   position: absolute;
   left: 0;
   right: 0;
-  top: 46%;
+  top: var(--spring-check-strike-position);
   height: var(--sc-rule);
-  border-radius: 2px;
+  border-radius: var(--aml-space-2);
   background: currentColor;
   transform-origin: var(--sc-origin);
+  transform: scaleX(var(--sc-strike-scale));
   pointer-events: none;
 }
 

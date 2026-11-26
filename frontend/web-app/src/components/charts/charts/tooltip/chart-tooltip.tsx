@@ -1,7 +1,8 @@
 "use client";
 
-import { m, useReducedMotion, useSpring } from "motion/react";
-import { type CSSProperties, memo, useEffect, useMemo } from "react";
+import { m, useMotionTemplate, useSpring, useTransform, type MotionStyle } from "motion/react";
+import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
+import { memo, useEffect, useEffectEvent, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
   resolveTooltipBoxMotion,
@@ -78,8 +79,6 @@ export interface ChartTooltipProps {
    * (`rounded-full bg-zinc-900 px-4 py-1 text-white shadow-lg …`).
    */
   datePillClassName?: string;
-  /** Inline styles for the pill surface (e.g. `background`, `color`). */
-  datePillStyle?: CSSProperties;
   /**
    * Replace the pill's contents entirely. The result is still positioned
    * under the crosshair and follows the tooltip spring.
@@ -174,8 +173,6 @@ export interface ChartTooltipProps {
   indicatorFadeLength?: number;
   /** Per-chart override for the floating-panel spring. */
   boxSpringConfig?: SpringConfig;
-  /** Inline styles for the tooltip panel (background, blur, etc.). */
-  panelStyle?: React.CSSProperties;
   /**
    * Tooltip panel background color (CSS variable or color value).
    * Default: `var(--chart-tooltip-background)`.
@@ -292,7 +289,6 @@ const ChartTooltipInner = memo(function ChartTooltipInner({
   datePillVariant,
   datePillVelocity,
   datePillClassName,
-  datePillStyle,
   datePill,
   showCrosshair: showCrosshairProp,
   showDots = true,
@@ -320,7 +316,6 @@ const ChartTooltipInner = memo(function ChartTooltipInner({
   indicatorFadeEdges,
   indicatorFadeLength,
   boxSpringConfig,
-  panelStyle,
   backgroundColor,
   dateLabels: dateLabelsProp,
   exit = true,
@@ -659,7 +654,6 @@ const ChartTooltipInner = memo(function ChartTooltipInner({
         containerRef={containerRef}
         containerWidth={width}
         exit={exit}
-        panelStyle={panelStyle}
         springConfig={boxMotion.springConfig}
         {...boxPlacement}
         visible={visible}
@@ -687,7 +681,6 @@ const ChartTooltipInner = memo(function ChartTooltipInner({
         point={tooltipData?.point}
         render={datePill}
         springConfig={springConfig}
-        style={datePillStyle}
         variant={datePillVariant}
         velocity={datePillVelocity}
         visible={visible}
@@ -723,7 +716,6 @@ interface DatePillTrackerProps {
   point?: Record<string, unknown>;
   animation?: DateTickerAnimation;
   className?: string;
-  style?: CSSProperties;
   render?: ChartTooltipProps["datePill"];
   variant?: DateTickerVariant;
   velocity?: ChartTooltipProps["datePillVelocity"];
@@ -748,41 +740,45 @@ function DatePillTrackerInner({
   point,
   animation,
   className,
-  style,
   render,
   variant,
   velocity,
 }: DatePillTrackerProps) {
   const { tooltipSpring } = useChartConfig();
-  const reduceMotion = useReducedMotion() === true;
+  const reduceMotion = useAppReducedMotion() === true;
   const effectiveSpring = springConfig ?? tooltipSpring;
   const animatedX = useSpring(xWithMargin, effectiveSpring);
+  const animatedLeft = useMotionTemplate`${animatedX}px`;
   const swell = useVelocityStretch(
     animatedX,
     reduceMotion || discreteInteraction
       ? null
       : resolveDatePillVelocity(velocity)
   );
+  const stretch = useTransform(() => {
+    const x = swell.scaleX.get();
+    const y = swell.scaleY.get();
+    return x === 1 && y === 1 ? "none" : `scale(${x}, ${y})`;
+  });
 
   if (!discreteInteraction) {
     animatedX.set(xWithMargin);
   }
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: we need to jump the animatedX when the visible prop changes
+  // 보이기 상태가 바뀔 때 스프링 없이 지금 x로 건너뛴다(x 변화마다 다시 돌지 않게 effect event로 읽는다)
+  const jumpToX = useEffectEvent(() => animatedX.set(xWithMargin));
   useEffect(() => {
-    animatedX.set(xWithMargin);
-  }, [animatedX, visible]);
+    jumpToX();
+  }, [visible]);
 
   return (
     <m.div
-      className="pointer-events-none absolute z-50 w-max"
+      className="chart-date-pill-anchor pointer-events-none absolute z-50 w-max"
       style={{
-        left: discreteInteraction ? xWithMargin : animatedX,
-        transform: "translateX(-50%)",
-        bottom: 4,
-      }}
+        "--chart-date-pill-x": discreteInteraction ? `${xWithMargin}px` : animatedLeft,
+      } as MotionStyle}
     >
-      <m.div style={{ scaleX: swell.scaleX, scaleY: swell.scaleY }}>
+      <m.div className="chart-date-pill-stretch" style={{ "--chart-date-pill-stretch": stretch } as MotionStyle}>
         {render && point ? (
           render({
             label: labels[currentIndex] ?? "",
@@ -795,7 +791,6 @@ function DatePillTrackerInner({
             className={className}
             currentIndex={currentIndex}
             labels={labels}
-            style={style}
             variant={variant}
             visible={visible}
           />

@@ -1,0 +1,25 @@
+.flow-connection-overlay {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  pointer-events: none;
+  fill: none;
+  stroke: var(--muted-text);
+  stroke-width: var(--aml-stroke-divider);
+}
+.flow-connection-overlay path { opacity: var(--flow-connection-opacity) }
+.flow-connection-overlay path[data-active] { stroke: var(--text); stroke-width: var(--aml-stroke-focus); opacity: 1 }
+
+[data-account-verdict] {
+  --transaction-endpoint-fill: var(--status-caution-accent);
+  --transaction-endpoint-ink: var(--status-accent-dark-ink);
+}
+[data-account-verdict="abnormal"] {
+  --transaction-endpoint-fill: var(--status-danger-accent);
+  --transaction-endpoint-ink: var(--status-accent-light-ink);
+}
+[data-account-verdict="normal"] { --transaction-endpoint-fill: var(--status-positive-accent) }
+
+.transaction-direction-arrow { inline-size: 100%; block-size: 100% }
+.transaction-arrow-shaft { width: calc(100% - var(--transaction-arrow-head-inset)) }

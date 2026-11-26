@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi, type MockInstance } from 'vitest'
 import { ApiError, clearCsrf } from './common'
 import {
-  cancelBacktest, cloneRule, commandRule, createRule, createRuleVersion, deleteRuleDraft, fetchBacktest, fetchBacktests, fetchCaseRuleHits, fetchRule,
+  cancelBacktest, cloneRule, commandRule, createRule, createRuleVersion, deleteRuleDraft, fetchBacktest, fetchBacktestPeriod, fetchBacktests, fetchCaseRuleHits, fetchRule,
   fetchRuleCatalog, fetchRules, requestBacktest, saveRuleDraft, validateRule, type RuleDefinition,
 } from './rules'
 
@@ -55,18 +55,20 @@ it('검증 · 만들기 · 초안 저장 · 초안 삭제를 POST · PUT · DELE
   expect(call(3)).toEqual({ url: '/api/v1/rules/3/versions/7', method: 'DELETE', body: undefined })
 })
 
-it('백테스트는 실행 · 조회 · 룰별 목록 · 취소를 rule-backtests 주소로 보낸다', async () => {
+it('백테스트는 실행 · 조회 · 룰별 목록 · 취소 · 고를 수 있는 기간을 rule-backtests 주소로 보낸다', async () => {
   await requestBacktest({ versionId: 7 })
   await requestBacktest({ versionId: 7, baselineVersionId: 5, from: '2023-09-08', to: '2023-09-16' })
   await fetchBacktest(31)
   await fetchBacktests(3)
   await cancelBacktest(31)
-  expect([0, 1, 2, 3, 4].map(index => call(index))).toEqual([
+  await fetchBacktestPeriod()
+  expect([0, 1, 2, 3, 4, 5].map(index => call(index))).toEqual([
     { url: '/api/v1/rule-backtests', method: 'POST', body: { versionId: 7 } },
     { url: '/api/v1/rule-backtests', method: 'POST', body: { versionId: 7, baselineVersionId: 5, from: '2023-09-08', to: '2023-09-16' } },
     { url: '/api/v1/rule-backtests/31', method: 'GET', body: undefined },
     { url: '/api/v1/rule-backtests?ruleId=3', method: 'GET', body: undefined },
     { url: '/api/v1/rule-backtests/31/cancel', method: 'POST', body: {} },
+    { url: '/api/v1/rule-backtests/period', method: 'GET', body: undefined },
   ])
 })
 

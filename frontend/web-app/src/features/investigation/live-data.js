@@ -58,7 +58,7 @@ function caseRow(item, transactions, userId, codes) {
     verdict: verdicts[item.outcome] ?? 'unjudged', status, assigned, open: item.status === 'OPEN',
     // 열람 여부는 서버가 기억한다. 방금 연 사건은 다시 받아 오기 전에도 읽은 것으로 보인다.
     unread: assigned && status === '처리 전' && !item.readAt && !wasPreviewCaseRead(code),
-    date: dateFromCode(code), createdAt, completedAt: item.closedAt ?? undefined,
+    date: dateFromCode(code), createdAt, assignedAt: item.assignedAt, completedAt: item.closedAt ?? undefined,
     hour: Number(kstTimestamp(createdAt).slice(11, 13)) - 9, elapsed: item.ageDays,
     score: Math.round((item.summary.riskScore ?? 0) * 100),
     pattern: `${item.summary.primaryType}${share == null ? '' : ` ${Math.round(share * 100)}%`}`,
@@ -66,7 +66,8 @@ function caseRow(item, transactions, userId, codes) {
     relatedAccounts: new Set(related.flatMap(record => [record.account, record.counterparty])).size,
     amountByCurrency: Object.fromEntries(Object.entries(item.summary.amountsByCurrency ?? {})
       .map(([currency, amount]) => [currency, Number(amount)])),
-    caseId: item.caseId, assigneeName: item.assigneeName, assignee: item.assigneeUsername, reviewDueOn: item.dueOn ?? undefined,
+    caseId: item.caseId, assigneeId: item.assigneeId, assigneeName: item.assigneeName,
+    assignee: item.assigneeUsername, reviewDueOn: item.dueOn ?? undefined,
     ...(item.episodeId && { episodeCode: codes.get(item.episodeId) }),
     ...(item.kind === 'EPISODE' && { linkedAlertCodes: item.linkedAlertIds.map(id => codes.get(id)), linkedAlertCodesComplete: true }),
     ...(item.edits?.length && { membershipHistory: item.edits.map(edit => ({

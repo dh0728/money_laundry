@@ -54,7 +54,6 @@ interface ScatterChartInteractionResult {
     onTouchMove?: (event: React.TouchEvent<SVGGElement>) => void;
     onTouchEnd?: () => void;
   };
-  interactionStyle: React.CSSProperties;
 }
 
 export function useScatterChartInteraction({
@@ -433,17 +432,11 @@ export function useScatterChartInteraction({
       }
     : {};
 
-  const interactionStyle: React.CSSProperties = {
-    cursor: canInteract ? "crosshair" : "default",
-    touchAction: "none",
-  };
-
   return {
     tooltipData,
     setTooltipData,
     selection,
     clearSelection,
     interactionHandlers,
-    interactionStyle,
   };
 }

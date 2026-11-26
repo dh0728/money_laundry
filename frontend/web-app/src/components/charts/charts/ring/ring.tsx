@@ -1,11 +1,12 @@
 "use client";
 
 import {
+  type MotionStyle,
   type MotionValue,
   m,
-  useReducedMotion,
   useTransform,
 } from "motion/react";
+import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
 import { memo, useCallback } from "react";
 import { arcPath } from "../pie/arc-path";
 import {
@@ -78,7 +79,7 @@ export const Ring = memo(function Ring({
     ringGap,
   } = useRingStable();
   const { hoveredIndex, setHoveredIndex } = useRingHover();
-  const reducedMotion = useReducedMotion() ?? false;
+  const reducedMotion = useAppReducedMotion() ?? false;
 
   const expandDelay = index * 0.08 * enterStaggerScale;
   const expandProgress = useMountProgress(
@@ -168,10 +169,7 @@ export const Ring = memo(function Ring({
   const enterDone =
     !animate || reducedMotion || (expandComplete && progressComplete);
 
-  const groupStyle = {
-    transformOrigin: "0px 0px",
-    filter: showGlow && isHovered ? `drop-shadow(0 0 12px ${color})` : "none",
-  };
+  const glowColor = showGlow && isHovered ? color : undefined;
 
   // Static hit band (does not scale with hover) so the pointer can't fall
   // off the edge of a growing ring and flicker between hover states.
@@ -195,7 +193,7 @@ export const Ring = memo(function Ring({
       fill="transparent"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      style={{ cursor: "pointer" }}
+      className="ring-hitbox"
     />
   );
 
@@ -205,9 +203,11 @@ export const Ring = memo(function Ring({
         {hitbox}
         <m.g
           animate={{ scale: hoverScale, opacity: layerOpacity }}
+          className="ring-progress-layer"
+          data-glow={glowColor ? true : undefined}
           initial={false}
           pointerEvents="none"
-          style={groupStyle}
+          style={{ "--ring-progress-glow-color": glowColor } as MotionStyle}
           transition={{
             scale: { type: "spring", stiffness: 400, damping: 25 },
             opacity: { duration: 0.15 },
@@ -225,12 +225,15 @@ export const Ring = memo(function Ring({
       <g>
         {hitbox}
         <m.g
+          className="ring-progress-layer"
+          data-entering
+          data-glow={glowColor ? true : undefined}
+          opacity={layerOpacity}
           pointerEvents="none"
           style={{
-            ...groupStyle,
-            scale: enterScale,
-            opacity: layerOpacity,
-          }}
+            "--ring-progress-glow-color": glowColor,
+            "--ring-progress-enter-scale": enterScale,
+          } as MotionStyle}
         >
           <path d={bgPath} fill={ringCssVars.ringBackground} />
         </m.g>
@@ -243,9 +246,11 @@ export const Ring = memo(function Ring({
       {hitbox}
       <m.g
         animate={{ scale: hoverScale, opacity: layerOpacity }}
+        className="ring-progress-layer"
+        data-glow={glowColor ? true : undefined}
         initial={false}
         pointerEvents="none"
-        style={groupStyle}
+        style={{ "--ring-progress-glow-color": glowColor } as MotionStyle}
         transition={{
           scale: { type: "spring", stiffness: 400, damping: 25 },
           opacity: { duration: 0.15 },

@@ -4,18 +4,21 @@ import { createPortal, flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { DayPicker } from 'react-day-picker';
 import { ko } from 'react-day-picker/locale';
-import { Check, ChevronRight } from 'lucide-react';
-import { downloadCsv as saveCsv } from '@/next/features/report-io';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
+import { createCsv, downloadBlob, downloadCsv as saveCsv } from '@/lib/report-io';
 import { Icon, IconButton, bindTooltip, hideTooltip } from './components.js';
 import { ActionButton } from './primary-button';
 import { FilterTag, reviewStates, reviewStatusLabel, VerdictTag, verdictLabels } from './semantic-tags';
 import { modelRiskBand, modelRiskLabels } from '../features/settings/model-risk-settings';
+import { createPageCsvZip, printWorkspace } from '../lib/page-export';
 import { downloadVisualizations, hasVisualizations } from '../lib/preview-visual-export.js';
 import JellyRadio from './react-bits/JellyRadio';
 import { QueryCheck } from './selection-check';
+import { FormDropdown, FormDropdownItem } from './form-dropdown';
 import { readWorkspaceGap } from '../features/dashboard/workspace-metrics.js';
 import { sortSavedTableRows, tableSortFields } from './workflow-table';
 import 'react-day-picker/style.css';
+import '../styles/page-export-print.css';
 import './query-controls.css';
 
 const statuses = reviewStates.map(({ value }) => value);
@@ -29,36 +32,55 @@ const samplePatterns = ['Fan-out 82%', 'Cycle 74%', 'Gather-scatter 71%'];
 
 const queryTools = { filter: '필터', sort: '정렬', period: '기간', download: '다운로드' };
 const queryTriggerSelector = '[data-query-tool]:not([data-query-tool="download"])';
+const embeddedDownloads = new WeakMap();
+const pageDownloadLabel = '현재 페이지 전체 다운로드';
 
-export function QueryToolbar() {
-  const buttons = Object.entries(queryTools).map(([tool, label]) => `<div class="query-control">
-    ${IconButton(Icon(tool), label, `data-query-tool="${tool}" aria-haspopup="dialog" aria-expanded="false" hidden`,
-      'query-trigger', 'ghost')}
-  </div>`).join('');
+function queryToolButton(tool, label, surface) {
+  return IconButton(Icon(tool), label,
+    `data-query-tool="${tool}" aria-haspopup="dialog" aria-expanded="false" hidden`, 'query-trigger', surface);
+}
+
+export function QueryToolbar({ page = false } = {}) {
+  const buttons = Object.entries(queryTools).map(([tool, label]) => {
+    const pageExport = page && tool === 'download';
+    return `<div class="query-control"${pageExport ? ' id="page-download"' : ''}>
+      ${queryToolButton(tool, pageExport ? pageDownloadLabel : label, 'ghost')}
+    </div>`;
+  }).join('');
   return `<div class="context-query-tools" role="group" aria-label="조회 도구" hidden>${buttons}</div>`;
+}
+
+export function WorkspaceQueryDock() {
+  return `<div id="workspace-query-dock" class="glass floating-glass">${QueryToolbar({ page: true })}</div>`;
 }
 
 const embeddedToolbar = { __html: QueryToolbar() };
 
-export function LocalQueryTools({ actions, relatedRows, onRelatedQuery }) {
+export function LocalQueryTools({ actions, relatedRows, onRelatedQuery, downloadSurface = 'ghost' }) {
   const host = useRef(null);
   const controller = useRef(null);
   useEffect(() => {
+    const element = host.current;
     const instance = setupQueryControls({
-      workspace: host.current, controls: host.current.firstElementChild, embedded: true,
+      workspace: element, controls: element.firstElementChild, embedded: true, downloadSurface,
       onChange: (_tool, query) => {
         onRelatedQuery?.(query);
         instance.refresh();
       },
     });
     controller.current = instance;
-    return () => instance.dispose();
-  }, [onRelatedQuery]);
+    embeddedDownloads.set(element, instance);
+    return () => {
+      embeddedDownloads.delete(element);
+      instance.dispose();
+    };
+  }, [onRelatedQuery, downloadSurface]);
   useEffect(() => {
     if (relatedRows) controller.current.setScreen('related-candidates', [], { rows: relatedRows });
-  }, [onRelatedQuery, relatedRows]);
-  useEffect(() => controller.current.registerTableTools(actions), [actions]);
-  return <div ref={host} dangerouslySetInnerHTML={embeddedToolbar} />;
+  }, [onRelatedQuery, relatedRows, downloadSurface]);
+  useEffect(() => controller.current.registerTableTools(actions), [actions, onRelatedQuery, downloadSurface]);
+  return <div ref={host} data-local-query-tools=""
+    data-page-only-download={actions?.panelDownload === false || undefined} dangerouslySetInnerHTML={embeddedToolbar} />;
 }
 
 export { LocalQueryTools as TableQueryTools };
@@ -71,7 +93,8 @@ export function visualizationEntries({ label, filename, readRoot }) {
 }
 
 function CalendarChevron({ orientation = 'left' }) {
-  return <span className="aml-calendar-chevron" data-direction={orientation} aria-hidden="true" />;
+  const Chevron = ({ left: ChevronLeft, right: ChevronRight, down: ChevronDown, up: ChevronUp })[orientation] ?? ChevronLeft;
+  return <Chevron className="aml-calendar-chevron" aria-hidden="true" />;
 }
 
 const patternValue = row => row.pattern?.replace(/\s+\d+%$/, '');
@@ -227,7 +250,7 @@ export { QueryCheck };
 
 export function QueryRadio({ items, label, value, onChange }) {
   return <JellyRadio className="aml-density-radio" items={items} ariaLabel={label} value={value} onChange={onChange}
-    size="sm" gap={4} radius={8} chipColor="var(--glass-surface)" activeColor="var(--selection-surface)"
+    size="sm" gap="var(--aml-space-4)" radius="var(--aml-space-8)" chipColor="var(--glass-surface)" activeColor="var(--selection-surface)"
     textColor="var(--text)" activeTextColor="var(--selection-ink)" />;
 }
 
@@ -327,10 +350,11 @@ function FilterPane({ value, groups, onApply, onResize, editingGroup }) {
   </QueryPanel>;
 }
 
-function SortPane({ value, sorts, onApply }) {
+function SortPane({ value, sorts, onApply, sortScope }) {
   const [sort, setSort] = useState(value.sort);
   return <QueryPanel title="정렬 기준" onSubmit={() => onApply({ ...value, sort })}>
     <div className="query-popover-body">
+      {sortScope && <p className="query-popover-note">대시보드에서는 ‘{sortScope}’ 섹션에만 적용됩니다.</p>}
       <QueryChoices label="정렬 기준" options={sorts} value={sort} onChange={setSort} />
     </div>
   </QueryPanel>;
@@ -345,12 +369,22 @@ function TableFilterPane({ filter, onApply }) {
   </QueryPanel>;
 }
 
+function CalendarDropdown({ 'aria-label': label, disabled, options, value, onChange }) {
+  const { host } = useContext(QueryActions);
+  return <FormDropdown label={label} value={String(value)} disabled={disabled}
+    onValueChange={value => onChange({ target: { value } })}
+    triggerClassName="query-calendar-select" optionsClassName="query-calendar-options"
+    portalContainer={host.closest('.query-tool-popover')}>
+    {options.map(({ value, label, disabled }) => <FormDropdownItem key={value} value={String(value)} disabled={disabled}>{label}</FormDropdownItem>)}
+  </FormDropdown>;
+}
+
 function AmlCalendar({ month, onMonth, range, onRange, asOf }) {
   return <DayPicker mode="range" locale={ko} month={month} onMonthChange={onMonth}
     captionLayout="dropdown" navLayout="around" selected={range} today={asOf} onSelect={onRange}
     showOutsideDays resetOnSelect disabled={{ after: asOf }} endMonth={asOf} aria-label="조회 기간 달력"
     formatters={{ formatYearDropdown: date => `${date.getFullYear()}년` }}
-    components={{ Chevron: CalendarChevron }} />;
+    components={{ Chevron: CalendarChevron, Dropdown: CalendarDropdown }} />;
 }
 
 function PeriodPane({ value, asOf, onApply, onResize }) {
@@ -386,18 +420,40 @@ const queryPanels = { filter: FilterPane, sort: SortPane, period: PeriodPane };
 const firstQueryControl = {
   filter: '.query-filter-group',
   sort: '.query-choice input:checked',
-  period: '.query-period-presets input:checked, .rdp-dropdown',
+  period: '.query-period-presets input:checked, .query-calendar-select',
   download: '.query-content button:not(:disabled)',
 };
 
 export function exportCases(rows, scope) {
-  downloadCsv(scope, ['코드', '탐지일', '처리 상태', '담당 범위'], rows.map(row =>
-    [row.code, formatDate(row.date), reviewStatusLabel(row.status), row.assigned ? '내 담당' : '다른 담당']));
+  caseCsvDownloadEntry('', scope, rows).download();
+}
+
+function caseDetectionDate({ code, date }) {
+  if (date instanceof Date && Number.isFinite(date.getTime())) return formatDate(date);
+  const stamp = /^[AE]-(\d{6})-\d{6,}$/.exec(code)?.[1];
+  if (!stamp) return '';
+  const inferred = formatDate(dateFromCode(code));
+  return inferred.slice(2).replaceAll('-', '') === stamp ? inferred : '';
+}
+
+export function caseCsvDownloadEntry(label, file, rows) {
+  return createCsvDownloadEntry(label, file, ['코드', '탐지일', '처리 상태', '담당 범위'], rows.length,
+    () => rows.map(row => [row.code, caseDetectionDate(row), reviewStatusLabel(row.status), row.assigned ? '내 담당' : '다른 담당']));
 }
 
 export function downloadCsv(file, headers, rows) {
   saveCsv(`aml-${file}.csv`, headers, rows);
   announceExport('CSV 다운로드', `${rows.length}건 다운로드를 요청했습니다.`);
+}
+
+export function csvDownloadEntry(label, file, headers, rows) {
+  return createCsvDownloadEntry(label, file, headers, rows.length, () => rows);
+}
+
+function createCsvDownloadEntry(label, file, headers, count, readRows) {
+  return { label, format: 'CSV', count, disabled: !count,
+    csv: { filename: `aml-${file}.csv`, headers, get rows() { return readRows(); } },
+    download: () => downloadCsv(file, headers, readRows()) };
 }
 
 function announceExport(title, description, status = 'done') {
@@ -409,7 +465,7 @@ function DownloadOptions({ entries, onDone }) {
   return <div className="query-popover-body query-download-options">
       {entries.map(({ format, label, count, download, disabled }) => <ActionButton
         key={`${label}-${format}`} className="query-menu-row" disabled={disabled}
-        aria-label={`${format} · ${label}${count ? ` · ${count}건` : ''}`} onClick={async () => {
+        aria-label={label ? `${format} · ${label}${count ? ` · ${count}건` : ''}` : format} onClick={async () => {
           onDone();
           try {
             await download();
@@ -427,16 +483,17 @@ function DownloadOptions({ entries, onDone }) {
 
 let nextPopoverId = 0;
 
-export function setupQueryControls({ onChange, workspace, controls, embedded = false,
+export function setupQueryControls({ onChange, workspace, controls, embedded = false, downloadSurface = 'ghost',
   tooltip = document.getElementById('tooltip') }) {
   const events = new AbortController();
   const eventOptions = { signal: events.signal };
+  const pageDownload = controls.querySelector('#page-download [data-query-tool]');
   const buttons = [...controls.querySelectorAll('[data-query-tool]')];
-  const queryButtons = buttons.filter(button => button.matches(queryTriggerSelector));
-  const downloadButton = buttons.find(button => button.dataset.queryTool === 'download');
-  const sortControl = buttons.find(button => button.dataset.queryTool === 'sort')?.parentElement;
-  const sortSibling = sortControl?.nextElementSibling;
-  const toolbarHome = controls.parentElement;
+  const toolbarButtons = buttons.filter(button => button !== pageDownload);
+  const queryButtons = toolbarButtons.filter(button => button.matches(queryTriggerSelector));
+  const downloadButton = toolbarButtons.find(button => button.dataset.queryTool === 'download');
+  if (downloadButton) downloadButton.dataset.buttonSurface = downloadSurface;
+  const sortButton = queryButtons.find(button => button.dataset.queryTool === 'sort');
   const popover = document.createElement('div');
   popover.id = `query-tool-popover-${++nextPopoverId}`;
   popover.popover = 'auto';
@@ -465,6 +522,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
   let opening = 0;
   let scope;
   let screen;
+  let sortScope;
   let tableTools;
   let localTable = embedded;
   let rows = [];
@@ -476,15 +534,18 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     const value = queries.get(scope) ?? defaultQuery;
     return localTable && value.sort ? { ...value, sort: '' } : value;
   };
-  const tableFrame = () => controls.closest('.data-table-frame');
+  const tableArea = () => embedded ? controls : workspace.querySelector('[data-table-tools]');
   function syncConditions() {
-    const host = controls.closest('.data-table-heading')?.querySelector('[data-table-query]')
-      ?? tableFrame()?.querySelector('[data-table-query]') ?? workspace.querySelector('[data-query-tags]');
+    const table = tableArea();
+    const frame = table?.closest('.data-table-frame');
+    const host = workspace.querySelector('[data-query-tags]')
+      ?? table?.closest('.data-table-heading')?.querySelector('[data-table-query]')
+      ?? frame?.querySelector('[data-table-query]');
     if (!host) return;
     if (conditionTags.parentElement !== host) host.prepend(conditionTags);
     const value = current();
     const groups = filterGroups(rows, scope);
-    const sort = tableSortFields(tableFrame()).find(field => field.direction);
+    const sort = tableSortFields(frame).find(field => field.direction);
     const filter = tableTools?.filter;
     const range = tableTools?.period?.range;
     const extra = [];
@@ -506,7 +567,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
       onChange={(next, tool) => {
         queries.set(scope, localTable ? { ...next, sort: queries.get(scope)?.sort ?? '' } : next);
         if (tool === 'sort' && boardSortHost) {
-          sortControl?.querySelector('[data-query-tool="sort"]')?.focus({ preventScroll: true });
+          sortButton?.focus({ preventScroll: true });
         } else focusTags = true;
         onChange(tool, current());
       }} />);
@@ -517,50 +578,43 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     const applied = {
       filter: tableTools?.filter ? tableTools.filter.value !== 'all'
         : groups.some(({ key }) => key === 'assignment' ? value.assignment !== 'all' : value[key].length),
-      sort: Boolean(value.sort),
+      sort: tableTools?.sort ? tableTools.sort.value !== tableTools.sort.defaultValue : Boolean(value.sort),
       period: Boolean(tableTools?.period?.range ?? value.range),
     };
     for (const button of queryButtons) {
       button.toggleAttribute('data-query-applied', applied[button.dataset.queryTool]);
     }
   }
-  function moveToolbar(target) {
-    const previous = controls.parentElement;
-    if (previous === target) return;
-    if (previous?.matches('[data-table-tools]')) previous.hidden = true;
-    target.append(controls);
+  function visibleLocalDownloads() {
+    return [...workspace.querySelectorAll('[data-local-query-tools]')]
+      .filter(element => {
+        const anchor = element.matches('[data-page-only-download]') ? element.closest('.data-table-heading, .data-table-frame') ?? element
+          : element.querySelector('[data-query-tool="download"]:not([hidden])');
+        return anchor?.getClientRects().length > 0;
+      })
+      .map(element => embeddedDownloads.get(element))
+      .filter(Boolean);
   }
-  function syncTools(hasVisibleVisuals = !localTable && hasVisualizations(workspace), workspaceReady = true) {
+  function syncTools(workspaceReady = true) {
     const hasRows = Boolean(scope && rows.length);
-    const tableSlot = embedded ? toolbarHome : localTable && workspaceReady
-      ? workspace.querySelector('[data-table-tools]') : null;
-    const screenSlot = !localTable && workspaceReady ? workspace.querySelector('[data-screen-query-tools]') : null;
-    const target = tableSlot ?? screenSlot;
-    const dashboardSort = workspaceReady && scope?.startsWith('dashboard-') && workspace.querySelector('[data-dashboard-sort]');
-    const sortHost = dashboardSort || controls;
-    if (sortControl && sortControl.parentElement !== sortHost) {
-      sortHost.insertBefore(sortControl, dashboardSort ? null : sortSibling);
-    }
+    const hasDownloadEntries = tableTools?.entries?.some(entry => !entry.disabled);
     const available = {
       filter: hasRows || Boolean(tableTools?.filter),
-      sort: hasRows && !localTable,
+      sort: hasRows && !localTable || Boolean(tableTools?.sort),
       period: Boolean(tableTools?.period || scope && (hasRows || periodAnchor)),
-      download: hasRows || Boolean(tableTools?.entries?.length)
-        || (!localTable && hasVisibleVisuals),
+      download: tableTools?.panelDownload !== false && (hasRows || hasDownloadEntries),
     };
-    for (const button of buttons) {
+    for (const button of toolbarButtons) {
       const hidden = !available[button.dataset.queryTool];
       if (button.hidden !== hidden) button.hidden = hidden;
     }
-    if (downloadButton) {
-      const surface = screenSlot?.closest('.preview-graph-metadata') ? 'floating' : 'ghost';
-      if (downloadButton.dataset.buttonSurface !== surface) downloadButton.dataset.buttonSurface = surface;
+    if (pageDownload) {
+      const hidden = !screen || !workspaceReady;
+      if (pageDownload.hidden !== hidden) pageDownload.hidden = hidden;
     }
-    const hideToolbar = !target || buttons.every(button => button.hidden);
+    const hideToolbar = !workspaceReady || buttons.every(button => button.hidden);
     if (controls.hidden !== hideToolbar) controls.hidden = hideToolbar;
-    if (tableSlot && tableSlot.hidden !== hideToolbar) tableSlot.hidden = hideToolbar;
-    moveToolbar(target ?? toolbarHome);
-    if (resumeTableFocus && tableSlot && !hideToolbar) {
+    if (resumeTableFocus && !hideToolbar) {
       if (document.activeElement === document.body) {
         resumeTableFocus.focus({ preventScroll: true });
         if (tooltip) hideTooltip(tooltip);
@@ -592,10 +646,11 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     const fitViewport = popover.dataset.tool === 'period' && !fitsBeneathOrAbove;
     const maxHeight = Math.max(0, fitViewport ? innerHeight - 2 * gap : openAbove ? above : below);
     const top = rect.bottom + gap;
-    popover.style.top = fitViewport ? `${Math.max(gap, Math.min(top, innerHeight - gap - panelHeight))}px` : openAbove ? 'auto' : `${top}px`;
-    popover.style.bottom = openAbove && !fitViewport ? `${innerHeight - rect.top + gap}px` : 'auto';
-    popover.style.maxHeight = `${maxHeight}px`;
-    popover.style.left = `${left}px`;
+    popover.style.setProperty('--query-placement-top',
+      fitViewport ? `${Math.max(gap, Math.min(top, innerHeight - gap - panelHeight))}px` : openAbove ? 'auto' : `${top}px`);
+    popover.style.setProperty('--query-placement-bottom', openAbove && !fitViewport ? `${innerHeight - rect.top + gap}px` : 'auto');
+    popover.style.setProperty('--query-placement-max-height', `${maxHeight}px`);
+    popover.style.setProperty('--query-placement-left', `${left}px`);
   }
   function resetTrigger(button) {
     button?.setAttribute('aria-expanded', 'false');
@@ -644,30 +699,49 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     triggerOrigin = origin;
     const version = ++opening;
     trigger.setAttribute('aria-expanded', 'true');
-    const isDownload = button === downloadButton;
     const tool = button.dataset.queryTool;
+    const isDownload = tool === 'download';
+    const isPageDownload = button === pageDownload;
+    const label = isPageDownload ? pageDownloadLabel : queryTools[tool];
     popover.dataset.tool = tool;
-    popover.setAttribute('aria-label', queryTools[tool]);
+    popover.setAttribute('aria-label', label);
     triggerSlot.append(popover);
-    popoverLabel.textContent = queryTools[tool];
+    popoverLabel.textContent = label;
     const value = current();
     const asOf = periodAnchor ?? rows.reduce((latest, row) => row.date > latest ? row.date : latest, new Date(0));
     root ??= createRoot(queryContent);
     const Panel = queryPanels[tool];
     const tableFilter = tool === 'filter' ? tableTools?.filter : undefined;
     const tablePeriod = tool === 'period' ? tableTools?.period : undefined;
+    const tableSort = tool === 'sort' ? tableTools?.sort : undefined;
     const content = isDownload
-      ? <DownloadOptions entries={downloadEntries()} onDone={close} />
+      ? <DownloadOptions entries={isPageDownload ? pageDownloadEntries() : downloadEntries()} onDone={close} />
       : tableFilter ? <TableFilterPane filter={tableFilter} onApply={next => { close(); tableFilter.onChange(next); }} />
+      : tableSort ? <SortPane value={{ sort: tableSort.value }} sorts={tableSort.options}
+        onApply={({ sort }) => { close(); tableSort.onChange(sort); }} />
       : tablePeriod ? <PeriodPane value={{ range: tablePeriod.range }} asOf={tablePeriod.asOf}
         onApply={next => { close(); tablePeriod.onChange(next.range); }} onResize={position} />
       : <Panel value={value} groups={filterGroups(rows, scope)} sorts={availableSorts(rows)} asOf={asOf}
-          onApply={apply} onResize={position} editingGroup={editingGroup} />;
+          onApply={apply} onResize={position} editingGroup={editingGroup} sortScope={sortScope} />;
     flushSync(() => root.render(<QueryActions.Provider value={actions} key={version}>{content}</QueryActions.Provider>));
     if (!popover.matches(':popover-open')) popover.showPopover();
     position();
     if (popover.matches(':popover-open')) focusOpenPopover();
   }
+  function pageDownloadEntries() {
+    const formats = [{ format: 'PDF로 저장', download: () => printWorkspace(workspace) }];
+    const datasets = [...downloadEntries(), ...visibleLocalDownloads().flatMap(instance => instance.downloadEntries())]
+      .filter(entry => entry.format === 'CSV' && !entry.disabled);
+    if (datasets.length && datasets.every(entry => entry.csv)) {
+      formats.push({ format: 'CSV 묶음 (.zip)', download: () => {
+        const files = datasets.map(({ csv }) => ({ filename: csv.filename, content: createCsv(csv.headers, csv.rows) }));
+        downloadBlob(`aml-${screen.replaceAll('/', '-')}-csv.zip`, createPageCsvZip(files));
+        announceExport('CSV 묶음 다운로드', '현재 페이지의 CSV 묶음 다운로드를 요청했습니다.');
+      } });
+    }
+    return formats;
+  }
+
   function downloadEntries() {
     const entries = [...(tableTools?.entries ?? [])];
     if (scope && rows.length) {
@@ -675,12 +749,10 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
       const visible = localTable ? sortSavedTableRows(filtered, scope) : filtered;
       const dataset = scope === 'related-candidates' ? '연관 후보'
         : scope.startsWith('dashboard-') ? 'Alert·Episode' : scope === 'alerts' ? 'Alert' : 'Episode';
-      entries.push({ label: `조회된 ${dataset}`, format: 'CSV', count: visible.length, disabled: !visible.length,
-        download: () => exportCases(visible, scope) });
-      if (visible.length !== rows.length) entries.push({ label: `전체 ${dataset}`, format: 'CSV', count: rows.length,
-        download: () => exportCases(rows, scope) });
+      entries.push(caseCsvDownloadEntry(`조회된 ${dataset}`, scope, visible));
+      if (visible.length !== rows.length) entries.push(caseCsvDownloadEntry(`전체 ${dataset}`, scope, rows));
     }
-    if (!localTable && hasVisualizations(workspace)) {
+    if (!pageDownload && !localTable && hasVisualizations(workspace)) {
       const segment = screen?.replaceAll('/', '-') ?? 'transaction';
       entries.push(...visualizationEntries({
         label: '현재 차트·그래프', filename: `aml-${segment}-visualizations`, readRoot: () => workspace,
@@ -730,7 +802,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
   });
   const observationRoot = embedded ? workspace.closest('.data-table-frame') : workspace;
   if (observationRoot) watchVisualizations.observe(observationRoot, {
-    childList: true, subtree: true, attributes: true, attributeFilter: ['aria-selected', 'aria-sort', 'hidden'],
+    childList: true, subtree: true, attributes: true, attributeFilter: ['aria-selected', 'aria-sort', 'hidden', 'data-page-only-download'],
   });
   return {
     dispose() {
@@ -749,8 +821,10 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     },
     hasQuery() { return Boolean(scope); },
     refresh() { syncTools(); },
+    downloadEntries,
     registerTableTools(options) {
       tableTools = options;
+      downloadButton?.setAttribute('aria-label', options?.downloadLabel ?? queryTools.download);
       syncTools();
       return () => {
         if (tableTools === options) tableTools = undefined;
@@ -761,8 +835,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
       tagsRoot = undefined;
       conditionTags.remove();
     },
-    renderTags(host) {
-      if (!scope || !host) return;
+    renderTags() {
       syncTools();
     },
     caseRows() {
@@ -796,9 +869,9 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
         resumeTableFocus = undefined;
       }
       dismiss();
-      moveToolbar(toolbarHome);
       scope = next;
       screen = path;
+      sortScope = data?.sortScope;
       localTable = hasLocalTableTools(path);
       tableTools = undefined;
       rows = data?.rows ?? (scope ? caseFixtureRows(codes) : []);
@@ -808,7 +881,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
       }
       periodAnchor = data?.asOf;
       for (const button of queryButtons) button.removeAttribute('data-query-applied');
-      syncTools(false, false);
+      syncTools(false);
       return scope && !data?.dashboard ? visibleCaseRows(rows, current()).map(row => row.code) : codes;
     },
   };
