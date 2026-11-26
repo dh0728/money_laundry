@@ -1,6 +1,6 @@
 # AML RADAR Web App
 
-팀 작업 Branch `frontend` · 기본 화면 3.6.0
+팀 작업 Branch `frontend` · 화면 버전 3.10.25
 
 ## 화면 검수
 
