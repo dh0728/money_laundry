@@ -64,20 +64,31 @@ public class BacktestService {
     }
   }
 
-  /**
-   * 검사할 날짜 범위. 원장 첫날부터 warmupDays 일은 이력으로만 쓰므로 검사 날짜에서 뺀다(그 거래도 돌아보는 쪽에는 들어간다). 기간을 안 주면 그 뒤부터 원장
-   * 마지막 날까지이고, 90일을 넘으면 마지막 90일이다.
-   */
-  private LocalDate[] period(String from, String to) {
+  /** 원장의 첫 거래 기준일과 마지막 거래 기준일. 거래가 없으면 400. */
+  private LocalDate[] ledger() {
     var ledger =
         jdbc.queryForMap(
             "select min(business_date)::text as first, max(business_date)::text as last from ledger.transactions where integration_status='ACTIVE'");
     if (ledger.get("first") == null) throw invalid("원장에 거래가 없어 백테스트를 돌릴 수 없습니다.");
-    LocalDate first = LocalDate.parse(ledger.get("first").toString());
-    LocalDate last = LocalDate.parse(ledger.get("last").toString());
+    return new LocalDate[] {
+      LocalDate.parse(ledger.get("first").toString()),
+      LocalDate.parse(ledger.get("last").toString())
+    };
+  }
+
+  /**
+   * 검사할 날짜 범위. 원장 첫날부터 warmupDays 일은 이력으로만 쓰므로 검사 날짜에서 뺀다(그 거래도 돌아보는 쪽에는 들어간다). 기간을 안 주면 그 뒤부터 원장
+   * 마지막 날까지이고, 90일을 넘으면 마지막 90일이다.
+   *
+   * @param ledger {@link #ledger()} 가 준 원장의 첫날과 마지막 날
+   */
+  private LocalDate[] period(LocalDate[] ledger, String from, String to) {
+    LocalDate first = ledger[0];
+    LocalDate last = ledger[1];
     LocalDate earliest = first.plusDays(warmupDays);
     LocalDate start = date(from, "시작");
     LocalDate end = date(to, "끝");
+    if (start != null && end != null && start.isAfter(end)) throw invalid("시작 날짜가 끝 날짜보다 늦습니다.");
     if (end == null || end.isAfter(last)) end = last;
     boolean chosen = start != null;
     if (start == null || start.isBefore(earliest)) start = earliest;
@@ -89,6 +100,25 @@ public class BacktestService {
       start = end.minusDays(MAX_DAYS - 1);
     }
     return new LocalDate[] {start, end};
+  }
+
+  /**
+   * 화면이 검사 기간을 고를 때 쓰는 범위. ledgerFrom ~ ledgerTo 는 원장의 첫날과 마지막 날, earliest 는 검사할 수 있는 가장 이른 날(원장 첫날
+   * + warmupDays), from ~ to 는 기간을 안 주고 접수했을 때 검사하는 날짜다. 원장이 비었거나 검사할 날짜가 없으면 400.
+   */
+  public Map<String, Object> range() {
+    var ledger = ledger();
+    var days = period(ledger, null, null);
+    var view = new LinkedHashMap<String, Object>();
+    view.put("ledgerFrom", ledger[0].toString());
+    view.put("ledgerTo", ledger[1].toString());
+    view.put("earliest", ledger[0].plusDays(warmupDays).toString());
+    view.put("from", days[0].toString());
+    view.put("to", days[1].toString());
+    view.put("days", ChronoUnit.DAYS.between(days[0], days[1]) + 1);
+    view.put("warmupDays", warmupDays);
+    view.put("maxDays", MAX_DAYS);
+    return view;
   }
 
   /** 백테스트를 접수한다. 같은 버전 · 같은 조건 · 같은 기간이 이미 줄에 있거나 돌고 있으면 그것을 돌려준다. */
@@ -124,7 +154,7 @@ public class BacktestService {
               ruleId);
       if (same == null || same == 0) throw invalid("비교 기준은 같은 룰의 버전이어야 합니다.");
     }
-    var days = period(in.from(), in.to());
+    var days = period(ledger(), in.from(), in.to());
     String digest = version.get("definition_digest").toString();
     Long base = baseline;
     Long id =

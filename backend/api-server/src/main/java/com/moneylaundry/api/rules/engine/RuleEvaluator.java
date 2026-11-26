@@ -90,12 +90,26 @@ public class RuleEvaluator {
    * @return 바쁜 계좌의 account_id
    */
   public List<Long> busy(List<Long> known) {
+    return busy(known, null);
+  }
+
+  /**
+   * {@link #busy(List)} 와 같고, until 이 있으면 거래 기준일이 그 날짜까지인 거래로만 센다. 백테스트는 검사하는 마지막 날을 준다. 그 뒤에 거래가
+   * 몰린 계좌를 미리 바쁜 계좌로 보지 않으려는 것이다.
+   *
+   * @param until 이 날짜(YYYY-MM-DD)까지의 거래로 센다. null 이면 원장 전체
+   */
+  public List<Long> busy(List<Long> known, String until) {
     jdbc.execute("create temp table rule_busy(account_id bigint primary key) on commit drop");
     if (busyMax == 0) return List.of();
     if (known != null) {
       for (Long account : known) jdbc.update("insert into rule_busy values(?)", account);
       return known;
     }
+    String upTo = until == null ? "" : " and business_date <= ?::date";
+    var args = new ArrayList<Object>();
+    if (until != null) args.addAll(List.of(until, until));
+    args.add(busyMax);
     // 분마다 건수를 먼저 세고(행 수가 줄어든다) 그 합을 구간으로 더한다. 구간은 그 분을 포함해 busyWindowMinutes 분이다.
     jdbc.update(
         """
@@ -103,23 +117,23 @@ public class RuleEvaluator {
         select distinct account_id from (
           select account_id,
                  sum(n) over (partition by account_id, side order by at
-                              range between interval '%d minutes' preceding and current row) as total
+                              range between interval '%1$d minutes' preceding and current row) as total
           from (
             select from_account_id as account_id, 0 as side, date_trunc('minute', occurred_at) as at, count(*) as n
             from ledger.transactions
-            where integration_status = 'ACTIVE' and from_account_id <> to_account_id
+            where integration_status = 'ACTIVE' and from_account_id <> to_account_id%2$s
             group by from_account_id, date_trunc('minute', occurred_at)
             union all
             select to_account_id, 1, date_trunc('minute', occurred_at), count(*)
             from ledger.transactions
-            where integration_status = 'ACTIVE' and from_account_id <> to_account_id
+            where integration_status = 'ACTIVE' and from_account_id <> to_account_id%2$s
             group by to_account_id, date_trunc('minute', occurred_at)
           ) per_minute
         ) windowed
         where total > ?
         """
-            .formatted(busyWindowMinutes - 1),
-        busyMax);
+            .formatted(busyWindowMinutes - 1, upTo),
+        args.toArray());
     return jdbc.queryForList("select account_id from rule_busy order by account_id", Long.class);
   }
 

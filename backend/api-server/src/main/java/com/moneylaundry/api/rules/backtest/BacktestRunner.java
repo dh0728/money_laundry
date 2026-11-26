@@ -8,6 +8,7 @@ import com.moneylaundry.api.rules.engine.RuleCompiler;
 import com.moneylaundry.api.rules.engine.RuleEvaluator;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -206,7 +207,8 @@ public class BacktestRunner implements SmartInitializingSingleton, DisposableBea
     tx.executeWithoutResult(
         s -> {
           evaluator.begin();
-          busy.addAll(evaluator.busy(null));
+          // 바쁜 계좌는 검사하는 마지막 날까지의 거래로만 센다. 그 뒤의 거래는 보지 않는다.
+          busy.addAll(evaluator.busy(null, to));
           evaluator.filtered(definition, from, to);
           var summary = evaluator.run(definition, from, to);
           jdbc.update(
@@ -221,6 +223,11 @@ public class BacktestRunner implements SmartInitializingSingleton, DisposableBea
               subjectType);
           result.put("summary", summary);
           result.put("skippedBusySubjects", evaluator.skippedBusySubjects(definition, from, to));
+          result.put(
+              "ledgerFrom",
+              jdbc.queryForObject(
+                  "select min(business_date)::text from ledger.transactions where integration_status='ACTIVE'",
+                  String.class));
           result.put(
               "txCount",
               jdbc.queryForObject(
@@ -385,7 +392,14 @@ public class BacktestRunner implements SmartInitializingSingleton, DisposableBea
     var busy = new LinkedHashMap<String, Object>();
     busy.put("maxTransactions", evaluator.busyMax());
     busy.put("windowMinutes", evaluator.busyWindowMinutes());
+    busy.put("until", row.get("date_to"));
     result.put("busy", busy);
+    result.put(
+        "lookback",
+        lookback(
+            ReviewJson.object(row.get("definition")),
+            row.get("date_from").toString(),
+            (String) run.get("ledgerFrom")));
     if (sweepMetric != null && !((List<?>) run.get("sweep")).isEmpty()) {
       var definition = ReviewJson.object(row.get("definition"));
       var spec = sweepSpec(sweepMetric);
@@ -403,6 +417,25 @@ public class BacktestRunner implements SmartInitializingSingleton, DisposableBea
       result.put("sweep", sweep);
     }
     return result;
+  }
+
+  /**
+   * 돌아본 범위. 검사 시점마다 룰의 기간만큼 돌아보므로, 읽는 가장 이른 거래의 날짜는 검사 첫날에서 그 기간(날짜로 올림)만큼 앞이다. 원장 첫날보다 앞서지는 않는다.
+   * 기간이 없는 템플릿(LARGE_TX)은 돌아보지 않으므로 from · windowMinutes 가 null 이다. "처음 거래하는 상대"와 바쁜 계좌는 이 범위와 상관없이
+   * 원장 첫날(ledgerFrom)부터 본다.
+   */
+  static Map<String, Object> lookback(
+      Map<String, Object> definition, String from, String ledgerFrom) {
+    int minutes = definition.get("windowMinutes") instanceof Number window ? window.intValue() : 0;
+    LocalDate start =
+        minutes == 0 ? null : LocalDate.parse(from).minusDays((minutes + 1439) / 1440);
+    if (start != null && ledgerFrom != null && start.isBefore(LocalDate.parse(ledgerFrom)))
+      start = LocalDate.parse(ledgerFrom);
+    var view = new LinkedHashMap<String, Object>();
+    view.put("from", start == null ? null : start.toString());
+    view.put("windowMinutes", minutes == 0 ? null : minutes);
+    view.put("ledgerFrom", ledgerFrom);
+    return view;
   }
 
   /** 값을 바꿔 보는 항목의 정의(문구 · 단위 · 범위). 적중 조건 항목, 경로 값(minHops), 세는 거래 항목(LARGE_TX 의 건당 금액) 가운데 하나다. */
