@@ -22,6 +22,11 @@ public class DemoResetService {
   public static final String TABLES =
       String.join(
           ",",
+          "rules.hit_transactions",
+          "rules.hits",
+          "rules.executions",
+          "rules.backtest_subjects",
+          "rules.backtests",
           "analysis.alert_plans",
           "review.judgments",
           "review.work_requests",
@@ -232,6 +237,9 @@ public class DemoResetService {
                     + " continue identity restrict");
             jdbc.update(
                 "update core.users set last_assigned_at=null where last_assigned_at is not null");
+            // 룰 정의·버전·이력은 남긴다. 운영·시험 운영 중인 버전은 초기화 뒤 첫 분석부터 다시 돈다.
+            jdbc.update(
+                "update rules.rule_versions set eval_from_seq=0 where eval_from_seq is not null");
             // The source and read models are both empty. Remove truncate invalidations atomically.
             jdbc.update("delete from ops.dashboard_dirty");
             jdbc.update(

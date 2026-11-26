@@ -4,6 +4,7 @@ import com.moneylaundry.api.analysis.AnalysisDeferred;
 import com.moneylaundry.api.analysis.AnalysisFailure;
 import com.moneylaundry.api.analysis.AnalysisStage;
 import com.moneylaundry.api.analysis.AnalysisStageExecutor;
+import com.moneylaundry.api.rules.engine.RuleRunStep;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -33,6 +34,13 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
   private java.util.Map<String, String> remoteEnvironment = java.util.Map.of();
   private String analysisUser = "";
   private String analysisPassword = "";
+  private RuleRunStep ruleRunStep;
+
+  /** 룰 일일 실행. ALERTS 단계에서 워커를 띄우기 직전에 돈다. */
+  @Autowired
+  void configureRules(RuleRunStep step) {
+    ruleRunStep = step;
+  }
 
   @Autowired
   public void configureDatabase(
@@ -145,6 +153,9 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
     long startedNanos = System.nanoTime();
     Process process = null;
     try {
+      // 운영 · 시험 운영 룰의 적중을 Alert 생성 전에 저장한다. 룰이 실패해도 이 단계는 계속한다(RuleRunStep 이 예외를 던지지 않는다).
+      if (ruleRunStep != null && context.stage() == AnalysisStage.ALERTS && context.runId() != null)
+        ruleRunStep.run(context.runId());
       var command =
           new ArrayList<>(
               List.of(

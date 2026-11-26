@@ -20,7 +20,8 @@ REPO = ROOT.parents[1]
 spec = importlib.util.spec_from_file_location("reset_dev_rds", ROOT / "reset_dev_rds.py")
 reset = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(reset)
-MIGRATION = REPO / "backend/api-server/src/main/resources/db/migration/V1__initial_schema.sql"
+MIGRATIONS = sorted((REPO / "backend/api-server/src/main/resources/db/migration").glob("V*__*.sql"),
+                    key=lambda path: int(path.name[1:].split("__")[0]))
 GRANTS = REPO / "backend/api-server/worker/analysis_permissions.sql"
 
 
@@ -116,9 +117,11 @@ class InnerSqlTests(unittest.TestCase):
 
     def migrate(self):
         with self.admin.transaction():
-            self.admin.execute(MIGRATION.read_text(encoding="utf-8-sig"))
             self.admin.execute("CREATE TABLE public.flyway_schema_history(installed_rank int, version text, success bool)")
-            self.admin.execute("INSERT INTO public.flyway_schema_history VALUES(1,'1',true)")
+            for rank, migration in enumerate(MIGRATIONS, 1):
+                self.admin.execute(migration.read_text(encoding="utf-8-sig"))
+                self.admin.execute("INSERT INTO public.flyway_schema_history VALUES(%s,%s,true)",
+                                   (rank, migration.name[1:].split("__")[0]))
 
     def run_inner(self, action, payload=None, database=reset.DATABASE):
         source = reset.INNER.replace('.endswith(".rds.amazonaws.com")', '== "127.0.0.1"').replace(
@@ -142,7 +145,7 @@ class InnerSqlTests(unittest.TestCase):
         self.admin.execute("INSERT INTO core.banks(bank_id,name) VALUES(12,'Germany Bank #12')")
         report = json.loads(self.run_inner("inspect"))
         self.assertEqual(report["unexpected_schemas"], [])
-        self.assertEqual(report["flyway_versions"], ["1"])
+        self.assertEqual(report["flyway_versions"], [m.name[1:].split("__")[0] for m in MIGRATIONS])
         saved = json.loads(self.run_inner("backup"), parse_float=str)
         self.assertEqual(set(saved), {"users", "fx_rates"})
         self.assertEqual(len(saved["fx_rates"]), 15)

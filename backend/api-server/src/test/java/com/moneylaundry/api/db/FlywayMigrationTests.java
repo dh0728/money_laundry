@@ -30,7 +30,7 @@ class FlywayMigrationTests {
             jdbc.queryForList(
                 "select version from flyway_schema_history where success and version is not null order by installed_rank",
                 String.class))
-        .containsExactly("1");
+        .containsExactly("1", "2");
     assertThat(
             jdbc.queryForList(
                 "select role||'='||count(*) from core.users group by role", String.class))
@@ -41,7 +41,13 @@ class FlywayMigrationTests {
             jdbc.queryForList(
                 "select indexname from pg_indexes where schemaname='ledger' and tablename='transactions'",
                 String.class))
-        .contains("transactions_from_time", "transactions_to_time");
+        .contains("transactions_from_time", "transactions_to_time", "transactions_pair_time");
+    // V2: 예전 룰 표는 rules 스키마로 바뀌었다.
+    assertThat(
+            jdbc.queryForList(
+                "select table_schema||'.'||table_name from information_schema.tables where table_name in ('rules','rule_history','rule_versions') order by 1",
+                String.class))
+        .containsExactly("rules.rule_versions", "rules.rules");
     assertThat(
             jdbc.queryForList(
                 "select table_name from information_schema.tables where table_schema='public'",

@@ -468,16 +468,71 @@ TRANSFER는 Episode 측 이벤트 하나만 알림으로 제공한다. 같은 �
 
 ## 12. 룰엔진
 
+룰은 이름표(`ruleId`, 화면 번호 `code` = `RULE-NNN`)이고 조건은 버전(`versionId`)이 갖는다. 한 룰은 운영 버전(ACTIVE·PAUSED) 최대 1개와 작업 중 버전(DRAFT·SHADOW·PENDING) 최대 1개를 가진다. 조회·명령 모두 STAFF·ADMIN 세션과 CSRF 가 필요하다.
+
 | 요청 | 입력 / 응답 |
 |---|---|
-| GET /api/v1/rules | 룰 목록. `{id:"RULE-NNN",name,description,typeCode,scoreMin,minTransactions,windowHours,status,version,author,updatedAt,history[{at,actor,action,reason}]}` |
-| POST /api/v1/rules | 초안 생성. `{name,description,typeCode,scoreMin(0~1),minTransactions,windowHours}` |
-| POST /api/v1/rules/{id} | 초안 수정. DRAFT·REJECTED·STOPPED만, 그 밖은 409 |
-| POST /api/v1/rules/{id}/review | `{status,reason}`. DRAFT→PENDING_APPROVAL(작성 가능한 직원), PENDING_APPROVAL→TESTING/REJECTED(ADMIN만), TESTING·ACTIVE→STOPPED(ADMIN만) |
-| POST /api/v1/rules/{id}/delete | 룰과 변경 이력 삭제. DRAFT·REJECTED는 담당자(마지막 저장자)와 ADMIN, 그 밖의 상태는 ADMIN만. 권한이 없으면 403. `{id}` |
-| POST /api/v1/rules/backtest | `{rule,start,end,offset,limit}`. 기간(최대 2년)의 ACTIVE 원장 전체에 조건 적용. `{matchedCount,accountCount,amountUsd,matchedAccountIds,scannedCount,transactions}`. 서버 제한 90초 |
+| GET /api/v1/rule-templates | 템플릿 카탈로그(`resources/rules/catalog.json`)에 `backtestTemplates[]`(평가기가 있어 백테스트를 돌릴 수 있는 템플릿 키)를 더한 것. `{schema,templates[{key,name,group(PATTERN/GENERAL),available,pattern,evaluator,subject,subjectLabel,trigger,side,directionSelectable,windowRequired,maxWindowMinutes,alert,references,filterFields[],requiredFilterFields[],metrics[],whereMin,sweep,defaults,performance,note}],filterFields{},metrics{},path{},windows[],comparators[],directions[],then[{key,label,enabled}],limits{}}`. `available=false` 는 이후 제공 템플릿이다. `note` 는 그 템플릿의 세는 방식이다. 값이나 조건을 바꿔도 달라지지 않는 것만 적는다(이후 제공 템플릿은 제공하지 않는 이유). `performance`(기본값을 고른 실험의 정밀도·재현율)와 `oracle`(대응하는 업계 시나리오 이름)은 기본값의 근거 기록이고 화면에는 쓰지 않는다 |
+| GET /api/v1/rules | 목록. `{content[{ruleId,code,name,template,templateName,summary,status,then,versionNo,versionId,operatingVersionNo,operatingStatus,operatingSummary,workingVersionNo,workingStatus,owner,changedAt,hitCount,lastHitDate,shadowHitCount,linkedAlertCount,normalRate,alertedHitCount,skippedBusySubjects,lastRunFailed}],counts{ACTIVE,SHADOW,PENDING,PAUSED,DRAFT}}`. `status`·`versionNo`·`summary` 는 작업 중 버전이 SHADOW·PENDING 이면 그 버전, 아니면 운영 버전, 운영 버전이 없으면 작성 중 버전의 값이다. 적중 숫자의 뜻은 아래 "목록의 적중 숫자"에 있다 |
+| GET /api/v1/rules/{ruleId} | 상세. `{ruleId,code,name,template,templateName,owner,createdAt,status,operating,working,commands[{action,versionId,revision,enabled,reason,commentRequired}],versions[{versionId,versionNo,status,summary,author,createdAt,submittedAt,decidedAt,decidedBy}],executions[{versionNo,mode(LIVE/SHADOW),status(COMPLETED/FAILED),analysisDate,triggerCount,hitCount,skippedBusySubjects,errorCode(TIMEOUT/BUDGET/INTERNAL/INTERRUPTED),finishedAt}],events[{at,actor,action,comment,versionNo,selfApproved,clonedFrom{code,versionNo}?}]}`. `operating`·`working` 은 `versions` 한 줄에 `{revision,definition,digest,sentence,editable,deletable,backtest{backtestId,status,currentDefinition,finishedAt}?}` 를 더한 것이고 없으면 null. `commands` 는 지금 상태에서 있는 명령과 요청한 사람이 할 수 있는지(`enabled`, 못 하면 `reason`)다. 상태 명령 말고 `NEW_VERSION`(POST …/versions)과 `CLONE`(POST …/clone)도 여기에 온다. `CLONE` 의 `versionId` 는 따로 고르지 않을 때 복제될 버전이다. `executions` 는 최근 일일 실행 20건, `events` 는 최근 200건이다. `action` 은 CREATED·EDITED·DRAFT_DELETED·SHADOW_STARTED·SUBMITTED·WITHDRAWN·APPROVED·REJECTED·PAUSED·RESUMED·BACKTEST_DONE |
+| POST /api/v1/rules | 룰과 v1 초안. `{name(1~80자),template,definition?}`. `definition` 을 안 주면 템플릿 기본값. `{ruleId,code,versionId,revision}` |
+| PUT /api/v1/rules/{ruleId}/versions/{versionId} | 초안 저장. `{name,definition,revision}`. DRAFT 를 작성자만. 응답은 `{ruleId,code,name,versionId,versionNo,status,revision,definition}` 에 검증 결과(아래 validate 응답)를 더한 것 |
+| POST /api/v1/rules/{ruleId}/versions | 운영 버전을 복사해 새 초안을 만든다. 본문 없음. `{ruleId,code,versionId,versionNo,revision}`. 운영 버전이 없거나 작업 중 버전이 이미 있으면 409 |
+| POST /api/v1/rules/{ruleId}/clone | 복제. 그 룰의 한 버전의 조건을 그대로 가진 **새 룰**의 v1 초안(DRAFT)을 만든다. 본문은 없어도 되고 `{versionId?,name?}` 를 줄 수 있다. `versionId` 가 없으면 운영 버전, 없으면 작업 중 버전, 그것도 없으면 가장 나중 버전이다(어느 상태의 버전이든 된다). `name` 이 없으면 `원래 이름 복사본` 이고 80자를 넘으면 원래 이름의 뒤를 자른다. 새 룰의 담당자와 작성자는 요청한 사람이다. 조건은 다시 검증하지 않고 옮기며 백테스트·적중·변경 기록은 옮기지 않는다. 원래 룰은 바뀌지 않는다. 새 룰의 첫 변경 기록(CREATED)에 `clonedFrom{code,versionNo}` 가 남는다. `{ruleId,code,name,versionId,revision}`. 없는 룰·그 룰의 것이 아닌 버전 404, 이름 규칙 위반 400 |
+| POST /api/v1/rules/{ruleId}/commands | 상태 명령. `{requestId?,action,versionId,revision,comment?}` → 바뀐 룰 상세(GET /rules/{ruleId} 와 같다). `action` 은 START_SHADOW·SUBMIT·WITHDRAW·APPROVE·REJECT·PAUSE·RESUME. 표는 아래 "상태 명령" |
+| GET /api/v1/review/cases/{caseId}/rule-hits | Alert·Episode 의 현재 거래에 걸린 운영 룰 적중. `[{alertId,ruleId,code,name,template,templateName,pattern,versionId,versionNo,versionStatus,summary,subjectType,subjectLabel,subject,hitDates[],windowMinutes,measured{},conditions[{metric,label,cmp,value,unit,measured}],roles[{role,label,accountId}],matchedTxIds[],evidenceTxCount}]`. 없는 사건은 404 |
+| POST /api/v1/rules/validate | 저장 없이 검증. `{template,definition,ruleId?}` → `{items[{key,label,ok,message,errors[]}],warnings[],canSave,canRun,sentence,summary}`. `items` 는 FORMAT·CONDITIONS·DATA·COST 순서. 형식을 통과하지 못하면 `sentence`·`summary` 는 null |
+| DELETE /api/v1/rules/{ruleId}/versions/{versionId} | 초안 삭제. 204. 시험 운영·승인 요청을 한 적이 없는 DRAFT 를 작성자와 ADMIN 만. 그 룰에 다른 버전이 없으면 룰과 변경 기록도 지우고, 있으면 버전만 지우고 DRAFT_DELETED 를 남긴다 |
+| POST /api/v1/rule-backtests | 백테스트 접수. `{versionId,baselineVersionId?,from?,to?}` → 202 `{backtestId,status}`. `baselineVersionId` 를 안 주면 그 룰의 운영 버전(있으면)과 비교한다. 기간을 안 주면 원장 첫날 + `app.rules.warmup-days`(기본 7)일부터 원장 마지막 날까지이고 90일을 넘으면 마지막 90일이다. 같은 버전·조건·기간이 이미 줄에 있거나 돌고 있으면 그 `backtestId` 를 돌려준다. 평가기가 없는 템플릿, 체크리스트를 통과하지 못한 조건, 검사할 날짜가 없는 기간은 400 |
+| GET /api/v1/rule-backtests/{backtestId} | 상태와 결과. `{backtestId,status(QUEUED/RUNNING/COMPLETED/FAILED/CANCELLED),progress(0~100),cancelRequested,errorCode(TIMEOUT/INTERNAL/INTERRUPTED),ruleId,code,name,template,versionId,versionNo,summary,currentDefinition,baseline{versionId,versionNo,summary}?,period{from,to,days},requestedBy,requestedAt,startedAt,finishedAt}`. `currentDefinition=false` 면 백테스트 뒤에 조건을 고친 것이다. COMPLETED 면 `{kpis{hits,added,dropped,precision,judged,baseHits,basePrecision,baseJudged},txCount,evidenceTxCount,evidenceShare,hitDays,alertOverlap,expectedNewAlerts,chunkedCount,skippedBusySubjects,busy{maxTransactions,windowMinutes},sweep{metric,label,unit,rows[{value,current,hits,txCount,alertOverlap,expectedNewAlerts}]}?,cases[{subjectType(ACCOUNT/TX),subject,txId?,occurredAt?,state(HIT/ADDED/DROPPED/KEPT),measured,txCount,alertId,judgement}]}` 가 같이 온다 |
+| GET /api/v1/rule-backtests?ruleId= | 그 룰의 백테스트 기록. 최근 20건. 위 응답의 머리 부분 + `txCount` |
+| POST /api/v1/rule-backtests/{backtestId}/cancel | 취소 요청. 202 와 현재 상태. 줄에 서 있으면 바로 CANCELLED, 돌고 있으면 지금 쿼리가 끝난 뒤 멈춘다. 이미 끝났으면 409 |
 
-룰은 분석 파이프라인에 연결하지 않는다. 화면에 ACTIVE로 바꾸는 버튼이 없어 서버에도 그 전이는 없다.
+- 정의(`definition`): `{schema:2,template,direction?,windowMinutes?,filter,path?,where,then}`. `filter`(세는 거래)는 `{op:"ALL",items[]}` 이고 항목은 `{field,cmp?,value?}` 또는 `{op:"ANY",items[]}` 하나까지다. `where`(적중 조건)는 `{op:"ALL"|"ANY",items[]}` 이고 항목은 `{metric,cmp?,value?}` 또는 한 단계 안쪽 그룹이다. `path` 는 CYCLE·RANDOM 의 `{minHops,maxHops,stepRatioMin,stepRatioMax}`, `direction` 은 STRUCTURING·SAME_AMOUNT 의 `IN`/`OUT`, `then` 은 `ATTACH_EVIDENCE`(`CREATE_ALERT` 는 아직 고를 수 없다). 쓸 수 있는 항목·비교·범위는 카탈로그가 정한다.
+- 저장은 형식(FORMAT)만 통과하면 된다. 값이 빈 초안도 저장된다(`canSave=true, canRun=false`). 저장 때 키 순서를 고정하고 null 을 뺀 정의의 SHA-256 을 `digest` 로 같이 저장한다.
+- 오류: 형식 실패·이름 길이·필수 값 누락 400 `VALIDATION_FAILED`(`detail` 에 첫 사유), 작성자가 아님 403 `FORBIDDEN_ROLE`, 없는 룰·버전 404, DRAFT 가 아니거나 `revision` 이 다름 409 `INVALID_TRANSITION`.
+- 백테스트: 지금 고를 수 있는 템플릿 열 개(유형 여섯 FAN_OUT, FAN_IN, GATHER_SCATTER, SCATTER_GATHER, CYCLE, RANDOM + 일반 넷 LARGE_TX, STRUCTURING, SAME_AMOUNT, PASS_THROUGH)에 모두 평가기가 있다. 전용 스레드 하나가 접수 순서대로 한 번에 하나씩 돌리고, 쿼리 하나는 120초를 넘으면 끊긴다(`errorCode=TIMEOUT`). 서버가 돌던 중에 꺼지면 `INTERRUPTED` 로 남는다.
+  - 검사 시점은 대상 계좌의 거래이고, 그 시각(분)을 포함해 직전 기간 안에서 세는 거래를 통과한 거래만 센다. 적중은 대상 × 거래 기준일이고, 사례(`cases`)는 대상마다 한 줄이다(근거 거래는 기간 전체의 것을 합친다). `cases` 는 200줄까지 싣는다. `subject` 는 가명 계좌 ID 앞 8자리다.
+  - `kpis.added`·`dropped` 는 비교 기준에 없다가 생긴 대상 수와 있다가 빠진 대상 수다. 비교 기준이 없으면 null 이고 `state` 는 전부 `HIT` 다.
+  - `judgement` 는 대상의 근거 거래와 가장 많이 겹치는 Alert 의 사람 판정(SUSPICIOUS/NORMAL)이다. Episode 에 편입된 Alert 는 그 Episode 의 판정을 따른다. `precision` 은 판정이 붙은 대상 가운데 의심의 비율(%)이고 판정이 없으면 null 이다. 정답 라벨은 쓰지 않는다.
+  - `expectedNewAlerts` 는 어느 Alert 와도 겹치지 않고 근거 거래가 2건 이상인 대상 수로, 추정값이다. `chunkedCount` 는 근거 거래가 32건을 넘는 대상 수다. `evidenceShare` 는 검사한 거래 가운데 근거 거래의 비율(%)이다.
+  - `sweep` 은 템플릿이 정한 항목 하나의 값만 바꿔 다시 돌린 결과다(최대 5개 값). 경로형(CYCLE, RANDOM)은 `sweep.metric` 이 `minHops` 이고 그 룰의 `path.maxHops` 를 넘는 값은 돌리지 않는다. 바쁜 계좌(`app.rules.busy.*`)는 대상에서 빼고 그 수를 `skippedBusySubjects` 로 준다.
+  - SCATTER_GATHER: 대상은 도착 계좌, 검사 시점은 경유 → 도착 입금이다. 같은 출발 계좌에서 받은 뒤(같은 분 포함) 도착 계좌로 보낸 경유 계좌를 (출발, 도착) 쌍마다 세고, 출발 → 경유 → 도착이 모두 기간 안이어야 한다. 출발 = 도착은 세지 않는다. `measured.MID_COUNT` 가 경유 계좌 수다.
+  - CYCLE · RANDOM: 받는 계좌 = 다음 거래의 보내는 계좌로 이어지고, 시각이 거꾸로 가지 않고(같은 분 허용), 이어지는 두 거래의 금액 비(뒤 ÷ 앞)가 `path.stepRatioMin ~ stepRatioMax` 안이고, 첫 거래부터 마지막 거래까지가 기간 안인 경로를 `path.maxHops` 건까지 따라간다. 같은 계좌를 두 번 지나지 않는다(출발 계좌로 돌아오면 닫힌다). CYCLE 은 닫힌 경로, RANDOM 은 닫히지 않은 경로만 보고 거래 수가 `path.minHops` 이상이면 걸린다. 대상은 CYCLE 이 출발 계좌(돈이 돌아온 계좌), RANDOM 이 경로의 끝 계좌이고 `measured.HOPS` 가 그 날 가장 긴 경로의 거래 수다.
+  - SCATTER_GATHER · CYCLE · RANDOM 은 대상뿐 아니라 경로 어느 자리에도 바쁜 계좌가 없는 거래만 본다. 집계형은 대상만 본다.
+  - LARGE_TX: 돌아보는 기간도 적중 조건도 없다. 세는 거래를 통과한 거래 하나하나가 적중이고 **대상이 거래**다(`subjectType=TX`). 바쁜 계좌를 빼지 않는다(`skippedBusySubjects=0`). `measured.TX_USD` 가 그 거래의 금액이다. `cases[]` 는 거래마다 한 줄이고 `subject` 는 거래 ID(문자열), 거래 코드를 만들 수 있게 `txId` · `occurredAt` 이 같이 온다. `sweep.metric` 은 `TX_USD`(세는 거래의 맨 위 첫 건당 금액 줄)이고 값을 바꿀 때마다 세는 거래부터 다시 거른다.
+  - STRUCTURING: FAN 과 같은 집계다. 금액 띠(하한 ≤ 금액 < 상한)는 세는 거래의 건당 금액 두 줄이고, `direction` 이 OUT 이면 보낸 쪽, IN 이면 받은 쪽 계좌가 대상이다. 그날의 측정값은 거래 건수가 가장 많은 검사 시점의 것이다.
+  - SAME_AMOUNT: 검사 시점은 대상 계좌의 그 방향 거래 하나하나다(같은 분이어도 금액이 다르면 따로 검사). 기간 안 같은 방향 거래 가운데 금액이 **검사 거래 금액의 ±N%**(`NEAR_TRIGGER_AMOUNT`, 경계 포함) 안인 것만 센다. 검사 거래 자신도 센다. 범위는 나중 거래의 금액으로 정하므로 2,000 뒤의 2,105 는 걸리고(±5% 하한 1,999.75) 2,105 뒤의 2,000 은 안 걸린다(상한 2,100). 금액이 0 인 거래는 보지 않는다.
+  - PASS_THROUGH: GATHER_SCATTER 와 같은 집계(검사 시점은 대상 계좌의 출금, 출금은 기간 안 첫 입금 시각부터)에서 상대 계좌 수를 보지 않고 받은 합계(`SUM_USD`)와 출금 ÷ 입금(`OUT_IN_RATIO`, %)만 본다. 그날의 측정값은 통과한 금액(받은 합계와 내보낸 합계 가운데 작은 쪽)이 가장 큰 검사 시점의 것이다.
+  - 끝나면 룰 변경 기록에 `BACKTEST_DONE` 이 남는다.
+- 상태 명령: 한 번에 버전 하나의 상태를 바꾸고 변경 기록에 남긴다. `revision` 은 그 버전의 현재 값이어야 하고 명령마다 1 오른다. `requestId` 를 주면 같은 요청이 다시 와도 한 번만 적용한다.
+
+  | action | 누가 | 전 → 후 | 조건 | 사유(`comment`) |
+  |---|---|---|---|---|
+  | START_SHADOW | 작성자·ADMIN | DRAFT → SHADOW | 지금 조건으로 끝낸 백테스트 | |
+  | SUBMIT | 작성자 | DRAFT·SHADOW → PENDING | 지금 조건으로 끝낸 백테스트 | |
+  | WITHDRAW | 작성자 | SHADOW·PENDING → DRAFT | | |
+  | APPROVE | ADMIN | PENDING → ACTIVE. 기존 운영 버전(ACTIVE·PAUSED)은 RETIRED | | 필수 |
+  | REJECT | ADMIN | PENDING → DRAFT | | 필수 |
+  | PAUSE | ADMIN | ACTIVE → PAUSED | | 필수 |
+  | RESUME | ADMIN | PAUSED → ACTIVE | | 필수 |
+
+  - 오류: 모르는 명령·사유 누락·사유 2,000자 초과 400, 권한 없음 403 `FORBIDDEN_ROLE`, 없는 룰·버전 404, 상태가 맞지 않음·`revision` 이 다름·백테스트 없음 409 `INVALID_TRANSITION`.
+  - ADMIN 은 자기가 쓴 버전도 승인할 수 있고 그때 변경 기록의 `selfApproved` 가 true 다. `app.rules.self-approval=false` 면 403 이다.
+  - 매일 실행할지는 버전의 `eval_from_seq` 로 정한다. SHADOW·ACTIVE 가 되는 순간의 가장 큰 분석 입력 순번(`analysis.runs.input_seq`)을 적고, 그보다 뒤에 입력이 고정된 분석부터 돈다. DRAFT 로 돌아가거나 PAUSED·RETIRED 가 되면 비운다. DRAFT 에서 바로 승인 요청한 PENDING 은 돌지 않는다.
+- 일일 실행: 분석이 ALERTS 단계에 들어와 워커를 띄우기 직전에 돈다(`RuleRunStep`). SHADOW·PENDING·ACTIVE 버전 가운데 `eval_from_seq` 가 그 분석의 입력 순번보다 작은 것을 순서대로 돌린다.
+  - 검사 날짜는 그 분석의 TARGET 거래가 있는 거래 기준일이다. 원장 첫날부터 `app.rules.warmup-days` 안의 날짜는 뺀다. 그 날짜의 거래 전체를 검사 시점으로 삼으므로 같은 날짜를 백테스트한 결과와 같다.
+  - 실행 기록은 분석 × 버전에 한 줄(`rules.executions`)이다. 단계가 다시 돌아도 끝났거나 실패한 버전은 다시 돌리지 않는다. 적중(`rules.hits`)은 버전 × 대상 × 거래 기준일에 한 줄이고, 같은 날짜를 다시 검사하면 그 날짜의 적중을 새 결과로 바꾼다. 실행 당시 ACTIVE 였으면 `LIVE`, 아니면 `SHADOW` 다.
+  - 버전 하나가 실패하면 `FAILED`(`TIMEOUT`·`INTERNAL`)로 남기고 다음 버전으로 넘어간다. 한 분석에서 룰 전체에 쓰는 시간은 10분이고 넘으면 남은 버전은 `BUDGET` 이다. 룰 때문에 ALERTS 단계가 실패하지는 않는다.
+  - 룰 쿼리는 서버 한 대 안에서 한 번에 하나만 돈다. 일일 실행과 백테스트가 같은 줄에 선다.
+- 사건의 룰 적중(`rule-hits`): 연결을 저장하지 않고, 사건의 현재 거래(`review.current_members`)와 적중의 근거 거래에 같은 거래가 있으면 걸린 것으로 본다. 운영 중일 때 만든 적중(`LIVE`)이고 실행과 그 분석이 끝난 것만 나온다. 시험 운영의 적중은 나오지 않고, 지금은 중지했거나 물러난 버전이 운영 중에 만든 적중은 나온다(`versionStatus`).
+  - 카드 한 장은 Alert × 룰 버전 × 대상 계좌다. `hitDates` 는 걸린 거래 기준일들, `measured` · `conditions[].measured` 는 가장 최근 날의 측정값, `matchedTxIds` 는 사건의 거래 가운데 근거 거래인 것, `evidenceTxCount` 는 그 적중들의 근거 거래 수다. `conditions` 는 적중 조건을 그룹 구분 없이 순서대로 편 것이다. 경로형은 적중 조건이 없으므로 `{metric:"minHops",label:"순환 거래 수"|"경로 거래 수",cmp:"GTE",value,unit:"건",measured}` 한 줄이 온다(`measured` 는 `HOPS`).
+  - 대상이 거래인 룰(LARGE_TX)은 걸린 거래마다 카드를 만들지 않고 **Alert × 룰 버전으로 한 장**에 모은다. `subjectType` 은 `TX`, `subject` 는 null 이고 걸린 거래는 `matchedTxIds` 에 있다. 조건 줄은 세는 거래의 건당 금액 줄(`{metric:"TX_USD",label:"건당 금액",cmp,value,unit:"USD",measured}`)이고 `measured` 는 그 Alert 에서 걸린 거래 가운데 가장 큰 금액이다.
+  - `roles[{role,label,accountId}]` 는 대상 말고 보여 줄 계좌다. 따로 저장하지 않고 근거 거래에서 읽는다. SCATTER_GATHER 는 `SOURCE`(출발 계좌: 경유 계좌에 보낸 계좌) 다음에 `MID`(경유 계좌: 대상에 보낸 계좌), CYCLE · RANDOM 은 `PATH`(경로 계좌: 근거 거래에 나오는 대상 아닌 계좌)다. `accountId` 는 `subject` 와 같은 가명 계좌 ID 앞 8자리이고, 순서는 그 계좌가 처음 보낸 근거 거래의 시각 순이다(경로가 하나면 지나간 순서). 집계형 템플릿에서는 비어 있다.
+- 목록의 적중 숫자: 끝난 실행, 끝난 분석의 적중만 센다.
+  - `hitCount` · `lastHitDate`: 그 룰의 운영 적중(`LIVE`) 수(대상 × 날짜)와 가장 최근 거래 기준일. `shadowHitCount`: 지금 시험 운영(SHADOW·PENDING) 중인 버전이 쌓은 적중 수, 그런 버전이 없으면 null.
+  - `linkedAlertCount`: 운영 적중의 근거 거래와 공개된 거래가 하나라도 겹치는 Alert 수(병합돼 사라진 Alert 제외). `normalRate`: 그 가운데 사람이 종결한 것에서 정상 ÷ (정상 + 의심) (%), 종결한 것이 없으면 null. Episode 에 편입된 Alert 는 그 Episode 의 판정을 따른다.
+  - `skippedBusySubjects` · `lastRunFailed`: 가장 최근 일일 실행에서 바쁜 계좌라 평가하지 않은 대상 수와 그 실행이 실패했는지. 실행한 적이 없으면 null. `alertedHitCount` 는 Alert 생성을 제공할 때까지 null 이다.
 
 ## 13. 설정
 

@@ -21,7 +21,7 @@ from pathlib import Path
 
 ROOT = Path("/opt/aml")
 DATABASE = "aml_dev_v3"
-SCHEMAS = ("core", "ingest", "ledger", "analysis", "review", "ops", "private", "evaluation")
+SCHEMAS = ("core", "ingest", "ledger", "analysis", "review", "ops", "private", "evaluation", "rules")
 # Banks are ledger data now (named by the loaded ledger files), so only accounts and FX rates are kept.
 CONFIGURATION = {
     "users": "user_id,username,name,role,password_hash,last_assigned_at,created_at",

@@ -30,7 +30,12 @@ erDiagram
     episodes ||--o{ judgments : judged
     alerts ||--o{ work_requests : requested
     episodes ||--o{ work_requests : requested
-    rules ||--o{ rule_history : changes
+    rules ||--o{ rule_versions : versions
+    rules ||--o{ rule_events : changes
+    rule_versions ||--o{ rule_backtests : tested
+    rule_versions ||--o{ rule_executions : runs
+    rule_executions ||--o{ rule_hits : produces
+    rule_hits ||--o{ rule_hit_transactions : evidence
 ```
 
 ## 테이블 역할
@@ -65,7 +70,12 @@ erDiagram
 | review | episode_alerts | Episode에 편입된 Alert. Episode 거래는 소속 Alert의 현재 거래 합집합 |
 | review | alert_lineage | MERGED_INTO/FOLLOWUP_OF 관계와 원인 이벤트 |
 | review | events, event_recipients, notification_reads | 감사 이력·공개 시 고정 수신자·사용자별 알림 읽음 |
-| review | rules, rule_history | 룰엔진 초안·승인 상태·버전과 변경 이력. 파이프라인과 연결하지 않음 |
+| rules | rules, rule_versions | 룰 이름표와 조건을 가진 버전(정의 JSONB·지문·한 줄 요약·상태·revision). 룰마다 운영 버전 1개와 작업 중 버전 1개까지 |
+| rules | events, event_recipients | 룰 변경 기록(만들기·저장·초안 삭제·상태 명령)과 알림 수신자 |
+| rules | backtests, backtest_subjects | 백테스트 1회와 대상별 결과. 시연 초기화 때 비운다 |
+| rules | executions, hits, hit_transactions | 일일 실행(분석 run × 룰 버전), 적중(버전 × 대상 × 날짜)과 근거 거래. 시연 초기화 때 비운다 |
+| rules | alert_seeds (뷰) | Alert 생성 룰의 운영 적중의 근거 거래. Alert 생성기가 읽는 유일한 창구 |
+| rules | risk_bands | 위험 점수 구간(주의·위험 시작점). 가장 최근 줄이 현재 값 |
 | ops | business_clock | 시연 업무 시각 |
 | ops | model_risk_bands | 설정 화면의 모델 점수 위험 구간(주의·위험 시작 점수, 한 행). 화면 표시 기준이며 초기화 대상이 아님 |
 | ops | dashboard_dirty | component·영향 범위·source transaction별 요청. PIPELINE/INVESTIGATION scope는 component에서 생성 |
@@ -129,6 +139,8 @@ statement trigger는 실제 집계 입력이 바뀐 old/new 날짜 또는 caseId
 ## 초기화 전환
 
 초기 스키마는 빈 DB용이다. 구 Flyway 이력이 있는 DB 위에 적용하거나 validate를 끄지 않는다. 테스트 업무 데이터는 초기화하고 직원 계정·비밀번호 해시·은행·환율·외부 암호키를 보존하여 같은 환경 DB에 복원한다. 새 버전 DB를 추가하지 않는다. 실제 초기화·배포는 대상 확인과 코드 검증 후 수행한다.
+
+룰 엔진 스키마는 `V2__rule_engine.sql` 이다. V1 위에 그대로 적용된다(DB 를 다시 만들지 않는다). 예전 `review.rules`·`review.rule_history` 를 지우므로 거기 있던 룰과 이력은 사라지고, `ledger.transactions(from_account_id,to_account_id,occurred_at)` 인덱스를 만들기 때문에 거래가 쌓인 DB 에서는 적용에 시간이 걸린다.
 
 스키마 분리만으로 원문 접근 차단이 보장되지는 않는다. 원장 적재와 분석 작업의 접속 역할을 분리하고 분석 역할의 private/evaluation 접근 거부를 실제 PostgreSQL에서 검증해야 한다. 외부 추론 서비스에는 DB 자격증명을 전달하지 않는다.
 
