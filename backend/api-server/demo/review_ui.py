@@ -257,7 +257,7 @@ def money_overview(client, user, d):
             client.post(f"review/cases/{d['caseId']}/money-scope", payload, user['id'])
             st.rerun()
     if not data.get('available'):
-        reasons = {'WAITING_RECEIPTS': '관측 기간의 은행 보고 수신·통합 완료를 기다리고 있습니다.',
+        reasons = {'WAITING_RECEIPTS': '관측 기간의 원장 적재 완료를 기다리고 있습니다.',
                    'EMPTY_SUBJECT_SCOPE': '조사 대상 거래가 없습니다.', 'EMPTY_ACCOUNT_SCOPE': '조사 계좌를 선택하세요.',
                    'NO_CLOSED_SNAPSHOT': '이전 종결 사건에는 당시 자금 지표 기록이 없습니다.'}
         st.info(reasons.get(data.get('reason'), '지표를 산출할 수 없습니다.'))
@@ -427,11 +427,11 @@ def dashboard_page(client, user, today):
         cols[1].metric('오늘 유입 Alert', p['today'], change, delta_color='off')
         for col, label, field in zip(cols[2:], ['미처리 Alert', '미처리 Episode', '할당 후 3일 이상'], ['alerts', 'episodes', 'aged']):
             col.metric(label, p[field])
-        st.caption(f"거래 기준일 {data['deliveryDate']} · 수신·통합 {det['received']:,}건 / 모델 결과 {det['analyzed']:,}건")
+        st.caption(f"거래 기준일 {data['deliveryDate']} · 적재 {det['received']:,}건 / 모델 결과 {det['analyzed']:,}건")
         if det['analyzed'] < det['received']:
             st.info('분석 진행 중입니다. 탐지 건수·비율은 아직 최종 결과가 아닙니다.')
         if data.get('pendingReports'):
-            st.info('검수·통합이 끝나지 않은 수신 보고가 있어 전체 거래 수와 최종 탐지율을 아직 확정할 수 없습니다.')
+            st.info('적재가 끝나지 않은 원장 파일이 있어 전체 거래 수와 최종 탐지율을 아직 확정할 수 없습니다.')
         episode_work_metrics(data['episodeWork'])
         st.subheader('기관 탐지 현황')
         if data['daily']:

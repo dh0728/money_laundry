@@ -1,7 +1,6 @@
 import io
 import unittest
 from decimal import Decimal
-from pathlib import Path
 
 from ingest.ledger_csv import REQUIRED, LedgerReader, RowError
 
@@ -92,16 +91,6 @@ class CsvTests(unittest.TestCase):
                 fields[index]=unit*(limit+1)
                 with self.assertRaises(RowError):
                     self.reader(','.join(fields)+'\n').next()
-
-    def test_bank_mock_smoke_fixture(self):
-        fixture=Path(__file__).resolve().parents[3]/'bank-mock/fixtures/kubesphere_smoke.csv'
-        with fixture.open(encoding='utf-8',newline='') as stream:
-            reader=LedgerReader(stream)
-            row=reader.next()
-            self.assertEqual('SMOKE260917A',row['fromAccount'])
-            self.assertEqual('SMOKE260917B',row['toAccount'])
-            self.assertEqual('2022-09-01T03:34:00Z',row['occurredAt'])
-            self.assertIsNone(reader.next())
 
 
 if __name__ == '__main__':

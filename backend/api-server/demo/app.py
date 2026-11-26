@@ -86,7 +86,7 @@ def main():
         jobs = page_view(client, 'batch-jobs', {'type': 'ANALYSIS'}, 'jobs_' + base,
                          ['jobId', 'analysisDate', 'status', 'currentStage', 'rowCount', 'errorCode'])
         if not jobs:
-            st.info('분석 작업이 없습니다. 은행 목업 업로드와 백엔드 분석 실행 후 조회하세요.')
+            st.info('분석 작업이 없습니다. 조작패널에서 원장 파일 전송과 분석 실행 후 조회하세요.')
             return
         job_id = st.selectbox('분석 작업 선택', [j['jobId'] for j in jobs], key='job_' + base)
         job = client.get(f'batch-jobs/{job_id}')
