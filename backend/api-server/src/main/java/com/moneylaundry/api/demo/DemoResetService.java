@@ -28,6 +28,7 @@ public class DemoResetService {
           "rules.backtest_subjects",
           "rules.backtests",
           "analysis.alert_plans",
+          "review.ai_reports",
           "review.judgments",
           "review.work_requests",
           "review.alert_tx_edits",
