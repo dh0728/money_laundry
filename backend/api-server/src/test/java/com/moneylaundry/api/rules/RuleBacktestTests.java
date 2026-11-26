@@ -216,6 +216,39 @@ class RuleBacktestTests {
     assertThat(hits(new RuleEvaluator(jdbc, 0, 4320), definition)).containsKeys(quiet, busy);
   }
 
+  @Test
+  void busy_accounts_are_counted_only_up_to_the_last_checked_day() {
+    var definition = catalog.defaults("FAN_OUT");
+    first(definition, "where").put("value", 2);
+    long later = account();
+    fanOut(later, 2, "2023-09-09", 2000);
+    fanOut(later, 2, "2023-09-11", 2000); // 이틀 뒤 두 건이 더 생겨 72시간 안 네 건이 된다
+
+    // 72시간 안 같은 방향 거래가 3건을 넘으면 바쁜 계좌로 본다
+    var strict = new RuleEvaluator(jdbc, 3, 4320);
+    tx.executeWithoutResult(
+        s -> {
+          strict.begin();
+          // 09-09 까지의 거래로 세면 아직 두 건이라 바쁜 계좌가 아니고, 그날의 검사에서 걸린다
+          assertThat(strict.busy(null, "2023-09-09")).isEmpty();
+          strict.filtered(definition, "2023-09-09", "2023-09-09");
+          strict.run(definition, "2023-09-09", "2023-09-09");
+          assertThat(jdbc.queryForList("select subject_id from rule_result", Long.class))
+              .containsExactly(later);
+        });
+    tx.executeWithoutResult(
+        s -> {
+          strict.begin();
+          // 09-11 까지로 세면 바쁜 계좌다. 날짜를 안 주면 원장 전체로 센다
+          assertThat(strict.busy(null, "2023-09-11")).containsExactly(later);
+        });
+    tx.executeWithoutResult(
+        s -> {
+          strict.begin();
+          assertThat(strict.busy(null)).containsExactly(later);
+        });
+  }
+
   // ---- 백테스트 API ----
 
   void login(String username) throws Exception {
@@ -379,6 +412,81 @@ class RuleBacktestTests {
     // 끝난 백테스트는 취소할 수 없다
     send("/api/v1/rule-backtests/" + backtestId + "/cancel", Map.of())
         .andExpect(status().isConflict());
+  }
+
+  @Test
+  void backtest_checks_only_the_chosen_days_and_looks_back_from_them() throws Exception {
+    login("l1a");
+    long[] rule = created("분산 송금 감시", "FAN_OUT");
+    // 원장이 비어 있으면 고를 날짜가 없다
+    mvc.perform(get("/api/v1/rule-backtests/period").session(session))
+        .andExpect(status().isBadRequest());
+
+    pay(account(), account(), "2023-09-01 09:00+09", 2000); // 원장 첫날
+    long six = account();
+    fanOut(six, 6, "2023-09-09", 2000);
+    // 09-09 에 넷, 09-10 에 둘을 보낸다. 여섯 번째 수취 계좌는 09-10 에 채워진다
+    long split = account();
+    fanOut(split, 4, "2023-09-09", 2000);
+    pay(split, account(), "2023-09-10 11:00+09", 2000);
+    pay(split, account(), "2023-09-10 11:01+09", 2000);
+    pay(account(), account(), "2023-09-12 09:00+09", 2000); // 원장 마지막 날
+
+    // 화면이 기간을 고를 때 쓰는 범위. 첫 7일은 이력으로만 쓰므로 09-08 부터 검사할 수 있다
+    var range =
+        json(
+            mvc.perform(get("/api/v1/rule-backtests/period").session(session))
+                .andExpect(status().isOk()));
+    assertThat(range.get("ledgerFrom")).isEqualTo("2023-09-01");
+    assertThat(range.get("ledgerTo")).isEqualTo("2023-09-12");
+    assertThat(range.get("earliest")).isEqualTo("2023-09-08");
+    assertThat(range.get("from")).isEqualTo("2023-09-08");
+    assertThat(range.get("to")).isEqualTo("2023-09-12");
+    assertThat(number(range.get("days"))).isEqualTo(5L);
+    assertThat(number(range.get("warmupDays"))).isEqualTo(7L);
+    assertThat(number(range.get("maxDays"))).isEqualTo(90L);
+
+    // 09-10 하루만 검사한다. 검사 시점은 그날의 두 거래뿐이고, 09-09 의 넷은 돌아보는 쪽에 들어가 여섯이 채워진다
+    var day = backtest(Map.of("versionId", rule[1], "from", "2023-09-10", "to", "2023-09-10"));
+    assertThat(day.get("status")).isEqualTo("COMPLETED");
+    assertThat(part(day, "period").get("from")).isEqualTo("2023-09-10");
+    assertThat(part(day, "period").get("to")).isEqualTo("2023-09-10");
+    assertThat(number(part(day, "period").get("days"))).isEqualTo(1L);
+    assertThat(number(day.get("txCount"))).isEqualTo(2L);
+    assertThat(number(part(day, "kpis").get("hits"))).isEqualTo(1L);
+    assertThat(number(day.get("evidenceTxCount"))).isEqualTo(6L);
+    var cases = rows(day.get("cases"));
+    assertThat(cases).hasSize(1);
+    assertThat(cases.get(0).get("subject").toString())
+        .isEqualTo(
+            jdbc.queryForObject(
+                "select service_account_id from core.accounts where account_id=?",
+                String.class,
+                split));
+    // 돌아본 범위: 룰의 기간이 7일이라 검사 첫날에서 7일 앞인 09-03 부터 읽는다. 바쁜 계좌는 검사 마지막 날까지의 거래로 센다
+    assertThat(part(day, "lookback").get("from")).isEqualTo("2023-09-03");
+    assertThat(number(part(day, "lookback").get("windowMinutes"))).isEqualTo(10080L);
+    assertThat(part(day, "lookback").get("ledgerFrom")).isEqualTo("2023-09-01");
+    assertThat(part(day, "busy").get("until")).isEqualTo("2023-09-10");
+
+    // 09-09 하루만 검사하면 그날 여섯을 채운 six 만 걸린다. split 은 그날 넷뿐이다
+    var before = backtest(Map.of("versionId", rule[1], "from", "2023-09-09", "to", "2023-09-09"));
+    assertThat(number(before.get("txCount"))).isEqualTo(10L);
+    assertThat(number(part(before, "kpis").get("hits"))).isEqualTo(1L);
+    assertThat(rows(before.get("cases")).get(0).get("subject").toString())
+        .isEqualTo(
+            jdbc.queryForObject(
+                "select service_account_id from core.accounts where account_id=?",
+                String.class,
+                six));
+    assertThat(part(before, "lookback").get("from")).isEqualTo("2023-09-02");
+    assertThat(part(before, "busy").get("until")).isEqualTo("2023-09-09");
+
+    // 시작이 끝보다 늦으면 받지 않는다
+    send(
+            "/api/v1/rule-backtests",
+            Map.of("versionId", rule[1], "from", "2023-09-10", "to", "2023-09-09"))
+        .andExpect(status().isBadRequest());
   }
 
   @Test

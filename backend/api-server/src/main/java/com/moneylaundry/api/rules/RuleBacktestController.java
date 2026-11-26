@@ -6,7 +6,7 @@ import java.security.Principal;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-/** 룰 백테스트: 접수, 상태와 결과, 취소, 룰별 기록. */
+/** 룰 백테스트: 접수, 상태와 결과, 취소, 룰별 기록, 고를 수 있는 검사 기간. */
 @RestController
 @RequestMapping("/api/v1/rule-backtests")
 public class RuleBacktestController {
@@ -30,6 +30,12 @@ public class RuleBacktestController {
   public Object list(Principal principal, @RequestParam long ruleId) {
     reviews.actor(reviews.userId(principal));
     return backtests.list(ruleId);
+  }
+
+  @GetMapping("/period")
+  public Object period(Principal principal) {
+    reviews.actor(reviews.userId(principal));
+    return backtests.range();
   }
 
   @GetMapping("/{backtestId}")

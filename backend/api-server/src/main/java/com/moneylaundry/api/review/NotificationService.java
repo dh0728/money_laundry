@@ -105,6 +105,19 @@ public class NotificationService {
   public Map<String, Object> cases(long user, String id, int page, int size) {
     paging(page, size);
     var notification = owned(user, id);
+    // 룰 알림(caseKind=RULE)처럼 이어진 사건이 없는 알림
+    if (notification.get("batch_run_id") == null && notification.get("case_id") == null)
+      return Map.of(
+          "content",
+          List.of(),
+          "totalElements",
+          0L,
+          "number",
+          page,
+          "size",
+          size,
+          "totalPages",
+          0L);
     String base;
     Object ref;
     if (notification.get("batch_run_id") != null) {

@@ -443,7 +443,7 @@ DB 원자 범위: receipt 잠금·명시 테이블 잠금 → 대상 확인 → 
 - 기간 생략 시 전체 업무 이력. 날짜 역전·잘못된 페이지/크기는400. 날짜는 조회 시각이 아닌 배정/행동의 업무 시각 기준이다.
 - 응답: `{content, number, size, totalElements, totalPages, unreadCount}`. unreadCount는 같은 검색·기간의 전체 미확인 알림 수이며 현재 페이지에 한정하지 않는다.
 - 행: `{id, kind, title, description, code, count, at, read, caseId, caseKind}`.
-- `id`는 불투명 문자열. `at`은 KST ISO8601. `caseId`는 사건 종류에 따라 review.alerts.alert_id 또는 review.episodes.episode_id다. 공통 review.case_id 시퀀스로 중복을 방지한다. `caseKind`는 ALERT/EPISODE.
+- `id`는 불투명 문자열. `at`은 KST ISO8601. `caseId`는 사건 종류에 따라 review.alerts.alert_id 또는 review.episodes.episode_id다. 공통 review.case_id 시퀀스로 중복을 방지한다. `caseKind`는 ALERT/EPISODE/RULE. RULE은 룰 알림이며 `caseId=null`, `code`가 룰 번호(RULE-003)다(아래 "룰 알림").
 - 정렬은 업무 시각 내림차순, 동일 시각은 id 내림차순. 알림 하나가 여러 Alert를 나타내면 count>1이며 caseId=null이다. 배정1건도 분석 묶음 알림이므로 caseId=null일 수 있다.
 - ALERT_ASSIGNED: 최초 증거(version1)의 분석 run과 담당자별 묶음. 분석 run·batch가 모두 COMPLETED인 건만 표시. 이후 같은 Alert의 증거 갱신은 새 배정 알림을 만들지 않는다.
 - ADDED_EVIDENCE/MERGED/CHANGE_PROPOSED/FOLLOWUP_CREATED/EVIDENCE_WITHDRAWN은 공개 이벤트의 고정 수신자에게 제공한다. 동일 사건·공개 이벤트당 한 번이며 병합에 편입이 포함되면 MERGED 하나다.
@@ -452,7 +452,7 @@ DB 원자 범위: receipt 잠금·명시 테이블 잠금 → 대상 확인 → 
 
 ### GET /api/v1/notifications/{id}/cases
 
-본인이 소유한 알림에 연결된 사건 목록. 병합 알림은 대표 사건을 포함하며 대표의 현재 담당자가 다르더라도 당시 알림 수신자가 조회할 수 있다. page/size는 위와 동일. 응답 `{content:[{caseId,kind,alertId,status}],number,size,totalElements,totalPages}`. 묶음 알림은 해당 run에서 본인에게 배정된 Alert만 포함한다. 상세 화면 이동은 caseId 사용. 없는 알림과 다른 사용자의 알림은 동일404.
+본인이 소유한 알림에 연결된 사건 목록. 룰 알림은 이어진 사건이 없어 빈 목록이다. 병합 알림은 대표 사건을 포함하며 대표의 현재 담당자가 다르더라도 당시 알림 수신자가 조회할 수 있다. page/size는 위와 동일. 응답 `{content:[{caseId,kind,alertId,status}],number,size,totalElements,totalPages}`. 묶음 알림은 해당 run에서 본인에게 배정된 Alert만 포함한다. 상세 화면 이동은 caseId 사용. 없는 알림과 다른 사용자의 알림은 동일404.
 
 ### POST /api/v1/notifications/read
 
@@ -465,6 +465,30 @@ CSRF 필요. `{ids: string[], read: boolean}`. 1~100개, 중복 ID는 한 번 �
 ### Episode 편입 알림 집계
 
 TRANSFER는 Episode 측 이벤트 하나만 알림으로 제공한다. 같은 명령으로 저장된 원본 Alert별 TRANSFER 이력은 조사 이력으로 보존하되 알림에서 제외한다. TRANSFER 이력이 있는 Episode의 최초 EPISODE_ASSIGNED 알림도 별도로 노출하지 않는다. 따라서 새 Episode에 Alert5개 편입 시 편입 알림1건이며, 이후 추가 편입은 이벤트ID가 다른 별도1건이다. 시연 업무 시각이 동일해도 시간으로 합치지 않는다. Episode 담당자 범위는 유지한다. 기존 Episode 이벤트ID와 읽음 상태는 유지되고 기존 중복은 재조회부터 숨겨진다.
+
+### 룰 알림
+
+룰에 생긴 일을 같은 목록으로 준다. `caseKind=RULE`, `caseId=null`, `count=1`, `code`는 룰 번호다. 화면은 `code`로 룰 상세(`/rules?rule=RULE-003`)나 백테스트(`/rules/backtest?rule=RULE-003`)를 연다.
+
+| kind | title | 받는 사람 | description |
+|---|---|---|---|
+| RULE_SUBMITTED | 룰 승인 요청 | 관리자 전원 | `룰 이름 v1 · 요청한 사람 · 남긴 말` |
+| RULE_WITHDRAWN | 룰 승인 요청 철회 | 관리자 전원 | `룰 이름 v1 · 거둔 사람` |
+| RULE_APPROVED | 룰 승인 | 룰 담당자, 그 버전 작성자 | `룰 이름 v1 · 승인한 사람 · 사유` |
+| RULE_REJECTED | 룰 반려 | 룰 담당자, 그 버전 작성자 | `룰 이름 v1 · 반려한 사람 · 사유` |
+| RULE_PAUSED | 룰 중지 | 룰 담당자, 그 버전 작성자 | `룰 이름 v1 · 중지한 사람 · 사유` |
+| RULE_RESUMED | 룰 재개 | 룰 담당자, 그 버전 작성자 | `룰 이름 v1 · 재개한 사람 · 사유` |
+| RULE_SHADOW_STARTED | 룰 시험 운영 시작 | 룰 담당자, 그 버전 작성자 | `룰 이름 v1 · 시작한 사람` |
+| RULE_BACKTEST_DONE | 백테스트 완료 | 백테스트를 요청한 사람 | `룰 이름 v1` |
+| RULE_BACKTEST_FAILED | 백테스트 실패 | 백테스트를 요청한 사람 | `룰 이름 v1` |
+| RULE_RUN_FAILED | 룰 일일 실행 실패 | 룰 담당자, 관리자 전원 | `룰 이름 v1 · 운영` 또는 `· 시험 운영` |
+
+- 그 일을 한 본인은 받지 않는다. 관리자가 자기가 쓴 버전을 직접 승인하면 본인에게는 알림이 없다. 백테스트는 요청한 뒤 기다리는 일이라 요청한 사람이 받는다.
+- 받는 사람은 그 일이 일어난 때에 정해 `rules.event_recipients`(상태 명령) · `rules.execution_recipients`(일일 실행 실패)에 적는다. 뒤에 관리자가 된 사람은 그 전의 승인 요청을 받지 않고, 관리자가 아니게 된 사람이 받았던 알림은 남는다. V3 를 적용하기 전에 있었던 일은 받는 사람이 적혀 있지 않아 알림이 없다.
+- 승인 요청 철회는 승인 대기에서 거둔 것만 알린다. 시험 운영만 하다 거둔 것은 알리지 않는다.
+- 취소한 백테스트, 잘 끝난 일일 실행, 초안 저장 · 삭제 · 복제 · 새 버전 만들기는 알림이 없다.
+- `at`은 그 일의 업무 시각이다(백테스트는 끝난 시각). `id`는 `rule-event:{n}` · `rule-backtest:{n}` · `rule-run:{n}` 꼴이지만 다른 알림처럼 불투명 문자열로 다룬다. 읽음 처리와 검색(`query`는 제목 · 내용 · 룰 번호)은 다른 알림과 같다.
+- 시연 초기화는 백테스트와 일일 실행 기록을 비우므로 그 알림도 사라진다. 룰과 변경 기록은 남으므로 상태 명령 알림은 남되 읽음 기록은 지워진다.
 
 ## 12. 룰엔진
 
@@ -483,8 +507,9 @@ TRANSFER는 Episode 측 이벤트 하나만 알림으로 제공한다. 같은 �
 | GET /api/v1/review/cases/{caseId}/rule-hits | Alert·Episode 의 현재 거래에 걸린 운영 룰 적중. `[{alertId,ruleId,code,name,template,templateName,pattern,versionId,versionNo,versionStatus,summary,subjectType,subjectLabel,subject,hitDates[],windowMinutes,measured{},conditions[{metric,label,cmp,value,unit,measured}],roles[{role,label,accountId}],matchedTxIds[],evidenceTxCount}]`. 없는 사건은 404 |
 | POST /api/v1/rules/validate | 저장 없이 검증. `{template,definition,ruleId?}` → `{items[{key,label,ok,message,errors[]}],warnings[],canSave,canRun,sentence,summary}`. `items` 는 FORMAT·CONDITIONS·DATA·COST 순서. 형식을 통과하지 못하면 `sentence`·`summary` 는 null |
 | DELETE /api/v1/rules/{ruleId}/versions/{versionId} | 초안 삭제. 204. 시험 운영·승인 요청을 한 적이 없는 DRAFT 를 작성자와 ADMIN 만. 그 룰에 다른 버전이 없으면 룰과 변경 기록도 지우고, 있으면 버전만 지우고 DRAFT_DELETED 를 남긴다 |
-| POST /api/v1/rule-backtests | 백테스트 접수. `{versionId,baselineVersionId?,from?,to?}` → 202 `{backtestId,status}`. `baselineVersionId` 를 안 주면 그 룰의 운영 버전(있으면)과 비교한다. 기간을 안 주면 원장 첫날 + `app.rules.warmup-days`(기본 7)일부터 원장 마지막 날까지이고 90일을 넘으면 마지막 90일이다. 같은 버전·조건·기간이 이미 줄에 있거나 돌고 있으면 그 `backtestId` 를 돌려준다. 평가기가 없는 템플릿, 체크리스트를 통과하지 못한 조건, 검사할 날짜가 없는 기간은 400 |
-| GET /api/v1/rule-backtests/{backtestId} | 상태와 결과. `{backtestId,status(QUEUED/RUNNING/COMPLETED/FAILED/CANCELLED),progress(0~100),cancelRequested,errorCode(TIMEOUT/INTERNAL/INTERRUPTED),ruleId,code,name,template,versionId,versionNo,summary,currentDefinition,baseline{versionId,versionNo,summary}?,period{from,to,days},requestedBy,requestedAt,startedAt,finishedAt}`. `currentDefinition=false` 면 백테스트 뒤에 조건을 고친 것이다. COMPLETED 면 `{kpis{hits,added,dropped,precision,judged,baseHits,basePrecision,baseJudged},txCount,evidenceTxCount,evidenceShare,hitDays,alertOverlap,expectedNewAlerts,chunkedCount,skippedBusySubjects,busy{maxTransactions,windowMinutes},sweep{metric,label,unit,rows[{value,current,hits,txCount,alertOverlap,expectedNewAlerts}]}?,cases[{subjectType(ACCOUNT/TX),subject,txId?,occurredAt?,state(HIT/ADDED/DROPPED/KEPT),measured,txCount,alertId,judgement}]}` 가 같이 온다 |
+| POST /api/v1/rule-backtests | 백테스트 접수. `{versionId,baselineVersionId?,from?,to?}` → 202 `{backtestId,status}`. `baselineVersionId` 를 안 주면 그 룰의 운영 버전(있으면)과 비교한다. 기간을 안 주면 원장 첫날 + `app.rules.warmup-days`(기본 7)일부터 원장 마지막 날까지이고 90일을 넘으면 마지막 90일이다. `from` 이 검사할 수 있는 가장 이른 날보다 앞이면 그날로, `to` 가 원장 마지막 날보다 뒤면 마지막 날로 당긴다. 같은 버전·조건·기간이 이미 줄에 있거나 돌고 있으면 그 `backtestId` 를 돌려준다. 평가기가 없는 템플릿, 체크리스트를 통과하지 못한 조건, 검사할 날짜가 없는 기간, `from` 이 `to` 보다 늦은 기간, 직접 준 기간이 90일을 넘는 것은 400 |
+| GET /api/v1/rule-backtests/period | 화면이 검사 기간을 고를 때 쓰는 범위. `{ledgerFrom,ledgerTo,earliest,from,to,days,warmupDays,maxDays}`. `ledgerFrom`~`ledgerTo` 는 원장의 첫 거래 기준일과 마지막 거래 기준일, `earliest` 는 검사할 수 있는 가장 이른 날(원장 첫날 + `warmupDays`), `from`~`to`(`days` 일)는 기간을 안 주고 접수했을 때 검사하는 날짜, `maxDays` 는 한 번에 검사하는 날짜 수의 상한(90)이다. 원장이 비었거나 검사할 날짜가 없으면 400 |
+| GET /api/v1/rule-backtests/{backtestId} | 상태와 결과. `{backtestId,status(QUEUED/RUNNING/COMPLETED/FAILED/CANCELLED),progress(0~100),cancelRequested,errorCode(TIMEOUT/INTERNAL/INTERRUPTED),ruleId,code,name,template,versionId,versionNo,summary,currentDefinition,baseline{versionId,versionNo,summary}?,period{from,to,days},requestedBy,requestedAt,startedAt,finishedAt}`. `currentDefinition=false` 면 백테스트 뒤에 조건을 고친 것이다. COMPLETED 면 `{kpis{hits,added,dropped,precision,judged,baseHits,basePrecision,baseJudged},txCount,evidenceTxCount,evidenceShare,hitDays,alertOverlap,expectedNewAlerts,chunkedCount,skippedBusySubjects,busy{maxTransactions,windowMinutes,until},lookback{from,windowMinutes,ledgerFrom},sweep{metric,label,unit,rows[{value,current,hits,txCount,alertOverlap,expectedNewAlerts}]}?,cases[{subjectType(ACCOUNT/TX),subject,txId?,occurredAt?,state(HIT/ADDED/DROPPED/KEPT),measured,txCount,alertId,judgement}]}` 가 같이 온다 |
 | GET /api/v1/rule-backtests?ruleId= | 그 룰의 백테스트 기록. 최근 20건. 위 응답의 머리 부분 + `txCount` |
 | POST /api/v1/rule-backtests/{backtestId}/cancel | 취소 요청. 202 와 현재 상태. 줄에 서 있으면 바로 CANCELLED, 돌고 있으면 지금 쿼리가 끝난 뒤 멈춘다. 이미 끝났으면 409 |
 
@@ -493,6 +518,8 @@ TRANSFER는 Episode 측 이벤트 하나만 알림으로 제공한다. 같은 �
 - 오류: 형식 실패·이름 길이·필수 값 누락 400 `VALIDATION_FAILED`(`detail` 에 첫 사유), 작성자가 아님 403 `FORBIDDEN_ROLE`, 없는 룰·버전 404, DRAFT 가 아니거나 `revision` 이 다름 409 `INVALID_TRANSITION`.
 - 백테스트: 지금 고를 수 있는 템플릿 열 개(유형 여섯 FAN_OUT, FAN_IN, GATHER_SCATTER, SCATTER_GATHER, CYCLE, RANDOM + 일반 넷 LARGE_TX, STRUCTURING, SAME_AMOUNT, PASS_THROUGH)에 모두 평가기가 있다. 전용 스레드 하나가 접수 순서대로 한 번에 하나씩 돌리고, 쿼리 하나는 120초를 넘으면 끊긴다(`errorCode=TIMEOUT`). 서버가 돌던 중에 꺼지면 `INTERRUPTED` 로 남는다.
   - 검사 시점은 대상 계좌의 거래이고, 그 시각(분)을 포함해 직전 기간 안에서 세는 거래를 통과한 거래만 센다. 적중은 대상 × 거래 기준일이고, 사례(`cases`)는 대상마다 한 줄이다(근거 거래는 기간 전체의 것을 합친다). `cases` 는 200줄까지 싣는다. `subject` 는 가명 계좌 ID 앞 8자리다.
+  - 고른 기간(`period`)은 검사 시점이 되는 날짜다. 그 뒤의 거래는 읽지 않는다. 바쁜 계좌도 기간 마지막 날(`busy.until`)까지의 거래로만 센다. 그래서 같은 날짜라도 기간의 마지막 날이 다르면 바쁜 계좌가 달라 결과가 다를 수 있다. 일일 실행은 그대로 원장 전체로 센다.
+  - 기간보다 앞선 거래는 세 가지로 본다. 룰의 기간만큼 돌아보는 거래는 `lookback.from`(검사 첫날에서 룰의 기간을 날짜로 올린 만큼 앞, 원장 첫날보다 앞서지 않는다)부터이고 `lookback.windowMinutes` 가 그 기간이다. 기간이 없는 템플릿(LARGE_TX)은 둘 다 null 이다. "처음 거래하는 상대"와 바쁜 계좌는 원장 첫날(`lookback.ledgerFrom`)부터 본다. `lookback` 과 `busy.until` 은 이 값을 넣기 전에 돌린 백테스트의 결과에는 없다.
   - `kpis.added`·`dropped` 는 비교 기준에 없다가 생긴 대상 수와 있다가 빠진 대상 수다. 비교 기준이 없으면 null 이고 `state` 는 전부 `HIT` 다.
   - `judgement` 는 대상의 근거 거래와 가장 많이 겹치는 Alert 의 사람 판정(SUSPICIOUS/NORMAL)이다. Episode 에 편입된 Alert 는 그 Episode 의 판정을 따른다. `precision` 은 판정이 붙은 대상 가운데 의심의 비율(%)이고 판정이 없으면 null 이다. 정답 라벨은 쓰지 않는다.
   - `expectedNewAlerts` 는 어느 Alert 와도 겹치지 않고 근거 거래가 2건 이상인 대상 수로, 추정값이다. `chunkedCount` 는 근거 거래가 32건을 넘는 대상 수다. `evidenceShare` 는 검사한 거래 가운데 근거 거래의 비율(%)이다.
