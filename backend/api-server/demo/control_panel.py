@@ -115,6 +115,49 @@ def load_estimate(size):
     return int(rows), (rows / 1e6 * 450, rows / 1e6 * 600)
 
 
+NO_BACKFILL = '백필 없음'
+BACKFILL_DEFAULT_DAYS = 7
+
+
+def short_day(day):
+    return f'{int(day[5:7])}/{int(day[8:10])}'
+
+
+def split_days(days, last_backfill):
+    """Days up to last_backfill are backfilled, the rest analysed; NO_BACKFILL analyses them all."""
+    if last_backfill in (None, NO_BACKFILL):
+        return [], list(days)
+    return [day for day in days if day <= last_backfill], [day for day in days if day > last_backfill]
+
+
+def span_text(days):
+    if not days:
+        return '없음'
+    return f'{short_day(days[0])}~{short_day(days[-1])} ({len(days)}일)' if len(days) > 1 else f'{short_day(days[0])} (1일)'
+
+
+def run_label(backfill_days, analysis_days):
+    if backfill_days and analysis_days:
+        return f'▶ 전송 → 백필 {len(backfill_days)}일 → 분석 {len(analysis_days)}일 자동 재생'
+    if backfill_days:
+        return f'▶ 전송 → 백필 {len(backfill_days)}일'
+    return f'▶ 전송 → 분석 {len(analysis_days)}일 자동 재생'
+
+
+def timeline_html(backfill_days, analysis_days, done):
+    """One chip per day: blue = backfill, orange = analysis, ✓ = finished in this panel."""
+    from html import escape
+
+    def chip(day, background, color):
+        mark = ' ✓' if day in done else ''
+        return (f'<span style="display:inline-block;margin:2px;padding:3px 9px;border-radius:999px;'
+                f'background:{background};color:{color};font-size:0.85rem;white-space:nowrap">'
+                f'{escape(short_day(day))}{mark}</span>')
+    chips = [chip(day, 'rgba(59,130,246,0.16)', '#3b82f6') for day in backfill_days]
+    chips += [chip(day, 'rgba(234,88,12,0.16)', '#ea580c') for day in analysis_days]
+    return '<div style="line-height:2">' + ''.join(chips) + '</div>'
+
+
 def load_progress(state, now):
     """Progress bars for the S3 transfer (measured) and the server load (elapsed against an estimate)."""
     bars = []
@@ -302,19 +345,26 @@ class Replay:
         with self.lock:
             return dict(self.state, history=list(self.state['history']))
 
-    def start(self, days, files, *, analyze=True, upload=True, interval=0, backfill=False):
+    def start(self, days, files, *, analyze=True, upload=True, interval=0, backfill=False, backfill_until=None):
+        """backfill=True backfills every day; backfill_until backfills the days up to it, then analyses."""
         with self.lock:
             if self.future is not None and not self.future.done():
                 raise ValueError('현재 작업이 끝날 때까지 기다리세요.')
+            if backfill_until is not None and not analyze:
+                raise ValueError('백필 후 분석은 분석을 포함한 재생에서만 씁니다.')
             self.pause.clear()
             days = sorted(set(days))
             self.report('시작', error=None, totalDays=len(days),
                         doneDays=sum(day in self.completed for day in days) if analyze else 0,
                         currentDay=None, fileDone=0, fileTotal=0,
                         uploadId=None, jobId=None)
+            if backfill_until is not None:
+                backfill = frozenset(day for day in days if day <= backfill_until)
             self.future = self.pool.submit(self._run, days, files, analyze, upload, interval, backfill)
 
     def _run(self, days, files, analyze, upload, interval, backfill=False):
+        # backfill is True (every day) or the set of days to backfill before the analysed ones.
+        backfilled = (lambda day: True) if backfill is True else (lambda day: bool(backfill) and day in backfill)
         stage = '날짜 준비'
         day = None
         try:
@@ -342,7 +392,7 @@ class Replay:
                     self.report(f'{day}: 분석 시작 요청')
                     if day not in self.jobs:
                         # A backfill day is frozen as history only: no scores, no Alerts.
-                        payload = {'businessDate': day, 'backfill': True} if backfill else {'businessDate': day}
+                        payload = {'businessDate': day, 'backfill': True} if backfilled(day) else {'businessDate': day}
                         self.jobs[day] = self.controls.post('demo/analysis', payload)['jobId']
                     job = self.jobs[day]
                     self.report(f'{day}: 분석 대기', jobId=job, uploadId=None)
@@ -351,7 +401,7 @@ class Replay:
                     self.completed.add(day)
                 with self.lock:
                     self.state['doneDays'] += 1
-                    result = '백필 완료' if backfill else '분석 완료' if analyze else '전송·적재 완료'
+                    result = ('백필 완료' if backfilled(day) else '분석 완료') if analyze else '전송·적재 완료'
                     self.state['history'].append({'date': day, 'result': result})
                 if self.pause.wait(interval):
                     break
@@ -542,27 +592,43 @@ def render():
             if st.button('다음 날로 이동', disabled=busy or not clock['configured']):
                 replay.controls.set_clock((current + timedelta(days=1)).isoformat())
                 st.rerun()
-        days = st.multiselect('진행할 날짜 (날짜순)', list(files), default=[next(iter(files))])
-        st.write({day: files[day].name for day in sorted(days)})
+        all_days = list(files)
+        st.subheader('진행할 날짜')
+        if len(all_days) > 1:
+            start, end = st.select_slider('진행 기간 (양끝을 끌어 범위 지정)', options=all_days,
+                                          value=(all_days[0], all_days[-1]), format_func=short_day)
+        else:
+            start = end = all_days[0]
+        days = [day for day in all_days if start <= day <= end]
+        default = days[BACKFILL_DEFAULT_DAYS - 1] if len(days) > BACKFILL_DEFAULT_DAYS else NO_BACKFILL
+        # The key follows the range, so a stale boundary outside a new range never sticks.
+        last_backfill = st.select_slider(
+            '백필 / 분석 경계 (이 날짜까지 백필, 다음 날부터 분석)', options=[NO_BACKFILL, *days], value=default,
+            format_func=lambda day: day if day == NO_BACKFILL else short_day(day), key=f'split:{start}:{end}',
+            help='백필은 점수·Alert 없이 거래를 이력으로만 쌓습니다. 분석을 한 번이라도 한 뒤에는 서버가 백필을 거절합니다.')
+        backfill_days, analysis_days = split_days(days, last_backfill)
+        st.markdown(timeline_html(backfill_days, analysis_days, replay.completed), unsafe_allow_html=True)
+        # Markdown reads a pair of "~" as strikethrough, so the ranges escape it.
+        st.caption(f'백필 {span_text(backfill_days)} → 분석 {span_text(analysis_days)} · ✓ 이 패널에서 끝낸 날짜'
+                   .replace('~', '\\~'))
         interval = st.number_input('날짜 사이 대기(초)', min_value=0, max_value=300, value=5)
 
         @st.fragment(run_every='1s')
         def actions():
             running = reset_pending or (replay.future is not None and not replay.future.done())
-            cols = st.columns(4)
-            if cols[0].button('선택 날짜 전송', disabled=running or len(days) != 1):
-                replay.start(sorted(days), files, analyze=False)
+            if st.button(run_label(backfill_days, analysis_days), type='primary', disabled=running or not days,
+                         use_container_width=True):
+                replay.start(days, files, interval=interval,
+                             backfill_until=backfill_days[-1] if backfill_days else None)
                 st.rerun()
-            if cols[1].button('분석 트리거', disabled=running or len(days) != 1):
-                replay.start(days, files, upload=False)
-                st.rerun()
-            if cols[2].button('전송 → 분석 자동 재생', disabled=running or not days):
-                replay.start(sorted(days), files, interval=interval)
-                st.rerun()
-            if cols[3].button('전송 → 백필', disabled=running or not days,
-                              help='분석을 시작하기 전 앞 날짜에만 씁니다. 거래를 이력으로만 쌓고 점수·Alert는 만들지 않습니다.'):
-                replay.start(sorted(days), files, interval=interval, backfill=True)
-                st.rerun()
+            with st.expander('하루만 따로 실행 (진행 기간을 하루로 좁힌 뒤)'):
+                cols = st.columns(2)
+                if cols[0].button('선택 날짜 전송만', disabled=running or len(days) != 1):
+                    replay.start(days, files, analyze=False)
+                    st.rerun()
+                if cols[1].button('선택 날짜 분석만', disabled=running or len(days) != 1):
+                    replay.start(days, files, upload=False, backfill=bool(backfill_days))
+                    st.rerun()
             if st.button('현재 날짜 완료 후 일시정지', disabled=not running):
                 replay.pause.set()
             state = replay.snapshot()

@@ -158,7 +158,7 @@ class DevControlTests(unittest.TestCase):
                     login.assert_not_called()
                     controls.post.assert_not_called()
                     controls.upload.assert_not_called()
-                    self.assertIn('전송 → 분석 자동 재생', [b.label for b in app.button])
+                    self.assertTrue(any(b.label.startswith('▶ 전송') for b in app.button))
             finally:
                 replay.close()
 

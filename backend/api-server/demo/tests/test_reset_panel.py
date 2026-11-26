@@ -120,7 +120,7 @@ class ResetPanelTests(unittest.TestCase):
                     self.assertFalse(app.exception)
                     self.assertTrue(any('파일 정리 실패' in x.value for x in app.error))
                     self.assertFalse(app.success)
-                    self.assertTrue(next(b for b in app.button if b.label == '전송 → 분석 자동 재생').disabled)
+                    self.assertTrue(next(b for b in app.button if b.label.startswith('▶ 전송')).disabled)
                     controls.post.assert_not_called()
             finally:
                 replay.close()
