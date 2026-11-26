@@ -803,8 +803,8 @@ function TooltipBoxInner({
       initial={{ opacity: 0 }}
       ref={tooltipRef}
       style={animate ? {
-        "--chart-tooltip-left": anchorLeft,
-        "--chart-tooltip-top": anchorTop,
+        "--chart-tooltip-left": typeof finalLeft === "number" ? `${finalLeft}px` : anchorLeft,
+        "--chart-tooltip-top": typeof finalTop === "number" ? `${finalTop}px` : anchorTop,
       } as MotionStyle : undefined}
       transition={{ duration: fadeDuration }}
     >

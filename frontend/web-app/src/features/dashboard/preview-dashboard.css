@@ -191,6 +191,9 @@
   align-content: stretch;
 }
 .dashboard-score-band { min-block-size: calc(var(--aml-space-64) * 2) }
+.dashboard-score-band .bar-chart-interaction {
+  clip-path: inset(0 round max(0px, calc(var(--aml-radius-panel) - var(--aml-panel-text-inset))));
+}
 .dashboard-series-legend-item { display: inline-flex; align-items: center; gap: var(--aml-space-4) }
 .dashboard-series-legend-item i {
   inline-size: var(--aml-space-8);
