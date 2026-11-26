@@ -1,5 +1,10 @@
 .investigation-loading,
 .investigation-loading > [aria-hidden] { min-inline-size: 0 }
+:where(.investigation-loading, .investigation-loading-lines, .ledger-hierarchy) [data-slot="skeleton"] {
+  border-radius: var(--aml-radius-small);
+  background: var(--inner-surface);
+  animation: investigation-loading-pulse var(--loading-pulse-duration) ease-in-out infinite;
+}
 .investigation-skeleton-title {
   inline-size: min(100%, var(--loading-placeholder-title-width));
   block-size: var(--aml-type-panel-title-lineHeight);
@@ -24,9 +29,12 @@
 .investigation-skeleton-card { block-size: calc(var(--aml-space-64) * 2) }
 .investigation-loading-lines { display: grid; gap: var(--aml-space-4) }
 
+@keyframes investigation-loading-pulse { 50% { opacity: var(--loading-pulse-opacity) } }
 @media (prefers-reduced-motion: reduce) {
-  .investigation-loading [data-slot="skeleton"],
-  .investigation-loading-lines [data-slot="skeleton"] { animation: none }
+  :root:not([data-reduced-motion="false"]) :where(.investigation-loading, .investigation-loading-lines, .ledger-hierarchy) [data-slot="skeleton"] {
+    animation: none;
+  }
 }
-:root[data-reduced-motion="true"] .investigation-loading [data-slot="skeleton"],
-:root[data-reduced-motion="true"] .investigation-loading-lines [data-slot="skeleton"] { animation: none }
+:root[data-reduced-motion="true"] :where(.investigation-loading, .investigation-loading-lines, .ledger-hierarchy) [data-slot="skeleton"] {
+  animation: none;
+}

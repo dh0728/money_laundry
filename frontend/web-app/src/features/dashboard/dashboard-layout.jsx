@@ -22,15 +22,8 @@ export function DashboardIndicatorsGrid({ children, ...props }) {
   return <Grid as="section" columns={12} className="dashboard-priority-metrics" {...props}>{children}</Grid>;
 }
 
-const institutionMetricGroups = {
-  transactions: { columns: 1, label: '거래 요약' },
-  investigation: { columns: 4, label: '조사 요약' },
-};
-
-export function InstitutionMetricsGrid({ group, children, ...props }) {
-  const { columns, label } = institutionMetricGroups[group];
-  return <Grid as="section" columns={columns} className="dashboard-institution-metrics" data-metric-group={group}
-    aria-label={label} {...props}>{children}</Grid>;
+export function InstitutionMetricsGrid({ children, ...props }) {
+  return <Grid as="section" columns={12} className="dashboard-institution-metrics" {...props}>{children}</Grid>;
 }
 
 export function PersonalDashboardOverview({ children, recommendation, ...props }) {
@@ -42,9 +35,13 @@ export function PersonalDashboardOverview({ children, recommendation, ...props }
   </Grid>;
 }
 
-function LoadingChart({ className = '', chartClass = 'dashboard-proportion-band', children, showNote = true }) {
+function LoadingChart({ className = '', chartClass = 'dashboard-proportion-band', children, showNote = true, showTools = false }) {
+  const title = <Skeleton className="dashboard-loading-title" />;
   return <Panel as="article" className={`dashboard-chart ${className}`.trim()}>
-    <Skeleton className="dashboard-loading-title" />
+    {showTools ? <Stack>
+      {title}
+      <Skeleton className="dashboard-loading-note dashboard-loading-actions" />
+    </Stack> : title}
     {showNote && <Skeleton className="dashboard-loading-note" />}
     {children ?? <Skeleton className={chartClass} />}
   </Panel>;
@@ -66,19 +63,30 @@ function LoadingStaffChart() {
   </LoadingChart>;
 }
 
-function LoadingMetric({ detail, trend }) {
+function LoadingMetric({ detail, trend, ratio }) {
   return <Box className="dashboard-metric">
     <Skeleton className="dashboard-loading-title" />
     <Skeleton className="dashboard-loading-value" />
     {detail && <Skeleton className="dashboard-loading-note" />}
     {trend && <Skeleton className="dashboard-loading-trend" />}
+    {ratio && <Skeleton className="dashboard-metric-ratio" />}
   </Box>;
 }
 
-function LoadingInstitutionMetrics({ group }) {
-  return <InstitutionMetricsGrid group={group}>
-    {Array.from({ length: institutionMetricGroups[group].columns }, (_, index) =>
-      <Panel as="article" key={index}><LoadingMetric detail /></Panel>)}
+function LoadingInstitutionMetrics() {
+  return <InstitutionMetricsGrid>
+    {Array.from({ length: 6 }, (_, index) => index === 3
+      ? <LoadingChart className="dashboard-completion" showTools key={index}>
+        <Box className="dashboard-metric-reading dashboard-completion-reading">
+          <Skeleton className="dashboard-loading-note" />
+          <Skeleton className="dashboard-loading-value" />
+        </Box>
+        <Skeleton className="dashboard-proportion-band" />
+        <Skeleton className="dashboard-loading-completion-legend" />
+      </LoadingChart> :
+      <Panel as="article" key={index} data-compact-kpi={index >= 4 || undefined}>
+        <LoadingMetric detail={index !== 1} ratio={index !== 1} />
+      </Panel>)}
   </InstitutionMetricsGrid>;
 }
 
@@ -98,6 +106,7 @@ export function DashboardAnalyticsSkeleton({ reduced }) {
   return <Box className="dashboard-analytics dashboard-loading dashboard-workflow-charts" aria-busy="true">
     <Text as="span" className="visually-hidden" role="status">대시보드 차트 불러오는 중</Text>
     <Box aria-hidden="true" className="dashboard-analytics">
+      <LoadingInstitutionMetrics />
       <DashboardIndicatorsGrid>
         <LoadingSeries className="dashboard-priority-metric dashboard-new-entities" />
         <LoadingStaffChart />
@@ -106,13 +115,10 @@ export function DashboardAnalyticsSkeleton({ reduced }) {
       <Grid columns={12} className="dashboard-flow-family dashboard-work-overview-grid">
         <LoadingChart className="dashboard-transaction-flow" chartClass="staged-sankey-chart" />
         <LoadingSeries className="dashboard-flow-volume" />
-        <LoadingInstitutionMetrics group="transactions" />
         <LoadingChart className="dashboard-flow-risk" chartClass="dashboard-score-band" showNote={false} />
         <LoadingRecommendation reduced={reduced} />
       </Grid>
-      <LoadingInstitutionMetrics group="investigation" />
       <LoadingChart className="dashboard-investigation-flow" chartClass="staged-sankey-chart" />
-      <LoadingChart className="dashboard-completion" />
       <Grid columns={12} className="dashboard-flow-status-grid">
         <LoadingSeries className="dashboard-flow-status" />
         <LoadingSeries className="dashboard-flow-status" />

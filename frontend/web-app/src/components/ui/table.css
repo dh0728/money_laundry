@@ -41,6 +41,16 @@
   width: var(--table-cell-width);
   min-width: var(--table-cell-min-width, auto);
 }
+[data-slot="table"][data-table-skeleton] {
+  inline-size: 100%;
+  table-layout: fixed;
+}
+
+.data-table-skeleton-cell {
+  inline-size: 100%;
+  block-size: var(--aml-space-24);
+}
+
 [data-slot="table"] [data-table-cell-pin="none"] { position: relative }
 [data-slot="table"] :is([data-table-cell-pin="left"], [data-table-cell-pin="right"]) {
   position: sticky;

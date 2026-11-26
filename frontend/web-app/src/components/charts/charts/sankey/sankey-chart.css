@@ -14,8 +14,6 @@
 .staged-sankey-relations circle { r: var(--chart-sankey-connector-radius) }
 .staged-sankey-relations [data-relation] {
   color: var(--staged-sankey-relation-color, inherit);
-  opacity: var(--chart-sankey-link-opacity);
+  opacity: 0;
 }
-.staged-sankey-relations [data-relation] > path { pointer-events: stroke }
-.staged-sankey-relations [data-related-hover],
-.staged-sankey-relations [data-relation]:hover { opacity: 1 }
+.staged-sankey-relations [data-related-hover] { opacity: 1 }

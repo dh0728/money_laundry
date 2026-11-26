@@ -170,8 +170,7 @@
   min-inline-size: 0;
 }
 .dashboard-flow-family > .dashboard-priority-panel { grid-column: 9 / -1; grid-row: 1 / span 2 }
-.dashboard-flow-volume { grid-column: span 4 }
-.dashboard-flow-family > :is(.dashboard-flow-risk, [data-metric-group="transactions"]) { grid-column: span 2 }
+.dashboard-flow-volume, .dashboard-flow-risk { grid-column: span 4 }
 .dashboard-flow-status { grid-column: span 6 }
 .dashboard-flow-status-grid { gap: var(--workspace-gap) }
 .dashboard-workflow-charts .dashboard-series-plot {
@@ -249,14 +248,13 @@
 @media (width < 68rem) {
   .dashboard-work-overview-grid > :is(.dashboard-transaction-flow, .dashboard-priority-panel),
   .dashboard-personal-overview > :is(.dashboard-personal-work, .dashboard-priority-panel) { grid-column: 1 / -1; grid-row: auto }
-  .dashboard-flow-volume { grid-column: span 6 }
-  .dashboard-flow-family > :is(.dashboard-flow-risk, [data-metric-group="transactions"]) { grid-column: span 3 }
+  .dashboard-flow-volume, .dashboard-flow-risk { grid-column: span 6 }
   .staged-sankey-relations { display: none }
 }
 @media (width < 48rem) {
   .dashboard-personal-work { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto }
-  .dashboard-priority-metric, .dashboard-flow-volume, .dashboard-flow-status,
-  .dashboard-flow-family > :is(.dashboard-flow-risk, [data-metric-group="transactions"]) { grid-column: 1 / -1 }
+  .dashboard-priority-metric, .dashboard-flow-volume, .dashboard-flow-risk,
+  .dashboard-flow-status { grid-column: 1 / -1 }
   .staged-sankey-relations { display: none }
 }
 .dashboard-note {
@@ -291,17 +289,17 @@
 }
 .dashboard-metric h3, .dashboard-metric p { overflow-wrap: anywhere }
 .dashboard-metric h3 { font: inherit; font-weight: var(--aml-type-body-strong-weight) }
-.dashboard-institution-metrics .dashboard-metric h3, .dashboard-flow-family .dashboard-priority-heading {
+.dashboard-institution-metrics > article { grid-column: span 4; min-inline-size: 0 }
+.dashboard-institution-metrics > [data-compact-kpi] { grid-column: span 2 }
+.dashboard-institution-metrics > .dashboard-completion { grid-column: span 8 }
+.dashboard-institution-metrics :is(.dashboard-metric, .dashboard-completion) h3,
+.dashboard-flow-family .dashboard-priority-heading {
   font-size: var(--aml-type-panel-title-size);
   line-height: var(--aml-type-panel-title-lineHeight);
   font-weight: var(--aml-type-panel-title-weight);
 }
 .dashboard-metric p { color: var(--muted-text); font-size: var(--aml-type-caption-size) }
 .dashboard-metric-reading { display: flex; align-items: center; flex-wrap: wrap; gap: var(--aml-space-4) }
-.dashboard-transaction-detection { display: grid; gap: var(--aml-space-4) }
-.dashboard-institution-metrics[data-metric-group="transactions"] .dashboard-metric:has([data-wide-value]) {
-  --metric-value-size: var(--metric-wide-value-size);
-}
 .dashboard-metric-ratio { display: flex; gap: var(--aml-space-2); block-size: var(--aml-space-16) }
 .dashboard-metric-ratio > * { flex: var(--dashboard-ratio-part) 1 0; min-inline-size: 0; border-radius: var(--aml-radius-small) }
 .dashboard-metric-ratio[data-tone="suspect"] [data-share="value"] { background: var(--chart-suspect) }
@@ -309,6 +307,7 @@
 .dashboard-metric-ratio [data-share="remainder"] { background: var(--inner-surface) }
 .dashboard-institution-metrics [data-kpi-tone="suspect"] { --dashboard-metric-ink: var(--chart-suspect) }
 .dashboard-institution-metrics [data-kpi-tone="in-progress"] { --dashboard-metric-ink: var(--review-status-inProgress-accent) }
+.dashboard-metric-accent { color: var(--dashboard-metric-ink, inherit) }
 .dashboard-metric-value {
   color: var(--dashboard-metric-ink, inherit);
   font-size: var(--metric-value-size);
@@ -387,8 +386,8 @@
 }
 .dashboard-completion-reading .dashboard-metric-value {
   --dashboard-metric-ink: light-dark(var(--aml-status-positive-text), var(--review-status-done-accent));
-  justify-self: end;
 }
+.dashboard-completion-reading .dashboard-metric-value { justify-self: end }
 .dashboard-composition-legend {
   display: flex;
   flex-wrap: wrap;
@@ -531,6 +530,14 @@
 .dashboard-loading-title { inline-size: var(--loading-placeholder-title-width); block-size: var(--aml-type-body-lineHeight) }
 .dashboard-loading-value { inline-size: var(--loading-placeholder-value-width); block-size: var(--workspace-kpi-value-size) }
 .dashboard-loading-note { inline-size: var(--loading-placeholder-note-width); block-size: var(--aml-type-caption-lineHeight) }
+.dashboard-loading .dashboard-institution-metrics .dashboard-loading-title { block-size: var(--aml-type-panel-title-lineHeight) }
+.dashboard-loading .dashboard-institution-metrics .dashboard-loading-value { block-size: calc(var(--metric-value-size) * var(--metric-value-line-height)) }
+.dashboard-loading .dashboard-loading-actions { block-size: var(--aml-space-24) }
+.dashboard-loading-completion-legend { inline-size: 100%; block-size: var(--aml-type-body-lineHeight) }
+@media (width < 26rem) {
+  .dashboard-loading .dashboard-completion-reading { min-block-size: calc(2 * var(--aml-type-body-lineHeight)) }
+  .dashboard-loading .dashboard-loading-completion-legend { block-size: calc(2 * var(--aml-type-body-lineHeight) + var(--aml-space-6)) }
+}
 .dashboard-loading .dashboard-priority-metric .dashboard-loading-title {
   block-size: var(--aml-type-panel-title-lineHeight);
   margin-block-end: var(--aml-space-4);
@@ -556,17 +563,19 @@
 }
 
 @media (max-width: 930px) {
-  .dashboard-institution-metrics[data-metric-group="investigation"] { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .dashboard-institution-metrics > .dashboard-completion { grid-column: 1 / -1 }
+  .dashboard-institution-metrics > [data-compact-kpi] { grid-column: span 6 }
   .preview-dashboard[data-mine] .dashboard-top { grid-template-columns: minmax(0, 1fr) }
   .preview-dashboard .dashboard-top { grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto }
   .preview-dashboard .dashboard-top > * { grid-column: auto; grid-row: auto }
 }
 @media (max-width: 660px) {
   .dashboard-analytics-row,
+  .dashboard-institution-metrics,
   .dashboard-transaction-details:has(> :nth-child(2)) { grid-template-columns: minmax(0, 1fr) }
+  .dashboard-institution-metrics > :is(article, [data-compact-kpi]) { grid-column: 1 / -1 }
 }
 @media (max-width: 359px) {
-  .dashboard-institution-metrics { grid-template-columns: minmax(0, 1fr) }
   .dashboard-metrics-box .dashboard-metrics.magic-bento {
     grid-template-columns: minmax(0, 1fr);
   }

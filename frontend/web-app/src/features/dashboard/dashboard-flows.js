@@ -156,7 +156,7 @@ export function investigationFlow(data) {
   const unlinked = data.unlinked;
   const weight = linked > 0 && status.totalAlerts > 0 ? linked / status.totalAlerts : 1;
   const alerts = status.totalAlerts > 0
-    ? flow.node('Alert', 1, status.totalAlerts, flowColors.suspect)
+    ? flow.node('Alert', 1, status.totalAlerts, flowColors.suspect, { anchor: 'alerts' })
     : null;
 
   if (suspicious > 0 && linked != null && unlinked != null) {

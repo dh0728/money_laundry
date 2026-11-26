@@ -52,8 +52,6 @@
   place-items: center;
   inline-size: var(--aml-space-64);
   block-size: var(--aml-space-64);
-  border: var(--aml-stroke-divider) solid var(--divider);
-  border-radius: var(--aml-radius-full);
   color: var(--text);
 }
 .login-preparation-indicator .aml-radar-symbol { --icon-size: var(--aml-space-40) }

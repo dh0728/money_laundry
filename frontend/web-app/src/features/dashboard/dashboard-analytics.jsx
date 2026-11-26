@@ -15,7 +15,7 @@ import { Box, Grid as LayoutGrid, Text } from '../../components/layout-primitive
 import { SankeyDetailsLinks, StagedSankey } from '@/components/charts/charts/sankey/staged-sankey';
 import { flowColors, investigationFlow, reviewStatusTotals, share as compactShare, statusLabels, transactionFlow } from './dashboard-flows';
 import { dataSeriesColors, transactionTotalColor } from '@/components/charts/charts/chart-context';
-import { DashboardIndicatorsGrid } from './dashboard-layout';
+import { DashboardIndicatorsGrid, InstitutionMetricsGrid } from './dashboard-layout';
 
 const integer = new Intl.NumberFormat('ko-KR');
 const count = value => `${integer.format(value)}건`;
@@ -66,9 +66,9 @@ function DailySeries({ rows, series, reduced, label, showShare = false, detail, 
   </Box>;
 }
 
-function ChartPanel({ title, note, children, className = '', hasChart = true, ...props }) {
+function ChartPanel({ title, headingAs, note, children, className = '', hasChart = true, ...props }) {
   return <Panel as="article" className={`dashboard-chart ${className}`} {...props}>
-    <SectionDownloadHeading downloadLabel={hasChart ? title : undefined}>{title}</SectionDownloadHeading>
+    <SectionDownloadHeading as={headingAs} downloadLabel={hasChart ? title : undefined}>{title}</SectionDownloadHeading>
     {note && <Text className="dashboard-note">{note}</Text>}
     {children}
   </Panel>;
@@ -181,8 +181,8 @@ const institutionRelationTargets = [...relationTargets, { id: 'new-entities', so
 const institutionMetricRoutes = [
   { id: 'transactions', target: '.dashboard-transaction-flow [data-sankey-anchor="total"]' },
   { id: 'suspicious', target: '.dashboard-transaction-flow [data-sankey-anchor="suspect"]' },
+  { id: 'created-alerts', target: '.dashboard-investigation-flow [data-sankey-top-anchor="alerts"]' },
   { id: 'linked', target: '.dashboard-investigation-flow [data-sankey-top-anchor="alert-link"]' },
-  { id: 'episode-alerts', target: '.dashboard-investigation-flow [data-sankey-top-anchor="episode-alerts"]' },
   { id: 'open-alerts-pending', source: 'open-alerts', target: '.dashboard-investigation-flow [data-sankey-top-anchor="pending"]', partial: true },
   { id: 'open-alerts-in-progress', source: 'open-alerts', target: '.dashboard-investigation-flow [data-sankey-top-anchor="inProgress"]', partial: true },
   { id: 'open-episodes', target: '[data-dashboard-metric-target="open-episodes"]', color: flowColors.inProgress },
@@ -309,7 +309,7 @@ function RiskSegments({ data }) {
   </ChartPanel>;
 }
 
-function TransactionDetails({ data, flow, reduced, summary, metrics }) {
+function TransactionDetails({ data, flow, reduced, summary }) {
   const { scale } = flow;
   const series = [
     { key: 'total', label: '전체 거래', color: transactionTotalColor },
@@ -335,7 +335,6 @@ function TransactionDetails({ data, flow, reduced, summary, metrics }) {
         <DailySeries rows={rows} series={series} detail={detail} reduced={reduced} label="기간별 거래량 추이" stacked={false} />
       </> : <Text className="dashboard-note">표시할 일별 거래량이 없습니다.</Text>}
     </ChartPanel>
-    {metrics}
     <RiskSegments data={data} />
     {summary}
   </LayoutGrid>;
@@ -377,7 +376,7 @@ function CaseCompletion({ data }) {
     { label: statusLabels.inProgress, tone: 'in-progress', value: alerts.inProgress + episodes.inProgress },
     { label: statusLabels.done, tone: 'done', value: done },
   ];
-  return <ChartPanel title="업무 처리율" className="dashboard-completion" hasChart={total > 0}
+  return <ChartPanel title="업무 처리율" headingAs="h3" className="dashboard-completion" hasChart={total > 0}
     note="생성일별 현재 상태 · 개별 처리 Alert와 Episode를 건별로 집계">
     {total ? <>
       <Box className="dashboard-metric-reading dashboard-completion-reading">
@@ -391,6 +390,7 @@ function CaseCompletion({ data }) {
 }
 
 export function Analytics({ data, reduced, summary, metrics }) {
+  const [transactionsCard, alertsCard, linkedCard, ...unfinishedCards] = metrics;
   const hostRef = useRef(null);
   const transactions = transactionFlow(data);
   const investigation = investigationFlow(data);
@@ -398,21 +398,27 @@ export function Analytics({ data, reduced, summary, metrics }) {
   const investigationNote = data.linked == null
     ? '의심 거래의 Alert 연결 집계 미제공'
     : '첫 구간은 거래 건수 · 이후에는 Alert 건수';
+  const { episodeAlerts, totalAlerts } = data.investigation ?? {};
+  const episodeNote = totalAlerts > 0 && episodeAlerts != null
+    ? ` · Alert의 Episode 편입 ${count(episodeAlerts)} / ${count(totalAlerts)} (${compactShare(episodeAlerts, totalAlerts)})` : '';
   return <Box as="section" className="dashboard-analytics dashboard-workflow-charts dashboard-institution-relations"
     aria-label="기관 탐지 현황" ref={hostRef}>
+    <InstitutionMetricsGrid aria-label="전체 대시보드 요약 지표">
+      {transactionsCard}{alertsCard}{linkedCard}
+      <CaseCompletion data={data} />
+      {unfinishedCards}
+    </InstitutionMetricsGrid>
     <DashboardIndicatorsGrid aria-label="기관 주요 지표">
       <NewEntitiesMetric data={data} reduced={reduced} />
       <StaffWorkloadMetric workload={data.institutionWorkload} reduced={reduced} showAssignments />
       <StaffWorkloadMetric workload={data.institutionWorkload} reduced={reduced} />
     </DashboardIndicatorsGrid>
     {scope && <Text className="dashboard-note">거래 집계 범위 · {scope}</Text>}
-    <TransactionDetails data={data} flow={transactions} reduced={reduced} summary={summary} metrics={metrics.transactions} />
-    {metrics.investigation}
-    <ChartPanel title="조사 처리 흐름" note={investigationNote} className="dashboard-investigation-flow" hasChart={investigation.hasData}>
+    <TransactionDetails data={data} flow={transactions} reduced={reduced} summary={summary} />
+    <ChartPanel title="조사 처리 흐름" note={investigationNote + episodeNote} className="dashboard-investigation-flow" hasChart={investigation.hasData}>
       {investigation.hasData ? <StagedSankey data={investigation} stages={investigationStages} label="조사 처리 흐름" reduced={reduced} />
         : <Text className="dashboard-note">표시할 조사 처리 흐름이 없습니다.</Text>}
     </ChartPanel>
-    <CaseCompletion data={data} />
     <LayoutGrid columns={12} className="dashboard-flow-status-grid">
       <InvestigationStatus data={data} reduced={reduced} />
       <InvestigationStatus data={data} reduced={reduced} episode />

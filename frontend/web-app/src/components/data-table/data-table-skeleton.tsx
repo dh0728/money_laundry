@@ -31,7 +31,7 @@ function SkeletonCells({ columnCount, cellWidths = ["auto"], shrinkZero, header 
       "--table-cell-width": width,
       "--table-cell-min-width": shrinkZero ? width : undefined,
     } as React.CSSProperties}>
-      <Skeleton className="h-6 w-full" />
+      <Skeleton className="data-table-skeleton-cell" />
     </Cell>;
   });
 }
@@ -74,7 +74,7 @@ export function DataTableSkeleton({
         ) : null}
       </div>}
       <div className="rounded-md border">
-        <Table>
+        <Table data-table-skeleton>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <SkeletonCells {...cells} header />

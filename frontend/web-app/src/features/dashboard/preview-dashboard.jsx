@@ -6,7 +6,7 @@ import CountUp from '../../components/react-bits/CountUp';
 import { CaseProgressBoard } from '../investigation/preview-case-card';
 import {
   BenchmarkAnalyticsSkeleton, DashboardAnalyticsSkeleton, DashboardBoardSkeleton,
-  DashboardMetricGrid, InstitutionMetricsGrid, PersonalDashboardOverview,
+  DashboardMetricGrid, PersonalDashboardOverview,
 } from './dashboard-layout';
 import { ibmLaundering, ibmTotal } from '../investigation/ibm-hi-small-aggregate';
 import { benchmarkDashboardMetrics } from './benchmark-dashboard-metrics';
@@ -14,7 +14,7 @@ import { ActionButton } from '../../components/primary-button';
 import { csvDownloadEntry } from '../../components/query-controls';
 import { BoardSectionDownload, SectionDownloadHeading } from '../../components/section-download';
 import { Box, Heading, Stack, Text } from '../../components/layout-primitives';
-import { LinkTag, StatusTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
+import { LinkTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
 import { AccountTrailGraph } from '../../components/charts/charts/account-trail-graph';
 import { StagedSankey } from '../../components/charts/charts/sankey/staged-sankey';
 import { previewJudgmentReason } from '../investigation/case-judgment-data';
@@ -30,11 +30,11 @@ const Analytics = React.lazy(() => import('./dashboard-analytics').then(module =
 const BenchmarkCharts = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.BenchmarkCharts })));
 
 function Metric({ item, reduced }) {
-  const { label, value, unit, detail, key, overlap, relation, extra, ratio } = item;
+  const { label, value, unit, detail, key, relation, extra, ratio, tone } = item;
   const wide = (typeof value === 'number' ? formatter.format(value).length : value.length) >= 8;
   const reading = <Box className="dashboard-metric-reading">
-      <Text as="strong" className="dashboard-metric-value" data-wide-value={wide || undefined} data-dashboard-metric-source={relation}
-        data-kpi-tone={value === '—' ? undefined : ratio?.tone}>
+      <Text as="strong" className="dashboard-metric-value" data-wide-value={wide || undefined}
+        data-dashboard-metric-source={relation} data-kpi-tone={value === '—' ? undefined : tone ?? ratio?.tone}>
         {typeof value === 'number' && !reduced && !animated.has(key)
           ? <CountUp to={value} className="count-up-fast" trigger="view" separator="," onEnd={() => animated.add(key)} />
           : typeof value === 'number' ? formatter.format(value) : value}
@@ -47,7 +47,6 @@ function Metric({ item, reduced }) {
     {extra}
     {detail && <Text>{detail}</Text>}
     {ratio && <MetricRatio {...ratio} />}
-    {overlap && <Box><StatusTag preset="neutral" emphasis="subtle">{overlap}</StatusTag></Box>}
   </Box>;
 }
 
@@ -74,48 +73,34 @@ function institutionMetricCards(data, reduced) {
   const institution = coverageScope === 'institution';
   const alerts = reviewStatusTotals(data.dailyAlertStatus);
   const episodes = reviewStatusTotals(data.dailyEpisodeStatus);
-  const episodeAlerts = investigation?.episodeAlerts;
   const alertTotal = investigation?.totalAlerts;
-  const episodeLinksAvailable = episodeAlerts != null && alertTotal != null;
-  const transactionOverlap = total > 0 ? '중복 · 거래 분류' : undefined;
-  const groups = {
-    transactions: [{ label: '들어온 거래 수', value: total, unit: '건', overlap: transactionOverlap,
-      relation: total > 0 ? 'transactions' : undefined, detail: institution ? undefined : '선택 업무의 근거 거래',
-      extra: <Box className="dashboard-transaction-detection">
-        <Box><Text>의심 거래</Text>
-          <Text as="strong" className="dashboard-metric-value" data-kpi-tone="suspect" data-dashboard-metric-source={suspicious > 0 ? 'suspicious' : undefined}>
-            {formatter.format(suspicious)}<Text as="small">건</Text>
-          </Text>
-        </Box>
-        <Box><Text>의심 비율</Text><Text as="strong" className="dashboard-metric-value" data-kpi-tone={total > 0 ? 'suspect' : undefined}>
-          {compactShare(suspicious, total)}
-        </Text></Box>
-      </Box> }],
-    investigation: [
-      { label: '모델 의심 거래 중 Alert 편입', value: linked == null ? '—' : compactShare(linked, suspicious),
-        detail: linked == null ? 'Alert 연결 집계 미제공' : `모델 의심 거래 ${count(suspicious)} 중 ${count(linked)} 연결`,
-        ratio: { value: linked, total: suspicious, tone: 'suspect' },
-        overlap: linked > 0 ? '중복 · 조사 처리 흐름' : undefined, relation: linked > 0 ? 'linked' : undefined },
-      { label: 'Alert 중 Episode 편입', value: episodeLinksAvailable ? compactShare(episodeAlerts, alertTotal) : '—',
-        detail: episodeLinksAvailable ? `Alert ${count(alertTotal)} 중 편입된 Alert ${count(episodeAlerts)}` : 'Alert의 Episode 편입 집계 미제공',
-        ratio: { value: episodeAlerts, total: alertTotal, tone: 'suspect' },
-        overlap: episodeLinksAvailable && episodeAlerts > 0 ? '중복 · 조사 처리 흐름' : undefined,
-        relation: episodeLinksAvailable && episodeAlerts > 0 ? 'episode-alerts' : undefined },
-      { label: '미처리 Alert', value: compactShare(alerts.unfinished, alerts.total),
-        detail: data.dailyAlertStatus ? `Alert ${count(alerts.total)} 중 ${count(alerts.unfinished)} · 검토 대기와 처리 중` : 'Alert 상태 집계 미제공',
-        ratio: { value: alerts.unfinished, total: alerts.total, tone: 'in-progress' },
-        overlap: alerts.unfinished > 0 ? '일부 중복 · 조사 처리 흐름' : undefined, relation: alerts.unfinished > 0 ? 'open-alerts' : undefined },
-      { label: '미처리 Episode', value: compactShare(episodes.unfinished, episodes.total),
-        detail: data.dailyEpisodeStatus ? `Episode ${count(episodes.total)} 중 ${count(episodes.unfinished)} · 처리 중` : 'Episode 상태 집계 미제공',
-        ratio: { value: episodes.unfinished, total: episodes.total, tone: 'in-progress' },
-        overlap: episodes.total > 0 ? '중복 · 일별 Episode 처리 상태' : undefined, relation: episodes.total > 0 ? 'open-episodes' : undefined },
-    ],
-  };
-  return Object.fromEntries(Object.entries(groups).map(([group, items]) => [group, <InstitutionMetricsGrid group={group}>
-    {items.map(item => <Panel as="article" key={item.label}>
-      <Metric item={{ ...item, key: `institution-${item.label}` }} reduced={reduced} />
-    </Panel>)}
-  </InstitutionMetricsGrid>]));
+  const metrics = [
+    { label: '들어온 거래 수', value: total, unit: '건',
+      relation: total > 0 ? 'transactions' : undefined,
+      detail: institution ? undefined : '선택 업무의 근거 거래',
+      tone: 'neutral', ratio: { value: suspicious, total, tone: 'suspect' },
+      extra: <Text>의심 거래 <Text as="strong" className="dashboard-metric-accent" data-kpi-tone="suspect"
+        data-dashboard-metric-source={suspicious > 0 ? 'suspicious' : undefined}>
+        {count(suspicious)}{total > 0 && ` · ${compactShare(suspicious, total)}`}
+      </Text></Text> },
+    { label: '생성 Alert', value: alertTotal ?? '—', unit: alertTotal == null ? undefined : '건',
+      relation: alertTotal > 0 ? 'created-alerts' : undefined },
+    { label: '의심 거래 중 Alert 편입', value: linked == null ? '—' : compactShare(linked, suspicious),
+      detail: linked == null ? 'Alert 연결 집계 미제공' : `모델 의심 거래 ${count(suspicious)} 중 ${count(linked)} 연결`,
+      ratio: { value: linked, total: suspicious, tone: 'suspect' },
+      relation: linked > 0 ? 'linked' : undefined },
+    { label: '미처리 Alert', value: compactShare(alerts.unfinished, alerts.total), compact: true,
+      detail: data.dailyAlertStatus ? `Alert ${count(alerts.total)} 중 ${count(alerts.unfinished)} · 검토 대기와 처리 중` : 'Alert 상태 집계 미제공',
+      ratio: { value: alerts.unfinished, total: alerts.total, tone: 'in-progress' },
+      relation: alerts.unfinished > 0 ? 'open-alerts' : undefined },
+    { label: '미완료 Episode', value: compactShare(episodes.unfinished, episodes.total), compact: true,
+      detail: data.dailyEpisodeStatus ? `Episode ${count(episodes.total)} 중 ${count(episodes.unfinished)} · 처리 중` : 'Episode 상태 집계 미제공',
+      ratio: { value: episodes.unfinished, total: episodes.total, tone: 'in-progress' },
+      relation: episodes.total > 0 ? 'open-episodes' : undefined },
+  ];
+  return metrics.map(item => <Panel as="article" key={item.label} data-compact-kpi={item.compact || undefined}>
+    <Metric item={{ ...item, key: `institution-${item.label}` }} reduced={reduced} />
+  </Panel>);
 }
 
 const personalStages = ['배정된 업무', '현재 상태', '완료 판정'];
