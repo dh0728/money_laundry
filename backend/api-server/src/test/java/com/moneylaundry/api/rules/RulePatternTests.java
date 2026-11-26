@@ -59,9 +59,7 @@ class RulePatternTests {
 
   String shortId(long account) {
     return jdbc.queryForObject(
-        "select service_account_id from core.accounts where account_id=?",
-        String.class,
-        account);
+        "select service_account_id from core.accounts where account_id=?", String.class, account);
   }
 
   /** from → to 로 usd 달러를 보낸 거래 한 건. at 은 "2023-09-09 10:00+09" 꼴이다. */
