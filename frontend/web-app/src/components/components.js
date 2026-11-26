@@ -4,9 +4,18 @@ export { bindTooltip, hideTooltip } from './warm-tooltip-dom.jsx';
 export const Icon = (name, variant = '') =>
   `<svg class="icon ${variant}" viewBox="0 0 24 24" aria-hidden="true">${icons[name]}</svg>`;
 
-// Animated AML RADAR symbol. Shape comes from /aml_radar_symbol_*.svg; color follows currentColor.
+// Lucide Radar geometry with the AML RADAR rings and echoes.
 export const BrandSymbol = (variant = '') =>
-  `<span class="icon aml-radar-symbol ${variant}" aria-hidden="true"></span>`;
+  `<svg class="icon aml-radar-symbol ${variant}" viewBox="0 0 24 24" aria-hidden="true">
+    <g class="aml-radar-symbol__sweep">
+      <circle class="aml-radar-symbol__outer" cx="12" cy="12" r="10"/>
+      <circle class="aml-radar-symbol__inner" cx="12" cy="12" r="6"/>
+      <path class="aml-radar-symbol__echo aml-radar-symbol__echo--outer" d="M4 6h.01"/>
+      <path class="aml-radar-symbol__echo aml-radar-symbol__echo--inner" d="M12 18h.01"/>
+      <circle cx="12" cy="12" r="2"/>
+      <path d="m13.41 10.59 5.66-5.66"/>
+    </g>
+  </svg>`;
 
 export function buttonPresentation({ className = '', shape, surface, type = 'button' } = {}) {
   return {
@@ -24,6 +33,44 @@ export function Button(content, { variant = '', attributes = '', shape, surface 
 
 export const IconButton = (content, label, attributes, variant = '', surface = 'floating', shape = 'circle') =>
   Button(content, { variant: `icon-button ${variant}`, attributes: `aria-label="${label}" ${attributes}`, shape, surface });
+
+function elementHTML(tag, attributes, content) {
+  return `<${tag}${attributes ? ` ${attributes}` : ''}>${content}</${tag}>`;
+}
+
+// Mount the string components in the imperative workspace without adding a wrapper.
+export function HTMLFragment(markup) {
+  const template = document.createElement('template');
+  template.innerHTML = markup;
+  return document.adoptNode(template.content);
+}
+
+export const HTMLNode = markup => HTMLFragment(markup).firstElementChild;
+
+/** @param {'div' | 'section' | 'header' | 'footer' | 'main' | 'nav' | 'ul' | 'ol' | 'li' | 'form'} as */
+export function BoxHTML(content = '', attributes = '', as = 'div') {
+  return elementHTML(as, attributes, content);
+}
+
+/** @param {'span' | 'strong' | 'p' | 'code' | 'time' | 'label'} as */
+export function TextHTML(content = '', attributes = '', as = 'span') {
+  return elementHTML(as, attributes, content);
+}
+
+export function HeadingHTML(content = '', attributes = '', level = 2) {
+  return elementHTML(`h${Math.min(6, Math.max(1, level))}`, attributes, content);
+}
+
+export const InputHTML = attributes => `<input ${attributes}>`;
+
+export const ProfileAvatarHTML = (src, alt) =>
+  `<img class="avatar" data-profile-image src="${src}" alt="${alt}" width="32" height="32">`;
+
+export const DecorativeCanvasHTML = attributes => `<canvas ${attributes} aria-hidden="true"></canvas>`;
+
+// 문자열 화면용 Panel(components/panel.jsx와 같은 면: 화면 안으로 들어간 inner glow).
+export const PanelHTML = (content, variant = '') =>
+  `<section class="screen-panel ${variant}">${content}</section>`;
 
 export const Divider = () => '<hr class="divider">';
 

@@ -19,6 +19,6 @@
   font-size: var(--ui-font-size);
   color: var(--text);
 }
-.search-field[data-search-variant="compact"] .icon { inline-size: 1rem; block-size: 1rem; color: var(--muted-text) }
+.search-field[data-search-variant="compact"] .icon { inline-size: var(--search-field-compact-icon-size); block-size: var(--search-field-compact-icon-size); color: var(--muted-text) }
 .search-field input::placeholder { color: var(--muted-text) }
-.search-field[data-disabled] { opacity: .55 }
+.search-field[data-disabled] { opacity: var(--search-field-disabled-opacity) }

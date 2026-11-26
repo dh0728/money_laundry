@@ -2,16 +2,11 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import path from 'node:path'
 import { defineConfig } from 'vite'
+import { designDevGate } from './design-dev-gate.mts'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  build: {
-    rolldownOptions: {
-      input: ['index.html', 'components.html', 'ant-review.html', 'next-review.html', 'react-review.html', 'redesign.html']
-        .map(page => path.resolve(import.meta.dirname, page)),
-    },
-  },
+  plugins: [designDevGate(), react(), tailwindcss()],
   server: {
     proxy: { '/api': { target: process.env.VITE_API_PROXY_TARGET ?? 'http://127.0.0.1:8080', changeOrigin: true } },
   },

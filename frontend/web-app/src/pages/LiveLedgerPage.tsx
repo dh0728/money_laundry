@@ -11,9 +11,10 @@ import { Button } from '@/components/ui/button'
 import { useAsync } from '@/lib/useAsync'
 import { fetchReviewCases } from '@/api/liveReview'
 import { toast } from 'sonner'
+import { Box, Text } from '@/components/layout-primitives'
 
 function Pager({ page, total, onChange }: { page: number; total: number; onChange: (page: number) => void }) {
-  return <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground"><span>전체 {total.toLocaleString('ko-KR')}건 · {page + 1}쪽</span><div className="flex gap-1"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => onChange(page - 1)}>이전</Button><Button variant="outline" size="sm" disabled={(page + 1) * 20 >= total} onClick={() => onChange(page + 1)}>다음</Button></div></div>
+  return <Box className="mt-3 flex items-center justify-between text-xs text-muted-foreground"><Text as="span">전체 {total.toLocaleString('ko-KR')}건 · {page + 1}쪽</Text><Box className="flex gap-1"><Button variant="outline" size="sm" disabled={page === 0} onClick={() => onChange(page - 1)}>이전</Button><Button variant="outline" size="sm" disabled={(page + 1) * 20 >= total} onClick={() => onChange(page + 1)}>다음</Button></Box></Box>
 }
 
 type LedgerProps = { onOpen?: (kind: 'ALERT' | 'EPISODE', id: number) => void }
@@ -106,7 +107,7 @@ function LedgerContent({ onOpen, active, expectedTarget, onRelocate }: LedgerPro
     ...payments.map(value => ({ field: 'format' as const, value })),
     ...directions.map(value => ({ field: 'direction' as const, value: value === 'IN' ? '수취' : '송금' })),
   ]
-  return <div className="space-y-5">
+  return <Box className="space-y-5">
     <RefreshStatus queries={[owners, accounts, transactions, formats]} />
     <TransactionExplorer index={index} today={businessDate ? new Date(`${businessDate}T00:00:00`) : new Date()} remote={{
       onOpenEpisode: onOpen ? id => onOpen('EPISODE', id) : undefined,
@@ -128,5 +129,5 @@ function LedgerContent({ onOpen, active, expectedTarget, onRelocate }: LedgerPro
       counts: [owners, accounts, transactions].map(query => query.state.status === 'success' ? query.state.data.totalElements : undefined) as [number | undefined, number | undefined, number | undefined],
       stages: [owners, accounts, transactions].map((query, i) => i === 2 && targetMissing ? <ErrorBlock key={i} message={`거래 T-${expectedTarget}의 조회 결과가 변경되었습니다. 다시 확인해 주세요.`} onRetry={onRelocate!} /> : query.state.status === 'loading' ? <LoadingBlock key={i} label="목록" /> : query.state.status === 'error' ? <ErrorBlock key={i} message={query.state.message} onRetry={query.retry} /> : <Pager key={i} page={[ownerPage, accountPage, transactionPage][i]} total={query.state.data.totalElements} onChange={[setOwnerPage, setAccountPage, setTransactionPage][i]} />) as [ReactNode, ReactNode, ReactNode],
     }} />
-  </div>
+  </Box>
 }

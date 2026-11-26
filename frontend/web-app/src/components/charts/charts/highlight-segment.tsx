@@ -1,7 +1,8 @@
 "use client";
 
 import { type MotionValue, m } from "motion/react";
-import { type RefObject, useId, useLayoutEffect, useRef } from "react";
+import { type RefObject, useId, useLayoutEffect, useRef, useState } from "react";
+import { readChartDurationSeconds, readSvgEffectRegion } from "../chart-design-values";
 
 // Hover-highlight overlay: re-strokes the base path `d`, clipped to a vertical
 // band whose x/width spring to track the hovered point, so only the segment
@@ -52,6 +53,8 @@ export function HighlightSegment({
 }: HighlightSegmentProps) {
   const bandId = useId();
   const fadeId = `${bandId}-fade`;
+  const [fadeDuration] = useState(() => readChartDurationSeconds("--chart-hover-fade-duration", 0.4));
+  const [maskRegion] = useState(readSvgEffectRegion);
   const highlightRef = useRef<SVGPathElement>(null);
   const glowRef = useRef<SVGPathElement>(null);
 
@@ -124,12 +127,9 @@ export function HighlightSegment({
             {/* userSpaceOnUse region: a near-flat path has a thin bbox, so the
                 default objectBoundingBox region would crop the stroke. */}
             <mask
-              height="300%"
+              {...maskRegion}
               id={bandId}
               maskUnits="userSpaceOnUse"
-              width="300%"
-              x="-100%"
-              y="-100%"
             >
               {band}
             </mask>
@@ -144,7 +144,7 @@ export function HighlightSegment({
         exit={{ opacity: 0 }}
         initial={{ opacity: 0 }}
         mask={soft ? `url(#${bandId})` : undefined}
-        transition={{ duration: 0.4, ease: "easeInOut" }}
+        transition={{ duration: fadeDuration, ease: "easeInOut" }}
       >
         {glow ? (
           <path

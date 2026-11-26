@@ -1,7 +1,7 @@
-import { alternatePreviewStaff, previewAdmin, previewStaff } from '../auth/preview-session-user';
+import { alternatePreviewStaff, previewAdmin, previewAnalysts, previewStaff } from '../auth/preview-session-user';
 import { sharedCaseEvidence } from './case-graph-scope';
 
-export const requestStaff = [previewStaff, alternatePreviewStaff];
+export const requestStaff = [...previewAnalysts];
 const users = [previewAdmin, ...requestStaff];
 export const requestAdmin = () => users[0];
 // 서버 연결에서는 서버의 관리자·분석가 목록으로 바꾼다.
@@ -182,7 +182,10 @@ export function previewWorkRequestEffects() {
       current.reviewStatus = item.reviewStatus ?? '처리 중';
     }
     if (effect === 'deadline') current.reviewDueOn = item.deadline;
-    if (item.assignee) current.assignee = item.assignee;
+    if (item.assignee) {
+      current.assignee = item.assignee;
+      current.assignedAt = item.appliedAt;
+    }
     effects.set(item.code, current);
   }
   return effects;

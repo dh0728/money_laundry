@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useTheme } from '@/app/ThemeProvider'
+import { appReducedMotion } from '@/hooks/use-reduced-motion'
 
 type Node = { x: number; y: number; r: number; vx: number; vy: number }
 
@@ -13,8 +14,7 @@ export default function LoginNetwork() {
     if (!canvas) return
     const context = canvas.getContext('2d')
     if (!context) return
-    const motion = window.matchMedia?.('(prefers-reduced-motion: reduce)')
-    const reducedMotion = motion?.matches ?? false
+    const reducedMotion = appReducedMotion()
     let nodes: Node[] = [], frame = 0, previous = performance.now()
     let width = 0, height = 0
     const pointer = { x: 0, y: 0, active: false }
@@ -73,5 +73,5 @@ export default function LoginNetwork() {
       window.removeEventListener('pointerleave', onPointerLeave)
     }
   }, [resolvedTheme])
-  return <canvas ref={canvasRef} aria-hidden data-testid="login-network" className="absolute inset-0 size-full block" style={{ background: "transparent" }} />
+  return <canvas ref={canvasRef} aria-hidden data-testid="login-network" className="absolute inset-0 size-full block bg-transparent" />
 }

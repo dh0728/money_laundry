@@ -83,19 +83,12 @@
   display: grid;
   gap: var(--aml-space-8);
 }
-.case-judgment-dropdowns .glide-select__trigger {
-  inline-size: 100%;
-}
-.case-judgment-dropdowns .glide-select__chevron {
-  margin-inline-start: auto;
-  flex-shrink: 0;
-}
 .case-judgment-body .case-judgment-bundle-notice {
   margin: 0;
   padding: var(--aml-space-8) var(--aml-space-12);
   border: 0;
   border-radius: var(--aml-radius-control);
-  background: color-mix(in srgb, var(--status-pending-accent) 14%, var(--information-panel-surface));
+  background: color-mix(in srgb, var(--status-pending-accent) var(--case-judgment-notice-accent-share), var(--information-panel-surface));
   color: var(--text);
   white-space: pre-wrap;
   overflow-wrap: anywhere;

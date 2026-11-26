@@ -1,0 +1,9 @@
+.interactive-graph-canvas {
+  width: var(--graph-canvas-width);
+  height: var(--graph-canvas-height);
+  touch-action: none;
+}
+
+.interactive-graph-canvas[data-cursor="grab"] { cursor: grab; }
+.interactive-graph-canvas[data-cursor="grabbing"] { cursor: grabbing; }
+.interactive-graph-canvas[data-cursor="pointer"] { cursor: pointer; }

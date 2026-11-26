@@ -1,3 +1,5 @@
+import { createElement, useEffect, useRef } from 'react';
+
 // React Bits SquishSwitch interaction, adapted for the standalone layout.
 // Copyright (c) 2026 David Haz. See react-bits-LICENSE.md.
 export function SquishSwitch(id, label) {
@@ -8,6 +10,8 @@ export function SquishSwitch(id, label) {
 }
 
 export function bindSquishSwitch(button, onChange) {
+  const listeners = new AbortController();
+  const listen = (type, handler) => button.addEventListener(type, handler, { signal: listeners.signal });
   const thumb = button.querySelector('.squish-switch__thumb');
   const checked = () => button.getAttribute('aria-checked') === 'true';
   let grip;
@@ -34,7 +38,7 @@ export function bindSquishSwitch(button, onChange) {
     if (moved && !canceled) commit(offset >= travel / 2);
   }
 
-  button.addEventListener('pointerdown', event => {
+  listen('pointerdown', event => {
     if (event.button !== 0 || grip) return;
     suppressClick = false;
     const track = thumb.parentElement;
@@ -44,7 +48,7 @@ export function bindSquishSwitch(button, onChange) {
     grip = { id: event.pointerId, x: event.clientX, start, travel, offset: start, moved: false };
     button.setPointerCapture(event.pointerId);
   });
-  button.addEventListener('pointermove', event => {
+  listen('pointermove', event => {
     if (event.pointerId !== grip?.id) return;
     const delta = event.clientX - grip.x;
     const slop = event.pointerType === 'touch' ? 8 : 4;
@@ -54,17 +58,32 @@ export function bindSquishSwitch(button, onChange) {
     button.setAttribute('data-held', '');
     thumb.style.setProperty('--drag-offset', `${grip.offset}px`);
   });
-  button.addEventListener('pointerup', event => release(event, false));
-  button.addEventListener('pointercancel', event => release(event, true));
-  button.addEventListener('lostpointercapture', event => release(event, true));
-  button.addEventListener('keydown', event => {
+  listen('pointerup', event => release(event, false));
+  listen('pointercancel', event => release(event, true));
+  listen('lostpointercapture', event => release(event, true));
+  listen('keydown', event => {
     if (event.key === 'Escape' && grip) {
       event.preventDefault();
       release({ pointerId: grip.id }, true);
     }
   });
-  button.addEventListener('click', event => {
+  listen('click', event => {
     if (!suppressClick || event.detail === 0) commit(!checked());
     suppressClick = false;
   });
+  return () => {
+    if (grip) release({ pointerId: grip.id }, true);
+    listeners.abort();
+  };
+}
+
+export function SquishSwitchControl({ id, label, checked, onChange }) {
+  const button = useRef(null);
+  useEffect(() => bindSquishSwitch(button.current, onChange), [onChange]);
+
+  return createElement('button', {
+    ref: button, id, className: 'squish-switch', type: 'button', role: 'switch',
+    'aria-label': label, 'aria-checked': checked,
+  }, createElement('span', { className: 'squish-switch__track', 'aria-hidden': true },
+    createElement('span', { className: 'squish-switch__thumb' })));
 }

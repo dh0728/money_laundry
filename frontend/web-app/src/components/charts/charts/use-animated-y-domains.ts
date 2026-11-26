@@ -1,6 +1,7 @@
 "use client";
 
-import { animate, useReducedMotion } from "motion/react";
+import { animate } from "motion/react";
+import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
 import { useEffect, useRef, useState } from "react";
 import type { ChartPhase } from "./chart-phase";
 import { LINE_LOADING_PULSE_EASE } from "./line-loading-timing";
@@ -130,7 +131,7 @@ export function useAnimatedYDomains({
   onSettled,
   tweenOnTargetChange = false,
 }: UseAnimatedYDomainsOptions): Record<string, YDomain> {
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = useAppReducedMotion();
   const destinationByAxis = resolveAnimatedYDestinationDomains(
     chartPhase,
     skeletonByAxis,

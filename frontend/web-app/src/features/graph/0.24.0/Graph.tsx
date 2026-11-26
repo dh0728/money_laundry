@@ -1,7 +1,8 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react'
 import type { ForceGraphMethods, LinkObject, NodeObject } from 'react-force-graph-2d'
 import { Maximize2, Minimize2, Minus, Network, Pause, Play, Plus, RotateCcw, Search, Shrink, StepBack, StepForward } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
@@ -14,14 +15,19 @@ import { IconButton } from '@/components/IconButton'
 import OwnerGraph, { effectiveFlowLabel, flowParticleColor, flowParticleCount, flowParticleRadius, type OwnerGraphControls, type OwnerGraphState } from './OwnerGraph'
 import { formatGraphMoney, type GraphViewMode } from './model'
 import { configureDevAccountForces, seedComponentPositions } from './force-layout'
+import { useAppReducedMotion } from '@/hooks/use-reduced-motion'
+import { Box, Heading, Text } from '@/components/layout-primitives'
+import { readChartNumber } from '@/components/charts/chart-design-values'
 
 export { seedComponentPositions } from './force-layout'
 
 export const DEFAULT_HOP = 3
 const HOP_MIN = 1, HOP_MAX = 5
 const HOP_TICKS = [1, 2, 3, 4, 5]
-const PAD = 56
-const NARROW_WIDTH = 900
+const graphViews = [
+  { value: 'account', label: '계좌별 보기' },
+  { value: 'owner', label: '소유주별 보기' },
+] as const
 
 // 의심 여부 2색: 1=빨강, 0=무채색(사용자 확정). 위험도 색은 그래프에 쓰지 않는다.
 export const nodeTone = (n: GraphNode) => n.core ? 'var(--graph-l1)' : 'var(--graph-l0-node)'
@@ -68,14 +74,7 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
   const ownerGraph = useRef<OwnerGraphControls>(null)
   const [ownerState, setOwnerState] = useState<OwnerGraphState>({ positions: {}, camera: null })
   const [ownerZoom, setOwnerZoom] = useState({ ratio: 1, fitted: true })
-  const [reducedMotion, setReducedMotion] = useState(false)
-  useEffect(() => {
-    const media = window.matchMedia?.('(prefers-reduced-motion: reduce)')
-    if (!media) return
-    const update = () => setReducedMotion(media.matches)
-    update(); media.addEventListener('change', update)
-    return () => media.removeEventListener('change', update)
-  }, [])
+  const reducedMotion = useAppReducedMotion()
   // 상세: 오른쪽 도킹(좁으면 아래) 또는 RDR 9000처럼 떠 있는 창
   const [panelMode, setPanelMode] = useState<PanelMode>('dock')
   const [hover, setHover] = useState<{ kind: 'node' | 'edge'; key: string; x: number; y: number } | null>(null)
@@ -89,7 +88,18 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
   const fittedRef = useRef(true), fitting = useRef(false), fitCenter = useRef<{ x: number; y: number } | null>(null)
   const setFitted = useCallback((value: boolean) => { fittedRef.current = value; setFittedState(value) }, [])
   const [narrow, setNarrow] = useState(false)
-  const layout = useRef<HTMLDivElement>(null), [fillHeight, setFillHeight] = useState(640)
+  const layout = useRef<HTMLDivElement>(null), [fillHeight, setFillHeight] = useState<number>()
+  const [panelSizes] = useState(() => ({
+    settings: readChartNumber('--graph-settings-width', 210),
+    settingsMin: readChartNumber('--graph-settings-min-width', 190),
+    settingsMax: readChartNumber('--graph-settings-max-width', 260),
+    canvasMin: readChartNumber('--graph-canvas-min-width', 320),
+    detail: readChartNumber('--graph-detail-width', 440),
+    detailMin: readChartNumber('--graph-detail-min-width', 340),
+    detailMax: readChartNumber('--graph-detail-max-width', 760),
+    compactCanvasMin: readChartNumber('--graph-compact-canvas-min-height', 240),
+    compactDetailMin: readChartNumber('--graph-compact-detail-min-height', 180),
+  }))
   // 본문 스크롤 영역의 남은 높이를 그래프가 정확히 채운다(하단 여백·넘침 없음)
   useLayoutEffect(() => {
     const measure = () => {
@@ -97,7 +107,7 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
       if (!el || !main) return
       const top = el.getBoundingClientRect().top - main.getBoundingClientRect().top + main.scrollTop
       const bottom = parseFloat(getComputedStyle(main).paddingBottom) || 0
-      setFillHeight(Math.max(460, Math.floor(main.clientHeight - top - bottom)))
+      setFillHeight(Math.floor(main.clientHeight - top - bottom))
     }
     measure(); window.addEventListener('resize', measure); return () => window.removeEventListener('resize', measure)
   }, [fullscreen])
@@ -108,7 +118,7 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
     const evaluate = () => {
       const w = el.getBoundingClientRect().width
       const portrait = typeof window !== 'undefined' && !!window.matchMedia?.('(orientation: portrait)').matches
-      setNarrow((w > 0 && w < NARROW_WIDTH) || portrait)
+      setNarrow((w > 0 && w < readChartNumber('--graph-compact-breakpoint', 900)) || portrait)
     }
     evaluate()
     const ro = new ResizeObserver(evaluate)
@@ -167,7 +177,7 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
     if (viewMode === 'owner') { ownerGraph.current?.fit(); return }
     const g = fg.current; if (!g || !ready.current) return
     fitting.current = true; setFitted(true)
-    g.zoomToFit(ms, PAD)
+    g.zoomToFit(ms, readChartNumber('--graph-fit-padding', 56))
     window.setTimeout(() => { if (fg.current !== g) return; fitK.current = g.zoom(); fitCenter.current = g.centerAt(); setZoomK(g.zoom()); fitting.current = false }, ms + 20)
   }, [viewMode, setFitted])
   // 맞춤 상태에서 크기·토글·보기·배치가 바뀌면 다시 맞춘다
@@ -270,7 +280,7 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
         }
         // Obsidian처럼 확대할수록 이름이 드러난다. 의심 거래 계좌는 항상 표시
         if (n.core || scale > 2.2 || hoverKey === n.key) {
-          ctx.font = `${10 / scale}px ui-monospace, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'top'
+          ctx.font = `${10 / scale}px Pretendard`; ctx.textAlign = 'center'; ctx.textBaseline = 'top'
           ctx.fillStyle = colors.muted; ctx.fillText(n.account, n.x!, n.y! + r + 3 / scale)
         }
         ctx.globalAlpha = 1
@@ -291,7 +301,7 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
       linkCanvasObject={(l, ctx, scale) => {
         if (!(showInfo || hover?.key === l.key || selectedEdge === l.key)) return
         const s = l.source as FNode, t = l.target as FNode; if (typeof s !== 'object' || typeof t !== 'object') return
-        ctx.font = `${10 / scale}px ui-sans-serif, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = colors.fg
+        ctx.font = `${10 / scale}px Pretendard`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = colors.fg
         ctx.fillText(`${l.count}건 · ${formatGraphMoney(l)}`, (s.x! + t.x!) / 2, (s.y! + t.y!) / 2 - 4 / scale)
       }}
       onNodeHover={n => setHover(n ? { kind: 'node', key: n.key, ...pointer.current } : null)}
@@ -320,66 +330,69 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
     setViewMode(value); setHover(null); ready.current = false; setFitted(true)
   }
   const viewToggle = (
-    <div data-testid="graph-view-switch" role="group" aria-label="그래프 보기" className="relative grid w-full grid-cols-2 rounded-md border bg-muted/60 p-1">
-      <span aria-hidden="true" className={`graph-view-indicator pointer-events-none absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-sm bg-background shadow-sm ${viewMode === 'owner' ? 'translate-x-full' : 'translate-x-0'}`} />
-      <button type="button" aria-pressed={viewMode === 'account'} onClick={() => selectView('account')} className={`graph-view-option relative z-10 min-w-0 rounded-sm px-2 py-1.5 text-xs ${viewMode === 'account' ? 'font-medium text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>계좌별 보기</button>
-      <button type="button" aria-pressed={viewMode === 'owner'} onClick={() => selectView('owner')} className={`graph-view-option relative z-10 min-w-0 rounded-sm px-2 py-1.5 text-xs ${viewMode === 'owner' ? 'font-medium text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>소유주별 보기</button>
-    </div>
+    <Box data-testid="graph-view-switch" role="group" aria-label="그래프 보기" className="relative grid w-full grid-cols-2 rounded-md border bg-muted/60 p-1">
+      <Text as="span" aria-hidden="true" className={`graph-view-indicator pointer-events-none absolute inset-y-1 left-1 rounded-sm bg-background shadow-sm ${viewMode === 'owner' ? 'translate-x-full' : 'translate-x-0'}`} />
+      {graphViews.map(({ value, label }) => <Button key={value} type="button" variant="ghost" size={null}
+        aria-pressed={viewMode === value} onClick={() => selectView(value)}
+        className={`graph-view-option relative z-10 block min-w-0 rounded-sm px-2 py-1.5 text-xs whitespace-normal hover:bg-transparent hover:text-foreground ${viewMode === value ? 'font-medium text-foreground' : 'font-normal text-muted-foreground'}`}>
+        {label}
+      </Button>)}
+    </Box>
   )
   const settingsFull = (
-    <div className="p-4 h-full flex flex-col gap-6">
-      <div className="flex justify-between items-center">
-        <h3 className="font-semibold text-sm">그래프 설정</h3>
+    <Box className="p-4 h-full flex flex-col gap-6">
+      <Box className="flex justify-between items-center">
+        <Heading level={3} className="font-semibold text-sm">그래프 설정</Heading>
         <IconButton label="그래프 초기화" onClick={resetGraph}><RotateCcw className="size-3.5" /></IconButton>
-      </div>
+      </Box>
       {viewToggle}
-      <div className="flex items-center justify-between gap-3">
+      <Box className="flex items-center justify-between gap-3">
         <Label htmlFor="graph-info" className="text-xs font-normal leading-5">상시 거래 정보 표시</Label>
         <Switch id="graph-info" checked={showInfo} onCheckedChange={setShowInfo} />
-      </div>
-      <div className="space-y-3">
+      </Box>
+      <Box className="space-y-3">
         <Label className="text-xs text-muted-foreground">선택 계좌 기준 연결 단계 (hop)</Label>
         <Slider aria-label="선택 계좌 기준 연결 단계 hop 수" min={HOP_MIN} max={HOP_MAX} step={1} value={[hop]} disabled={!selectedNode} onValueChange={([v]) => setHop(v)} />
-        <div className="flex justify-between text-[0.625rem] text-muted-foreground tabular-nums">{HOP_TICKS.map(v => <span key={v} className={v === hop ? 'text-foreground font-semibold' : ''}>{v}</span>)}</div>
-        <p className="text-[0.6875rem] leading-relaxed text-muted-foreground">{selectedNode ? `${nodeMap.get(selectedNode)?.account} 기준 ${hop} hop 이내 노드만 표시` : '그래프에서 계좌 노드를 선택하면 hop 범위 설정이 활성화됩니다.'}</p>
-      </div>
-      <div className="mt-auto space-y-2.5 border-t pt-4 text-[0.6875rem] text-muted-foreground graph-legend">
-        <p className="flex items-center gap-2"><i className="legend-line" style={{ background: 'var(--graph-l1)' }} />의심 거래</p>
-        <p className="flex items-center gap-2"><i className="legend-line" style={{ background: 'var(--graph-l0)' }} />{nonSuspiciousLabel}</p>
-        <p className="flex items-center gap-2"><i className="legend-line legend-dash" />연결 경로</p>
-        <p className="flex items-center gap-2"><i className="legend-dot" style={{ background: 'var(--graph-l1)' }} />의심 거래 참여 계좌</p>
-        <p className="flex items-center gap-2"><i className="legend-dot legend-dot-sm" style={{ background: 'var(--graph-l0-node)' }} />주변 계좌 · 큰 점은 허브</p>
-        <p>선 굵기 · 거래 금액(USD)</p>
-      </div>
-    </div>
+        <Box className="flex justify-between text-3xs text-muted-foreground tabular-nums">{HOP_TICKS.map(v => <Text as="span" key={v} className={v === hop ? 'text-foreground font-semibold' : ''}>{v}</Text>)}</Box>
+        <Text className="text-2xs leading-relaxed text-muted-foreground">{selectedNode ? `${nodeMap.get(selectedNode)?.account} 기준 ${hop} hop 이내 노드만 표시` : '그래프에서 계좌 노드를 선택하면 hop 범위 설정이 활성화됩니다.'}</Text>
+      </Box>
+      <Box className="mt-auto space-y-2.5 border-t pt-4 text-2xs text-muted-foreground graph-legend">
+        <Text className="flex items-center gap-2"><Text as="i" className="legend-line" data-legend="suspicious" />의심 거래</Text>
+        <Text className="flex items-center gap-2"><Text as="i" className="legend-line" data-legend="non-suspicious" />{nonSuspiciousLabel}</Text>
+        <Text className="flex items-center gap-2"><Text as="i" className="legend-line legend-dash" />연결 경로</Text>
+        <Text className="flex items-center gap-2"><Text as="i" className="legend-dot" data-legend="suspicious" />의심 거래 참여 계좌</Text>
+        <Text className="flex items-center gap-2"><Text as="i" className="legend-dot legend-dot-sm" data-legend="adjacent-account" />주변 계좌 · 큰 점은 허브</Text>
+        <Text>선 굵기 · 거래 금액(USD)</Text>
+      </Box>
+    </Box>
   )
 
   const settingsCompact = (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 p-2.5 border-b text-xs shrink-0">
+    <Box className="flex flex-wrap items-center gap-x-4 gap-y-2 p-2.5 border-b text-xs shrink-0">
       {viewToggle}
-      <div className="flex items-center gap-2">
+      <Box className="flex items-center gap-2">
         <Label htmlFor="graph-info-c" className="text-xs font-normal">거래 정보</Label>
         <Switch id="graph-info-c" checked={showInfo} onCheckedChange={setShowInfo} />
-      </div>
-      <div className="flex items-center gap-2 flex-1 min-w-[180px]">
-        <Label className="text-[0.6875rem] text-muted-foreground shrink-0">연결 단계 (hop)</Label>
+      </Box>
+      <Box className="graph-compact-hop flex items-center gap-2 flex-1">
+        <Label className="text-2xs text-muted-foreground shrink-0">연결 단계 (hop)</Label>
         <Slider aria-label="선택 계좌 기준 연결 단계 hop 수" className="flex-1" min={HOP_MIN} max={HOP_MAX} step={1} value={[hop]} disabled={!selectedNode} onValueChange={([v]) => setHop(v)} />
-        <span className="text-[0.6875rem] tabular-nums min-w-12 text-center shrink-0">{selectedNode ? `${hop} hop` : '계좌 선택'}</span>
-      </div>
+        <Text as="span" className="text-2xs tabular-nums min-w-12 text-center shrink-0">{selectedNode ? `${hop} hop` : '계좌 선택'}</Text>
+      </Box>
       <IconButton label="그래프 초기화" onClick={resetGraph}><RotateCcw className="size-3.5" /></IconButton>
-    </div>
+    </Box>
   )
 
   const mainGraph = (
-    <div className="h-full flex flex-col min-w-0" tabIndex={-1} onKeyDown={onKeyDown} data-testid="graph-region">
-      <div className="flex gap-2 p-3 border-b items-center shrink-0">
-        <div className="relative min-w-0 flex-1">
+    <Box className="h-full flex flex-col min-w-0" tabIndex={-1} onKeyDown={onKeyDown} data-testid="graph-region">
+      <Box className="flex gap-2 p-3 border-b items-center shrink-0">
+        <Box className="relative min-w-0 flex-1">
           <Search className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" />
           <Input aria-label="그래프 계좌 검색" placeholder="계좌번호 · 소유주 검색 후 Enter" className="pl-8 h-8 text-xs" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') searchAccount() }} />
-        </div>
+        </Box>
         <IconButton label={fullscreen ? '전체화면 종료' : '전체화면'} onClick={() => setFullscreen(f => !f)}>{fullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}</IconButton>
-      </div>
-      <div ref={canvasRef} className="relative flex-1 min-h-0 graph-canvas outline-none" tabIndex={0} role="img" aria-label={`${label} · 계좌 ${nodes.length}개, 연결 ${edges.length}개 · ←/→ 이전·다음 거래, Space 재생`} onPointerMove={e => { const r = e.currentTarget.getBoundingClientRect(); pointer.current = { x: e.clientX - r.left, y: e.clientY - r.top } }}>
+      </Box>
+      <Box ref={canvasRef} className="relative flex-1 min-h-0 graph-canvas outline-none" tabIndex={0} role="img" aria-label={`${label} · 계좌 ${nodes.length}개, 연결 ${edges.length}개 · ←/→ 이전·다음 거래, Space 재생`} onPointerMove={e => { const r = e.currentTarget.getBoundingClientRect(); pointer.current = { x: e.clientX - r.left, y: e.clientY - r.top } }}>
         {viewMode === 'account' ? <Suspense fallback={null}>{forceGraph}</Suspense> : <OwnerGraph ref={ownerGraph}
           model={model} width={size.w} height={size.h} state={ownerState} onStateChange={setOwnerState} visibleNodes={visibleOwnerNodes}
           edges={visibleOwnerEdges} selectedNode={selectedNode} selectedEdge={selectedEdge}
@@ -387,80 +400,90 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
           onHover={setHover} onSelectNode={selectNode} onSelectEdge={key => { setSelectedEdge(key); setSelectedNode(null) }} onClear={clearSelection}
           onZoom={(ratio, isFitted) => setOwnerZoom({ ratio, fitted: isFitted })} />}
         {hover && (hoverNode || hoverEdge) && (
-          <div className="graph-tooltip" style={{ left: Math.min(hover.x + 14, size.w - 260), top: Math.min(hover.y + 14, size.h - 110) }}>
-            {hoverNode && <><b>{hoverNode.entity}</b><br />{hoverNode.account} · Bank {hoverNode.bank}<br />{graphNodeRole(hoverNode)}</>}
-            {hoverEdge && <><b>{hoverEdge.label === 1 ? '의심 거래' : hoverEdge.bridgePath ? `연결 경로 · ${nonSuspiciousLabel}` : nonSuspiciousLabel}</b> · {hoverEdge.count}건<br />{nodeMap.get(hoverEdge.s)!.account} → {nodeMap.get(hoverEdge.t)!.account}<br />{formatGraphMoney(hoverEdge)} · {hoverEdge.format}<br />{hoverEdge.first.slice(5)} ~ {hoverEdge.last.slice(5)}</>}
-          </div>
+          <Box className="graph-tooltip" style={{ '--graph-tooltip-x': `${hover.x}px`, '--graph-tooltip-y': `${hover.y}px` } as CSSProperties}>
+            {hoverNode && <>
+              <Text as="b" className="block">{hoverNode.entity}</Text>
+              <Text as="span" className="block">{hoverNode.account} · Bank {hoverNode.bank}</Text>
+              <Text as="span" className="block">{graphNodeRole(hoverNode)}</Text>
+            </>}
+            {hoverEdge && <>
+              <Text as="span" className="block"><Text as="b">{hoverEdge.label === 1 ? '의심 거래' : hoverEdge.bridgePath ? `연결 경로 · ${nonSuspiciousLabel}` : nonSuspiciousLabel}</Text> · {hoverEdge.count}건</Text>
+              <Text as="span" className="block">{nodeMap.get(hoverEdge.s)!.account} → {nodeMap.get(hoverEdge.t)!.account}</Text>
+              <Text as="span" className="block">{formatGraphMoney(hoverEdge)} · {hoverEdge.format}</Text>
+              <Text as="span" className="block">{hoverEdge.first.slice(5)} ~ {hoverEdge.last.slice(5)}</Text>
+            </>}
+          </Box>
         )}
-        <div className="absolute bottom-3 left-3 flex items-center gap-2 text-[0.6875rem] text-muted-foreground bg-card/90 rounded-md px-2 py-1 pointer-events-none"><Network className="size-3.5" />계좌 {nodes.length} · 연결 {edges.length}</div>
-        <div className="absolute bottom-3 right-3 flex items-center bg-card border rounded-md">
+        <Box className="absolute bottom-3 left-3 flex items-center gap-2 text-2xs text-muted-foreground bg-card/90 rounded-md px-2 py-1 pointer-events-none"><Network className="size-3.5" />계좌 {nodes.length} · 연결 {edges.length}</Box>
+        <Box className="absolute bottom-3 right-3 flex items-center bg-card border rounded-md">
           <IconButton label="축소" onClick={() => zoomBy(1 / 1.2)}><Minus className="size-3.5" /></IconButton>
-          <span className="text-[0.6875rem] tabular-nums w-10 text-center">{Math.round((viewMode === 'owner' ? ownerZoom.ratio : (fitted ? 1 : zoomK / (fitK.current || 1))) * 100)}%</span>
+          <Text as="span" className="text-2xs tabular-nums w-10 text-center">{Math.round((viewMode === 'owner' ? ownerZoom.ratio : (fitted ? 1 : zoomK / (fitK.current || 1))) * 100)}%</Text>
           <IconButton label="확대" onClick={() => zoomBy(1.2)}><Plus className="size-3.5" /></IconButton>
           <IconButton label="화면 맞춤" disabled={viewMode === 'owner' ? ownerZoom.fitted : fitted} onClick={() => fitGraph()}><Shrink className="size-3.5" /></IconButton>
-        </div>
-      </div>
-      <div className="graph-timebar flex items-center gap-3 border-t px-3 py-2 text-xs shrink-0">
-        <span className="text-muted-foreground shrink-0">시간축</span>
+        </Box>
+      </Box>
+      <Box className="graph-timebar flex items-center gap-3 border-t px-3 py-2 text-xs shrink-0">
+        <Text as="span" className="text-muted-foreground shrink-0">시간축</Text>
         <Slider aria-label="시간축" className="flex-1 min-w-24" min={firstEvent} max={last} step={1} value={[current]} onValueChange={([v]) => { setPlaying(false); setTime(v) }} />
         <IconButton label="이전 거래 (←)" className="size-7" onClick={() => step(-1)}><StepBack className="size-3.5" /></IconButton>
         <IconButton label={playing ? '일시정지 (Space)' : '시간순 재생 (Space)'} className="size-7" onClick={togglePlay}>{playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}</IconButton>
         <IconButton label="다음 거래 (→)" className="size-7" onClick={() => step(1)}><StepForward className="size-3.5" /></IconButton>
-        <span className="tabular-nums font-medium w-[86px] shrink-0">{current < (events[0] ?? 0) ? '시작 전' : timeLabel(current)}</span>
-        <span className="tabular-nums text-muted-foreground shrink-0" data-testid="timeline-count">이 시각까지 시작된 거래 {shownTx} / {allTx.length}건</span>
-        <span className="hidden 2xl:inline-flex items-center gap-1 text-muted-foreground shrink-0"><Kbd>←</Kbd><Kbd>→</Kbd><Kbd>Space</Kbd></span>
-      </div>
-    </div>
+        <Text as="span" className="graph-time-label tabular-nums font-medium shrink-0">{current < (events[0] ?? 0) ? '시작 전' : timeLabel(current)}</Text>
+        <Text as="span" className="tabular-nums text-muted-foreground shrink-0" data-testid="timeline-count">이 시각까지 시작된 거래 {shownTx} / {allTx.length}건</Text>
+        <Text as="span" className="hidden 2xl:inline-flex items-center gap-1 text-muted-foreground shrink-0"><Kbd>←</Kbd><Kbd>→</Kbd><Kbd>Space</Kbd></Text>
+      </Box>
+    </Box>
   )
 
 
   // 설정 | 그래프 | 상세(도킹). 상세는 본문을 덮지 않고 밀어낸다(v18 G5). 플로팅이면 분할 없이 위에 뜬다.
   const renderWideSplit = (testId: string) => (
-    <div className="flex-1 min-h-0 flex" data-testid={testId} data-split="horizontal">
+    <Box className="flex-1 min-h-0 flex" data-testid={testId} data-split="horizontal">
       <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
-        <ResizablePanel defaultSize="210px" minSize="190px" maxSize="260px">{settingsFull}</ResizablePanel>
+        <ResizablePanel defaultSize={panelSizes.settings} minSize={panelSizes.settingsMin} maxSize={panelSizes.settingsMax}>{settingsFull}</ResizablePanel>
         <ResizableHandle />
-        <ResizablePanel minSize="320px" id={`${testId}-main`}>{mainGraph}</ResizablePanel>
+        <ResizablePanel minSize={panelSizes.canvasMin} id={`${testId}-main`}>{mainGraph}</ResizablePanel>
         {docked && (
           <>
             <ResizableHandle />
-            <ResizablePanel id={`${testId}-detail`} defaultSize="440px" minSize="340px" maxSize="760px">
-              <div className="h-full min-h-0" data-testid="graph-detail-panel">{panel}</div>
+            <ResizablePanel id={`${testId}-detail`} defaultSize={panelSizes.detail} minSize={panelSizes.detailMin} maxSize={panelSizes.detailMax}>
+              <Box className="h-full min-h-0" data-testid="graph-detail-panel">{panel}</Box>
             </ResizablePanel>
           </>
         )}
       </ResizablePanelGroup>
-    </div>
+    </Box>
   )
 
   const narrowSplit = (
-    <div className="flex-1 min-h-0 flex flex-col" data-testid="graph-split-v" data-split="vertical">
+    <Box className="flex-1 min-h-0 flex flex-col" data-testid="graph-split-v" data-split="vertical">
       {settingsCompact}
       <ResizablePanelGroup orientation="vertical" className="flex-1 min-h-0">
-        <ResizablePanel minSize="240px" defaultSize="60%" id="graph-main-v">{mainGraph}</ResizablePanel>
+        <ResizablePanel minSize={panelSizes.compactCanvasMin} defaultSize="60%" id="graph-main-v">{mainGraph}</ResizablePanel>
         {docked && (
           <>
             <ResizableHandle />
-            <ResizablePanel minSize="180px" defaultSize="40%" id="graph-detail-v">
-              <div className="h-full min-h-0" data-testid="graph-detail-panel">{panel}</div>
+            <ResizablePanel minSize={panelSizes.compactDetailMin} defaultSize="40%" id="graph-detail-v">
+              <Box className="h-full min-h-0" data-testid="graph-detail-panel">{panel}</Box>
             </ResizablePanel>
           </>
         )}
       </ResizablePanelGroup>
-    </div>
+    </Box>
   )
 
   const normalBody = (
-    <div ref={layout} style={{ height: fillHeight }} className="graph-layout min-h-[460px] overflow-hidden rounded-lg border bg-card flex flex-col" data-testid="graph-layout">
+    <Box ref={layout} style={{ '--graph-available-height': fillHeight === undefined ? undefined : `${fillHeight}px` } as CSSProperties}
+      className="graph-layout graph-layout-inline overflow-hidden rounded-lg border bg-card flex flex-col" data-testid="graph-layout">
       {narrow ? narrowSplit : renderWideSplit('graph-split-h')}
-    </div>
+    </Box>
   )
 
   // 전체화면도 동일하게 밀어내는 분할(overlay graph-drawer 제거)
   const fullscreenBody = (
-    <div ref={layout} className="graph-layout h-full overflow-hidden rounded-lg border bg-card flex flex-col" data-testid="graph-layout-fs">
+    <Box ref={layout} className="graph-layout h-full overflow-hidden rounded-lg border bg-card flex flex-col" data-testid="graph-layout-fs">
       {renderWideSplit('graph-split-fs')}
-    </div>
+    </Box>
   )
 
   return (
@@ -468,10 +491,10 @@ export default function Graph({ model, label, panelExtra, nonSuspiciousLabel = '
       {!fullscreen && normalBody}
       {!fullscreen && panelMode === 'float' && panel}
       <Dialog open={fullscreen} onOpenChange={setFullscreen}>
-        <DialogContent className="graph-dialog w-[97vw] h-[94vh] max-w-none! p-4" showCloseButton={false}>
+        <DialogContent className="graph-dialog max-w-none! p-4" showCloseButton={false}>
           <DialogTitle className="sr-only">관계 그래프 전체화면</DialogTitle>
           <DialogDescription className="sr-only">계좌 및 거래 탐색. 전체화면 종료 버튼으로 돌아갑니다.</DialogDescription>
-          {fullscreen && <div className="flex-1 min-h-0">{fullscreenBody}</div>}
+          {fullscreen && <Box className="flex-1 min-h-0">{fullscreenBody}</Box>}
           {/* 전체화면(모달) 안에서는 바깥 창을 누를 수 없으므로 플로팅 상세도 대화상자 안에 띄운다 */}
           {fullscreen && panelMode === 'float' && panel}
         </DialogContent>

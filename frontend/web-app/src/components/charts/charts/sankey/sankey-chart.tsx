@@ -5,7 +5,6 @@ import {
   type SankeyLink,
   sankey,
   sankeyCenter,
-  sankeyLinkHorizontal,
 } from "d3-sankey";
 import type { Transition } from "motion/react";
 import { domAnimation, LazyMotion } from "motion/react";
@@ -14,6 +13,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -21,6 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ParentSize } from "../chart-parent-size";
 import { localPoint } from "../local-point";
+import { readChartNumber } from "../../chart-design-values";
 import {
   type Margin,
   type SankeyLinkDatum,
@@ -28,6 +29,8 @@ import {
   type SankeyTooltipData,
 } from "./sankey-context";
 import { SankeyProvider } from "./sankey-provider";
+import { sankeyLinkPath } from "./sankey-path";
+import "./sankey-chart.css";
 
 export interface SankeyData {
   nodes: SankeyNodeDatum[];
@@ -194,17 +197,17 @@ const SankeyChartCore = memo(function SankeyChartCore({
     return sankeyGenerator(clonedData);
   }, [data, layout, innerWidth, innerHeight, nodeWidth, nodePadding, sankeyGenerator]);
 
+  const [returnBend] = useState(() => readChartNumber("--chart-sankey-return-bend", 16));
   const createPath = useCallback(
     (link: SankeyLink<SankeyNodeDatum, SankeyLinkDatum>) => {
       if (linkPath) return linkPath(link);
       try {
-        const pathGenerator = sankeyLinkHorizontal();
-        return pathGenerator(link) || "";
+        return sankeyLinkPath(link, returnBend);
       } catch {
         return "";
       }
     },
-    [linkPath]
+    [linkPath, returnBend]
   );
 
   const handleMouseMove = useCallback((event: React.MouseEvent) => {
@@ -285,10 +288,14 @@ export function SankeyChart({
   onNodeHoverChange,
 }: SankeyChartProps) {
   const margin = { ...DEFAULT_MARGIN, ...marginProp };
+  const chartRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    chartRef.current?.style.setProperty("--sankey-chart-aspect-ratio", aspectRatio);
+  }, [aspectRatio]);
 
   return (
     <LazyMotion features={domAnimation}>
-      <div className={cn("relative w-full", className)} style={{ aspectRatio }}>
+      <div className={cn("sankey-chart relative w-full", className)} ref={chartRef}>
         <ParentSize>
           {({ width, height }) => (
             <SankeyChartInner

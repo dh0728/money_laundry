@@ -1,0 +1,11 @@
+:root {
+  --count-up-cell-height: 1.2em;
+  --count-up-duration: 2s;
+  --count-up-fast-duration: 450ms;
+  --count-up-stagger-seconds: 0.07;
+  --count-up-hidden-opacity: 0;
+  --count-up-blur-x: -20%;
+  --count-up-blur-y: -50%;
+  --count-up-blur-width: 140%;
+  --count-up-blur-height: 200%;
+}

@@ -6,6 +6,7 @@ import { CaseDataTable, RecordIdCell } from './case-table-components';
 import { CaseActorTag, ModelScoreTag, PatternTag, ReviewStatusTag, reviewStatusLabel, VerdictTag } from '../../components/semantic-tags';
 import { currencyColumn, SortableTableHead, tableCount,
   useTableSelection, useTableSort } from '../../components/workflow-table';
+import { Box, LineBreak, Text } from '@/components/layout-primitives';
 
 const flowsFor = records => [...new Set(records.map(({ from, to }) => `${from.code} → ${to.code}`))];
 const timesFor = records => records.map(record => record.timestamp).sort();
@@ -34,15 +35,15 @@ function EvidencePeriod({ records }) {
   const times = timesFor(records);
   const start = times[0];
   const end = times.at(-1);
-  const time = value => <time dateTime={value.replace(' ', 'T') + '+09:00'}>{value}</time>;
-  return <>{time(start)}{start !== end && <><br />{time(end)}</>}</>;
+  const time = value => <Text as="time" dateTime={value.replace(' ', 'T') + '+09:00'}>{value}</Text>;
+  return <>{time(start)}{start !== end && <><LineBreak />{time(end)}</>}</>;
 }
 
 function AccountFlows({ records }) {
   const flows = flowsFor(records);
   if (!flows.length) return '미제공';
-  return <>{flows.slice(0, 2).map(flow => <code key={flow}>{flow}</code>)}
-    {flows.length > 2 && <small>외 {flows.length - 2}개 흐름</small>}</>;
+  return <>{flows.slice(0, 2).map(flow => <Text as="code" key={flow}>{flow}</Text>)}
+    {flows.length > 2 && <Text as="small">외 {flows.length - 2}개 흐름</Text>}</>;
 }
 
 /** pageSize를 주면 표 정렬까지 적용한 전체 결과를 먼저 구한 뒤 페이지로 나눈다. 정렬을 바꾸면 첫 페이지로 돌아간다. */
@@ -70,11 +71,13 @@ export function PreviewCaseTable({ title, rows, episode = false, totalCount = ro
   }, [paging.key, paging.page, sortKey, onPageChange]);
   const numericHeadings = episode ? [...episodeMeasures, ...measures] : measures;
   const headings = [...columns, ...numericHeadings];
-  return <div ref={frame} className="case-table-pages"><CaseDataTable title={title} summary={tableCount(rows.length, totalCount, '건', selection.selectedCount)} className={`entry-list${episode ? ' case-table-episode' : ''}`} selection={selection}>
+  return <Box ref={frame} className="case-table-pages"><CaseDataTable title={title}
+    summary={tableCount(rows.length, totalCount, '건', selection.selectedCount)} className="entry-list" selection={selection} compact={episode}>
       <TableHeader><TableRow>
-        {headings.map(({ name, compactName, ...options }, index) =>
-          <SortableTableHead key={name} sorting={sorting} column={name} label={options.label ?? name} {...options}
-            className={index >= columns.length ? 'case-table-numeric' : undefined}>{episode ? compactName ?? name : name}</SortableTableHead>)}
+        {headings.map(({ name, compactName, ...options }) =>
+          <SortableTableHead key={name} sorting={sorting} column={name} label={options.label ?? name} {...options}>
+            {episode ? compactName ?? name : name}
+          </SortableTableHead>)}
       </TableRow></TableHeader>
       <TableBody>
         {visibleRows.map(row => {
@@ -83,19 +86,19 @@ export function PreviewCaseTable({ title, rows, episode = false, totalCount = ro
           return <TableRow key={code} data-verdict={verdict} data-selected={selection.has(code) || undefined}>
             <RecordIdCell code={code} />
             <TableCell><PatternTag emphasis="solid">{pattern}</PatternTag></TableCell>
-            <TableCell><div className="semantic-tag-group"><VerdictTag verdict={verdict} /><ModelScoreTag score={score} /></div></TableCell>
+            <TableCell><Box className="semantic-tag-group"><VerdictTag verdict={verdict} /><ModelScoreTag score={score} /></Box></TableCell>
             <TableCell><CaseActorTag>{assigned ? '내 담당' : '다른 담당자'}</CaseActorTag></TableCell>
             <TableCell><ReviewStatusTag status={status} /></TableCell>
             <TableCell>{open ? `${elapsed}일` : '—'}</TableCell>
-            <TableCell className="case-table-flows"><AccountFlows records={related} /></TableCell>
+            <TableCell stacked><AccountFlows records={related} /></TableCell>
             <TableCell><EvidencePeriod records={related} /></TableCell>
             {episode && <>
-              <TableCell className="case-table-numeric">{linkedAlerts}건</TableCell>
-              <TableCell className="case-table-numeric">{relatedAccounts}개</TableCell>
+              <TableCell numeric>{linkedAlerts}건</TableCell>
+              <TableCell numeric>{relatedAccounts}개</TableCell>
             </>}
-            <TableCell className="case-table-numeric">{related.length}건</TableCell>
-            <TableCell className="case-table-numeric">
-              {totals.length ? totals.map(([currency, amount]) => <span key={currency}>{number.format(amount)} {currency}</span>) : '미제공'}
+            <TableCell numeric>{related.length}건</TableCell>
+            <TableCell numeric stacked>
+              {totals.length ? totals.map(([currency, amount]) => <Text as="span" key={currency}>{number.format(amount)} {currency}</Text>) : '미제공'}
             </TableCell>
           </TableRow>;
         })}
@@ -104,7 +107,7 @@ export function PreviewCaseTable({ title, rows, episode = false, totalCount = ro
     </CaseDataTable>
     {paged && <FooterPagination host={paginationHost} label={`${title} 페이지`} page={page} pageCount={pageCount} total={sorting.rows.length}
       onPageChange={changePage} alwaysShow />}
-  </div>;
+  </Box>;
 }
 
 export function mountPreviewCaseTable(host, title, rows, episode, totalCount, paging = {}) {

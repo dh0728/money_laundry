@@ -1,6 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { caseCsvDownloadEntry } from '../components/query-controls';
 import { LedgerWorkspace, CaseCards } from '../features/investigation/investigation-components';
 import { PreviewCaseTable } from '../features/investigation/preview-case-list-table';
 import { createSampleLedgerSource, createServerLedgerSource, pageOf } from '../features/investigation/ledger-source';
@@ -82,6 +83,7 @@ describe('원장 화면 더 보기', () => {
     render(<LedgerWorkspace source={source} tableView />);
     await flush();
     expect(source.calls.owners.at(-1)).toMatchObject({ page: 0 });
+    expect(screen.getAllByRole('searchbox')).toHaveLength(1);
     expect(screen.getByText(/소유주 20 \/ 45명/)).toBeTruthy();
     expect(screen.queryByText('소유주#00021')).toBeNull();
 
@@ -114,12 +116,46 @@ describe('원장 화면 더 보기', () => {
     expect(screen.getByText('Alert 1건')).toBeTruthy();
     expect(screen.getByText('Episode 0건')).toBeTruthy();
 
+    const searchTarget = screen.getByRole('combobox', { name: '원장 검색 대상' });
+    fireEvent.keyDown(searchTarget, { key: 'Enter' });
+    fireEvent.keyDown(searchTarget, { key: 'End' });
+    fireEvent.keyDown(searchTarget, { key: 'Enter' });
+    fireEvent.change(screen.getByRole('searchbox', { name: '거래 검색' }), { target: { value: 'T-22' } });
+    await act(async () => { vi.advanceTimersByTime(300); });
+    await flush();
+    expect(source.calls.owners.at(-1)).toMatchObject({ query: '', page: 0 });
+    expect(source.calls.transactions.at(-1)).toMatchObject({ query: 'T-22', account: 'owner-uuid-10-account-2', page: 0 });
+
     // 소유주를 바꾸면 계좌·거래 선택과 페이지가 초기화된다.
     fireEvent.click(screen.getByRole('button', { name: '소유주#00011의 계좌' }));
     await flush();
     expect(screen.getByText('거래를 선택해 연결 업무를 확인하세요.')).toBeTruthy();
     expect(source.calls.transactions.at(-1)).toMatchObject({ account: undefined, owner: 'owner-uuid-11', page: 0 });
-    expect(screen.getByRole('searchbox', { name: '거래 검색' })).toBeDisabled();
+    expect(screen.getByRole('searchbox', { name: '소유주 검색' })).toHaveValue('');
+  });
+
+  it('소유주를 열기 전에도 검색 메뉴에서 계좌와 거래를 골라 바로 찾는다', async () => {
+    vi.useFakeTimers();
+    const source = createSampleLedgerSource(dashboardRecordCodes({ prefix: 'T', digits: 8 }));
+    render(<LedgerWorkspace source={source} tableView />);
+    const target = screen.getByRole('combobox', { name: '원장 검색 대상' });
+    fireEvent.keyDown(target, { key: 'Enter' });
+    expect(target).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getAllByRole('option', { hidden: true }).map(option => option.textContent)).toEqual(['소유주', '계좌', '거래']);
+    fireEvent.keyDown(target, { key: 'ArrowDown' });
+    fireEvent.keyDown(target, { key: 'Enter' });
+    fireEvent.change(screen.getByRole('searchbox', { name: '계좌 검색' }), { target: { value: 'ACC-1002' } });
+    await act(async () => { vi.advanceTimersByTime(300); });
+    expect(screen.getByRole('button', { name: 'ACC-1002의 거래' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'ACC-1001의 거래' })).toBeNull();
+
+    fireEvent.keyDown(target, { key: 'Enter' });
+    fireEvent.keyDown(target, { key: 'End' });
+    fireEvent.keyDown(target, { key: 'Enter' });
+    fireEvent.change(screen.getByRole('searchbox', { name: '거래 검색' }), { target: { value: 'T-261111-00000002' } });
+    await act(async () => { vi.advanceTimersByTime(300); });
+    expect(screen.getByRole('button', { name: 'T-261111-00000002' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'T-261111-00000001' })).toBeNull();
   });
 
   it('늦게 도착한 이전 검색 응답이 현재 목록을 덮지 않는다', async () => {
@@ -155,8 +191,8 @@ describe('Alert·Episode 목록 페이지 이동', () => {
     const footer = within(host);
     expect(footer.getByText('1 / 3 페이지')).toBeTruthy();
     expect(footer.getByText('전체 45건')).toBeTruthy();
-    expect(footer.getByRole('button', { name: '이전' })).toBeDisabled();
-    fireEvent.click(footer.getByRole('button', { name: '다음' }));
+    expect(footer.getByRole('button', { name: '이전으로 가기' })).toBeDisabled();
+    fireEvent.click(footer.getByRole('button', { name: '다음으로 가기' }));
     expect(onPageChange).toHaveBeenLastCalledWith(1);
     expect(screen.getByRole('button', { name: 'A-261111-000021 상세 열기' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'A-261111-000001 상세 열기' })).toBeNull();
@@ -170,8 +206,8 @@ describe('Alert·Episode 목록 페이지 이동', () => {
     render(<PreviewCaseTable title="Episode 목록" rows={[]} pageSize={20} paginationHost={host} episode />);
     const footer = within(host);
     expect(footer.getByText('1 / 1 페이지')).toBeTruthy();
-    expect(footer.getByRole('button', { name: '이전' })).toBeDisabled();
-    expect(footer.getByRole('button', { name: '다음' })).toBeDisabled();
+    expect(footer.getByRole('button', { name: '이전으로 가기' })).toBeDisabled();
+    expect(footer.getByRole('button', { name: '다음으로 가기' })).toBeDisabled();
   });
 
   it('카드는 공통 푸터 없이 그룹의 더 보기로 항목을 이어 붙인다', () => {
@@ -184,8 +220,20 @@ describe('Alert·Episode 목록 페이지 이동', () => {
     expect(host).toBeEmptyDOMElement();
     expect(screen.getByRole('button', { name: 'A-261111-000001 상세 열기' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'A-261111-000009 상세 열기' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '검토 대기 업무 더 보기' }));
+    fireEvent.click(screen.getByRole('button', { name: '처리 전 업무 더 보기' }));
     expect(screen.getByRole('button', { name: 'A-261111-000009 상세 열기' })).toBeTruthy();
     expect(onPageChange).not.toHaveBeenCalled();
+  });
+
+  it('업무 내보내기는 날짜를 지연해서 읽고, 누락된 탐지일을 업무 코드에서 얻는다', () => {
+    const readDate = vi.fn(() => new Date(2026, 10, 12));
+    const explicit = { ...rows[0], get date() { return readDate(); } };
+    const unknown = { ...rows[2], code: 'A-261132-000003' };
+    const entry = caseCsvDownloadEntry('처리 전', 'review-pending', [explicit, rows[1], unknown]);
+    expect(entry.count).toBe(3);
+    expect(entry.csv.filename).toBe('aml-review-pending.csv');
+    expect(readDate).not.toHaveBeenCalled();
+    expect(entry.csv.rows.map(row => row[1])).toEqual(['2026-11-12', '2026-11-11', '']);
+    expect(readDate).toHaveBeenCalledTimes(1);
   });
 });

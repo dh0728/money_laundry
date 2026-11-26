@@ -3,7 +3,9 @@
 import type { ScaleBand as D3ScaleBand } from "d3-scale";
 import type { Transition } from "motion/react";
 import { m } from "motion/react";
-import { memo, useId, useMemo } from "react";
+import { memo, useId, useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
+import { readChartNumber } from "../chart-design-values";
 import { barDepthAndRise, barDepthMaxDepth } from "./bar-depth-geometry";
 import {
   type BarValueLabelOrientation,
@@ -60,7 +62,7 @@ export interface BarProps {
   dataKey: string;
   /** Y-scale group id for vertical bars (Recharts `yAxisId`). Default: `"left"`. */
   yAxisId?: string | number;
-  /** Fill color for the bar. Can be a color, gradient url, or pattern url. Default: var(--chart-line-primary) */
+  /** Fill color for the bar. Can be a color, gradient url, or pattern url. Default: var(--aml-sky-050) */
   fill?: string;
   /** Per-datum fill override, including SVG pattern references. */
   getFill?: (datum: Record<string, unknown>) => string;
@@ -78,6 +80,8 @@ export interface BarProps {
   staggerDelay?: number;
   /** Gap between stacked bars in pixels. Default: 0 */
   stackGap?: number;
+  /** Round the shared silhouette of a nonnegative vertical stack. */
+  roundStack?: boolean;
   /** Gap between grouped bars in pixels. Default: 4 */
   groupGap?: number;
   /** Shrink each positive bar's top by its perspective rise so the front face
@@ -121,6 +125,7 @@ interface AnimatedBarProps {
   index: number;
   isFaded: boolean;
   animationType: BarAnimationType;
+  enterBlur: number;
   fadedOpacity: number;
   staggerDelay: number;
   enterTransition?: Transition;
@@ -148,6 +153,7 @@ function AnimatedBar({
   index,
   isFaded,
   animationType,
+  enterBlur,
   fadedOpacity,
   staggerDelay,
   enterTransition,
@@ -165,11 +171,9 @@ function AnimatedBar({
   const label = valueLabel ? (
     <m.text
       animate={{ opacity: isFaded ? fadedOpacity : 1 }}
-      className={valueLabelClassName}
+      className={cn("bar-chart-value-label", valueLabelClassName)}
       dominantBaseline="middle"
       fill={valueLabelColor}
-      fontSize={12}
-      fontWeight={600}
       initial={{ opacity: 0 }}
       textAnchor="middle"
       transform={labelTransform}
@@ -191,7 +195,7 @@ function AnimatedBar({
           }}
           fill={fill}
           height={height}
-          initial={{ opacity: 0, filter: "blur(2px)" }}
+          initial={{ opacity: 0, filter: `blur(${enterBlur}px)` }}
           key={`fade-${index}-${revealEpoch}`}
           rx={rx}
           ry={ry}
@@ -214,8 +218,8 @@ function AnimatedBar({
 
   return (
     <g
+      className="bar-chart-opacity-transition"
       opacity={isFaded ? fadedOpacity : 1}
-      style={{ transition: "opacity 0.15s ease-in-out" }}
     >
       <m.rect
         animate={target}
@@ -240,18 +244,13 @@ interface BarGeometry {
   width: number;
   height: number;
   rx: number;
+  stackClip?: { top: number; height: number; radius: number };
   growOrigin: number;
   valueLabel?: string;
   labelX: number;
   labelY: number;
   labelTransform?: string;
 }
-
-const STATIC_BAR_STYLE = {
-  cursor: "default",
-  transition: "opacity 0.15s ease-in-out",
-} as const;
-const STATIC_LABEL_STYLE = { transition: "opacity 0.15s ease-in-out" } as const;
 
 interface StaticBarProps {
   geometry: BarGeometry;
@@ -276,25 +275,22 @@ const StaticBar = memo(function StaticBar({
   return (
     <g>
       <rect
+        className="bar-chart-static-mark bar-chart-opacity-transition"
         fill={fill}
         height={geometry.height}
         opacity={opacity}
         rx={geometry.rx}
         ry={geometry.rx}
-        style={STATIC_BAR_STYLE}
         width={geometry.width}
         x={geometry.x}
         y={geometry.y}
       />
       {geometry.valueLabel ? (
         <text
-          className={valueLabelClassName}
+          className={cn("bar-chart-value-label bar-chart-opacity-transition", valueLabelClassName)}
           dominantBaseline="middle"
           fill={valueLabelColor}
-          fontSize={12}
-          fontWeight={600}
           opacity={opacity}
-          style={STATIC_LABEL_STYLE}
           textAnchor="middle"
           transform={geometry.labelTransform}
           x={geometry.labelX}
@@ -318,6 +314,7 @@ const BarInner = memo(function BarInner({
   fadedOpacity = 0.3,
   staggerDelay,
   stackGap = 0,
+  roundStack = false,
   groupGap = 4,
   perspective = false,
   minBarHeight = 0,
@@ -346,6 +343,8 @@ const BarInner = memo(function BarInner({
     revealEpoch = 0,
   } = useChartStable();
   const { hoveredBarIndex = null } = useChartHover();
+  const [labelSize] = useState(() => readChartNumber("--chart-bar-value-label-size", 12));
+  const [enterBlur] = useState(() => readChartNumber("--aml-space-2", 2));
 
   // Calculate stagger delay automatically if not provided
   // Total animation duration is ~1200ms, with 40% for stagger spread and 60% for bar animation
@@ -444,11 +443,10 @@ const BarInner = memo(function BarInner({
           // Segment spans [offset, offset + value]; `valuePos` is the
           // position of `value` alone, so it is not this segment's end.
           barW = (scale(offset + value) ?? 0) - x;
-          // Apply stack gap for horizontal: shift right and reduce width
-          const gapOffset = seriesIndex * stackGap;
-          x += gapOffset;
-          if (!isLastSeries && stackGap > 0) {
-            barW = Math.max(0, barW - stackGap);
+          // Leave the stack endpoints in place and inset only before a visible neighbor.
+          if (stackGap > 0 && value > 0 && lines.slice(seriesIndex + 1)
+            .some(line => typeof d[line.dataKey] === "number" && Number(d[line.dataKey]) > 0)) {
+            barW -= Math.min(stackGap, barW / 2);
           }
         } else {
           // Grow from the zero line in either direction (zeroX is 0 for
@@ -470,12 +468,13 @@ const BarInner = memo(function BarInner({
         if (stacked && stackOffsets) {
           const offset = stackOffsets.get(i)?.get(dataKey) ?? 0;
           const offsetY = scale(offset) ?? innerHeight;
-          // Apply stack gap: shift up and reduce height
-          const gapOffset = seriesIndex * stackGap;
-          y = offsetY - barHeight - gapOffset;
-          // Reduce height slightly for non-last bars to create visual gap
-          if (!isLastSeries && stackGap > 0) {
-            barHeight = Math.max(0, barHeight - stackGap);
+          y = offsetY - barHeight;
+          // In a positive stack, separate visible neighbors without moving the baseline or the top.
+          if (stackGap > 0 && value > 0 && lines.slice(seriesIndex + 1)
+            .some(line => typeof d[line.dataKey] === "number" && Number(d[line.dataKey]) > 0)) {
+            const inset = Math.min(stackGap, barHeight / 2);
+            y += inset;
+            barHeight -= inset;
           }
         } else {
           y = Math.min(valuePos, zeroY);
@@ -539,7 +538,8 @@ const BarInner = memo(function BarInner({
           y,
           width: barW,
           height: barHeight,
-          labelWidth: text.length * 7.2,
+          labelWidth: text.length * labelSize * 0.6,
+          labelSize,
           isHorizontal,
           orientation: valueLabelOrientation,
           position: valueLabelPosition,
@@ -557,6 +557,17 @@ const BarInner = memo(function BarInner({
         growOrigin = stacked ? x : zeroX;
       }
 
+      let stackClip: BarGeometry["stackClip"];
+      if (roundStack && stacked && !isHorizontal && stackGap === 0 && cornerRadius > 0) {
+        const values = lines.map(line => d[line.dataKey]).filter(
+          (entry): entry is number => typeof entry === "number" && Number.isFinite(entry)
+        );
+        if (values.every(entry => entry >= 0)) {
+          const top = scale(values.reduce((sum, entry) => sum + entry, 0)) ?? zeroY;
+          stackClip = { top, height: zeroY - top, radius: cornerRadius };
+        }
+      }
+
       result.push({
         // Use categoryValue as key since it's the unique identifier from data
         key: `bar-${dataKey}-${categoryValue}`,
@@ -565,7 +576,8 @@ const BarInner = memo(function BarInner({
         y,
         width: barW,
         height: barHeight,
-        rx: effectiveRx,
+        rx: stackClip ? 0 : stackGap > 0 ? Math.min(effectiveRx, barW / 2, barHeight / 2) : effectiveRx,
+        stackClip,
         growOrigin,
         valueLabel,
         labelX,
@@ -588,8 +600,11 @@ const BarInner = memo(function BarInner({
     innerWidth,
     isHorizontal,
     isLastSeries,
+    labelSize,
+    lines,
     minBarHeight,
     perspective,
+    roundStack,
     seriesCount,
     seriesIndex,
     showValue,
@@ -612,10 +627,10 @@ const BarInner = memo(function BarInner({
           (hoveredBarIndex !== null && hoveredBarIndex !== bar.index) ||
           isLegendDimmed;
 
-        if (animating) {
-          return (
+        const rendered = animating ? (
             <AnimatedBar
               animationType={animationType}
+              enterBlur={enterBlur}
               enterTransition={enterTransition}
               fadedOpacity={fadedOpacity}
               fill={barFill}
@@ -639,11 +654,7 @@ const BarInner = memo(function BarInner({
               x={bar.x}
               y={bar.y}
             />
-          );
-        }
-
-        // Static bar after animation completes
-        return (
+        ) : (
           <StaticBar
             fill={barFill}
             geometry={bar}
@@ -652,6 +663,20 @@ const BarInner = memo(function BarInner({
             valueLabelClassName={valueLabelClassName}
             valueLabelColor={valueLabelColor}
           />
+        );
+        if (!bar.stackClip) return rendered;
+
+        const id = `stack-${uniqueId}-${bar.index}`;
+        return (
+          <g key={bar.key}>
+            <defs>
+              <clipPath id={id}>
+                <rect x={bar.x} y={bar.stackClip.top} width={bar.width}
+                  height={bar.stackClip.height} rx={bar.stackClip.radius} />
+              </clipPath>
+            </defs>
+            <g clipPath={`url(#${id})`}>{rendered}</g>
+          </g>
         );
       })}
     </g>
@@ -677,5 +702,17 @@ export function Bar(props: BarProps) {
 }
 
 Bar.displayName = "Bar";
+
+export function BarHatch({ id, fill, stroke }: { id: string; fill: string; stroke: string }) {
+  const [size] = useState(() => readChartNumber("--aml-space-7", 7));
+  return (
+    <defs>
+      <pattern id={id} width={size} height={size} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width={size} height={size} fill={fill} />
+        <path className="bar-chart-hatch-stripe" d={`M 0 0 V ${size}`} stroke={stroke} />
+      </pattern>
+    </defs>
+  );
+}
 
 export default Bar;

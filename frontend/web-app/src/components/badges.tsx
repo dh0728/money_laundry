@@ -1,7 +1,8 @@
-/* eslint-disable react-refresh/only-export-components -- 배지 컴포넌트와 상태 라벨 상수를 함께 내보냄 */
+import type { CSSProperties } from 'react'
 import { Badge } from '@/components/ui/badge'
-import { formatScore, typeDisplay, type AlertStatus, type TypeCode } from '@/api/codes'
+import { alertStatusLabels, formatScore, typeDisplay, type AlertStatus, type EpisodeStatus, type TypeCode } from '@/api/codes'
 import { workStatusLabels, workStatusTone, type WorkStatus } from '@/lib/workStatus'
+import { isOverdueCaseAge } from '@/features/investigation/case-age'
 
 // 위험 색 단계(--risk-0~9)는 theme.css가 가진다. 점수 0~1을 10단계로 나눈다.
 const riskTone = (score: number) => `var(--risk-${Math.min(9, Math.max(0, Math.floor(score * 10)))})`
@@ -9,18 +10,16 @@ const riskTone = (score: number) => `var(--risk-${Math.min(9, Math.max(0, Math.f
 export function RiskBadge({ score }: { score: number }) {
   // 배경은 단계 색(테마별로 라이트는 연하게, 다크는 어둡게)을 칠하고 글씨는 테마 글자색을 쓴다
   return (
-    <Badge className="gap-1.5 border-transparent font-normal text-foreground" style={{ backgroundColor: riskTone(score) }} title="모델 위험 점수 (0 정상 ~ 1 이상)">
+    <Badge className="gap-1.5 border-transparent bg-(color:--badge-risk-fill) font-normal text-foreground" style={{ '--badge-risk-fill': riskTone(score) } as CSSProperties} title="모델 위험 점수 (0 정상 ~ 1 이상)">
       <span className="font-mono">{formatScore(score)}</span>
     </Badge>
   )
 }
 
-/** 경과일도 위험 점수와 같은 연두→빨강 단계를 쓴다. 0일은 연두, 5일 이상은 가장 빨강(v24 ageTone 기준) */
-export const AGE_MAX_DAYS = 5
 export function AgeBadge({ days }: { days: number }) {
-  const step = Math.min(9, Math.max(0, Math.round((days / AGE_MAX_DAYS) * 9)))
+  const tone = isOverdueCaseAge(days) ? 'danger' : 'caution'
   return (
-    <Badge className="border-transparent font-normal text-foreground" style={{ backgroundColor: `var(--risk-${step})` }} data-testid="age-badge" title="탐지 뒤 지난 날수">
+    <Badge className="case-age-badge border-transparent font-normal" data-tone={tone} data-testid="age-badge" title="탐지 뒤 지난 날수">
       {days === 0 ? '오늘' : `${days}일 경과`}
     </Badge>
   )
@@ -35,9 +34,11 @@ export function WorkStatusBadge({ status, title }: { status: WorkStatus; title?:
   )
 }
 
-// Q4(10/8): Alert 상태는 처리 단계가 아니라 지금 어디 있나로 부른다. 대시보드 상태 차트 범례와 같은 말
-export const alertStatusLabels: Record<AlertStatus, string> = { OPEN: '진행 중 · 단독', ESCALATED: '진행 중 · Episode', CLOSED: '종결' }
-export const StatusBadge = ({ status }: { status: AlertStatus }) => <Badge variant="outline" data-tone={{ OPEN: 'pending', ESCALATED: 'working', CLOSED: 'closed' }[status]} data-status={status} className="semantic-status-badge text-xs font-normal">{alertStatusLabels[status]}</Badge>
+export function CaseLifecycleBadge({ status, label }: { status: AlertStatus | EpisodeStatus; label: string }) {
+  return <Badge variant="outline" data-tone={status === 'CLOSED' ? 'closed' : 'working'} data-status={status} className="semantic-status-badge text-xs font-normal">{label}</Badge>
+}
+
+export const StatusBadge = ({ status }: { status: AlertStatus }) => <CaseLifecycleBadge status={status} label={alertStatusLabels[status]} />
 
 export function PatternBadge({ code }: { code: TypeCode }) {
   const { key, label } = typeDisplay(code)

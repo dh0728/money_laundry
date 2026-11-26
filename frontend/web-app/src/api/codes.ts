@@ -4,6 +4,8 @@ export type TypeCode = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
 export type TypeRef = { code: TypeCode; name: string }
 
 export type AlertStatus = 'OPEN' | 'ESCALATED' | 'CLOSED'
+// Q4(10/8): Alert 상태는 처리 단계가 아니라 지금 어디 있나로 부른다. 대시보드 상태 차트 범례와 같은 말
+export const alertStatusLabels: Record<AlertStatus, string> = { OPEN: '진행 중 · 단독', ESCALATED: '진행 중 · Episode', CLOSED: '종결' }
 // SUSPICIOUS는 FE 제안이다(API.md에 없음). 9/28 회의에서 Alert 판정에 "이상거래 · Alert 단독"을 두기로 해
 // 담을 값이 필요하다. FALSE_POSITIVE(오탐)는 판정 선택지에서 뺐고 Backend와 정리할 예정이다.
 export type AlertResolution = 'NORMAL' | 'FALSE_POSITIVE' | 'SUSPICIOUS'

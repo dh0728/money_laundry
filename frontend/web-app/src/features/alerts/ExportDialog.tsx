@@ -9,10 +9,11 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Box, Text } from '@/components/layout-primitives'
 
 type Part = { id: string; label: ReactNode; detail: string; locked?: boolean }
 
-const step = (n: number, text: string) => <span className="inline-flex items-center gap-1.5"><NumBadge n={n} />{text}</span>
+const step = (n: number, text: string) => <Text as="span" className="inline-flex items-center gap-1.5"><NumBadge n={n} />{text}</Text>
 
 export default function ExportDialog({ open, onOpenChange, code, txCount, seedCount }: { open: boolean; onOpenChange: (open: boolean) => void; code: string; txCount: number; seedCount: number }) {
   const parts: Part[] = [
@@ -36,37 +37,37 @@ export default function ExportDialog({ open, onOpenChange, code, txCount, seedCo
         <DialogTitle className="flex items-center gap-2">{code} 내보내기<ProvenanceBadge kind="proposal" title="파일 형식과 생성 위치(FE·BE)는 팀과 정함" /></DialogTitle>
         <DialogDescription>거래 표 {txCount}건 전체를 내보냅니다. 강조할 카드를 고르면 그 내용이 요약 시트에 들어가고 관련 거래가 표에서 강조됩니다.</DialogDescription>
       </DialogHeader>
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="space-y-2">
-          <p className="text-xs font-medium">강조할 카드</p>
-          {parts.map(p => <label key={p.id} className="flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2 text-xs has-[:disabled]:cursor-default">
+      <Box className="grid grid-cols-1 gap-5 md:grid-cols-2">
+        <Box className="space-y-2">
+          <Text className="text-xs font-medium">강조할 카드</Text>
+          {parts.map(p => <Box as="label" key={p.id} className="flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2 text-xs has-[:disabled]:cursor-default">
             <Checkbox className="mt-0.5" checked={p.locked || picked.includes(p.id)} disabled={p.locked} onCheckedChange={() => toggle(p.id)} />
-            <span><span className="font-medium">{p.label}</span><span className="mt-0.5 block text-muted-foreground">{p.detail}</span></span>
-          </label>)}
-        </div>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <p className="text-xs font-medium">파일 형식</p>
+            <Text as="span"><Text as="span" className="font-medium">{p.label}</Text><Text as="span" className="mt-0.5 block text-muted-foreground">{p.detail}</Text></Text>
+          </Box>)}
+        </Box>
+        <Box className="space-y-4">
+          <Box className="space-y-2">
+            <Text className="text-xs font-medium">파일 형식</Text>
             <RadioGroup value={format} onValueChange={setFormat} className="gap-2">
               <Label className="flex items-center gap-2 text-xs font-normal"><RadioGroupItem value="xlsx" />XLSX · 요약 시트 + 거래 표(강조 포함)</Label>
               <Label className="flex items-center gap-2 text-xs font-normal"><RadioGroupItem value="csv" />CSV · 거래 표만(강조·요약 없음)</Label>
             </RadioGroup>
-          </div>
-          <div className="rounded-md border bg-muted/30 p-3 text-xs">
-            <p className="font-medium">미리보기 · 요약 시트</p>
-            <ol className="mt-2 space-y-1 text-muted-foreground">
-              <li>{code} · 내보낸 사람 · 근거 기준 시각 · 근거 버전</li>
-              {format === 'xlsx' ? chosen.map(p => <li key={p.id}>{p.label}</li>) : <li>CSV는 요약 시트가 없습니다</li>}
-            </ol>
-            <p className="mt-3 font-medium">미리보기 · 거래 표</p>
-            <div className="mt-2 grid grid-cols-[auto_1fr_auto] gap-x-3 gap-y-1 font-mono text-[0.6875rem]">
-              {[['T-1', '씨앗', true], ['T-2', '경유', false], ['T-3', '씨앗', true], ['T-4', '주변', false]].map(([id, role, hi]) => <div key={String(id)} className={`contents ${hi && format === 'xlsx' && picked.includes('why') ? '[&>span]:bg-[var(--risk-6)]/40' : ''}`}>
-                <span className="px-1">{id}</span><span className="px-1">{role}</span><span className="px-1">…</span>
-              </div>)}
-            </div>
-          </div>
-        </div>
-      </div>
+          </Box>
+          <Box className="rounded-md border bg-muted/30 p-3 text-xs">
+            <Text className="font-medium">미리보기 · 요약 시트</Text>
+            <Box as="ol" className="mt-2 space-y-1 text-muted-foreground">
+              <Box as="li">{code} · 내보낸 사람 · 근거 기준 시각 · 근거 버전</Box>
+              {format === 'xlsx' ? chosen.map(p => <Box as="li" key={p.id}>{p.label}</Box>) : <Box as="li">CSV는 요약 시트가 없습니다</Box>}
+            </Box>
+            <Text className="mt-3 font-medium">미리보기 · 거래 표</Text>
+            <Box className="mt-2 grid grid-cols-(--alert-export-preview-columns) gap-x-3 gap-y-1 font-mono text-2xs">
+              {[['T-1', '씨앗', true], ['T-2', '경유', false], ['T-3', '씨앗', true], ['T-4', '주변', false]].map(([id, role, hi]) => <Box key={String(id)} className={`contents ${hi && format === 'xlsx' && picked.includes('why') ? '[&>span]:bg-[var(--risk-6)]/40' : ''}`}>
+                <Text as="span" className="px-1">{id}</Text><Text as="span" className="px-1">{role}</Text><Text as="span" className="px-1">…</Text>
+              </Box>)}
+            </Box>
+          </Box>
+        </Box>
+      </Box>
       <DialogFooter>
         <Button variant="outline" onClick={() => onOpenChange(false)}>취소</Button>
         <Button onClick={() => { onOpenChange(false); toast.success(`${code}.${format} 내보내기`, { description: '시안이라 파일은 만들지 않습니다.' }) }}>내보내기</Button>

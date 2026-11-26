@@ -9,6 +9,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -54,6 +55,7 @@ import {
   collectBarValueExtents,
   resolveBarValueDomain,
 } from "./y-domain-utils";
+import "./bar-chart.css";
 
 /** Skeleton bars to show when `status="loading"` and `data` is empty. */
 const FALLBACK_LOADING_BARS = 12;
@@ -87,6 +89,8 @@ export interface BarChartProps {
   orientation?: BarOrientation;
   /** AML RADAR: exact horizontal scale for aligned proportion bands. */
   horizontalValueDomain?: [number, number];
+  /** Exact scale for a single-axis vertical proportion band. */
+  verticalValueDomain?: [number, number];
   /** Whether to stack bars instead of grouping them. Default: false */
   stacked?: boolean;
   /** Gap between stacked bar segments in pixels. Default: 0 */
@@ -102,7 +106,7 @@ export interface BarChartProps {
    * bars (no chart data required). Default: `"ready"`. */
   status?: ChartStatus;
   /** Fill color for the loading skeleton. Defaults to the first `<Bar>`'s
-   * `stroke`, falling back to `var(--foreground)`. */
+   * `stroke`, falling back to `var(--text)`. */
   loadingFill?: string;
 }
 
@@ -152,7 +156,7 @@ function extractBarConfigs(children: ReactNode): LineConfig[] {
       // Use stroke for tooltip dot color if provided, otherwise fall back to fill
       // This allows gradient/pattern fills to have a solid dot color
       const dotColor =
-        props.stroke || props.fill || "var(--chart-line-primary)";
+        props.stroke || props.fill || "var(--aml-sky-050)";
       configs.push({
         dataKey: props.dataKey,
         stroke: dotColor,
@@ -179,6 +183,7 @@ interface ChartInnerProps {
   barWidthProp?: number;
   orientation: BarOrientation;
   horizontalValueDomain?: [number, number];
+  verticalValueDomain?: [number, number];
   stacked: boolean;
   stackGap: number;
   squareSnap?: { squareGap: number; groupGap?: number; fit?: boolean };
@@ -211,6 +216,7 @@ const ChartCore = memo(function ChartCore({
   barWidthProp,
   orientation,
   horizontalValueDomain,
+  verticalValueDomain,
   stacked,
   stackGap,
   squareSnap,
@@ -235,7 +241,7 @@ const ChartCore = memo(function ChartCore({
   // Extract bar configs synchronously from children
   const lines = useMemo(() => extractBarConfigs(children), [children]);
   const effectiveLoadingFill =
-    loadingFill ?? lines[0]?.stroke ?? "var(--foreground)";
+    loadingFill ?? lines[0]?.stroke ?? "var(--text)";
 
   const innerWidth = width - margin.left - margin.right;
   const innerHeight = height - margin.top - margin.bottom;
@@ -290,17 +296,18 @@ const ChartCore = memo(function ChartCore({
   // grow from the zero line in either direction.
   const valueScale = useMemo(() => {
     const range = isHorizontal ? [0, innerWidth] : [innerHeight, 0];
-    if (isHorizontal && horizontalValueDomain) {
-      return scaleLinear().domain(horizontalValueDomain).range(range);
+    const domain = isHorizontal ? horizontalValueDomain : verticalValueDomain;
+    if (domain) {
+      return scaleLinear().domain(domain).range(range);
     }
     return scaleLinear()
       .domain(resolveBarValueDomain(valueExtents))
       .nice()
       .range(range);
-  }, [innerWidth, innerHeight, valueExtents, isHorizontal, horizontalValueDomain]);
+  }, [innerWidth, innerHeight, valueExtents, isHorizontal, horizontalValueDomain, verticalValueDomain]);
 
   const yScales = useMemo(() => {
-    if (isHorizontal) {
+    if (isHorizontal || verticalValueDomain) {
       return wrapSingleYScale(valueScale);
     }
     return buildYScalesForLines({
@@ -310,7 +317,7 @@ const ChartCore = memo(function ChartCore({
       resolveDomain: (dataKeys) =>
         resolveBarValueDomain(collectBarValueExtents(data, dataKeys, stacked)),
     });
-  }, [data, innerHeight, isHorizontal, lines, stacked, valueScale]);
+  }, [data, innerHeight, isHorizontal, lines, stacked, valueScale, verticalValueDomain]);
 
   const primaryYScale = getPrimaryYScale(yScales, valueScale);
 
@@ -397,7 +404,7 @@ const ChartCore = memo(function ChartCore({
       setIsLoaded(true);
     }, animationDuration + staggerMs);
     return () => clearTimeout(timer);
-  }, [animationDuration, revealSignature, status]);
+  }, [animationDuration, data.length, revealSignature, status]);
 
   useEffect(() => {
     onPhaseChange?.(isLoaded ? "ready" : "revealing");
@@ -650,9 +657,10 @@ const ChartCore = memo(function ChartCore({
 
         {/* biome-ignore lint/a11y/noStaticElementInteractions: Chart interaction area */}
         <g
+          className="bar-chart-interaction"
+          data-interactive={canInteract || undefined}
           onMouseLeave={canInteract ? handleMouseLeave : undefined}
           onMouseMove={canInteract ? handleMouseMove : undefined}
-          style={{ cursor: canInteract ? "crosshair" : "default" }}
           transform={`translate(${margin.left},${margin.top})`}
         >
           {/* Background rect for mouse event detection */}
@@ -702,6 +710,7 @@ export function BarChart({
   barWidth,
   orientation = "vertical",
   horizontalValueDomain,
+  verticalValueDomain,
   stacked = false,
   stackGap = 0,
   squareSnap,
@@ -711,14 +720,16 @@ export function BarChart({
   loadingFill,
 }: BarChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    containerRef.current?.style.setProperty("--bar-chart-aspect-ratio", aspectRatio);
+  }, [aspectRatio]);
   const margin = { ...DEFAULT_MARGIN, ...marginProp };
 
   return (
     <LazyMotion features={domAnimation}>
       <div
-        className={cn("relative w-full overflow-visible", className)}
+        className={cn("bar-chart relative w-full overflow-visible", className)}
         ref={containerRef}
-        style={{ aspectRatio }}
       >
         <ParentSize debounceTime={10}>
           {({ width, height }) => (
@@ -736,6 +747,7 @@ export function BarChart({
               onPhaseChange={onPhaseChange}
               orientation={orientation}
               horizontalValueDomain={horizontalValueDomain}
+              verticalValueDomain={verticalValueDomain}
               revealSignature={revealSignature}
               squareSnap={squareSnap}
               stacked={stacked}

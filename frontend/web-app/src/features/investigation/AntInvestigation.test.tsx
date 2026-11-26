@@ -56,6 +56,32 @@ it('다른 담당자의 사건은 의견과 판정 명령을 보낼 수 없다',
   expect(close).toBeDisabled()
   expect(mocks.command).not.toHaveBeenCalled()
 })
+it('Episode 거래 표는 페이지별로 판정 가능한 거래만 선택하며 탭을 바꿔도 선택을 유지한다', async () => {
+  const group = item.groups![0]
+  const members = Array.from({ length: 12 }, (_, index) => ({
+    ...group.members[0],
+    txId: 298 + index,
+    reviewRole: index === 0 ? 'CONTEXT' as const : 'SUBJECT' as const,
+    state: index === 1 ? 'DECIDED' as const : 'PENDING' as const,
+  }))
+  mocks.detail.mockResolvedValue({ ...item, kind: 'EPISODE', alertId: null, groups: [{ ...group, members }] })
+  show()
+  await screen.findByRole('checkbox', { name: '현재 페이지 전체 선택' })
+  const overview = within(screen.getByRole('tabpanel', { name: '개요' }))
+  fireEvent.click(overview.getByRole('checkbox', { name: '현재 페이지 전체 선택' }))
+  expect(overview.getByRole('checkbox', { name: 'T-298 선택' })).toBeDisabled()
+  expect(overview.getByRole('checkbox', { name: 'T-299 선택' })).toBeDisabled()
+  expect(overview.getByRole('checkbox', { name: 'T-300 선택' })).toBeChecked()
+  fireEvent.click(overview.getByTitle('Next Page'))
+  expect(overview.getByRole('checkbox', { name: 'T-308 선택' })).not.toBeChecked()
+  fireEvent.click(overview.getByRole('checkbox', { name: '현재 페이지 전체 선택' }))
+  expect(overview.getByRole('checkbox', { name: 'T-309 선택' })).toBeChecked()
+  fireEvent.click(screen.getByRole('tab', { name: '거래' }))
+  const transactions = within(screen.getByRole('tabpanel', { name: '거래' }))
+  expect(transactions.getByRole('checkbox', { name: 'T-300 선택' })).toBeChecked()
+  fireEvent.click(transactions.getByTitle('Next Page'))
+  expect(transactions.getByRole('checkbox', { name: 'T-309 선택' })).toBeChecked()
+})
 it('늦은 저장 응답이 같은 사건의 후속 초안을 지우지 않는다', async () => {
   let resolve!: (value: unknown) => void
   mocks.command.mockImplementation(() => new Promise(done => { resolve = done }))

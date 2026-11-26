@@ -3,9 +3,9 @@
 import {
   animate,
   useMotionValue,
-  useReducedMotion,
   useTransform,
 } from "motion/react";
+import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
 import { useEffect } from "react";
 import {
   LINE_LOADING_LOOP_PAUSE_MS,
@@ -35,7 +35,7 @@ export function useGridShimmer({
   oneShot = false,
 }: UseGridShimmerOptions) {
   const progress = useMotionValue(0);
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = useAppReducedMotion();
   const shimmerCycleS =
     LINE_LOADING_PULSE_CYCLE_S / Math.max(shimmerSpeed, 0.1);
   const shimmerEnabled =

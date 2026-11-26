@@ -2,25 +2,26 @@ import React, { lazy, Suspense, useEffect, useState, useSyncExternalStore } from
 import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { MotionConfig } from 'motion/react';
-import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
+import { TableBody, TableCell, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
 import { Check, Circle, CircleAlert, Info, TriangleAlert } from 'lucide-react';
 import StatusMark from '../components/react-bits/StatusMark';
-import MagicBento from '../components/react-bits/MagicBento';
 import { ActionButton, PrimaryButton } from '../components/primary-button';
 import { CardHeader } from '../components/card-header';
 import { RecordCard } from '../components/record-card';
 import { Panel } from '../components/panel';
 import { ScreenActions } from '../components/screen-actions';
-import { LinkTag, PatternTag, StatusTag, VerdictTag, verdictLabels } from '../components/semantic-tags';
-import { downloadCsv, inDateRange, LocalQueryTools } from '../components/query-controls';
+import { SectionDownloadHeading } from '../components/section-download';
+import { CountTag, LinkTag, PatternTag, StatusTag, VerdictTag, verdictLabels } from '../components/semantic-tags';
+import { csvDownloadEntry, inDateRange, LocalQueryTools } from '../components/query-controls';
 import { LiveRuleBacktest } from '../features/rules/live-rule-backtest';
 import { LiveRuleList } from '../features/rules/live-rule-list';
 import { liveActiveRules, liveRules, refreshLiveRules } from '../features/rules/live-rule-store';
 import { useCaseRuleHits } from '../features/rules/case-rule-hits';
 import { liveSource } from '../features/investigation/live-data.js';
-import { readWorkspaceGap } from '../features/dashboard/workspace-metrics';
+import { readWorkspaceDuration } from '../features/dashboard/workspace-metrics';
 import { SortableTableHead, tableCount, useTableSort, WorkflowQueryHeading, WorkflowTable } from '../components/workflow-table';
 import { DashboardSkeleton } from '../features/dashboard/dashboard-layout';
+import { CaseOverviewSkeleton } from '../features/investigation/investigation-skeletons';
 import { PreviewEpisodeDialog } from '../features/investigation/preview-episode-dialog';
 import { canManagePreviewEpisodes, canTransferAlert } from '../features/investigation/preview-episode-transfer';
 import { CaseJudgment } from '../features/investigation/case-judgment';
@@ -31,14 +32,20 @@ import { currentPreviewUser, subscribePreviewUser } from '../features/auth/previ
 import { judgmentReasonLabels } from '../features/investigation/case-judgment-data';
 import '../features/investigation/preview-case-card.css';
 import './workflow-components.css';
+import { Box, Heading, Text } from '@/components/layout-primitives';
 
 const PreviewDashboard = lazy(() => import('../features/dashboard/preview-dashboard').then(module => ({ default: module.PreviewDashboard })));
 const BenchmarkDashboard = lazy(() => import('../features/dashboard/preview-dashboard').then(module => ({ default: module.BenchmarkDashboard })));
 const PreviewCaseOverview = lazy(() => import('../features/investigation/preview-case-overview').then(module => ({ default: module.PreviewCaseOverview })));
-const reportSelection = { ids: [], verdict: 'all' };
+const reportSelection = { ids: [], verdict: 'all', order: 'recent' };
 const verdictChoices = [
   { label: '전체', value: 'all' }, { label: '정상', value: 'normal' }, { label: '이상', value: 'abnormal' },
 ];
+const reportSortOptions = [
+  { label: '최근 판정순', value: 'recent' },
+  { label: '오래된 판정순', value: 'oldest' },
+];
+const reportColumns = ['abnormal', 'normal'];
 const reportTime = new Intl.DateTimeFormat('sv-SE', {
   timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
 });
@@ -76,21 +83,6 @@ function reportHistory({ cases = [], transactions = [] } = {}) {
 const statusLabels = {
   pending: '실행 대기', running: '실행 중', done: '완료', failed: '실패', cancelled: '취소됨',
 };
-const backtestStepperStyles = {
-  '--stepper-ink': 'var(--text)',
-  '--stepper-muted': 'var(--muted-text)',
-  '--stepper-faint': 'var(--divider)',
-  '--stepper-ring': 'var(--focus-ring)',
-  '--stepper-well': 'var(--inner-surface)',
-  '--stepper-track': 'var(--divider)',
-  '--stepper-tile': 'var(--canvas-surface)',
-  '--stepper-tile-edge': 'var(--divider)',
-  '--stepper-tile-highlight': 'transparent',
-  '--stepper-tile-shadow': 'var(--information-panel-shadow)',
-  '--stepper-solid': 'var(--inverse-surface)',
-  '--stepper-solid-ink': 'var(--inverse-text)',
-  '--stepper-hover-fill': 'var(--hover)',
-};
 
 function useAppearance() {
   const root = document.documentElement;
@@ -112,10 +104,10 @@ function ResultStatus({ status, children }) {
   const label = <StatusTag preset={status}>{children ?? statusLabels[status]}</StatusTag>;
   if (reduced) {
     const Icon = status === 'done' ? Check : status === 'failed' ? TriangleAlert : Circle;
-    return <span className="workflow-static-status" role="status"><Icon className="icon" aria-hidden="true" />{label}</span>;
+    return <Text as="span" className="workflow-static-status" role="status"><Icon className="icon" aria-hidden="true" />{label}</Text>;
   }
-  return <div role="status"><StatusMark status={status} label={label}
-    size={16} strike={false} doneColor="currentColor" errorColor="currentColor" /></div>;
+  return <Box role="status"><StatusMark status={status} label={label}
+    size="var(--aml-size-icon-small)" strike={false} doneColor="currentColor" errorColor="currentColor" /></Box>;
 }
 
 function announce(detail) {
@@ -128,30 +120,28 @@ const noticeTones = {
   failed: { tone: 'error', Icon: CircleAlert },
   info: { tone: 'info', Icon: Info },
 };
-const noticeDuration = 5000;
-const noticeMotion = 260;
-
 function FooterNotice({ item, onClose }) {
   const { reduced } = useAppearance();
   const [closing, setClosing] = useState(false);
   const { tone, Icon } = noticeTones[item.status] ?? noticeTones.info;
   useEffect(() => {
+    const noticeDuration = readWorkspaceDuration('--notice-duration', 5000);
+    const noticeMotion = readWorkspaceDuration('--notice-motion', 260);
     const timer = setTimeout(() => setClosing(true), noticeDuration + (reduced ? 0 : noticeMotion));
     return () => clearTimeout(timer);
   }, [reduced]);
   useEffect(() => {
     if (closing && reduced) onClose();
   }, [closing, reduced, onClose]);
-  return <div className="footer-notice glass" data-tone={tone} data-closing={closing || undefined}
-    style={{ '--notice-duration': `${noticeDuration}ms`, '--notice-motion': `${noticeMotion}ms` }}
+  return <Box className="footer-notice glass" data-tone={tone} data-closing={closing || undefined}
     onAnimationEnd={event => { if (event.target === event.currentTarget && event.animationName === 'footer-notice-out') onClose(); }}
     role="status" aria-atomic="true">
     <Icon className="icon" aria-hidden="true" />
-    <span className="footer-notice-text" title={[item.title, item.description].filter(Boolean).join(' · ')}>
-      <strong>{item.title}</strong>{item.description && <span> · {item.description}</span>}
-    </span>
-    {item.showTimer !== false && <span className="footer-notice-fuse" aria-hidden="true" />}
-  </div>;
+    <Text as="span" className="footer-notice-text" title={[item.title, item.description].filter(Boolean).join(' · ')}>
+      <Text as="strong">{item.title}</Text>{item.description && <Text as="span"> · {item.description}</Text>}
+    </Text>
+    {item.showTimer !== false && <Text as="span" className="footer-notice-fuse" aria-hidden="true" />}
+  </Box>;
 }
 
 function ResultNotifications() {
@@ -180,35 +170,45 @@ function ReportAudit({ row }) {
   const category = reasonCategoryLabel(reasonCategory);
   const rationale = reason || '기록 없음';
   const hasDetail = Boolean(reason || evidence || observations || category);
-  return <div className="report-audit">
-    <dl className="report-audit-fields">
-      <div><dt>판정자</dt><dd>{reviewer || '기록 없음'}</dd></div>
-      <div><dt>판정 시각</dt><dd>{timestamp ? <time dateTime={at}>{timestamp}</time> : '기록 없음'}</dd></div>
-    </dl>
-    {hasDetail ? <details className="report-audit-details">
-      <summary><span>판정 사유</span><span className="report-audit-preview">{rationale}</span></summary>
-      <dl className="report-audit-fields">
-        {category && <div><dt>사유 분류</dt><dd>{category}</dd></div>}
-        <div><dt>사유</dt><dd>{rationale}</dd></div>
-        {evidence && <div><dt>검토 근거</dt><dd>{evidence}</dd></div>}
-        {observations && <div><dt>관찰 내용</dt><dd>{observations}</dd></div>}
-      </dl>
-    </details> : <dl className="report-audit-fields"><div><dt>판정 사유</dt><dd>{rationale}</dd></div></dl>}
-  </div>;
+  return <Box className="report-audit">
+    <Box as="dl" className="report-audit-fields">
+      <Box><Box as="dt">판정자</Box><Box as="dd">{reviewer || '기록 없음'}</Box></Box>
+      <Box><Box as="dt">판정 시각</Box><Box as="dd">{timestamp ? <Text as="time" dateTime={at}>{timestamp}</Text> : '기록 없음'}</Box></Box>
+    </Box>
+    {hasDetail ? <Box as="details" className="report-audit-details">
+      <Box as="summary"><Text as="span">판정 사유</Text><Text as="span" className="report-audit-preview">{rationale}</Text></Box>
+      <Box as="dl" className="report-audit-fields">
+        {category && <Box><Box as="dt">사유 분류</Box><Box as="dd">{category}</Box></Box>}
+        <Box><Box as="dt">사유</Box><Box as="dd">{rationale}</Box></Box>
+        {evidence && <Box><Box as="dt">검토 근거</Box><Box as="dd">{evidence}</Box></Box>}
+        {observations && <Box><Box as="dt">관찰 내용</Box><Box as="dd">{observations}</Box></Box>}
+      </Box>
+    </Box> : <Box as="dl" className="report-audit-fields"><Box><Box as="dt">판정 사유</Box><Box as="dd">{rationale}</Box></Box></Box>}
+  </Box>;
 }
 
-function Report({ view, data, appearance, registerTableTools, documentId, actionsHost }) {
+function compareJudgments(left, right, order) {
+  const [leftTime, rightTime] = [Date.parse(left.at), Date.parse(right.at)];
+  const [leftDated, rightDated] = [Number.isFinite(leftTime), Number.isFinite(rightTime)];
+  if (leftDated !== rightDated) return leftDated ? -1 : 1;
+  const timestampDifference = leftDated ? leftTime - rightTime : 0;
+  return (order === 'oldest' ? 1 : -1) * (timestampDifference || left.id.localeCompare(right.id));
+}
+
+function Report({ view, data, registerTableTools, documentId, actionsHost }) {
   const history = reportHistory(data);
   const target = history.find(row => row.id === documentId);
   const [selected, setSelected] = useState(() => target ? [target.id] : reportSelection.ids);
   const [filter, setFilter] = useState(() => target ? 'all' : reportSelection.verdict);
   const [range, setRange] = useState(() => target ? undefined : reportSelection.range);
+  const [order, setOrder] = useState(reportSelection.order);
   const [status, setStatus] = useState('pending');
-  const records = history.filter(row => (filter === 'all' || row.verdict === filter)
+  const tableView = view !== 'card';
+  const records = history.filter(row => (!tableView || filter === 'all' || row.verdict === filter)
     && (!range || row.at && inDateRange(reportDate(row.at), range)));
   const sorting = useTableSort(records);
-  const selectedRows = records.filter(row => selected.includes(row.id));
-  const tableView = view !== 'card';
+  const shown = tableView ? sorting.rows : records.toSorted((left, right) => compareJudgments(left, right, order));
+  const selectedRows = (tableView ? records : shown).filter(row => selected.includes(row.id));
   function changeFilter(value) {
     reportSelection.verdict = value;
     setFilter(value);
@@ -216,6 +216,10 @@ function Report({ view, data, appearance, registerTableTools, documentId, action
   function changeRange(value) {
     reportSelection.range = value;
     setRange(value);
+  }
+  function changeOrder(value) {
+    reportSelection.order = value;
+    setOrder(value);
   }
   function updateSelection(ids, checked) {
     const next = new Set(selected);
@@ -238,53 +242,61 @@ function Report({ view, data, appearance, registerTableTools, documentId, action
       announce({ status: 'failed', title: 'PDF 생성 실패', description: error.message });
     }
   }
-  const csvEntry = (label, file, rows) => ({
-    label, format: 'CSV', count: rows.length,
-    download: () => downloadCsv(file, ['판정 ID', '대상 ID', '구분', '유형', '판정 결과', '판정자', '판정 시각 (KST)',
+  const csvEntry = (label, file, rows) => csvDownloadEntry(label, file,
+    ['판정 ID', '대상 ID', '구분', '유형', '판정 결과', '판정자', '판정 시각 (KST)',
       '사유 분류', '판정 사유', '검토 근거', '관찰 내용'], rows.map(row => [
-        row.id, row.targets.map(({ code }) => code).join(' · '), row.kind, row.patterns.join(' · '),
-        verdictLabels[row.verdict], row.reviewer || '', reportTimestamp(row.at), reasonCategoryLabel(row.reasonCategory) || '',
-        row.reason || '', row.evidence || '', row.observations || '',
-      ])),
-  });
+      row.id, row.targets.map(({ code }) => code).join(' · '), row.kind, row.patterns.join(' · '),
+      verdictLabels[row.verdict], row.reviewer || '', reportTimestamp(row.at), reasonCategoryLabel(row.reasonCategory) || '',
+      row.reason || '', row.evidence || '', row.observations || '',
+    ]));
   const actions = {
-    filter: { label: '판정 결과', options: verdictChoices, value: filter, onChange: changeFilter },
+    filter: tableView ? { label: '판정 결과', options: verdictChoices, value: filter, onChange: changeFilter } : undefined,
+    sort: tableView ? undefined : { options: reportSortOptions, value: order, defaultValue: 'recent', onChange: changeOrder },
     period: { asOf: reportDate(new Date()), range, onChange: changeRange },
+    panelDownload: !registerTableTools,
     entries: [
-      ...(records.length ? [csvEntry('표시 중인 판정 이력', 'aml-judgment-history', sorting.rows)] : []),
-      ...(history.length > records.length ? [csvEntry('전체 판정 이력', 'aml-judgment-history-all', history)] : []),
+      ...(records.length ? [csvEntry('표시 중인 판정 이력', 'judgment-history', shown)] : []),
+      ...(history.length > records.length ? [csvEntry('전체 판정 이력', 'judgment-history-all', history)] : []),
     ],
   };
   useEffect(() => registerTableTools?.(actions));
   const tools = registerTableTools ? true : <LocalQueryTools actions={actions} />;
   const summary = tableCount(records.length, history.length, '건', selectedRows.length);
   const verdict = row => <VerdictTag verdict={row.verdict} />;
-  const targets = row => <div className="workflow-report-targets">{row.targets.map(({ code }) =>
-    <LinkTag key={code} code={code} />)}</div>;
+  const targets = row => <Box className="workflow-report-targets">{row.targets.map(({ code }) =>
+    <LinkTag key={code} code={code} />)}</Box>;
   const patterns = row => row.patterns.length ? row.patterns.map(pattern => <PatternTag emphasis="solid" key={pattern}>{pattern}</PatternTag>) : '자료 없음';
-  return <section className="screen-section workflow-report workflow-panel">
+  return <Box as="section" className="screen-section workflow-report workflow-panel">
     {!tableView && <WorkflowQueryHeading title="판정 이력" summary={summary} tools={tools} />}
-    {view === 'card' ? <div className="workflow-report-cards">
-      <MagicBento key={appearance.reduced} className="report-bento preview-tilt-cards" columns={4} rowHeight={0} gap={readWorkspaceGap()}
-        theme={appearance.theme} disableAnimations={appearance.reduced} intro={false} textAutoHide={false}
-        enableTilt enableBorderGlow={false} enableSpotlight={false} enableStars={false} clickEffect={false}
-        items={records.map(row => ({ id: row.id, content: <RecordCard className="preview-case-card" label={row.id}
+    {!tableView ? <Box className="workflow-report-cards">
+      {reportColumns.map(result => {
+        const rows = shown.filter(row => row.verdict === result);
+        const label = `${verdictLabels[result]} 판정`;
+        return <Box as="section" className="workflow-report-lane" aria-label={label} key={result}>
+          <SectionDownloadHeading as="h3" entries={rows.length ? [csvEntry(label, `judgments-${result}`, rows)] : []}>
+            <VerdictTag verdict={result} /> <CountTag count={rows.length} />
+          </SectionDownloadHeading>
+          {rows.map(row => <RecordCard key={row.id} className="preview-case-card" label={row.id}
           verdict={row.verdict} selected={selected.includes(row.id)}>
           <CardHeader code={row.id} openRecord={false} selection={{
             checked: selected.includes(row.id), disabled: status === 'running',
             onChange: checked => updateSelection([row.id], checked),
           }} />
-          <div className="preview-case-card-body">
-            <div className="semantic-tag-group">
+          <Box className="preview-case-card-body">
+            <Box className="semantic-tag-group">
               {verdict(row)}
               {row.patterns.length > 0 && patterns(row)}
-            </div>
-            <dl><div><dt>대상 ID</dt><dd>{targets(row)}</dd></div></dl>
+            </Box>
+            <Box as="dl"><Box><Box as="dt">대상 ID</Box><Box as="dd">{targets(row)}</Box></Box></Box>
             <ReportAudit row={row} />
-          </div>
-        </RecordCard> }))} />
-    </div> :
-      <WorkflowTable label="판정 로그" title="판정 이력" tools={tools}
+          </Box>
+          </RecordCard>)}
+          {!rows.length && <Text tone="muted">표시할 판정이 없습니다.</Text>}
+        </Box>;
+      })}
+    </Box> :
+      <WorkflowTable label="판정 로그" title="판정 이력" tools={tools} scrollbarGutter="auto"
+        cellAlignment="top" invertSelectedControls
         selection={{
           codes: sorting.rows.map(row => row.id),
           rowCount: records.length,
@@ -305,21 +317,20 @@ function Report({ view, data, appearance, registerTableTools, documentId, action
           </TableRow></TableHeader>
           <TableBody>
             {sorting.rows.map(row => <TableRow key={row.id} data-selected={selected.includes(row.id) || undefined}>
-              <th scope="row"><code>{row.id}</code></th>
+              <TableRowHead><Text as="code">{row.id}</Text></TableRowHead>
               <TableCell>{targets(row)}</TableCell>
               <TableCell>{row.kind}</TableCell>
-              <TableCell><div className="workflow-report-patterns">{patterns(row)}</div></TableCell>
+              <TableCell><Box className="workflow-report-patterns">{patterns(row)}</Box></TableCell>
               <TableCell>{verdict(row)}</TableCell>
               <TableCell className="report-audit-cell"><ReportAudit row={row} /></TableCell>
             </TableRow>)}
             {!records.length && <TableRow><TableCell colSpan={6}>조회 조건과 일치하는 판정이 없습니다.</TableCell></TableRow>}
           </TableBody>
       </WorkflowTable>}
-    {!tableView && !records.length && <p>조회 조건과 일치하는 판정이 없습니다.</p>}
     {status !== 'pending' && <ResultStatus status={status} />}
     <ScreenActions host={actionsHost} stackOnNarrow><PrimaryButton tone="brand"
       disabled={selectedRows.length === 0 || status === 'running'} onHold={download}>AI 보고서 다운로드</PrimaryButton></ScreenActions>
-  </section>;
+  </Box>;
 }
 
 function AlertEpisodeActions({ overview }) {
@@ -327,7 +338,7 @@ function AlertEpisodeActions({ overview }) {
   const user = useSyncExternalStore(subscribePreviewUser, currentPreviewUser);
   if (!canManagePreviewEpisodes(user)) return null;
   return <ScreenActions host={overview.actionsHost}>
-    <ActionButton onClick={() => setOpen(true)}>Episode로 묶기</ActionButton>
+    <PrimaryButton tone="brand" aria-haspopup="dialog" onClick={() => setOpen(true)}>Episode로 묶기</PrimaryButton>
     {open && <PreviewEpisodeDialog cases={overview.reportData.cases} save={overview.saveEpisode}
       onClose={saved => saved ? overview.refreshEpisode() : setOpen(false)} />}
   </ScreenActions>;
@@ -376,9 +387,9 @@ function CaseReviewActions({ overview }) {
       {selected.length > 0 && <CaseTransactionEdit row={row} selected={selected} canEdit={!blockedReason}
         blockedReason={blockedReason} destinations={!blockedReason ? previewAlertMembershipTargets(reportData.cases, row.code, user) : []}
         onApply={overview.editTransactions} onClear={evidenceSelection.clear} />}
-      {row.episodeCode && <ActionButton as="a" href={`/episodes/${row.episodeCode}?tab=related`}>연결 Episode 열기</ActionButton>}
+      {row.episodeCode && <PrimaryButton tone="inverse" as="a" href={`/episodes/${row.episodeCode}?tab=related`}>연결 Episode 열기</PrimaryButton>}
       {canManageEpisodes && row.kind === 'Episode' && row.open && row.assigned && Boolean(row.linkedAlertCodes?.length)
-        && <ActionButton onClick={() => setEpisodeAction('unlink')}>Alert 연결 해제</ActionButton>}
+        && <PrimaryButton tone="inverse" aria-haspopup="dialog" onClick={() => setEpisodeAction('unlink')}>Alert 연결 해제</PrimaryButton>}
       {episodeAction && <PreviewEpisodeDialog cases={reportData.cases} save={overview.saveEpisode} row={row}
         bundle={episodeAction === 'bundle' ? bundle : undefined} unlink={episodeAction === 'unlink'}
         onRelationRequest={episodeAction === 'bundle' ? onRelationRequest : undefined}
@@ -405,7 +416,9 @@ function CaseOverview({ overview, appearance }) {
   }, []);
   // Episode 에서는 카드가 어느 Alert 의 것인지 화면 코드로 보여 준다
   const alertCode = id => liveSource().cases.find(row => row.kind === 'Alert' && row.caseId === id)?.code;
-  return <Suspense fallback={null}><PreviewCaseOverview {...overview} appearance={appearance}
+  const loading = overview?.row && <CaseOverviewSkeleton episode={overview.row.kind === 'Episode'}
+    perPanel={overview.perPanel} initialPanel={overview.initialPanel} />;
+  return <Suspense fallback={loading}><PreviewCaseOverview {...overview} appearance={appearance}
     history={reportHistory(overview?.reportData)} activeRules={liveActiveRules()}
     ruleHits={liveRules ? { ...hits, alertCode } : undefined} /></Suspense>;
 }
@@ -413,7 +426,7 @@ function CaseOverview({ overview, appearance }) {
 function Workflow({ kind, view, dashboard, overview }) {
   const appearance = useAppearance();
   if (kind.includes('dashboard') && dashboard?.error) return <Panel className="dashboard-chart" role="alert">
-    <p>대시보드 데이터를 불러오지 못했습니다.</p>
+    <Text>대시보드 데이터를 불러오지 못했습니다.</Text>
     <ActionButton surface="floating" shape="pill" onClick={dashboard.retry}>다시 불러오기</ActionButton>
   </Panel>;
   if (kind.startsWith('benchmark-dashboard-')) {
@@ -433,8 +446,7 @@ function Workflow({ kind, view, dashboard, overview }) {
   if (kind === 'case-overview') return <CaseOverview overview={overview} appearance={appearance} />;
   if (kind === 'alert-episode-actions') return <AlertEpisodeActions overview={overview} />;
   if (kind === 'case-judgment') return <CaseReviewActions overview={overview} />;
-  if (kind === 'case-readonly') return <Panel className="glass"><h2>읽기 전용</h2></Panel>;
-  // 룰 화면은 서버에 붙였든(VITE_API_MODE=live) 아니든 같은 화면(live-rule-*)이다. 서버가 없으면 @/api/rules 가 샘플 응답을 준다.
+  if (kind === 'case-readonly') return <Panel><Heading>읽기 전용</Heading></Panel>;
   if (kind === 'backtest') return <LiveRuleBacktest initialRule={overview?.rule}
     registerTableTools={overview?.registerTableTools} actionsHost={overview?.actionsHost} />;
   if (kind === 'rules-list') return <LiveRuleList initialRule={overview?.rule}
@@ -442,7 +454,6 @@ function Workflow({ kind, view, dashboard, overview }) {
   return <MotionConfig reducedMotion={appearance.reduced ? 'always' : 'never'}>
     {kind === 'report' &&
       <Report view={view} data={overview?.reportData} documentId={overview?.reportDocument}
-        appearance={appearance}
         registerTableTools={overview?.registerTableTools} actionsHost={overview?.actionsHost} />}
   </MotionConfig>;
 }
@@ -456,7 +467,7 @@ export function mountWorkflows(workspace, dashboard, overview) {
   render();
   return {
     updateDashboard(data) {
-      dashboard = data;
+      dashboard = typeof data === 'function' ? data(dashboard) : data;
       render();
     },
     updateDashboardSort(rows, sort) {

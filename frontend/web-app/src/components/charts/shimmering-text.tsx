@@ -1,24 +1,22 @@
 "use client";
 
-import { domAnimation, LazyMotion, m, useReducedMotion } from "motion/react";
+import { domAnimation, LazyMotion, m } from "motion/react";
+import { useAppReducedMotion } from "@/hooks/use-reduced-motion";
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
+import "./chart-utilities.css";
 
 /**
  * Highlight band painted across the text. The gradient is 3× the text width
  * with the band in its middle third, so at either end of the sweep the visible
  * window is solid `--color` and the band enters/leaves fully off-text.
  */
-const SHIMMER_GRADIENT =
-  "linear-gradient(90deg, var(--color) 0%, var(--color) 40%, var(--shimmering-color) 50%, var(--color) 60%, var(--color) 100%)";
-const SHIMMER_BG_SIZE = "300% 100%";
-/** Band off the right edge → band off the left edge (left-to-right sweep). */
 const SWEEP_FROM = "100% 0%";
 const SWEEP_TO = "0% 0%";
 
 export type ShimmeringTextProps = Omit<
   ComponentProps<typeof m.span>,
-  "children"
+  "children" | "style"
 > & {
   /** The text to render with the shimmering effect. */
   text: string;
@@ -45,10 +43,9 @@ export function ShimmeringText({
   isStopped = false,
   paused = false,
   className,
-  style,
   ...props
 }: ShimmeringTextProps) {
-  const reducedMotion = useReducedMotion();
+  const reducedMotion = useAppReducedMotion();
   const stopped = isStopped || paused || reducedMotion === true;
 
   // One gradient across the whole run (rather than per-character colors), so
@@ -63,21 +60,11 @@ export function ShimmeringText({
             : { backgroundPosition: [SWEEP_FROM, SWEEP_TO] }
         }
         className={cn(
-          "inline-block select-none whitespace-nowrap leading-none",
-          "[--color:var(--muted-foreground)] [--shimmering-color:var(--foreground)]",
+          "chart-shimmering-text inline-block select-none whitespace-nowrap leading-none",
+          "[--color:var(--muted-text)] [--shimmering-color:var(--text)]",
           className
         )}
         initial={{ backgroundPosition: SWEEP_FROM }}
-        style={{
-          backgroundImage: SHIMMER_GRADIENT,
-          backgroundSize: SHIMMER_BG_SIZE,
-          backgroundRepeat: "no-repeat",
-          backgroundClip: "text",
-          WebkitBackgroundClip: "text",
-          color: "transparent",
-          WebkitTextFillColor: "transparent",
-          ...style,
-        }}
         transition={
           stopped
             ? { duration: duration * 0.5, ease: "easeOut" }

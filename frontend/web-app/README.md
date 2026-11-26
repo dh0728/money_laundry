@@ -1,6 +1,6 @@
 # AML RADAR Web App
 
-팀 작업 Branch `frontend` · 기본 화면 3.6.0
+팀 작업 Branch `frontend` · 화면 버전 3.10.25
 
 ## 화면 검수
 
@@ -11,6 +11,8 @@ pnpm dev --host 127.0.0.1 --port 5215 --strictPort
 ```
 
 [Sample Login](http://127.0.0.1:5215/login?data=sample) → **관리자 테스트로 열기**
+
+컴포넌트 카탈로그(`/components.html`), 합성 데이터 검수(`/ant-review.html`, `VITE_API_MODE=fixture`), IBM 벤치마크(`/dashboard/all?data=ibm`)는 로컬 개발 서버에서 확인한다. 배포 빌드는 서비스 진입점(`index.html`)을 생성한다.
 
 ## 공용 UI 수정
 
@@ -26,5 +28,5 @@ pnpm dev --host 127.0.0.1 --port 5215 --strictPort
 - 요청 생성: [`buildAlertTransfer`·`buildEpisodeUnlink`](src/api/reviewCommands.ts)
 - 요청 전송: [`submitReviewCommand`](src/api/liveReview.ts) · `POST /api/v1/review/commands`
 - 편입은 사건 `caseId`·`revision`과 기존 대상의 `targetCaseId`·`targetRevision` 사용. 해제는 대상 Episode의 `caseId`·`revision`과 소속 Alert의 `groupId` 사용.
-- 룰 화면의 데이터 호출부: [`ruleRepository`](src/features/rules/rule-repository.js). 화면은 이 저장소만 호출하고 모든 함수는 Promise 반환. 룰마다 `allowedActions`·`blockedReasons` 포함. 현재 Sample(sessionStorage) 구현만 있고 서버 구현은 같은 모양으로 교체 예정.
-- `saveEpisode`는 현재 Sample 저장 호출부. 실제 Episode 저장 연결은 진행 전. `/api` 기본 연결은 Local 8080.
+- 룰 화면은 [`ruleRepository`](src/features/rules/rule-repository.js)를 호출한다. 서비스 모드에서는 서버 저장소를, 로컬 샘플 모드에서는 `sessionStorage`를 사용한다.
+- `saveEpisode`는 서비스 모드에서 저장 후 서버 데이터를 다시 불러온다. 로컬 개발 서버는 `/api` 요청을 기본값 `127.0.0.1:8080`으로 전달한다.

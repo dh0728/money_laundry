@@ -61,13 +61,13 @@ export function changePreviewEpisode({ cases, alertCodes, episodeCode, expectedN
   const rows = readTransfers();
   const episode = cases.find(row => row.code === episodeCode && row.kind === 'Episode' && row.open);
   const saved = rows.find(row => row.code === episodeCode);
-  const members = saved?.alerts ?? [];
+  const members = episode?.linkedAlertCodes ?? saved?.alerts ?? [];
   if (unlink) {
-    if (!episode?.assigned || !saved || alertCodes.some(code => !members.includes(code))) return failure('연결된 Alert를 다시 선택해 주세요.');
+    if (!episode?.assigned || alertCodes.some(code => !members.includes(code))) return failure('연결된 Alert를 다시 선택해 주세요.');
     const remaining = members.filter(code => !alertCodes.includes(code));
     const dissolved = previewEpisodeWillDissolve(episode, alertCodes.length);
-    return storeTransfers(rows.map(row => row === saved
-      ? { ...row, alerts: dissolved ? [] : remaining, dissolved, comment } : row), episodeCode);
+    const transfer = { ...saved, code: episodeCode, alerts: dissolved ? [] : remaining, fullMembership: true, dissolved, comment };
+    return storeTransfers([...rows.filter(row => row.code !== episodeCode), transfer], episodeCode);
   }
   if (alertCodes.some(code => !cases.some(row => row.code === code && canTransferAlert(row)))) {
     return failure('내 담당 진행 중 Alert를 다시 선택해 주세요.');
@@ -79,27 +79,35 @@ export function changePreviewEpisode({ cases, alertCodes, episodeCode, expectedN
   if (!episodeCode && code !== expectedNewCode) {
     return failure('생성 예정 ID가 바뀌었습니다. 내용을 다시 확인해 주세요.');
   }
-  const transfer = { code, alerts: [...members, ...alertCodes], created: saved?.created ?? !episodeCode,
+  const transfer = { code, alerts: [...members, ...alertCodes], fullMembership: true, created: saved?.created ?? !episodeCode,
     seed: saved?.seed ?? first.code, comment };
   return storeTransfers([...rows.filter(row => row.code !== code), transfer], code);
 }
 
 export function applyPreviewEpisodeTransfers(cases, summarize) {
-  const records = readTransfers();
+  const overrides = readTransfers();
+  const overridden = new Set(overrides.map(row => row.code));
+  const seeds = cases.filter(row => row.kind === 'Episode' && row.linkedAlertCodesComplete && !overridden.has(row.code))
+    .map(row => ({ code: row.code, alerts: row.linkedAlertCodes, fullMembership: true, comment: row.episodeComment }));
   const byCode = new Map(cases.map(row => [row.code, row]));
   const memberships = new Map();
-  for (const record of records) for (const code of record.alerts) memberships.set(code, record.code);
 
-  for (const record of records) {
+  for (const record of [...seeds, ...overrides]) {
     const seed = byCode.get(record.seed);
     const parent = record.created ? seed : byCode.get(record.code);
-    if (!parent || (record.dissolved && !record.created)) continue;
-    const previous = record.created ? [] : parent.related;
-    const linked = record.alerts.map(code => byCode.get(code)).filter(Boolean);
+    if (!parent) continue;
+    const complete = !!record.created || parent.linkedAlertCodesComplete === true;
+    if (record.dissolved && !complete) continue;
+    const previous = complete ? [] : parent.related;
+    // Older preview sessions stored only the Alerts added by the user.
+    const alerts = !record.fullMembership && !record.created && parent.linkedAlertCodesComplete
+      ? [...new Set([...parent.linkedAlertCodes, ...record.alerts])] : record.alerts;
+    const linked = alerts.map(code => byCode.get(code)).filter(Boolean);
     const related = record.dissolved ? [] : [...new Map([...previous, ...linked.flatMap(row => row.related)]
       .map(transaction => [transaction.code, transaction])).values()];
+    for (const alert of linked) memberships.set(alert.code, record.code);
     byCode.set(record.code, applyPreviewJudgment({ ...parent, ...summarize(related), code: record.code, kind: 'Episode',
-      related, linkedAlertCodes: record.alerts, linkedAlertCodesComplete: record.created, episodeComment: record.comment,
+      related, linkedAlertCodes: alerts, linkedAlertCodesComplete: complete, episodeComment: record.comment,
       status: record.dissolved ? '처리 완료' : record.created ? '처리 중' : parent.status,
       open: !record.dissolved && (record.created || parent.open),
       unread: record.created ? false : parent.unread,

@@ -5,10 +5,13 @@ import { configureDevAccountForces, seedComponentPositions } from './0.24.0/forc
 import { graphRiskBand, graphVerdict, graphVerdictLabels } from '../investigation/case-graph-scope';
 import { caseMembership } from './graph-case-groups';
 import { GraphZoomControls } from './preview-graph-controls';
-import { graphFlowDuration, graphRevealDuration } from './graph-flow-pulse';
+import { readGraphCanvasPulse } from '../../components/charts/charts/graph-flow-pulse';
+import { readCanvasColors } from '../../components/charts/chart-design-values';
 import { makeGraphSnapshot, registerGraphSnapshot } from '../../lib/preview-visual-export';
-import { buildPatternTime, graphTimeAxisInset, graphTimePill, projectGraphTimeTicks,
+import { buildPatternTime, readGraphTimeAxisDesign, projectGraphTimeTicks,
   patternHomeForce, patternVelocityDecay } from './pattern-graph-time';
+import { useAppReducedMotion } from '@/hooks/use-reduced-motion';
+import { Box, Text } from '../../components/layout-primitives';
 
 function simulationData(network, positions, timePlan, previous) {
   const saved = new Map(previous?.nodes.map(node => [node.id, node]));
@@ -151,14 +154,15 @@ function revealedEdge(edge, progress) {
     text: progress > 0.6 ? edge.text : undefined };
 }
 
-function paintFlow(context, edge, pulse, color, scale) {
-  const time = (performance.now() - pulse.startedAt) / graphFlowDuration;
+function paintFlow(context, edge, pulse, color, highlight, scale, design) {
+  const time = (performance.now() - pulse.startedAt) / design.duration;
   if (time < 0 || time >= 1) return;
-  const start = Math.max(0, time * 1.16 - .16);
-  const end = Math.min(1, time * 1.16);
+  const progress = time * (1 + design.pulseLength);
+  const start = Math.max(0, progress - design.pulseLength);
+  const end = Math.min(1, progress);
   const { x, y } = curvePoint(edge.curve, start);
   context.save();
-  context.globalAlpha = Math.min(1, time / .12, (1 - time) / .12);
+  context.globalAlpha = Math.min(1, time / design.fadeShare, (1 - time) / design.fadeShare);
   context.lineCap = 'round';
   context.setLineDash([]);
   context.beginPath();
@@ -168,35 +172,27 @@ function paintFlow(context, edge, pulse, color, scale) {
     context.lineTo(point.x, point.y);
   }
   context.strokeStyle = color;
-  context.lineWidth = 5 / scale;
+  context.lineWidth = design.width / scale;
   context.stroke();
-  context.strokeStyle = 'white';
-  context.lineWidth = 2 / scale;
+  context.strokeStyle = highlight;
+  context.lineWidth = design.highlightWidth / scale;
   context.stroke();
   context.restore();
 }
 
 function tokenColors(host, groups) {
-  const probe = host.ownerDocument.createElement('i');
-  probe.hidden = true;
-  host.append(probe);
-  const entries = {
+  return readCanvasColors(host, {
     ink: 'var(--text)', dimmed: 'var(--case-graph-dimmed)', accent: 'var(--brand-accent)',
     axisFill: 'var(--inner-surface)', grid: 'var(--divider)',
+    flowHighlight: 'var(--graph-flow-highlight)',
     high: 'var(--case-graph-risk-high)', medium: 'var(--case-graph-risk-medium)',
     low: 'var(--case-graph-risk-low)', unknown: 'var(--case-graph-risk-unknown)',
     ...Object.fromEntries(groups.map(group => [group.id, group.color])),
-  };
-  const colors = Object.fromEntries(Object.entries(entries).map(([name, token]) => {
-    probe.style.color = token;
-    return [name, getComputedStyle(probe).color];
-  }));
-  probe.remove();
-  return colors;
+  });
 }
 
-function timeAxisMarks(plan, engine, { width, height }) {
-  return { height, ticks: projectGraphTimeTicks(plan.ticks, x => engine.graph2ScreenCoords(x, 0).x, width) };
+function timeAxisMarks(plan, engine, { width, height }, design) {
+  return { height, design, ticks: projectGraphTimeTicks(plan.ticks, x => engine.graph2ScreenCoords(x, 0).x, width, design) };
 }
 
 function drawTimeAxis(context, engine, scale, axis, colors, foreground) {
@@ -206,15 +202,15 @@ function drawTimeAxis(context, engine, scale, axis, colors, foreground) {
   context.scale(1 / scale, 1 / scale);
   if (!foreground) {
     context.strokeStyle = colors.grid;
-    context.lineWidth = 1;
+    context.lineWidth = axis.design.stroke;
     context.beginPath();
     for (const tick of axis.ticks) {
-      context.moveTo(tick.x, graphTimeAxisInset);
+      context.moveTo(tick.x, axis.design.inset);
       context.lineTo(tick.x, axis.height);
     }
     context.stroke();
   } else {
-    const pill = graphTimePill;
+    const pill = axis.design.pill;
     context.font = `${pill.fontSize}px ${pill.fontFamily}`;
     context.textAlign = 'center';
     context.textBaseline = 'alphabetic';
@@ -238,9 +234,9 @@ function addTimeAxisSnapshot(snapshot, axis, colors) {
     if (label) element.textContent = label;
     return element;
   };
-  const lines = axis.ticks.map(tick => `M ${tick.x} ${graphTimeAxisInset} V ${axis.height}`).join(' ');
-  snapshot.prepend(make('path', { d: lines, stroke: colors.grid, fill: 'none' }));
-  const pill = graphTimePill;
+  const lines = axis.ticks.map(tick => `M ${tick.x} ${axis.design.inset} V ${axis.height}`).join(' ');
+  snapshot.prepend(make('path', { d: lines, stroke: colors.grid, 'stroke-width': axis.design.stroke, fill: 'none' }));
+  const pill = axis.design.pill;
   const text = { fill: colors.ink, 'font-family': pill.fontFamily, 'font-size': pill.fontSize, 'text-anchor': 'middle' };
   for (const { x, label, pillWidth } of axis.ticks) {
     if (!label) continue;
@@ -262,11 +258,12 @@ export function ForceCaseCanvas({
   const [zoom, setZoom] = useState(100);
   const [colors, setColors] = useState({});
   const [idleFlow, setIdleFlow] = useState();
+  const [pulseDesign] = useState(readGraphCanvasPulse);
+  const [axisDesign] = useState(readGraphTimeAxisDesign);
   const timePlan = useMemo(() => buildPatternTime(records ?? [], network.nodes, positions), [records, network, positions]);
   const [data, setData] = useState(() => simulationData(network, positions, timePlan));
   const currentLayout = useRef({ network, positions, timePlan });
-  const reducedMotion = document.documentElement.dataset.reducedMotion === 'true' ||
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reducedMotion = useAppReducedMotion();
   const activeFlow = reducedMotion ? undefined : flowPulse;
   const ambientFlow = reducedMotion || playing || activeFlow ? undefined : idleFlow;
   useEffect(() => {
@@ -281,11 +278,11 @@ export function ForceCaseCanvas({
       timer = setTimeout(() => {
         setIdleFlow(undefined);
         timer = setTimeout(sweep, 840);
-      }, graphFlowDuration);
+      }, pulseDesign.duration);
     }
     timer = setTimeout(sweep, 440);
     return () => clearTimeout(timer);
-  }, [activeFlow, playing, reducedMotion, visible.edges]);
+  }, [activeFlow, playing, pulseDesign.duration, reducedMotion, visible.edges]);
   useLayoutEffect(() => {
     const observer = new ResizeObserver(([{ contentRect }]) => {
       setSize({ width: Math.floor(contentRect.width), height: Math.floor(contentRect.height) });
@@ -346,7 +343,7 @@ export function ForceCaseCanvas({
     const [top, bottom] = bounds.y;
     const scale = Math.max(.12, Math.min(5, (size.width - 144) / Math.max(right - left, 1),
       (size.height - 118) / Math.max(bottom - top, 1)));
-    engine.centerAt((left + right) / 2, (top + bottom) / 2 - graphTimeAxisInset / (2 * scale), duration);
+    engine.centerAt((left + right) / 2, (top + bottom) / 2 - axisDesign.inset / (2 * scale), duration);
     engine.zoom(scale, duration);
     return true;
   }
@@ -358,11 +355,11 @@ export function ForceCaseCanvas({
     const detail = graphGeometry(coordinates(), visible, groups, colors, selection, highlightedCase,
       (x, y) => engine.graph2ScreenCoords(x, y), engine.zoom(), showDetails, ownerView);
     const snapshot = makeGraphSnapshot({ ...size, ...detail });
-    if (timePlan) addTimeAxisSnapshot(snapshot, timeAxisMarks(timePlan, engine, size), colors);
+    if (timePlan) addTimeAxisSnapshot(snapshot, timeAxisMarks(timePlan, engine, size, axisDesign), colors);
     return snapshot;
   }));
 
-  return <div ref={host} className="preview-evidence-canvas" data-force-graph=""
+  return <Box ref={host} className="preview-evidence-canvas" data-force-graph=""
     data-graph-layout={positions ? 'account' : 'gravity'} data-time-axis={timePlan ? 'first-appearance' : undefined} role="group"
     aria-label={timePlan ? '패턴별 관계 그래프 · 계좌 첫 등장 시각 순서 · KST'
       : ownerView ? '소유주 관계 그래프' : '계좌 관계 그래프'}>
@@ -373,17 +370,17 @@ export function ForceCaseCanvas({
       nodeVisibility={node => visibleNodes.has(node.id)} linkVisibility={link => visibleEdges.has(link.id)}
       nodeRelSize={1} nodeLabel={node => {
         const time = timePlan?.first.get(node.id);
-        return <span>{node.id}{time === undefined ? '' : ` · 첫 거래 ${timePlan.formatTime(time)} KST`}</span>;
+        return <Text as="span">{node.id}{time === undefined ? '' : ` · 첫 거래 ${timePlan.formatTime(time)} KST`}</Text>;
       }}
       linkLabel={link => {
         const edge = visibleEdges.get(link.id);
         if (!edge) return '';
         const direction = `${edge.source} → ${edge.target} · ${graphVerdictLabels[graphVerdict(edge.verdicts)]}`;
         const times = [...edge.codes].map(code => timePlan?.byCode.get(code)).filter(Number.isFinite);
-        if (!times.length) return <span>{direction}</span>;
+        if (!times.length) return <Text as="span">{direction}</Text>;
         const first = Math.min(...times);
         const last = Math.max(...times);
-        return <span>{direction} · {timePlan.formatTime(first)}{first !== last && ` ~ ${timePlan.formatTime(last)}`} KST</span>;
+        return <Text as="span">{direction} · {timePlan.formatTime(first)}{first !== last && ` ~ ${timePlan.formatTime(last)}`} KST</Text>;
       }}
       nodeVal={node => Math.pow(radius(visibleNodes.get(node.id) ?? { codes: new Set() }), 2)}
       nodePointerAreaPaint={(node, color, context, scale) => {
@@ -422,12 +419,12 @@ export function ForceCaseCanvas({
       onEngineStop={() => { if (fitPending.current) { fitPending.current = false; fit(); } }}
       onRenderFramePre={(context, scale) => {
         if (timePlan && graph.current) drawTimeAxis(context, graph.current, scale,
-          timeAxisMarks(timePlan, graph.current, size), colors, false);
+          timeAxisMarks(timePlan, graph.current, size, axisDesign), colors, false);
         const model = graphGeometry(coordinates(), visible, groups, colors, selection, highlightedCase,
           (x, y) => ({ x, y }), 1, showDetails, ownerView, scale);
         drawing = { nodes: new Map(model.nodes.map(node => [node.id, node])),
           edges: new Map(model.edges.map(edge => [edge.id, edge])) };
-        const reveal = activeFlow ? (performance.now() - activeFlow.startedAt) / graphRevealDuration : 1;
+        const reveal = activeFlow ? (performance.now() - activeFlow.startedAt) / pulseDesign.revealDuration : 1;
         const growing = reveal >= 0 && reveal < 1 && model.edges.find(edge => {
           const codes = visibleEdges.get(edge.id)?.codes;
           return codes?.size === 1 && codes.has(activeFlow.code);
@@ -437,23 +434,23 @@ export function ForceCaseCanvas({
           paintLine(context, wrap.edgeId === growing?.id && growing
             ? { ...wrap, path: drawing.edges.get(wrap.edgeId).path } : wrap);
         }
-        context.font = `${11 / scale}px sans-serif`;
+        context.font = `${11 / scale}px Pretendard`;
       }}
       onRenderFramePost={(context, scale) => {
         if (timePlan && graph.current) drawTimeAxis(context, graph.current, scale,
-          timeAxisMarks(timePlan, graph.current, size), colors, true);
+          timeAxisMarks(timePlan, graph.current, size, axisDesign), colors, true);
       }}
       linkCanvasObjectMode={() => 'replace'} linkCanvasObject={(link, context, scale) => {
         const edge = drawing?.edges.get(link.id);
         if (!edge) return;
         paintLine(context, edge);
         if (activeFlow && visibleEdges.get(link.id).codes.has(activeFlow.code)) {
-          paintFlow(context, edge, activeFlow, colors[activeFlow.risk] ?? edge.stroke, scale);
+          paintFlow(context, edge, activeFlow, colors[activeFlow.risk] ?? edge.stroke, colors.flowHighlight, scale, pulseDesign);
         } else if (ambientFlow?.edgeId === link.id) {
-          paintFlow(context, edge, ambientFlow, edge.stroke, scale);
+          paintFlow(context, edge, ambientFlow, edge.stroke, colors.flowHighlight, scale, pulseDesign);
         }
         if (!edge.text) return;
-        context.font = `${11 / scale}px sans-serif`;
+        context.font = `${11 / scale}px Pretendard`;
         context.textAlign = 'center';
         context.textBaseline = 'bottom';
         context.fillStyle = edge.textColor;
@@ -468,7 +465,7 @@ export function ForceCaseCanvas({
         context.fill();
         if (dot.stroke) { context.strokeStyle = dot.stroke; context.lineWidth = 2 / scale; context.stroke(); }
         if (!dot.text) return;
-        context.font = `${11 / scale}px sans-serif`;
+        context.font = `${11 / scale}px Pretendard`;
         context.textAlign = 'center';
         context.textBaseline = 'top';
         context.fillStyle = dot.textColor;
@@ -476,5 +473,5 @@ export function ForceCaseCanvas({
       }} />}
     {controlsHost && createPortal(<GraphZoomControls zoom={zoom} onFit={() => fit()}
       onZoom={factor => graph.current?.zoom(graph.current.zoom() * factor, 180)} />, controlsHost)}
-  </div>;
+  </Box>;
 }

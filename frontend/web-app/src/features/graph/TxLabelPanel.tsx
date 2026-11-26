@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { focusTransactions, type PanelFocus } from './relabel'
 import { formatMoney, type GraphModel, type GraphTransaction } from './0.24.0/model'
+import { Box, Heading, Text } from '@/components/layout-primitives'
 
 const labelText = (label: 0 | 1) => (label === 1 ? '이상 거래' : '정상 거래')
 
@@ -27,30 +28,30 @@ export default function TxLabelPanel({ model, focus, editable, onRelabel }: Prop
   const next: 0 | 1 = target?.label === 1 ? 0 : 1
 
   return (
-    <section className="mt-4 border-t pt-4" data-testid="tx-label-panel">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold">거래 판정 <span className="ml-1 text-xs font-normal text-muted-foreground">{rows.length}건</span></h4>
-      </div>
+    <Box as="section" className="mt-4 border-t pt-4" data-testid="tx-label-panel">
+      <Box className="mb-2 flex items-center justify-between gap-2">
+        <Heading level={4} className="text-sm font-semibold">거래 판정 <Text as="span" className="ml-1 text-xs font-normal text-muted-foreground">{rows.length}건</Text></Heading>
+      </Box>
       <ProvenanceNote kind="proposal">사람이 바꾼 판정은 API 계약에 아직 없어 시연 화면에서만 저장됩니다.</ProvenanceNote>
-      <ul className="mt-3 divide-y rounded-md border">
+      <Box as="ul" className="mt-3 divide-y rounded-md border">
         {rows.map(t => {
           const changed = t.modelLabel !== undefined && t.modelLabel !== t.label
           return (
-            <li key={t.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 text-xs" data-testid="tx-label-row">
-              <span className="font-mono">{t.id}</span>
-              <span className="tabular-nums text-muted-foreground">{t.at.slice(5)}</span>
-              <span className="ml-auto tabular-nums">{formatMoney(t.amount, t.currency)}</span>
-              <span className="flex w-full items-center gap-1.5">
+            <Box as="li" key={t.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 text-xs" data-testid="tx-label-row">
+              <Text as="span" className="font-mono">{t.id}</Text>
+              <Text as="span" className="tabular-nums text-muted-foreground">{t.at.slice(5)}</Text>
+              <Text as="span" className="ml-auto tabular-nums">{formatMoney(t.amount, t.currency)}</Text>
+              <Text as="span" className="flex w-full items-center gap-1.5">
                 <Badge variant="outline" className={`font-normal ${t.label === 1 ? 'border-destructive/50 text-destructive-text' : ''}`}>{labelText(t.label)}</Badge>
                 {changed && <Badge variant="outline" className="semantic-metadata-badge font-normal" title={`${t.relabel?.actor} · ${t.relabel?.at.slice(0, 16).replace('T', ' ')} · ${t.relabel?.reason}`}>사람 판정 · 모델은 {labelText(t.modelLabel!)}</Badge>}
                 <Button size="sm" variant="outline" className="ml-auto h-7 text-xs" disabled={!editable} onClick={() => { setTarget(t); setReason('') }}>
                   {t.label === 1 ? '정상 거래로 전환하기' : '이상 거래로 전환하기'}
                 </Button>
-              </span>
-            </li>
+              </Text>
+            </Box>
           )
         })}
-      </ul>
+      </Box>
 
       <AlertDialog open={target !== null} onOpenChange={open => { if (!open) setTarget(null) }}>
         <AlertDialogContent>
@@ -60,10 +61,10 @@ export default function TxLabelPanel({ model, focus, editable, onRelabel }: Prop
               현재 판정은 {target ? labelText(target.label) : ''}입니다. 전환 사유와 처리자, 시각이 처리 이력에 남습니다.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="relabel-reason">전환 사유 <span className="text-muted-foreground">(필수)</span></Label>
+          <Box className="space-y-2">
+            <Label htmlFor="relabel-reason">전환 사유 <Text as="span" className="text-muted-foreground">(필수)</Text></Label>
             <Textarea id="relabel-reason" value={reason} onChange={e => setReason(e.target.value)} className="min-h-24 text-sm" placeholder="예: 거래 목적 증빙이 확인되어 정상으로 판단함" />
-          </div>
+          </Box>
           <AlertDialogFooter>
             <AlertDialogCancel>돌아가기</AlertDialogCancel>
             <AlertDialogAction disabled={!reason.trim()} onClick={() => { if (target) onRelabel(Number(target.id), next, reason.trim()); setTarget(null) }}>
@@ -72,6 +73,6 @@ export default function TxLabelPanel({ model, focus, editable, onRelabel }: Prop
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </section>
+    </Box>
   )
 }
