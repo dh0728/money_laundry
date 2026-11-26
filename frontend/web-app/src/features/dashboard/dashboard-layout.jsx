@@ -63,13 +63,12 @@ function LoadingStaffChart() {
   </LoadingChart>;
 }
 
-function LoadingMetric({ detail, trend, ratio }) {
+function LoadingMetric({ detail, trend }) {
   return <Box className="dashboard-metric">
     <Skeleton className="dashboard-loading-title" />
     <Skeleton className="dashboard-loading-value" />
     {detail && <Skeleton className="dashboard-loading-note" />}
     {trend && <Skeleton className="dashboard-loading-trend" />}
-    {ratio && <Skeleton className="dashboard-metric-ratio" />}
   </Box>;
 }
 
@@ -81,11 +80,13 @@ function LoadingInstitutionMetrics() {
           <Skeleton className="dashboard-loading-note" />
           <Skeleton className="dashboard-loading-value" />
         </Box>
-        <Skeleton className="dashboard-proportion-band" />
         <Skeleton className="dashboard-loading-completion-legend" />
+        <Box className="dashboard-series">
+          <Skeleton className="dashboard-series-plot" />
+        </Box>
       </LoadingChart> :
       <Panel as="article" key={index} data-compact-kpi={index >= 4 || undefined}>
-        <LoadingMetric detail={index !== 1} ratio={index !== 1} />
+        <LoadingMetric detail={index >= 4} trend />
       </Panel>)}
   </InstitutionMetricsGrid>;
 }

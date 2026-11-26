@@ -14,10 +14,12 @@ import { createPageCsvZip, printWorkspace } from '../lib/page-export';
 import { downloadVisualizations, hasVisualizations } from '../lib/preview-visual-export.js';
 import JellyRadio from './react-bits/JellyRadio';
 import { QueryCheck } from './selection-check';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { readWorkspaceGap } from '../features/dashboard/workspace-metrics.js';
 import { sortSavedTableRows, tableSortFields } from './workflow-table';
 import 'react-day-picker/style.css';
 import '../styles/page-export-print.css';
+import './form-dropdown.css';
 import './query-controls.css';
 
 const statuses = reviewStates.map(({ value }) => value);
@@ -364,12 +366,24 @@ function TableFilterPane({ filter, onApply }) {
   </QueryPanel>;
 }
 
+function CalendarDropdown({ 'aria-label': label, disabled, options, value, onChange }) {
+  const { host } = useContext(QueryActions);
+  return <Select value={String(value)} disabled={disabled}
+    onValueChange={value => onChange({ target: { value } })}>
+    <SelectTrigger aria-label={label} className="form-dropdown-trigger query-calendar-select"><SelectValue /></SelectTrigger>
+    <SelectContent className="form-dropdown-options query-calendar-options" position="popper" align="start"
+      portalContainer={host.closest('.query-tool-popover')}>
+      {options.map(({ value, label, disabled }) => <SelectItem key={value} value={String(value)} disabled={disabled}>{label}</SelectItem>)}
+    </SelectContent>
+  </Select>;
+}
+
 function AmlCalendar({ month, onMonth, range, onRange, asOf }) {
   return <DayPicker mode="range" locale={ko} month={month} onMonthChange={onMonth}
     captionLayout="dropdown" navLayout="around" selected={range} today={asOf} onSelect={onRange}
     showOutsideDays resetOnSelect disabled={{ after: asOf }} endMonth={asOf} aria-label="조회 기간 달력"
     formatters={{ formatYearDropdown: date => `${date.getFullYear()}년` }}
-    components={{ Chevron: CalendarChevron }} />;
+    components={{ Chevron: CalendarChevron, Dropdown: CalendarDropdown }} />;
 }
 
 function PeriodPane({ value, asOf, onApply, onResize }) {
@@ -405,7 +419,7 @@ const queryPanels = { filter: FilterPane, sort: SortPane, period: PeriodPane };
 const firstQueryControl = {
   filter: '.query-filter-group',
   sort: '.query-choice input:checked',
-  period: '.query-period-presets input:checked, .rdp-dropdown',
+  period: '.query-period-presets input:checked, .query-calendar-select',
   download: '.query-content button:not(:disabled)',
 };
 

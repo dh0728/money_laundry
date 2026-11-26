@@ -16,10 +16,14 @@ import { BoardSectionDownload, SectionDownloadHeading } from '../../components/s
 import { Box, Heading, Stack, Text } from '../../components/layout-primitives';
 import { LinkTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
 import { AccountTrailGraph } from '../../components/charts/charts/account-trail-graph';
+import { dataSeriesColors, transactionTotalColor } from '../../components/charts/charts/chart-context';
 import { StagedSankey } from '../../components/charts/charts/sankey/staged-sankey';
+import { useElementSize } from '../../components/charts/charts/use-element-size';
+import { AreaSparkline } from '../../components/charts/sparkline';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
 import { previewJudgmentReason } from '../investigation/case-judgment-data';
 import { workRequestUserName } from '../investigation/preview-work-requests';
-import { personalInvestigationFlow, reviewStatusTotals, share as compactShare } from './dashboard-flows';
+import { flowColors, personalInvestigationFlow, reviewStatusTotals, share as compactShare } from './dashboard-flows';
 
 const formatter = new Intl.NumberFormat('ko-KR');
 const count = value => `${formatter.format(value)}건`;
@@ -29,12 +33,128 @@ const animated = new Set();
 const Analytics = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.Analytics })));
 const BenchmarkCharts = React.lazy(() => import('./dashboard-analytics').then(module => ({ default: module.BenchmarkCharts })));
 
+function dailyTrend(rows, measure, color, { rate = false, caption = '일별 · KST', comparison } = {}) {
+  return {
+    rows: (rows ?? []).map(row => ({ date: row.date, value: measure(row), comparison: comparison?.measure(row) })),
+    color, rate, caption, comparison,
+  };
+}
+
+function dailyRate(value, total) {
+  return Number.isFinite(value) && Number.isFinite(total) && total > 0 ? value / total : null;
+}
+
+function unfinishedStatusTrend(rows) {
+  return dailyTrend(rows, row => {
+    const { unfinished, total } = reviewStatusTotals([row]);
+    return dailyRate(unfinished, total);
+  }, flowColors.inProgress, { rate: true, caption: '생성일별 현재 상태 · KST' });
+}
+
+function MetricTrend({ label, trend, reduced }) {
+  const known = trend.rows.filter(({ value }) => Number.isFinite(value));
+  if (!known.length || (!trend.rate && !known.some(({ value }) => value > 0))) return null;
+  return <MetricTrendPlot label={label} trend={trend} known={known} reduced={reduced} />;
+}
+
+function MetricTrendPlot({ label, trend, known, reduced }) {
+  const [index, setIndex] = React.useState(null);
+  const plot = React.useRef(null);
+  const { height } = useElementSize(plot);
+  const formatValue = value => Number.isFinite(value) ? (trend.rate ? smallPercent.format(value) : count(value)) : '집계 없음';
+  const comparison = trend.comparison;
+  const values = dataKey => trend.rows.map(row => `${row.date} ${formatValue(row[dataKey])}`).join(', ');
+  const yDomain = trend.rate ? [0, 1] : [0, comparison ? Math.max(...known.map(({ value }) => value)) : undefined];
+  const point = trend.rows[index];
+  const onKeyDown = event => {
+    if (event.key === 'Escape') {
+      setIndex(null);
+      return;
+    }
+    const last = trend.rows.length - 1;
+    const current = index ?? 0;
+    const keys = { ArrowLeft: Math.max(0, current - 1), ArrowRight: Math.min(last, current + 1), Home: 0, End: last };
+    if (!Object.hasOwn(keys, event.key)) return;
+    event.preventDefault();
+    setIndex(keys[event.key]);
+  };
+  return <Box className="dashboard-metric-trend">
+    <Text as="span" className="dashboard-note">{trend.caption}</Text>
+    <TooltipProvider>
+      <Tooltip open={Boolean(point)} disableHoverableContent>
+        <TooltipTrigger asChild>
+          <Box ref={plot} className="dashboard-metric-trend-plot" tabIndex={0} aria-label={`${label} 일별 추이, 좌우 방향키로 날짜 이동`}
+            onFocus={event => { if (event.currentTarget.matches(':focus-visible')) setIndex(0); }}
+            onBlur={() => setIndex(null)} onKeyDown={onKeyDown}>
+            <AreaSparkline data={trend.rows} dataKey="value" color={trend.color} height={height} yDomain={yDomain}
+              endDot={known.length === 1} animate={!reduced} hoverTransition={!reduced} hoverIndex={index}
+              interactive={!comparison} onHoverChange={setIndex} crosshair={comparison ? false : undefined}
+              aria-label={`${comparison ? '들어온 거래' : label} ${trend.caption} · ${values('value')}`} />
+            {comparison && <AreaSparkline data={trend.rows} dataKey="comparison" color={comparison.color} height={height} yDomain={yDomain}
+              endDot={known.length === 1} animate={!reduced} hoverTransition={!reduced} hoverIndex={index} onHoverChange={setIndex}
+              aria-label={`${comparison.label} ${trend.caption} · ${values('comparison')}`} />}
+          </Box>
+        </TooltipTrigger>
+        {point && <TooltipContent className="dashboard-metric-tooltip">
+          <Text as="time" dateTime={point.date}>{point.date} KST</Text>
+          <Text as="strong">{comparison && '들어온 거래 '}{formatValue(point.value)}</Text>
+          {comparison && <Text as="strong">{comparison.label} {formatValue(point.comparison)}</Text>}
+        </TooltipContent>}
+      </Tooltip>
+    </TooltipProvider>
+  </Box>;
+}
+
+function MetricComparison({ comparison, relation }) {
+  const { numerator, denominator, numeratorRelation, denominatorRelation } = comparison;
+  const valueRef = React.useRef(null);
+  React.useLayoutEffect(() => {
+    const value = valueRef.current;
+    if (!value) return;
+    let active = true;
+    let frame = 0;
+    let observedWidth;
+    const fit = () => {
+      if (!active || !value.clientWidth) return;
+      value.style.removeProperty('--dashboard-comparison-fit');
+      const available = value.clientWidth;
+      const textWidth = value.scrollWidth;
+      if (textWidth > available) {
+        const fullSize = Number.parseFloat(getComputedStyle(value).fontSize);
+        value.style.setProperty('--dashboard-comparison-fit', `${Math.floor(fullSize * available / textWidth)}px`);
+      }
+    };
+    const scheduleFit = () => {
+      if (!active) return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(fit);
+    };
+    fit();
+    const observer = new ResizeObserver(([entry]) => {
+      const { width } = entry.contentRect;
+      if (width === observedWidth) return;
+      observedWidth = width;
+      scheduleFit();
+    });
+    observer.observe(value.parentElement);
+    document.fonts?.ready.then(scheduleFit);
+    return () => { active = false; cancelAnimationFrame(frame); observer.disconnect(); };
+  }, [numerator, denominator]);
+
+  return <Text as="strong" ref={valueRef} className="dashboard-metric-value dashboard-metric-comparison"
+    data-dashboard-metric-source={denominatorRelation ? undefined : relation}>
+    <Text as="span" data-kpi-tone="suspect" data-dashboard-metric-source={numeratorRelation}>{formatter.format(numerator)}</Text>{' / '}
+    <Text as="span" data-dashboard-metric-source={denominatorRelation}>{formatter.format(denominator)}</Text>
+    {denominator > 0 && <Text as="span" data-kpi-tone="suspect">{' '}({compactShare(numerator, denominator)})</Text>}
+  </Text>;
+}
+
 function Metric({ item, reduced }) {
-  const { label, value, unit, detail, key, relation, extra, ratio, tone } = item;
+  const { label, value, unit, detail, key, relation, comparison, tone, trend } = item;
   const wide = (typeof value === 'number' ? formatter.format(value).length : value.length) >= 8;
   const reading = <Box className="dashboard-metric-reading">
       <Text as="strong" className="dashboard-metric-value" data-wide-value={wide || undefined}
-        data-dashboard-metric-source={relation} data-kpi-tone={value === '—' ? undefined : tone ?? ratio?.tone}>
+        data-dashboard-metric-source={relation} data-kpi-tone={value === '—' ? undefined : tone}>
         {typeof value === 'number' && !reduced && !animated.has(key)
           ? <CountUp to={value} className="count-up-fast" trigger="view" separator="," onEnd={() => animated.add(key)} />
           : typeof value === 'number' ? formatter.format(value) : value}
@@ -43,19 +163,9 @@ function Metric({ item, reduced }) {
     </Box>;
   return <Box className="dashboard-metric">
     <SectionDownloadHeading as="h3">{label}</SectionDownloadHeading>
-    {reading}
-    {extra}
+    {comparison ? <MetricComparison comparison={comparison} relation={relation} /> : reading}
     {detail && <Text>{detail}</Text>}
-    {ratio && <MetricRatio {...ratio} />}
-  </Box>;
-}
-
-function MetricRatio({ value, total, tone }) {
-  if (value == null || !total) return null;
-  const remainder = total - value;
-  return <Box className="dashboard-metric-ratio" data-tone={tone} aria-hidden="true">
-    {value > 0 && <Box data-share="value" style={{ '--dashboard-ratio-part': value }} />}
-    {remainder > 0 && <Box data-share="remainder" style={{ '--dashboard-ratio-part': remainder }} />}
+    {trend && <MetricTrend label={label} trend={trend} reduced={reduced} />}
   </Box>;
 }
 
@@ -67,35 +177,42 @@ function Metrics({ items, appearance }) {
 }
 
 function institutionMetricCards(data, reduced) {
-  const { coverageScope, investigation, linked } = data;
+  const { coverageScope, investigation, linked, operationalDaily, dailyAlertStatus, dailyEpisodeStatus } = data;
   const total = data.transactions.length;
   const suspicious = data.suspicious.length;
   const institution = coverageScope === 'institution';
-  const alerts = reviewStatusTotals(data.dailyAlertStatus);
-  const episodes = reviewStatusTotals(data.dailyEpisodeStatus);
+  const alerts = reviewStatusTotals(dailyAlertStatus);
+  const episodes = reviewStatusTotals(dailyEpisodeStatus);
   const alertTotal = investigation?.totalAlerts;
   const metrics = [
-    { label: '들어온 거래 수', value: total, unit: '건',
+    { label: '의심 거래 / 들어온 거래', value: total,
       relation: total > 0 ? 'transactions' : undefined,
       detail: institution ? undefined : '선택 업무의 근거 거래',
-      tone: 'neutral', ratio: { value: suspicious, total, tone: 'suspect' },
-      extra: <Text>의심 거래 <Text as="strong" className="dashboard-metric-accent" data-kpi-tone="suspect"
-        data-dashboard-metric-source={suspicious > 0 ? 'suspicious' : undefined}>
-        {count(suspicious)}{total > 0 && ` · ${compactShare(suspicious, total)}`}
-      </Text></Text> },
+      tone: 'neutral',
+      trend: dailyTrend(operationalDaily, row => row.total, transactionTotalColor, {
+        comparison: { label: '의심 거래', measure: row => row.suspicious, color: flowColors.suspect },
+      }),
+      comparison: { numerator: suspicious, denominator: total,
+        numeratorRelation: suspicious > 0 ? 'suspicious' : undefined,
+        denominatorRelation: total > 0 ? 'transactions' : undefined } },
     { label: '생성 Alert', value: alertTotal ?? '—', unit: alertTotal == null ? undefined : '건',
-      relation: alertTotal > 0 ? 'created-alerts' : undefined },
+      relation: alertTotal > 0 ? 'created-alerts' : undefined,
+      trend: dailyTrend(operationalDaily, row => row.alerts, dataSeriesColors.teal) },
     { label: '의심 거래 중 Alert 편입', value: linked == null ? '—' : compactShare(linked, suspicious),
-      detail: linked == null ? 'Alert 연결 집계 미제공' : `모델 의심 거래 ${count(suspicious)} 중 ${count(linked)} 연결`,
-      ratio: { value: linked, total: suspicious, tone: 'suspect' },
+      detail: linked == null ? 'Alert 연결 집계 미제공' : undefined,
+      tone: 'suspect',
+      trend: dailyTrend(operationalDaily, row => dailyRate(row.linked, row.suspicious), flowColors.suspect, { rate: true }),
+      comparison: linked == null ? null : { numerator: linked, denominator: suspicious },
       relation: linked > 0 ? 'linked' : undefined },
     { label: '미처리 Alert', value: compactShare(alerts.unfinished, alerts.total), compact: true,
-      detail: data.dailyAlertStatus ? `Alert ${count(alerts.total)} 중 ${count(alerts.unfinished)} · 검토 대기와 처리 중` : 'Alert 상태 집계 미제공',
-      ratio: { value: alerts.unfinished, total: alerts.total, tone: 'in-progress' },
+      detail: dailyAlertStatus ? `Alert ${count(alerts.total)} 중 ${count(alerts.unfinished)} · 검토 대기와 처리 중` : 'Alert 상태 집계 미제공',
+      tone: 'in-progress',
+      trend: unfinishedStatusTrend(dailyAlertStatus),
       relation: alerts.unfinished > 0 ? 'open-alerts' : undefined },
     { label: '미완료 Episode', value: compactShare(episodes.unfinished, episodes.total), compact: true,
-      detail: data.dailyEpisodeStatus ? `Episode ${count(episodes.total)} 중 ${count(episodes.unfinished)} · 처리 중` : 'Episode 상태 집계 미제공',
-      ratio: { value: episodes.unfinished, total: episodes.total, tone: 'in-progress' },
+      detail: dailyEpisodeStatus ? `Episode ${count(episodes.total)} 중 ${count(episodes.unfinished)} · 처리 중` : 'Episode 상태 집계 미제공',
+      tone: 'in-progress',
+      trend: unfinishedStatusTrend(dailyEpisodeStatus),
       relation: episodes.total > 0 ? 'open-episodes' : undefined },
   ];
   return metrics.map(item => <Panel as="article" key={item.label} data-compact-kpi={item.compact || undefined}>

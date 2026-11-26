@@ -1,4 +1,6 @@
 .overview-top { display: grid; gap: var(--workspace-gap); min-inline-size: 0; align-items: stretch }
+.overview-top > * { min-inline-size: 0 }
+.overview-top > .overview-side { gap: var(--workspace-gap) }
 .overview-top p { margin-block: var(--aml-space-4) 0 }
 .overview-top .overview-flow-charts { margin-block: var(--workspace-gap) }
 .overview-top .overview-flow-charts .overview-horizontal-chart {
@@ -31,6 +33,7 @@
   min-block-size: 0;
   overflow-wrap: anywhere;
 }
+.overview-tiles > [data-overview-panel="transactions"] { min-inline-size: 0 }
 @container case-overview (36rem <= width < 56rem) {
   .overview-tiles { grid-template-columns: repeat(12, minmax(0, 1fr)) }
   .overview-tiles > [data-overview-span] { grid-column: span 6 }
@@ -38,8 +41,32 @@
 }
 @container case-overview (min-width: 56rem) {
   .overview-top { grid-template-columns: repeat(12, minmax(0, 1fr)) }
-  .overview-top > :first-child { grid-column: span 8 }
-  .overview-top > :nth-child(2) { grid-column: span 4 }
+  .overview-top > :nth-child(-n+2) { grid-column: 1 / span 8 }
+  .overview-top > :nth-child(n+3) { grid-column: 9 / span 4 }
+  .overview-top > :is(:first-child, :nth-child(3)) { grid-row: 1 }
+  .overview-top > :is(:nth-child(2), :nth-child(4)) { grid-row: 2 }
+  .overview-top > .overview-side > :last-child { flex: 1 }
+  .overview-top > :is([data-overview-panel="flow"], [data-overview-panel="detection"]) {
+    display: flex;
+    flex-direction: column;
+  }
+  .overview-top .overview-flow-charts { flex: 1 }
+  .overview-top .overview-flow-charts > section { display: flex; flex-direction: column }
+  .overview-top .overview-flow-charts .overview-horizontal-chart { flex: 1; align-items: stretch }
+  .overview-top .overview-flow-charts .overview-horizontal-labels {
+    grid-auto-rows: minmax(var(--overview-horizontal-row-height), 1fr);
+  }
+  .overview-top .overview-flow-charts .overview-horizontal-bars {
+    min-block-size: calc(var(--overview-measures-count) * var(--overview-horizontal-row-height));
+    block-size: auto;
+  }
+  .overview-top .overview-score-chart { display: flex; flex-direction: column; flex: 1 }
+  .overview-top .overview-score-compact { flex: 1; min-block-size: var(--overview-score-compact-height) }
+  .overview-top .overview-episode-relations:has(> :nth-child(3)) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .overview-top .overview-episode-relations > :first-child { grid-column: 1 / -1 }
   .overview-tiles { grid-template-columns: repeat(12, minmax(0, 1fr)) }
   .overview-tiles > [data-overview-span="3"] { grid-column: span 3 }
   .overview-tiles > [data-overview-span="4"] { grid-column: span 4 }

@@ -571,18 +571,16 @@ function AlertOverview({ panels, evidence, summary }) {
   const byId = new Map(panels.map(panel => [panel.id, panel]));
   return <>
     <Box className="overview-top" data-alert-evidence>
-      <Stack>
-        <FlowOverviewTile panel={byId.get('flow')} evidence={evidence} />
-        <ScoreOverviewTile panel={byId.get('detection')} lead={lead} />
-      </Stack>
-      <Stack>
+      <FlowOverviewTile panel={byId.get('flow')} evidence={evidence} />
+      <ScoreOverviewTile panel={byId.get('detection')} lead={lead} />
+      <Stack className="overview-side">
         {summary}
         <AccountsOverviewTile panel={byId.get('accounts')} accounts={accounts} ownerCount={ownerCount} />
-        <OverviewTile panel={byId.get('past')} />
       </Stack>
+      <OverviewTile panel={byId.get('past')} />
     </Box>
     <Box className="overview-tiles">
-      <Panel data-overview-panel="transactions" data-overview-span="12">{byId.get('transactions').visualContent}</Panel>
+      <Box data-overview-panel="transactions" data-overview-span="12">{byId.get('transactions').visualContent}</Box>
       <OverviewTile panel={byId.get('composition')} />
       <OverviewTile panel={byId.get('judgment')} />
       <OverviewTile panel={byId.get('history')} />
@@ -597,13 +595,13 @@ function EpisodeOverview({ panels, evidence, summary }) {
   const composition = byId.get('composition');
   return <>
     <Box className="overview-top" data-episode-evidence>
-      <Stack>
-        <OverviewTile panel={{ ...composition, count: undefined }} title="Alert 연결" />
-        <FlowOverviewTile panel={byId.get('flow')} evidence={evidence} />
-      </Stack>
-      <Stack>
+      <OverviewTile panel={{ ...composition, count: undefined }} title="Alert 연결" />
+      <FlowOverviewTile panel={byId.get('flow')} evidence={evidence} />
+      <Stack className="overview-side">
         {summary}
         <AccountsOverviewTile panel={byId.get('accounts')} accounts={accounts} ownerCount={ownerCount} />
+      </Stack>
+      <Stack className="overview-side">
         <OverviewTile panel={byId.get('history')} />
         <OverviewTile panel={byId.get('judgment')} />
         <OverviewTile panel={byId.get('rules')} />
@@ -613,7 +611,7 @@ function EpisodeOverview({ panels, evidence, summary }) {
       <ScoreOverviewTile panel={{ ...byId.get('detection'), span: 8 }} lead={lead} />
       <OverviewTile panel={{ ...composition, id: 'distribution', entries: composition.distributionEntries }}
         title="근거 거래 구성" span={4}>{composition.distribution}</OverviewTile>
-      <Panel data-overview-panel="transactions" data-overview-span="12">{byId.get('transactions').visualContent}</Panel>
+      <Box data-overview-panel="transactions" data-overview-span="12">{byId.get('transactions').visualContent}</Box>
     </Box>
   </>;
 }

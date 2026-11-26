@@ -46,6 +46,7 @@ export function investigationDashboard(allCases, cases, dates, { assignmentRows 
   }
 
   const alertDays = new Map(dates.map(date => [date, { date, ...statusCounts() }]));
+  const individualAlertDays = new Map(dates.map(date => [date, { date, ...statusCounts() }]));
   const episodeDays = new Map(dates.map(date => [date, { date, ...statusCounts() }]));
   const routes = { individual: routeCounts(), episode: routeCounts() };
   const linkedEpisodes = new Set();
@@ -74,6 +75,8 @@ export function investigationDashboard(allCases, cases, dates, { assignmentRows 
       episodeAlerts++;
     } else {
       individualAlerts++;
+      const day = individualAlertDays.get(date);
+      if (day) day[status]++;
     }
     route[status]++;
     if (status === 'done') {
@@ -92,6 +95,7 @@ export function investigationDashboard(allCases, cases, dates, { assignmentRows 
   const overdueWork = openWork.filter(row => isOverdueCaseAge(row.elapsed));
   return {
     dailyAlertStatus,
+    dailyIndividualAlertStatus: [...individualAlertDays.values()],
     dailyEpisodeStatus: [...episodeDays.values()],
     accountRecommendation: recommendation && { ...recommendation, comparison: accountTrailComparison(recommendation, allCases) },
     institutionWorkload: staffWorkload(openWork, overdueWork, assignmentRows, dates, roster),

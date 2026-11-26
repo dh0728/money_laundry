@@ -101,6 +101,7 @@
 .query-tool-popover[data-tool="period"] {
   --query-width: calc(var(--aml-space-64) * 7 - var(--aml-stroke-divider));
 }
+.query-tool-popover:has(.query-calendar-options) { overflow: visible }
 .query-tool-popover[data-tool="download"] {
   --query-width: calc(var(--aml-size-sidebar) + var(--aml-space-64) - var(--aml-space-4));
 }
@@ -292,17 +293,18 @@
   border-collapse: separate;
   border-spacing: 0;
 }
-.query-tool-popover .rdp-dropdown_root {
-  min-inline-size: 0;
-  padding-inline: var(--aml-space-4);
-  background: var(--information-panel-surface);
-  border-radius: var(--aml-radius-control);
+.query-tool-popover .query-calendar-select {
+  gap: var(--aml-space-4);
+  block-size: var(--rdp-nav-height);
+  padding-inline: var(--aml-space-6);
 }
-.query-tool-popover .rdp-dropdown_root .rdp-caption_label {
-  column-gap: var(--aml-space-4);
-  pointer-events: none;
+.query-calendar-options {
+  max-block-size: min(var(--radix-select-content-available-height), calc(var(--aml-size-control-compact) * 8));
 }
-.query-tool-popover .rdp-dropdown { font: inherit; color: inherit }
+[data-reduced-motion="true"] .query-calendar-options { animation: none }
+@media (prefers-reduced-motion: reduce) {
+  .query-calendar-options { animation: none }
+}
 .query-tool-popover :is(.rdp-button_previous, .rdp-button_next) {
   border-radius: var(--aml-radius-control);
   background: var(--information-panel-surface);

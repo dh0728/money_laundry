@@ -134,6 +134,11 @@ test('creation-day charts use explicit membership and current Episode verdicts o
     { date: '2023-09-06', pending: 0, inProgress: 1, done: 0 },
     { date: '2023-09-07', pending: 1, inProgress: 0, done: 1 },
   ]);
+  expect(result.dailyIndividualAlertStatus).toEqual([
+    { date: '2023-09-05', pending: 0, inProgress: 0, done: 0 },
+    { date: '2023-09-06', pending: 0, inProgress: 0, done: 0 },
+    { date: '2023-09-07', pending: 1, inProgress: 0, done: 0 },
+  ]);
   expect(result.dailyEpisodeStatus.every(row => row.pending + row.inProgress + row.done === 0)).toBe(true);
   expect(result.alertCases[0].status).toBe('처리 완료');
   const both = await liveDashboardResponse({ ...source, cases });

@@ -8,6 +8,7 @@ import { BarXAxis } from '../../components/charts/charts/bar-x-axis';
 import { readChartNumber } from '../../components/charts/chart-design-values';
 import { Grid } from '../../components/charts/charts/grid';
 import { ChartTooltip } from '../../components/charts/charts/tooltip/chart-tooltip';
+import { TooltipContent } from '../../components/charts/charts/tooltip/tooltip-content';
 import { ibmLaundering, ibmPatterns, ibmRemaining } from '../investigation/ibm-hi-small-aggregate';
 import { SectionDownloadHeading } from '../../components/section-download';
 import { dashboardPattern } from '../../mocks/dashboard-patterns';
@@ -26,8 +27,9 @@ function volumeAxisLabel(point, label) {
   return <Text as="span" className="dashboard-volume-axis">{label}<Text as="small">{share(point.labeled, point.total)}</Text></Text>;
 }
 
-function DailySeries({ rows, series, reduced, label, showShare = false, detail, stacked = true, separatedStack = false }) {
+function DailySeries({ rows, series, reduced, label, showShare = false, detail, stacked = true, separatedStack = false, tooltipTitle }) {
   const columns = detail ?? series.map(item => ({ label: item.label, value: row => count(row[item.key]), color: item.color }));
+  const tooltipRows = point => columns.map(column => ({ label: column.label, color: column.color, value: column.value(point) }));
   const barGap = readChartNumber('--aml-space-2', 2);
   const sideInset = readChartNumber('--aml-space-4', 4);
   const cap = separatedStack ? readChartNumber('--aml-radius-small', 4) : 'round';
@@ -50,9 +52,7 @@ function DailySeries({ rows, series, reduced, label, showShare = false, detail, 
         <BarXAxis maxLabels={showShare ? { base: 4, sm: 10, lg: 18 } : 14} tickerHalfWidth={0}
           formatLabel={showShare ? volumeAxisLabel : undefined} />
         <ChartTooltip showCrosshair showDatePill={false} showDots={false} damping={reduced ? 0 : 25}
-          rows={point => columns.map(column => ({
-            label: column.label, color: column.color, value: column.value(point),
-          }))} />
+          rows={tooltipRows} content={tooltipTitle && (({ point }) => <TooltipContent title={tooltipTitle(point)} rows={tooltipRows(point)} />)} />
       </BarChart>
     </Box>
     <Box className="visually-hidden">
@@ -340,6 +340,15 @@ function TransactionDetails({ data, flow, reduced, summary }) {
   </LayoutGrid>;
 }
 
+function StatusLegend({ series, sums, target }) {
+  return <Box className="dashboard-legend">
+    {series.map(item => <Box className="dashboard-status-legend-item" key={item.key}>
+      <ReviewStatusTag status={item.key === 'pending' ? '처리 전' : item.label} />
+      <Text as="strong" data-dashboard-metric-target={target?.(item.key)}>{count(sums[item.key])}</Text>
+    </Box>)}
+  </Box>;
+}
+
 function InvestigationStatus({ data, episode = false, reduced }) {
   const keys = episode ? ['inProgress', 'done'] : ['pending', 'inProgress', 'done'];
   const daily = episode ? data.dailyEpisodeStatus : data.dailyAlertStatus;
@@ -351,40 +360,42 @@ function InvestigationStatus({ data, episode = false, reduced }) {
   const note = total ? '생성일별 현재 상태 · ' + count(total) + ' · 완료 ' + compactShare(sums.done, total) : '생성일별 현재 상태 · KST';
   return <ChartPanel title={title} note={note} className="dashboard-flow-status" hasChart={total > 0}>
     {total ? <>
-      <Box className="dashboard-legend">
-        {series.map(item => <Box className="dashboard-status-legend-item" key={item.key}>
-          <ReviewStatusTag status={item.key === 'pending' ? '처리 전' : item.label} />
-          <Text as="strong" data-dashboard-metric-target={episode ? (item.key === 'done' ? 'completed-episodes' : 'open-episodes') : undefined}>
-            {count(sums[item.key])}
-          </Text>
-        </Box>)}
-      </Box>
+      <StatusLegend series={series} sums={sums} target={episode ? key => key === 'done' ? 'completed-episodes' : 'open-episodes' : undefined} />
       <DailySeries rows={rows} series={series} reduced={reduced} label={title} separatedStack />
     </> : <Text className="dashboard-note">{daily ? '조회 기간에 생성된 업무가 없습니다.' : '처리 상태 집계 미제공'}</Text>}
   </ChartPanel>;
 }
 
-function CaseCompletion({ data }) {
+const completionStatusKeys = ['pending', 'inProgress', 'done'];
+const completionSeries = completionStatusKeys.map(key => ({ key, label: statusLabels[key], color: flowColors[key] }));
+
+function CaseCompletion({ data, reduced }) {
   const individual = data.investigation?.routes?.individual;
   const alerts = reviewStatusTotals(individual && [individual]);
   const episodes = reviewStatusTotals(data.dailyEpisodeStatus);
   const available = individual != null && data.dailyEpisodeStatus != null;
   const total = available ? alerts.total + episodes.total : 0;
   const done = alerts.done + episodes.done;
-  const segments = [
-    { label: statusLabels.pending, tone: 'pending', value: alerts.pending + episodes.pending },
-    { label: statusLabels.inProgress, tone: 'in-progress', value: alerts.inProgress + episodes.inProgress },
-    { label: statusLabels.done, tone: 'done', value: done },
-  ];
-  return <ChartPanel title="업무 처리율" headingAs="h3" className="dashboard-completion" hasChart={total > 0}
+  const sums = reviewStatusTotals([alerts, episodes]);
+  const individualByDate = new Map(data.dailyIndividualAlertStatus?.map(row => [row.date, row]));
+  const episodeDays = data.dailyEpisodeStatus ?? [];
+  const rows = episodeDays.flatMap(episode => {
+    const alert = individualByDate.get(episode.date);
+    return alert ? [{ ...reviewStatusTotals([alert, episode]), date: episode.date, label: episode.date.slice(5).replace('-', '/') }] : [];
+  });
+  const hasChart = total > 0 && rows.length === episodeDays.length && reviewStatusTotals(rows).total === total;
+  const detail = completionSeries.map(item => ({ ...item, value: row => row.total
+    ? `${count(row[item.key])} (${compactShare(row[item.key], row.total)})` : count(row[item.key]) }));
+  return <ChartPanel title="업무 처리율" headingAs="h3" className="dashboard-completion" hasChart={hasChart}
     note="생성일별 현재 상태 · 개별 처리 Alert와 Episode를 건별로 집계">
     {total ? <>
       <Box className="dashboard-metric-reading dashboard-completion-reading">
         <Text as="span">{count(total)} 중 {count(done)} 완료 · 개별 처리 Alert {count(alerts.total)} + Episode {count(episodes.total)}</Text>
         <Text as="strong" className="dashboard-metric-value" data-dashboard-metric-source="completion">{compactShare(done, total)}</Text>
       </Box>
-      <ProportionBar label="개별 처리 Alert·Episode 처리 상태" segments={segments} total={total} formatShare={compactShare} separated />
-      <CompositionLegend label="개별 처리 Alert·Episode 처리 상태별 건수와 비율" segments={segments} total={total} formatShare={compactShare} />
+      <StatusLegend series={completionSeries} sums={sums} />
+      {hasChart && <DailySeries rows={rows} series={completionSeries} detail={detail} reduced={reduced} label="일별 업무 처리 상태"
+        separatedStack tooltipTitle={point => `${point.date} KST`} />}
     </> : <Text className="dashboard-note">{available ? '조회 기간에 생성된 Alert·Episode가 없습니다.' : 'Alert·Episode 처리 상태 집계 미제공'}</Text>}
   </ChartPanel>;
 }
@@ -405,7 +416,7 @@ export function Analytics({ data, reduced, summary, metrics }) {
     aria-label="기관 탐지 현황" ref={hostRef}>
     <InstitutionMetricsGrid aria-label="전체 대시보드 요약 지표">
       {transactionsCard}{alertsCard}{linkedCard}
-      <CaseCompletion data={data} />
+      <CaseCompletion data={data} reduced={reduced} />
       {unfinishedCards}
     </InstitutionMetricsGrid>
     <DashboardIndicatorsGrid aria-label="기관 주요 지표">

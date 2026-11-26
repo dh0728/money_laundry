@@ -35,9 +35,10 @@ function OverviewSummary() {
 }
 
 function OverviewTransactions() {
-  return <OverviewPlaceholder panel="transactions" span={12}>
+  return <Stack data-overview-panel="transactions" data-overview-span="12">
+    <Skeleton className="investigation-skeleton-title" />
     <TablePlaceholder columns={9} rows={3} />
-  </OverviewPlaceholder>;
+  </Stack>;
 }
 
 function PerPanelPlaceholder({ panel }) {
@@ -70,20 +71,17 @@ export function CaseOverviewSkeleton({ episode, perPanel, initialPanel }) {
       </Box>
       {perPanel ? <PerPanelPlaceholder panel={initialPanel} /> : <>
         <Box className="overview-top" data-alert-evidence={!episode || undefined} data-episode-evidence={episode || undefined}>
-          <Stack>
-            {episode && <OverviewPlaceholder panel="composition" lines={4} />}
-            <OverviewPlaceholder panel="flow" chart="flow" />
-            {!episode && <OverviewPlaceholder panel="detection" chart="score" />}
-          </Stack>
-          <Stack>
+          {episode ? <OverviewPlaceholder panel="composition" lines={4} /> : <OverviewPlaceholder panel="flow" chart="flow" />}
+          {episode ? <OverviewPlaceholder panel="flow" chart="flow" /> : <OverviewPlaceholder panel="detection" chart="score" />}
+          <Stack className="overview-side">
             <OverviewSummary />
             <OverviewPlaceholder panel="accounts" />
-            {episode ? <>
-              <OverviewPlaceholder panel="history" />
-              <OverviewPlaceholder panel="judgment" />
-              <OverviewPlaceholder panel="rules" />
-            </> : <OverviewPlaceholder panel="past" />}
           </Stack>
+          {episode ? <Stack className="overview-side">
+            <OverviewPlaceholder panel="history" />
+            <OverviewPlaceholder panel="judgment" />
+            <OverviewPlaceholder panel="rules" />
+          </Stack> : <OverviewPlaceholder panel="past" />}
         </Box>
         <Box className="overview-tiles">
           {episode ? <>
