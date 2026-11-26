@@ -310,7 +310,7 @@ it('목록은 상태별 수 · 템플릿 · 대상 · 조건을 보여 주고, �
   for (const duplicate of ['운영 적중', '연결 Alert', '대상 · 계좌', activeRuleFixture.templateName]) {
     expect(within(detail).queryByText(duplicate)).not.toBeInTheDocument();
   }
-  expect(sharedTableHeading('일일 실행', '2건').getByRole('button', { name: '다운로드' })).toBeInTheDocument();
+  expect(await sharedTableHeading('일일 실행', '2건').findByRole('button', { name: '다운로드' })).toBeInTheDocument();
   const executions = within(screen.getByRole('table', { name: '일일 실행' }));
   const runs = executions.getAllByRole('row');
   expect(runs[1]).toHaveTextContent('2023-09-16v1운영실패 · 쿼리 120초 초과');
