@@ -1,6 +1,6 @@
 import unittest
 
-from integrate.entity_attributes import bank_country, entity_type
+from ingest.entity_attributes import bank_country, entity_type
 
 
 class EntityAttributeTests(unittest.TestCase):

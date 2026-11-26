@@ -45,7 +45,7 @@ class DashboardProjectionTests {
             Long.class);
     account =
         jdbc.queryForObject(
-            "insert into core.accounts(bank_id,service_account_id,owner_id) values(999019,gen_random_uuid(),?) returning account_id",
+            "insert into core.accounts(bank_id,owner_id) values(999019,?) returning account_id",
             Long.class,
             owner);
     user = jdbc.queryForObject("select user_id from core.users where username='l1a'", Long.class);
@@ -134,18 +134,14 @@ class DashboardProjectionTests {
         jdbc.queryForObject(
             "select xmin::text from ops.dashboard_model_counts where business_date='2023-09-01'",
             String.class);
-    jdbc.update("update ledger.transactions set integration_status='HELD' where tx_id=?", first);
+    jdbc.update("update ledger.transactions set business_date='2023-09-02' where tx_id=?", first);
     projection.refresh(DashboardProjection.Scope.PIPELINE);
-    assertThat(received()).isEqualTo(1);
+    // Only the dates that changed are recomputed.
     assertThat(
             jdbc.queryForObject(
                 "select xmin::text from ops.dashboard_model_counts where business_date='2023-09-01'",
                 String.class))
         .isEqualTo(unchanged);
-    jdbc.update(
-        "update ledger.transactions set integration_status='ACTIVE',business_date='2023-09-02' where tx_id=?",
-        first);
-    projection.refresh(DashboardProjection.Scope.PIPELINE);
     assertThat(
             jdbc.queryForList(
                 "select business_date::text from ops.dashboard_model_counts order by 1",
@@ -301,7 +297,7 @@ class DashboardProjectionTests {
   void pipeline_components_publish_together_and_truncate_clears_rebuilt_values() {
     long upload =
         jdbc.queryForObject(
-            "insert into ingest.uploads(bank_id,business_date,file_name,file_hash,size_bytes,status) values(999019,'2023-08-31','fixture.csv',repeat('a',64),1,'FAILED') returning upload_id",
+            "insert into ingest.uploads(business_date,file_name,file_hash,size_bytes,status) values('2023-08-31','fixture.csv',repeat('a',64),1,'FAILED') returning upload_id",
             Long.class);
     jdbc.update(
         "insert into analysis.jobs(analysis_date,analysis_cutoff_at,business_at,threshold_value,status,current_stage) values('2023-09-01',now(),'2023-09-03 09:00+09',.7,'QUEUED','FEATURES')");
@@ -525,7 +521,7 @@ class DashboardProjectionTests {
   void pipeline_failure_does_not_publish_only_some_components() {
     transaction("2023-08-31");
     jdbc.update(
-        "insert into ingest.uploads(bank_id,business_date,file_name,file_hash,size_bytes,status) values(999019,'2023-08-31','fixture.csv',repeat('a',64),1,'FAILED')");
+        "insert into ingest.uploads(business_date,file_name,file_hash,size_bytes,status) values('2023-08-31','fixture.csv',repeat('a',64),1,'FAILED')");
     var broken =
         new JdbcTemplate(jdbc.getDataSource()) {
           @Override

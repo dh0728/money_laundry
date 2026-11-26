@@ -33,8 +33,8 @@ public class DemoAnalysisController {
   }
 
   /**
-   * backfill: integrate and freeze the day as history only, without scores or Alerts. Boxed so a
-   * body without it (the normal analysis request) reads as false, not as a null primitive.
+   * backfill: freeze the loaded day as history only, without scores or Alerts. Boxed so a body
+   * without it (the normal analysis request) reads as false, not as a null primitive.
    */
   public record Trigger(LocalDate businessDate, Boolean backfill) {
     public Trigger(LocalDate businessDate) {

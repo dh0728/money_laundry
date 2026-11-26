@@ -39,7 +39,7 @@ class PollRecoveryTests(unittest.TestCase):
         messages = []
         try:
             with patch('control_panel.time.sleep', side_effect=lambda _: messages.append(replay.snapshot())):
-                replay.start(['d1', 'd2'], {'d1': [(7, Path('a'))], 'd2': [(8, Path('b'))]})
+                replay.start(['d1', 'd2'], {'d1': Path('a'), 'd2': Path('b')})
                 replay.future.result(timeout=5)
             self.assertIsNone(replay.snapshot()['error'])
             self.assertEqual(replay.snapshot()['doneDays'], 2)
@@ -49,7 +49,7 @@ class PollRecoveryTests(unittest.TestCase):
             waiting = [s for s in messages if '확인 대기' in s['message']]
             self.assertEqual(len(waiting), 2)
             self.assertIn('FREEZE_INPUT', waiting[0]['message'])
-            self.assertIsNone(waiting[0]['bankId'])
+            self.assertIsNone(waiting[0]['uploadId'])
         finally:
             replay.close()
 

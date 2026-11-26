@@ -109,8 +109,8 @@ public class AnalysisService {
   }
 
   /**
-   * A backfill day only integrates and freezes its transactions: they become history for later
-   * analyses but are never scored or grouped into Alerts.
+   * A backfill day only freezes its loaded transactions: they become history for later analyses but
+   * are never scored or grouped into Alerts.
    */
   public long registerDemo(LocalDate businessDay, LocalDate currentBusinessDay, boolean backfill) {
     if (businessDay == null
@@ -247,12 +247,6 @@ public class AnalysisService {
           if (!job.status().equals("FAILED"))
             throw conflict(
                 job.status().equals("COMPLETED") ? "JOB_ALREADY_COMPLETED" : "INVALID_TRANSITION");
-          if ("RUN_CANCELLED".equals(job.error())) {
-            jdbc.update(
-                "update analysis.cancel_outbox o set attempts=0,retry_at=null,error_code=null from analysis.model_requests m join analysis.runs r using(run_id) where o.request_id=m.request_id and o.execution_round=m.execution_round and r.job_id=? and o.acknowledged_at is null",
-                id);
-            return;
-          }
           // A model the inference server ended as failed is sent again as a new round of the
           // same request, reusing the prepared input. The old round is closed so it no longer
           // counts as unconfirmed; the other model's state is left as it is.
@@ -298,7 +292,7 @@ public class AnalysisService {
   }
 
   void lock(long id) {
-    AnalysisRunService.integrationLock(jdbc);
+    AnalysisRunService.ingestLock(jdbc);
     if (jdbc.queryForList(
             "select job_id from analysis.jobs where job_id=? for update", Long.class, id)
         .isEmpty()) throw ApiException.notFound("작업 없음");
@@ -307,12 +301,7 @@ public class AnalysisService {
   boolean owns(Job expected) {
     Job actual = job(expected.id());
     return actual.status().equals("RUNNING")
-        && Objects.equals(expected.executionId(), actual.executionId())
-        && !Boolean.TRUE.equals(
-            jdbc.queryForObject(
-                "select exists(select 1 from analysis.runs r join analysis.jobs b on b.current_run_id=r.run_id where b.job_id=? and r.status in ('CANCEL_REQUESTED','CANCELLED'))",
-                Boolean.class,
-                expected.id()));
+        && Objects.equals(expected.executionId(), actual.executionId());
   }
 
   public Map<String, Object> detail(long id) {
@@ -346,11 +335,6 @@ public class AnalysisService {
     for (String key : List.of("uploads", "failures", "models"))
       for (Object row : (List<?>) result.get(key))
         ((Map<String, Object>) row).replaceAll((name, value) -> jsonValue(value));
-    result.put(
-        "cancellations",
-        jdbc.queryForList(
-            "select o.cancel_id as \"cancelId\",o.attempts,o.error_code as \"errorCode\",o.acknowledged_at as \"acknowledgedAt\",(o.attempts>=3 and o.acknowledged_at is null) as \"actionRequired\" from analysis.cancel_outbox o join analysis.model_requests m using(request_id,execution_round) join analysis.runs r using(run_id) where r.job_id=?",
-            id));
     return result;
   }
 

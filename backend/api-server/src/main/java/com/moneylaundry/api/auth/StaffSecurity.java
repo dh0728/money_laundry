@@ -43,20 +43,22 @@ public class StaffSecurity {
   SecurityFilterChain staffFilterChain(HttpSecurity http, Environment env, StaffAccounts accounts)
       throws Exception {
     boolean enabled = WorkbenchAccess.enabled(env);
-    http.csrf(c -> c.ignoringRequestMatchers("/api/v1/bank/**"))
-        .requestCache(c -> c.disable())
+    http.requestCache(c -> c.disable())
         .exceptionHandling(
             c ->
                 c.authenticationEntryPoint((q, r, e) -> error(r, 401, "UNAUTHENTICATED"))
                     .accessDeniedHandler((q, r, e) -> error(r, 403, "FORBIDDEN")))
         .authorizeHttpRequests(
             c -> {
-              c.requestMatchers("/actuator/health", "/actuator/health/**", "/api/v1/bank/**")
-                  .permitAll();
+              c.requestMatchers("/actuator/health", "/actuator/health/**").permitAll();
               if (enabled) {
                 c.requestMatchers("/api/auth/csrf", "/api/auth/login")
                     .permitAll()
-                    .requestMatchers(HttpMethod.POST, "/api/v1/demo/**", "/api/v1/batch-jobs/**")
+                    .requestMatchers(
+                        HttpMethod.POST,
+                        "/api/v1/demo/**",
+                        "/api/v1/batch-jobs/**",
+                        "/api/v1/ledger-uploads/**")
                     .hasRole("ADMIN")
                     .requestMatchers("/api/**")
                     .hasAnyRole("STAFF", "ADMIN");

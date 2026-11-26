@@ -15,7 +15,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-/** Spring owns receipt/dispatch; Python owns validation and private report publication. */
+/** Spring owns receipt/dispatch; Python owns validation and loading the ledger file. */
 @Service
 public class LedgerLoader {
   private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LedgerLoader.class);
@@ -39,8 +39,21 @@ public class LedgerLoader {
       String encryption,
       String search,
       String version,
+      String fxVersion,
       String zone) {
-    this(jdbc, store, database, python, script, timeout, encryption, search, version, zone, null);
+    this(
+        jdbc,
+        store,
+        database,
+        python,
+        script,
+        timeout,
+        encryption,
+        search,
+        version,
+        fxVersion,
+        zone,
+        null);
   }
 
   @org.springframework.beans.factory.annotation.Autowired
@@ -54,6 +67,7 @@ public class LedgerLoader {
       @Value("${app.ingest.encryption-key:}") String encryption,
       @Value("${app.ingest.search-key:}") String search,
       @Value("${app.ingest.key-version:}") String version,
+      @Value("${app.ingest.fx-rate-version}") String fxVersion,
       @Value("${app.zone}") String zone,
       com.moneylaundry.api.common.BusinessTime businessTime) {
     this.jdbc = jdbc;
@@ -71,6 +85,8 @@ public class LedgerLoader {
             search,
             "INGEST_KEY_VERSION",
             version,
+            "INGEST_FX_VERSION",
+            fxVersion,
             "INGEST_ZONE",
             zone);
   }
@@ -149,9 +165,9 @@ public class LedgerLoader {
     } catch (Exception e) {
       if (e instanceof InterruptedException) Thread.currentThread().interrupt();
       log.error(
-          "Report load failed uploadId={} exceptionType={}", id, e.getClass().getSimpleName());
+          "Ledger load failed uploadId={} exceptionType={}", id, e.getClass().getSimpleName());
       jdbc.update(
-          "update ingest.uploads set status='FAILED',error_code='LOAD_FAILED',error_message='보고 저장 실패. 관리자 확인이 필요합니다.',finished_at=?,execution_id=null,execution_owner=null where upload_id=? and execution_id=?",
+          "update ingest.uploads set status='FAILED',error_code='LOAD_FAILED',error_message='원장 적재 실패. 관리자 확인이 필요합니다.',finished_at=?,execution_id=null,execution_owner=null where upload_id=? and execution_id=?",
           java.sql.Timestamp.from(businessNow()),
           id,
           token);

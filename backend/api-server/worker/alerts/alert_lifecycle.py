@@ -24,7 +24,6 @@ class Action(StrEnum):
     UPDATE = 'UPDATE'
     MERGE = 'MERGE'
     FOLLOWUP = 'FOLLOWUP'
-    WITHDRAW = 'WITHDRAW'
     NOOP = 'NOOP'
 
 
@@ -86,14 +85,10 @@ class CaseSnapshot:
 
 @dataclass(frozen=True)
 class Validity:
-    """Explicit facts from the frozen input; absence is never invalidation.
+    """Score/policy changes from the frozen input: members whose seed decision no longer holds.
 
-    ``checked_ids`` must cover a case's complete former core before automatic
-    withdrawal. Only report-correction invalidation belongs in ``invalid_ids``.
-    Score/policy changes use ``reassessment_ids`` and are published like any other change.
+    They are published like any other change.
     """
-    checked_ids: frozenset[int] = frozenset()
-    invalid_ids: frozenset[int] = frozenset()
     reassessment_ids: frozenset[int] = frozenset()
 
 
@@ -109,7 +104,6 @@ class Plan:
     baselines: tuple[CaseSnapshot, ...]
     # Existing explicit staff exclusions survive publication.
     excluded_tx_ids: frozenset[int]
-    invalid_tx_ids: frozenset[int]
 
     def contract(self):
         return dict(action=str(self.action), targetAlertId=self.target_alert_id,
@@ -117,8 +111,7 @@ class Plan:
                     referenceIds=list(self.reference_ids),
                     recipientIds=list(self.recipient_ids), reason=self.reason,
                     baselines=[case.baseline() for case in self.baselines],
-                    excludedTxIds=sorted(self.excluded_tx_ids),
-                    invalidTxIds=sorted(self.invalid_tx_ids))
+                    excludedTxIds=sorted(self.excluded_tx_ids))
 
 
 @dataclass(frozen=True)
@@ -172,10 +165,6 @@ def _validate(cases, graphs, validity):
     by_id = {case.alert_id: case for case in cases}
     if len(by_id) != len(cases):
         raise PlanningError('Duplicate Alert in business snapshot')
-    if not validity.invalid_ids <= validity.checked_ids:
-        raise PlanningError('Invalidated facts must have explicit validity checks')
-    if validity.invalid_ids & validity.reassessment_ids:
-        raise PlanningError('Report invalidation and score reassessment are distinct')
     for case in cases:
         if (case.alert_id <= 0 or case.published_version <= 0 or case.revision < 0
                 or case.assignee_id <= 0 or case.status not in ('OPEN', 'CLOSED')):
@@ -209,8 +198,6 @@ def _validate(cases, graphs, validity):
         if assigned_seeds & graph.seed_ids:
             raise PlanningError('A seed occurs in more than one new graph')
         assigned_seeds.update(graph.seed_ids)
-        if graph.member_ids & validity.invalid_ids:
-            raise PlanningError('A new graph contains an invalidated transaction')
     return by_id, canonical
 
 
@@ -234,12 +221,6 @@ def _matches(case, graph, by_id):
     return bool(graph.core_ids & own_core or set(graph.witnesses) & own_witnesses)
 
 
-def _remaining_relation(case, validity):
-    return any(not set(w.tx_ids) & validity.invalid_ids
-               and set(w.tx_ids) & (case.evidence.seed_ids - validity.invalid_ids)
-               for w in case.evidence.witnesses)
-
-
 def _novel(graph, references, validity):
     """A closed flow is followed up only by a relation that holds a seed it never had (N4).
 
@@ -259,7 +240,7 @@ def build_case_plans(cases, graphs, *, validity=Validity(), composed_digests=Non
     Graph IDs are positions in the input tuple. ``composed_digests`` maps a
     component's sorted open case IDs and graph IDs to the digest of its composed
     immutable evidence. The materializer supplies it after retaining history and
-    removing explicitly invalid facts. Without it, equality is only established
+    dropping reassessed seeds. Without it, equality is only established
     for an exact one-graph/one-case match or a case with no changes. This avoids
     mistaking equal membership for equal scores/facts. ``unchanged_members`` names
     the components whose composed evidence keeps the case's members and facts and
@@ -322,8 +303,8 @@ def build_case_plans(cases, graphs, *, validity=Validity(), composed_digests=Non
     components = defaultdict(list)
     for index in range(len(graphs)):
         components[root(index)].append(index)
-    # An unchanged or explicitly invalidated old case still needs a coverage /
-    # withdrawal / reassessment decision even when no new graph matched it.
+    # An unchanged old case still needs a coverage / reassessment decision even
+    # when no new graph matched it.
     isolated = sorted(key for key, case in canonical_cases.items()
                       if case.status == 'OPEN' and key not in first_graph_for_case)
     components_to_plan = [(tuple(indexes), set().union(*(open_matches[i] for i in indexes)),
@@ -346,16 +327,12 @@ def build_case_plans(cases, graphs, *, validity=Validity(), composed_digests=Non
             if references and not any(_novel(graphs[i], references, validity) for i in indexes):
                 action, reason = Action.NOOP, 'NO_NEW_SEED_RELATION'
         else:
-            invalid = set().union(*(c.evidence.member_ids for c in active)) & validity.invalid_ids
             reassess = any(c.evidence.member_ids & validity.reassessment_ids for c in active)
-            withdrawn = (not indexes and bool(invalid)
-                         and all(c.evidence.core_ids <= validity.checked_ids
-                                 and not _remaining_relation(c, validity) for c in active))
             composed = (composed_digests or {}).get((case_ids, indexes))
             if composed is not None and (len(composed) != 64
                     or any(c not in '0123456789abcdef' for c in composed)):
                 raise PlanningError('Invalid composed semantic digest')
-            unchanged = (len(active) == 1 and not invalid and not reassess
+            unchanged = (len(active) == 1 and not reassess
                          and (composed == target.evidence.digest
                               or (composed is None and (not indexes
                                   or (len(indexes) == 1
@@ -364,14 +341,9 @@ def build_case_plans(cases, graphs, *, validity=Validity(), composed_digests=Non
                 action, reason = Action.NOOP, 'FROZEN_LEGACY'
             elif unchanged:
                 action, reason = Action.NOOP, 'UNCHANGED_EVIDENCE'
-            elif (len(active) == 1 and not invalid and not reassess
+            elif (len(active) == 1 and not reassess
                   and (case_ids, indexes) in unchanged_members):
                 action, reason = Action.NOOP, 'UNCHANGED_CORE_MEMBERS'
-            elif withdrawn:
-                action, reason = Action.WITHDRAW, 'EVIDENCE_WITHDRAWN'
-            elif (invalid and not indexes and not reassess
-                  and not any(_remaining_relation(c, validity) for c in active)):
-                action, reason = Action.NOOP, 'INCOMPLETE_VALIDITY'
             elif reassess:
                 action = Action.MERGE if len(active) > 1 else Action.UPDATE
                 reason = 'SCORE_OR_POLICY_REASSESSMENT'
@@ -381,15 +353,12 @@ def build_case_plans(cases, graphs, *, validity=Validity(), composed_digests=Non
                 action = Action.UPDATE
             # Every change to an open Alert is published at once; the assignees are
             # notified. Staff exclusions and moves are kept by the publisher.
-            if invalid and reason == 'FLOW_EVIDENCE':
-                reason = 'REPORT_CORRECTED'
         baselines = tuple(sorted(active + references, key=lambda c: c.alert_id))
         exclusions = frozenset().union(*(c.excluded_tx_ids for c in active))
-        invalid_ids = frozenset().union(*(c.evidence.member_ids for c in active)) & validity.invalid_ids
         recipients = () if action == Action.NOOP else tuple(sorted({c.assignee_id for c in active}))
         plans.append(Plan(action, target.alert_id if target else None, case_ids, indexes,
                           tuple(sorted(referenced)), recipients, reason, baselines,
-                          exclusions, invalid_ids))
+                          exclusions))
     plans.sort(key=lambda p: (p.target_alert_id is None, p.target_alert_id or 0, p.graph_ids))
     affected_ids = [key for plan in plans for key in plan.case_ids]
     if len(affected_ids) != len(set(affected_ids)):

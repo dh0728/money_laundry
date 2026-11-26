@@ -116,15 +116,9 @@ def _prepare_plans(connection, execution, batch, rows, scores, seeds, days, meta
     by_id = {case.alert_id: case for case in cases}
     del raw_cases
     steps.lap('caseIndex')
-    members = None if case_ids is None else sorted({key for c in cases for key in c.evidence.member_ids})
-    facts = dict(connection.execute('''SELECT tx_id,integration_status FROM analysis.run_fact_checks
-        WHERE run_id=%s AND (%s::bigint[] IS NULL OR tx_id=ANY(%s))''', (execution.run_id, members, members)).fetchall())
-    checked = frozenset(key for key, state in facts.items() if state in ('ACTIVE', 'SUPERSEDED'))
-    invalid = frozenset(key for key, state in facts.items() if state == 'SUPERSEDED')
     reassessed = frozenset(key for c in cases for key in c.evidence.seed_ids
-                           if key in scores and key not in positive and key not in invalid)
-    validity = Validity(checked, invalid, reassessed)
-    steps.lap('factRead', len(facts))
+                           if key in scores and key not in positive)
+    validity = Validity(reassessed)
     graphs = []
     for graph in batch.graphs:
         # Digests read only the semantic keys; the full document is rendered for payloads.
@@ -163,13 +157,10 @@ def _prepare_plans(connection, execution, batch, rows, scores, seeds, days, meta
             return None
         cleaned = []
         for source in sources:
-            source['transactions'] = [m for m in source['transactions'] if m['txId'] not in invalid]
-            source['seeds'] = [s for s in source['seeds'] if s['txId'] not in invalid | reassessed]
+            source['seeds'] = [s for s in source['seeds'] if s['txId'] not in reassessed]
             live_seeds = {s['txId'] for s in source['seeds']}
-            source['witnesses'] = [w for w in source['witnesses']
-                if not set(w['tx_ids']) & invalid and set(w['tx_ids']) & live_seeds]
-            source['boundaryWitnesses'] = [w for w in source.get('boundaryWitnesses', [])
-                if not set(w['tx_ids']) & invalid]
+            source['witnesses'] = [w for w in source['witnesses'] if set(w['tx_ids']) & live_seeds]
+            source['boundaryWitnesses'] = list(source.get('boundaryWitnesses', []))
             core = {key for w in source['witnesses'] for key in w['tx_ids']}
             source['seeds'] = [s for s in source['seeds'] if s['txId'] in core]
             for member in source['transactions']:

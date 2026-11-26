@@ -184,11 +184,10 @@ public class AlertQueryService {
     var core = new ArrayList<Object>();
     for (Object item : (List<?>) evidence.getOrDefault("transactions", List.of()))
       core.add(((Map<?, ?>) item).get("txId"));
-    String window =
-        " where t.occurred_at between ?::timestamptz and ?::timestamptz and t.integration_status='ACTIVE'";
+    String window = " where t.occurred_at between ?::timestamptz and ?::timestamptz";
     return jdbc.queryForObject(
         """
-        with f as (select (e->>'bankId')::int as bank_id,(e->>'accountId')::uuid as service_account_id
+        with f as (select (e->>'bankId')::int as bank_id,e->>'accountId' as service_account_id
                      from jsonb_array_elements(?::jsonb) e),
              acc as (select a.account_id from core.accounts a join f using(bank_id,service_account_id)),
              core as (select k.value::bigint as tx_id from jsonb_array_elements_text(?::jsonb) k)

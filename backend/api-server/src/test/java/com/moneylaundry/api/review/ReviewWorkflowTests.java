@@ -94,12 +94,12 @@ class ReviewWorkflowTests {
             Long.class);
     long account =
         jdbc.queryForObject(
-            "insert into core.accounts(bank_id,service_account_id,owner_id) values(999998,gen_random_uuid(),?) returning account_id",
+            "insert into core.accounts(bank_id,owner_id) values(999998,?) returning account_id",
             Long.class,
             owned);
     for (var item : items) {
       jdbc.update(
-          "insert into ledger.transactions(tx_id,occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date,integration_status) overriding system value values(?,'2023-09-01',?,?,100,'USD',100,'USD','ACH',100,'fx_rates_usd_v1','2023-09-01','HELD')",
+          "insert into ledger.transactions(tx_id,occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date) overriding system value values(?,'2023-09-01',?,?,100,'USD',100,'USD','ACH',100,'fx_rates_usd_v1','2023-09-01')",
           item.get("txId"),
           account,
           account);

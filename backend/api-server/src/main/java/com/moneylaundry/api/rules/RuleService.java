@@ -273,7 +273,7 @@ public class RuleService {
           out.put(
               "scannedCount",
               jdbc.queryForObject(
-                  "select count(*) from ledger.transactions where integration_status='ACTIVE' and business_date between ? and ?",
+                  "select count(*) from ledger.transactions where business_date between ? and ?",
                   Long.class,
                   scope[0],
                   scope[1]));

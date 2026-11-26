@@ -211,7 +211,7 @@ class RuleApiTests {
     for (int i = 0; i < 3; i++)
       accounts.add(
           jdbc.queryForObject(
-              "insert into core.accounts(bank_id,service_account_id,owner_id) values(999017,gen_random_uuid(),?) returning account_id",
+              "insert into core.accounts(bank_id,owner_id) values(999017,?) returning account_id",
               Long.class,
               owner));
     long job =

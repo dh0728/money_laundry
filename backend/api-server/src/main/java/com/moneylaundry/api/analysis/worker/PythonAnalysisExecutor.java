@@ -31,7 +31,6 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
   private final String mode;
   private final String storage;
   private java.util.Map<String, String> remoteEnvironment = java.util.Map.of();
-  private java.util.Map<String, String> ingestEnvironment = java.util.Map.of();
   private String analysisUser = "";
   private String analysisPassword = "";
 
@@ -41,24 +40,6 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
       @Value("${app.worker.db-password:}") String password) {
     analysisUser = username;
     analysisPassword = password;
-  }
-
-  @Autowired
-  void configureIngest(
-      @Value("${app.ingest.encryption-key:}") String encryption,
-      @Value("${app.ingest.search-key:}") String search,
-      @Value("${app.ingest.key-version:}") String version,
-      @Value("${app.ingest.fx-rate-version}") String fxVersion) {
-    ingestEnvironment =
-        java.util.Map.of(
-            "INGEST_ENCRYPTION_KEY",
-            encryption,
-            "INGEST_SEARCH_KEY",
-            search,
-            "INGEST_KEY_VERSION",
-            version,
-            "INGEST_FX_VERSION",
-            fxVersion);
   }
 
   @Autowired
@@ -121,20 +102,6 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
   }
 
   private String checkpoint(Context context) {
-    if (jdbc != null && context.stage() == AnalysisStage.INTEGRATE) {
-      var rows =
-          jdbc.queryForList(
-              """
-          select s.artifact from analysis.stage_results s join analysis.jobs j using(job_id)
-          where j.job_id=? and j.status='RUNNING' and j.current_stage='INTEGRATE'
-          and j.execution_id=? and s.stage='INTEGRATE' and s.execution_id=? and s.completed
-          """,
-              String.class,
-              context.jobId(),
-              context.executionId(),
-              context.executionId());
-      return rows.isEmpty() ? null : rows.getFirst();
-    }
     if (jdbc == null
         || context.runId() == null
         || !List.of(
@@ -197,36 +164,27 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
       var builder = new ProcessBuilder(command);
       builder.environment().put("WORKER_MODE", mode);
       builder.environment().putAll(remoteEnvironment);
-      if (context.stage() == AnalysisStage.INTEGRATE)
-        builder.environment().putAll(ingestEnvironment);
       if (database != null) {
-        boolean integrating = context.stage() == AnalysisStage.INTEGRATE;
-        if (!integrating && (analysisUser.isBlank() || analysisPassword.isBlank()))
+        if (analysisUser.isBlank() || analysisPassword.isBlank())
           throw new AnalysisFailure("WORKER_DB_CONFIGURATION", AnalysisFailure.Kind.PERMANENT);
         builder.environment().put("WORKER_DB_URL", workerDatabaseUrl(database.getJdbcUrl()));
+        builder.environment().put("WORKER_DB_USER", analysisUser);
+        builder.environment().put("WORKER_DB_PASSWORD", analysisPassword);
+        // Child processes inherit the API environment unless these are explicitly removed.
         builder
             .environment()
-            .put("WORKER_DB_USER", integrating ? database.getUsername() : analysisUser);
-        builder
-            .environment()
-            .put("WORKER_DB_PASSWORD", integrating ? database.getPassword() : analysisPassword);
-        if (!integrating) {
-          // Child processes inherit the API environment unless these are explicitly removed.
-          builder
-              .environment()
-              .keySet()
-              .removeIf(
-                  key ->
-                      key.startsWith("INGEST_")
-                          || key.startsWith("SPRING_DATASOURCE_")
-                          || key.equals("DB_PASSWORD")
-                          || key.equals("DB_USERNAME")
-                          || key.equals("DB_URL")
-                          || key.equals("PGPASSWORD")
-                          || key.equals("PGUSER")
-                          || key.startsWith("APP_INGEST_")
-                          || key.equals("SPRING_APPLICATION_JSON"));
-        }
+            .keySet()
+            .removeIf(
+                key ->
+                    key.startsWith("INGEST_")
+                        || key.startsWith("SPRING_DATASOURCE_")
+                        || key.equals("DB_PASSWORD")
+                        || key.equals("DB_USERNAME")
+                        || key.equals("DB_URL")
+                        || key.equals("PGPASSWORD")
+                        || key.equals("PGUSER")
+                        || key.startsWith("APP_INGEST_")
+                        || key.equals("SPRING_APPLICATION_JSON"));
         builder
             .environment()
             .put(
@@ -262,10 +220,6 @@ public class PythonAnalysisExecutor implements AnalysisStageExecutor {
             invalidScores ? "SCORES_MISMATCH" : "MODEL_TASK_FAILED",
             AnalysisFailure.Kind.PERMANENT);
       }
-      if (process.exitValue() == 81 && context.stage() == AnalysisStage.INTEGRATE)
-        throw new AnalysisDeferred();
-      if (process.exitValue() == 82 && context.stage() == AnalysisStage.INTEGRATE)
-        throw new AnalysisFailure("CUTOFF_SUPERSEDED", AnalysisFailure.Kind.PERMANENT);
       if (process.exitValue() == 78)
         throw new AnalysisFailure("PIPELINE_NOT_CONFIGURED", AnalysisFailure.Kind.PERMANENT);
       if (process.exitValue() == 80)

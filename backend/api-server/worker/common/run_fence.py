@@ -13,15 +13,6 @@ def lock_stage(connection, execution, stage='INFERENCE'):
     if row != (execution.execution_id, 'RUNNING', stage, execution.run_id, 'READY') and row != (
             execution.execution_id, 'RUNNING', stage, execution.run_id, 'ACTIVE'):
         raise StaleExecution('Worker owner is no longer current')
-    blocked = connection.execute('''
-        WITH RECURSIVE predecessors(run_id) AS (
-          SELECT replaces_run_id FROM analysis.run_replacements WHERE run_id=%s
-          UNION SELECT x.replaces_run_id FROM analysis.run_replacements x JOIN predecessors p ON x.run_id=p.run_id)
-        SELECT EXISTS(SELECT 1 FROM analysis.model_requests m JOIN predecessors p USING(run_id)
-          WHERE m.status NOT IN ('STOPPED','ALREADY_FINISHED','BLOCKED'))
-        ''', (execution.run_id,)).fetchone()[0]
-    if blocked:
-        raise StaleExecution('Previous run has not stopped')
 
 
 def save_checkpoint(connection, execution, stage, artifact):

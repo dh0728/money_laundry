@@ -3,18 +3,15 @@ package com.moneylaundry.api.analysis.freeze;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/** Called inside FREEZE_INPUT's integration lock and transaction. */
+/** Called inside FREEZE_INPUT's ingest lock and transaction. */
 @Component
 public class AlertInputSnapshot {
   static final String LEDGER_VALUES =
@@ -36,32 +33,20 @@ public class AlertInputSnapshot {
       from ledger.transactions t join core.accounts a on a.account_id=t.from_account_id
       join core.accounts b on b.account_id=t.to_account_id
       join core.owners e on e.owner_id=a.owner_id join core.owners f on f.owner_id=b.owner_id
-      where t.integration_status='ACTIVE' and t.tx_id=""";
+      where t.tx_id=""";
 
   /**
-   * Tables 거래 통합 fills. Right after their first load they have no statistics until autovacuum
-   * reaches them, and without statistics the planner once walked every report of a version for each
+   * Tables ledger loading fills. Right after their first load they have no statistics until
+   * autovacuum reaches them, and without statistics the planner can walk a whole table for each
    * transaction instead of looking the transaction up. A freeze analyzes those never analyzed.
    */
-  private static final List<String> INTEGRATED =
-      List.of(
-          "ledger.transactions",
-          "ledger.transaction_reports",
-          "private.bank_reports",
-          "core.accounts",
-          "core.owners",
-          "ingest.report_sets",
-          "ingest.report_versions",
-          "analysis.selected_versions");
+  private static final List<String> LOADED =
+      List.of("ledger.transactions", "core.accounts", "core.owners", "ingest.uploads");
 
   private final JdbcTemplate jdbc;
 
   public AlertInputSnapshot(JdbcTemplate jdbc) {
     this.jdbc = jdbc;
-  }
-
-  public void freeze(UUID run, Instant cutoff) {
-    freeze(run, cutoff, Set.of());
   }
 
   /**
@@ -82,49 +67,28 @@ public class AlertInputSnapshot {
         > 0) jdbc.execute("analyze frozen_input");
   }
 
-  public void freeze(UUID run, Instant cutoff, Set<Long> blockedSets) {
-    complete(run, cutoff, blockedSets, prepare(run, cutoff, blockedSets));
+  public void freeze(UUID run, Instant cutoff) {
+    complete(run, cutoff, prepare(run, cutoff));
   }
 
   /**
-   * Records the manifest and this run's input_seq and lists the transactions whose eligibility can
+   * Records the run's source files and input_seq and lists the transactions whose eligibility can
    * differ from the previous freeze (changed_input). TARGET selection reads the same list, so it
    * runs between this and {@link #complete}.
    */
-  public long prepare(UUID run, Instant cutoff, Set<Long> blockedSets) {
+  public long prepare(UUID run, Instant cutoff) {
     openFrozen(jdbc, run);
-    for (String table : INTEGRATED)
+    for (String table : LOADED)
       if (jdbc.queryForObject(
           "select reltuples<0 from pg_class where oid=?::regclass", Boolean.class, table))
         jdbc.execute("analyze " + table);
     freezeManifest(run, cutoff);
-    return changedInput(run, cutoff, blockedSets);
+    return changedInput(run, cutoff);
   }
 
-  public void complete(UUID run, Instant cutoff, Set<Long> blockedSets, long seq) {
-    freezeLedger(cutoff, blockedSets, seq);
+  public void complete(UUID run, Instant cutoff, long seq) {
+    freezeLedger(run, cutoff, seq);
     freezeAlerts(seq);
-    // The run's input is its own frozen rows plus the eligible set, which is the open ledger now.
-    // The second branch stops at the first eligible transaction of each report set.
-    jdbc.update(
-        """
-        insert into analysis.input_report_sets
-        select distinct ?::uuid,s.set_id from frozen_input i
-        cross join lateral (select rs.set_id from ledger.transaction_reports tr
-          join private.bank_reports br using(report_id) join ingest.report_versions rv using(version_id)
-          join ingest.report_sets rs on rs.set_id=rv.set_id and rs.current_version_id=rv.version_id
-          where tr.tx_id=i.tx_id offset 0) s
-        where i.run_id=?
-        union
-        select ?::uuid,s.set_id from ingest.report_sets s cross join lateral (
-          select 1 from private.bank_reports br join ledger.transaction_reports tr using(report_id)
-          join analysis.input_ledger l on l.tx_id=tr.tx_id and l.valid_to_seq is null
-          where br.version_id=s.current_version_id limit 1) eligible
-        on conflict do nothing
-        """,
-        run,
-        run,
-        run);
     freezeScores(run, seq);
     var dates =
         jdbc.queryForList(
@@ -142,19 +106,13 @@ public class AlertInputSnapshot {
       jdbc.update(
           """
           insert into analysis.input_coverage
-          select ?,?,count(*)::integer,
-            count(*) filter(where v.stage_status='ACTIVE' and v.self_valid and v.received_at<=?)::integer,
-            count(*)>0 and bool_and(coalesce(v.stage_status='ACTIVE' and v.self_valid and v.received_at<=?,false)),
-            coalesce(jsonb_agg(jsonb_build_object('bankId',sb.bank_id,'versionId',v.version_id,
-              'status',case when v.received_at<=? then v.stage_status else 'NOT_RECEIVED' end)), '[]'::jsonb)
-          from ingest.reporting_scope_banks sb left join ingest.report_sets rs on rs.bank_id=sb.bank_id and rs.business_date=sb.business_date
-          left join ingest.report_versions v on v.version_id=rs.current_version_id where sb.business_date=?
+          select ?,?,count(u.upload_id)>0,coalesce(sum(u.row_count),0)::integer
+          from analysis.source_manifest m join ingest.uploads u using(upload_id)
+          where m.run_id=? and u.business_date=?
           """,
           run,
           day,
-          Timestamp.from(cutoff),
-          Timestamp.from(cutoff),
-          Timestamp.from(cutoff),
+          run,
           day);
     }
   }
@@ -181,24 +139,29 @@ public class AlertInputSnapshot {
     return day;
   }
 
+  /** The loaded ledger files received by the cutoff: what this run's input stands on. */
+  private void freezeManifest(UUID run, Instant cutoff) {
+    jdbc.update(
+        """
+        insert into analysis.source_manifest(run_id,upload_id)
+        select ?,upload_id from ingest.uploads where status='COMPLETED' and received_at<=?
+        """,
+        run,
+        Timestamp.from(cutoff));
+  }
+
   /**
-   * Brings the shared input ledger to this cutoff and blocked sets and returns this run's
-   * input_seq. The ledger holds every eligible transaction (this run's TARGET included); run_inputs
-   * subtracts each run's own rows, so CONTEXT is every other eligible transaction.
+   * Brings the shared input ledger to this cutoff and returns this run's input_seq. The ledger
+   * holds every eligible transaction (this run's TARGET included); run_inputs subtracts each run's
+   * own rows, so CONTEXT is every other eligible transaction.
    *
-   * <p>Only transactions whose eligibility can differ from the previous freeze are re-evaluated
-   * (changed_input). Eligibility reads a transaction's status and time, the current version of its
-   * report sets and when that version was received; every writer of those bumps the set's
-   * generation or the version's revision, which the source manifest records. So the candidates are
-   * the transactions reported through any version of a set whose manifest entry differs between the
-   * two runs, of a set the manifest does not list (dated after the cutoff, or current version
-   * received after it), of a set blocked in either run, and those timed between the two cutoffs.
-   * The first freeze has no previous run and re-evaluates everything.
-   *
-   * <p>TARGET selection also depends on the versions the job selected, so a set this job selected
-   * and the previous run's job did not is a candidate as well.
+   * <p>A transaction is eligible when the file that loaded it was received by the cutoff (it is in
+   * the run's manifest) and it occurred by the cutoff. Loaded transactions never change, so only
+   * the transactions of files in one manifest but not the other, and those timed between the two
+   * cutoffs, can differ from the previous freeze. The first freeze has no previous run and
+   * re-evaluates everything.
    */
-  private long changedInput(UUID run, Instant cutoff, Set<Long> blockedSets) {
+  private long changedInput(UUID run, Instant cutoff) {
     long seq = jdbc.queryForObject("select nextval('analysis.input_seq')", Long.class);
     if (jdbc.queryForObject("select coalesce(max(input_seq),0) from analysis.runs", Long.class)
         >= seq) throw new IllegalStateException("INPUT_LEDGER_ORDER");
@@ -211,57 +174,30 @@ public class AlertInputSnapshot {
             .findFirst()
             .orElse(null);
     Timestamp at = Timestamp.from(cutoff);
-    String blockedIds =
-        blockedSets.stream().map(String::valueOf).collect(Collectors.joining(",", "{", "}"));
     jdbc.update(
-        "update analysis.runs set input_seq=?,input_cutoff_at=?,input_blocked_sets=?::bigint[] where run_id=?",
-        seq,
-        at,
-        blockedIds,
-        run);
-    jdbc.execute("create temp table changed_sets(set_id bigint primary key) on commit drop");
+        "update analysis.runs set input_seq=?,input_cutoff_at=? where run_id=?", seq, at, run);
+    jdbc.execute("create temp table changed_uploads(upload_id bigint primary key) on commit drop");
     jdbc.update(
         """
-        insert into changed_sets
-        with was as (select (e->>'setId')::bigint as set_id,e from analysis.source_manifest m
-            cross join lateral jsonb_array_elements(m.state->'reports') e where m.run_id=?),
-          stands as (select (e->>'setId')::bigint as set_id,e from analysis.source_manifest m
-            cross join lateral jsonb_array_elements(m.state->'reports') e where m.run_id=?)
-        select set_id from was full join stands using(set_id) where was.e is distinct from stands.e
-        union select set_id from ingest.report_sets
-          where business_date>(?::timestamptz at time zone 'Asia/Seoul')::date
-        union select rs.set_id from ingest.report_sets rs
-          join ingest.report_versions rv on rv.version_id=rs.current_version_id where rv.received_at>?
-        union select unnest(?::bigint[])
-        union select unnest(input_blocked_sets) from analysis.runs where run_id=?
-        union select sv.set_id from analysis.runs r join analysis.selected_versions sv using(job_id)
-          where r.run_id=? and not exists(select 1 from analysis.runs p
-            join analysis.selected_versions was using(job_id)
-            where p.run_id=? and was.set_id=sv.set_id and was.version_id=sv.version_id)
+        insert into changed_uploads
+        select upload_id from (select upload_id from analysis.source_manifest where run_id=?) was
+        full join (select upload_id from analysis.source_manifest where run_id=?) stands using(upload_id)
+        where was.upload_id is null or stands.upload_id is null
         """,
         previous,
-        run,
-        at,
-        at,
-        blockedIds,
-        previous,
-        run,
-        previous);
-    jdbc.execute("analyze changed_sets");
+        run);
+    jdbc.execute("analyze changed_uploads");
     jdbc.execute("create temp table changed_input(tx_id bigint primary key) on commit drop");
     jdbc.update(
         """
         insert into changed_input
-        select tr.tx_id from changed_sets s join ingest.report_versions v using(set_id)
-          cross join lateral (select br.report_id from private.bank_reports br
-            where br.version_id=v.version_id offset 0) br
-          cross join lateral (select tr.tx_id from ledger.transaction_reports tr
-            where tr.report_id=br.report_id offset 0) tr
+        select t.tx_id from changed_uploads u
+          cross join lateral (select t.tx_id from ledger.transactions t
+            where t.upload_id=u.upload_id offset 0) t
         union
         select t.tx_id from ledger.transactions t cross join (select coalesce(
             (select input_cutoff_at from analysis.runs where run_id=?),'-infinity') as at) was
-        where t.integration_status='ACTIVE'
-          and t.occurred_at>least(was.at,?) and t.occurred_at<=greatest(was.at,?)
+        where t.occurred_at>least(was.at,?) and t.occurred_at<=greatest(was.at,?)
         """,
         previous,
         at,
@@ -270,18 +206,7 @@ public class AlertInputSnapshot {
     return seq;
   }
 
-  private void freezeLedger(Instant cutoff, Set<Long> blockedSets, long seq) {
-    Timestamp at = Timestamp.from(cutoff);
-    String blocked = "";
-    var inputArgs = new ArrayList<Object>(List.of(at));
-    if (!blockedSets.isEmpty()) {
-      blocked =
-          "and (select count(*) from (select 1 from ledger.transaction_reports blocked_tr join private.bank_reports blocked_br using(report_id) join ingest.report_versions blocked_v using(version_id) where blocked_tr.tx_id=k.tx_id and blocked_v.set_id in ("
-              + String.join(",", Collections.nCopies(blockedSets.size(), "?"))
-              + ") limit 1) hit)=0";
-      inputArgs.addAll(blockedSets);
-    }
-    inputArgs.addAll(List.of(at, at));
+  private void freezeLedger(UUID run, Instant cutoff, long seq) {
     jdbc.execute(
         "create temp table desired_input on commit drop as select "
             + LEDGER_VALUES
@@ -290,26 +215,21 @@ public class AlertInputSnapshot {
         """
         with eligible as materialized (
           select k.tx_id from changed_input k
-          cross join lateral (select rv.received_at from ledger.transactions t
-            join ledger.transaction_reports tr using(tx_id)
-            join private.bank_reports br using(report_id)
-            join ingest.report_versions rv using(version_id)
-            join ingest.report_sets rs on rs.set_id=rv.set_id and rs.current_version_id=rv.version_id
-            where t.tx_id=k.tx_id and t.integration_status='ACTIVE' and t.occurred_at<=? offset 0) rv
-          where true %s
-          group by k.tx_id
-          having bool_or(rv.received_at<=?) and not bool_or(rv.received_at>?)
+          cross join lateral (select 1 from ledger.transactions t
+            join analysis.source_manifest m on m.upload_id=t.upload_id and m.run_id=?
+            where t.tx_id=k.tx_id and t.occurred_at<=? offset 0) source
         )
         insert into desired_input
         select v.* from eligible c cross join lateral (%s c.tx_id offset 0) v
         """
-            .formatted(blocked, LEDGER_ROW),
-        inputArgs.toArray());
+            .formatted(LEDGER_ROW),
+        run,
+        Timestamp.from(cutoff));
     analyzeDesired("input", "tx_id");
     syncLedger("analysis.input_ledger", "input", "tx_id", LEDGER_VALUES, seq, "changed_input");
   }
 
-  /** Published Alert versions and the integration status of their member transactions. */
+  /** Published Alert versions. */
   private void freezeAlerts(long seq) {
     jdbc.execute(
         """
@@ -319,15 +239,6 @@ public class AlertInputSnapshot {
     analyzeDesired("origins", "alert_id");
     syncLedger(
         "analysis.alert_origin_ledger", "origins", "alert_id", "alert_id,version", seq, null);
-    jdbc.execute(
-        """
-        create temp table desired_facts on commit drop as
-        select distinct t.tx_id,t.integration_status from desired_origins o
-        join review.alert_transactions m on m.alert_id=o.alert_id and m.version=o.version
-        join ledger.transactions t using(tx_id)
-        """);
-    analyzeDesired("facts", "tx_id");
-    syncLedger("analysis.fact_ledger", "facts", "tx_id", "tx_id,integration_status", seq, null);
   }
 
   /**
@@ -445,28 +356,5 @@ public class AlertInputSnapshot {
         "insert into %s(valid_from_seq,%s) select ?,d.* from %s d left join %s o on o.%s=d.%s and %s where o.%s is null"
             .formatted(ledger, columns, desired, open, key, key, same, key),
         seq);
-  }
-
-  private void freezeManifest(UUID run, Instant cutoff) {
-    jdbc.update(
-        """
-        insert into analysis.source_manifest(run_id,business_date,state)
-        select ?,d.business_date,jsonb_build_object(
-          'scopeRevision',s.scope_revision,
-          'banks',coalesce((select jsonb_agg(sb.bank_id order by sb.bank_id)
-            from ingest.reporting_scope_banks sb where sb.business_date=d.business_date),'[]'::jsonb),
-          'reports',coalesce((select jsonb_agg(jsonb_build_object(
-            'setId',rs.set_id,'bankId',rs.bank_id,'versionId',rv.version_id,
-            'revision',rv.revision,'generation',rs.generation,'status',rv.stage_status)
-            order by rs.set_id) from ingest.report_sets rs
-            join ingest.report_versions rv on rv.version_id=rs.current_version_id
-            where rs.business_date=d.business_date and rv.received_at<=?),'[]'::jsonb))
-        from (select business_date from ingest.reporting_scopes union select business_date from ingest.report_sets) d
-        left join ingest.reporting_scopes s using(business_date)
-        where d.business_date <= (?::timestamptz at time zone 'Asia/Seoul')::date
-        """,
-        run,
-        Timestamp.from(cutoff),
-        Timestamp.from(cutoff));
   }
 }

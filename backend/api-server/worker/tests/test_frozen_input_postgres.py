@@ -88,6 +88,9 @@ class FrozenInputPostgresTests(unittest.TestCase):
         with cls.admin.transaction():
             for script in sorted(migrations.glob('V*__*.sql'), key=lambda p: int(p.name[1:].split('__')[0])):
                 cls.admin.execute(script.read_text(encoding='utf-8-sig'))
+            # Fixtures write ledger rows directly; give them a loaded file and account numbers.
+            cls.admin.execute((Path(__file__).resolve().parents[2]
+                               / 'src/test/resources/test_ledger_defaults.sql').read_text(encoding='utf-8'))
         from configure_analysis_db import configure
         cls.worker_user = 'analysis_fixture'
         cls.worker_password = secrets.token_urlsafe(32)
@@ -124,9 +127,9 @@ class FrozenInputPostgresTests(unittest.TestCase):
             RETURNING owner_id
             """, (uuid4(), uuid4().hex)).fetchone()[0]
         account = self.admin.execute("""
-            INSERT INTO core.accounts(bank_id,service_account_id,owner_id) VALUES(12,%s,%s)
+            INSERT INTO core.accounts(bank_id,owner_id) VALUES(12,%s)
             RETURNING account_id
-            """, (uuid4(), entity)).fetchone()[0]
+            """, (entity,)).fetchone()[0]
         self.ids = []
         for role in ("TARGET", "TARGET", "TARGET", "CONTEXT"):
             tx = self.admin.execute("""
@@ -141,7 +144,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
                   from_owner_id,to_owner_id,amount_received,receiving_currency,
                   amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version)
                 VALUES(%s,%s,%s,now(),'2022-09-01',12,12,%s,%s,%s,%s,1,'USD',1,'USD','ACH',1,'test')
-                """, (self.run, tx, role, uuid4(), uuid4(), uuid4(), uuid4()))
+                """, (self.run, tx, role, '12-0001', '12-0001', uuid4(), uuid4()))
             if role == "TARGET":
                 self.ids.append(tx)
                 self.admin.execute("INSERT INTO analysis.target_ownership VALUES(%s,%s)",(tx,self.run))
@@ -182,15 +185,6 @@ class FrozenInputPostgresTests(unittest.TestCase):
         ids = [i for page in self.source.target_pages() for i in page]
         self.assertEqual(ids, self.ids)
 
-    def test_committed_cancellation_between_pages_is_observed(self):
-        batches = self.source.target_pages()
-        self.assertEqual(len(next(batches)), 2)
-        with self.admin.transaction():
-            self.admin.execute("UPDATE analysis.runs SET status='CANCEL_REQUESTED' WHERE run_id=%s",
-                               (self.run,))
-        with self.assertRaises(StaleExecution):
-            next(batches)
-
     def test_new_execution_token_between_pages_is_observed(self):
         batches = self.source.target_pages()
         next(batches)
@@ -210,12 +204,6 @@ class FrozenInputPostgresTests(unittest.TestCase):
         with self.assertRaises(StaleExecution):
             next(batches)
 
-    def test_final_check_observes_cancellation_after_last_page(self):
-        list(self.source.target_pages())
-        self.admin.execute("UPDATE analysis.runs SET status='CANCELLED' WHERE run_id=%s", (self.run,))
-        with self.assertRaises(StaleExecution):
-            self.source.check_current()
-
     def test_empty_target_run_creates_no_file(self):
         self.admin.execute("DELETE FROM analysis.target_ownership WHERE run_id=%s",(self.run,))
         self.admin.execute("DELETE FROM analysis.input_transactions WHERE run_id=%s AND input_role='TARGET'",
@@ -226,12 +214,9 @@ class FrozenInputPostgresTests(unittest.TestCase):
         self.assertEqual(output.getvalue(), b"")
 
     def annotate_demo(self, ids):
-        upload = self.admin.execute("INSERT INTO ingest.uploads(bank_id,file_name,file_hash,size_bytes,business_date,status) VALUES(12,'fixture.csv',repeat('a',64),1,'2022-09-01','COMPLETED') RETURNING upload_id").fetchone()[0]
-        report_set = self.admin.execute("INSERT INTO ingest.report_sets(bank_id,business_date) VALUES(12,'2022-09-01') ON CONFLICT(bank_id,business_date) DO UPDATE SET bank_id=excluded.bank_id RETURNING set_id").fetchone()[0]
-        version = self.admin.execute("INSERT INTO ingest.report_versions(set_id,upload_id,version_no,received_at,stage_status) VALUES(%s,%s,%s,now(),'ACTIVE') RETURNING version_id", (report_set, upload, upload)).fetchone()[0]
         for i, tx_id in enumerate(ids):
-            report = self.admin.execute("INSERT INTO private.bank_reports(version_id,source_row) VALUES(%s,%s) RETURNING report_id", (version, i + 2)).fetchone()[0]
-            self.admin.execute("INSERT INTO evaluation.report_labels VALUES(%s,%s)", (report, i != 1))
+            self.admin.execute("""INSERT INTO evaluation.transaction_labels(tx_id,is_laundering) VALUES(%s,%s)
+                ON CONFLICT(tx_id) DO UPDATE SET is_laundering=excluded.is_laundering""", (tx_id, i != 1))
 
     def test_legacy_hints_do_not_affect_random_input(self):
         from models.demo_random.spec import MODEL_VERSION
@@ -245,7 +230,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
                                  ['tx_id', 'demo_value'])
             self.assertEqual(result, json.loads(prepare_features(self.admin, self.execution, root)))
         with self.assertRaises(self.psycopg.errors.InsufficientPrivilege):
-            self.reader.execute('SELECT * FROM evaluation.report_labels')
+            self.reader.execute('SELECT * FROM evaluation.transaction_labels')
 
     def test_prepared_legacy_version_is_preserved_on_retry(self):
         from models.demo_random.spec import LEGACY_MODEL_VERSION
@@ -328,33 +313,6 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.admin.execute("UPDATE analysis.jobs SET execution_id=%s WHERE job_id=%s", (new_token, self.job))
             retry = prepare_features(self.admin, InputExecution(self.job, self.run, new_token), root)
             self.assertEqual(retry, saved)
-            self.assertEqual(len(list(Path(root).rglob("*.parquet"))), 3)
-            self.assertEqual(list(Path(root).rglob("*.partial")), [])
-
-    def test_cancel_before_checkpoint_does_not_complete_stage(self):
-        from features import prepare_features as pipeline
-        original_save = pipeline._save_prepared
-        def cancel_then_save(connection, execution, kind, token, document, *stage):
-            # Commit on another connection after the file and staging rows exist.
-            # Cancelling inside the writer's own transaction would roll back the
-            # cancellation itself and would not exercise a real correction race.
-            with self.psycopg.connect(**self.connect_args) as other:
-                other.execute("UPDATE analysis.runs SET status='CANCELLED' WHERE run_id=%s",
-                              (self.run,))
-            original_save(connection, execution, kind, token, document, *stage)
-        with tempfile.TemporaryDirectory(prefix="aml-worker-test-") as root:
-            with patch.object(pipeline, "_save_prepared", side_effect=cancel_then_save):
-                with self.assertRaises(StaleExecution):
-                    prepare_features(self.admin, self.execution, root)
-            self.assertIsNone(self.admin.execute(
-                "SELECT 1 FROM analysis.stage_results WHERE run_id=%s", (self.run,)).fetchone())
-            self.assertEqual(self.admin.execute(
-                "SELECT status FROM analysis.runs WHERE run_id=%s", (self.run,)).fetchone()[0], "CANCELLED")
-            self.assertEqual(self.admin.execute(
-                "SELECT count(*) FROM analysis.features WHERE run_id=%s", (self.run,)).fetchone()[0], 0)
-            self.assertEqual(self.admin.execute(
-                "SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND input_artifact IS NOT NULL",
-                (self.run,)).fetchone()[0], 0)
             self.assertEqual(len(list(Path(root).rglob("*.parquet"))), 3)
             self.assertEqual(list(Path(root).rglob("*.partial")), [])
 
@@ -448,37 +406,6 @@ class FrozenInputPostgresTests(unittest.TestCase):
                 publish_model(self.admin, self.execution, 'BINARY', root, replace(settings, prefix='another/'), s3)
             self.assertEqual(self.admin.execute("SELECT phase,status FROM analysis.model_tasks WHERE run_id=%s AND model_kind='BINARY'", (self.run,)).fetchone(), ('PUBLISH', 'FAILED'))
 
-    def test_cancellation_after_s3_upload_prevents_remote_submission(self):
-        import httpx
-        from inference.model_publication import publish_model
-        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
-            settings, s3 = self.publication_setup(root)
-            def cancel_before_http(*args, **kwargs):
-                with self.psycopg.connect(**self.connect_args) as other:
-                    other.execute("UPDATE analysis.runs SET status='CANCELLED' WHERE run_id=%s", (self.run,))
-                return 'https://objects.example/test'
-            s3.generate_presigned_url = cancel_before_http
-            calls = []
-            with self.assertRaises(StaleExecution):
-                publish_model(self.admin, self.execution, 'BINARY', root, settings, s3,
-                              transport=httpx.MockTransport(lambda request: calls.append(request)))
-            self.assertEqual(calls, [])
-            self.assertEqual(self.admin.execute("SELECT status FROM analysis.model_requests WHERE run_id=%s", (self.run,)).fetchone()[0], 'REGISTERED')
-
-    def test_cancellation_after_remote_acceptance_blocks_local_wait_commit(self):
-        import httpx
-        from inference.model_publication import publish_model
-        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
-            settings, s3 = self.publication_setup(root)
-            def cancelled(request):
-                with self.psycopg.connect(**self.connect_args) as other:
-                    other.execute("UPDATE analysis.runs SET status='CANCEL_REQUESTED' WHERE run_id=%s", (self.run,))
-                return httpx.Response(202, json={**json.loads(request.content), 'status': 'QUEUED'})
-            with self.assertRaises(StaleExecution):
-                publish_model(self.admin, self.execution, 'BINARY', root, settings, s3, transport=httpx.MockTransport(cancelled))
-            self.assertEqual(self.admin.execute("SELECT status FROM analysis.model_requests WHERE run_id=%s", (self.run,)).fetchone()[0], 'PUBLISHED')
-            self.assertEqual(self.admin.execute("SELECT phase FROM analysis.model_tasks WHERE run_id=%s AND model_kind='BINARY'", (self.run,)).fetchone()[0], 'PUBLISH')
-
     def test_single_entry_dispatches_publication_without_completing_inference(self):
         import httpx
         from analysis_entry import main
@@ -500,19 +427,6 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertEqual(self.admin.execute("SELECT phase,status FROM analysis.model_tasks WHERE run_id=%s AND model_kind='TYPE'", (self.run,)).fetchone(), ('WAIT_REMOTE', 'WAITING'))
             self.assertIsNone(self.admin.execute("SELECT 1 FROM analysis.stage_results WHERE run_id=%s AND stage='INFERENCE'", (self.run,)).fetchone())
-
-    def test_unstopped_predecessor_blocks_publication_without_side_effects(self):
-        from inference.model_publication import publish_model
-        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
-            settings, s3 = self.publication_setup(root)
-            old = uuid4()
-            self.admin.execute("INSERT INTO analysis.runs(run_id,job_id,status) VALUES(%s,%s,'CANCEL_REQUESTED')", (old, self.job))
-            self.admin.execute("INSERT INTO analysis.run_replacements VALUES(%s,%s)", (self.run, old))
-            self.admin.execute("INSERT INTO analysis.model_requests VALUES(%s,1,%s,'BINARY','PUBLISHED')", (uuid4(), old))
-            with self.assertRaises(StaleExecution):
-                publish_model(self.admin, self.execution, 'BINARY', root, settings, s3)
-            self.assertEqual(s3.objects, {})
-            self.assertEqual(self.admin.execute("SELECT count(*) FROM analysis.model_requests WHERE run_id=%s", (self.run,)).fetchone()[0], 0)
 
     def inference_remote(self, s3):
         import httpx
@@ -970,7 +884,7 @@ class FrozenInputPostgresTests(unittest.TestCase):
                     occurred_at='2022-09-01 12:00+09'::timestamptz + %s * interval '10 minutes'
                 WHERE run_id=%s AND tx_id=%s''',
                 (accounts[index], accounts[index+1], index, self.run, key))
-        self.admin.execute("INSERT INTO analysis.input_coverage VALUES(%s,'2022-09-01',1,1,true,'[]')", (self.run,))
+        self.admin.execute("INSERT INTO analysis.input_coverage VALUES(%s,'2022-09-01',true,1)", (self.run,))
         self.admin.execute("INSERT INTO core.users(username,name,role,password_hash) VALUES(%s,'Demo','STAFF','test')", (uuid4().hex,))
         with tempfile.TemporaryDirectory(prefix='aml-label-pipeline-') as root:
             settings, s3 = self.collected_results(root)
@@ -1048,20 +962,6 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.assertEqual(self.admin.execute('SELECT count(*) FROM analysis.scores JOIN analysis.runs USING(run_id) WHERE job_id=%s', (self.job,)).fetchone()[0], 3)
             self.assertEqual(self.admin.execute('SELECT count(*) FROM analysis.model_requests WHERE run_id=%s', (self.run,)).fetchone()[0], 2)
 
-    def test_cancel_after_score_staging_blocks_every_persistent_write(self):
-        from scores import result_collection
-        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
-            settings, s3 = self.collected_results(root)
-            self.scoring_stage()
-            stage = result_collection._stage
-            def cancel(*args):
-                stage(*args)
-                if args[2] == 'TYPE':
-                    self.admin.execute("UPDATE analysis.runs SET status='CANCEL_REQUESTED' WHERE run_id=%s", (self.run,))
-            with patch('scores.result_collection._stage', side_effect=cancel), self.assertRaises(StaleExecution):
-                result_collection.save_scores(self.admin, self.execution, root, settings, s3)
-            self.assertEqual(self.admin.execute('SELECT count(*) FROM analysis.scores JOIN analysis.runs USING(run_id) WHERE job_id=%s', (self.job,)).fetchone()[0], 0)
-
     def test_collection_rejects_corrupt_file_but_preserves_peer_and_request(self):
         from inference.inference_dispatch import advance
         from scores.result_collection import _download
@@ -1137,21 +1037,6 @@ class FrozenInputPostgresTests(unittest.TestCase):
             self.assertEqual(self.admin.execute('SELECT p_laundering,score_pct FROM analysis.scores JOIN analysis.runs USING(run_id) WHERE job_id=%s ORDER BY tx_id', (self.job,)).fetchall(), [(0.5, 0.0), (0.5, 0.0), (0.9, 100.0)])
             self.assertEqual(self.admin.execute('SELECT suspicious_tx_count FROM analysis.jobs WHERE job_id=%s', (self.job,)).fetchone()[0], 3)
 
-    def test_collection_cancel_after_download_does_not_publish_artifact(self):
-        from inference.inference_dispatch import advance
-        from scores.result_collection import _download
-        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
-            settings, s3 = self.publication_setup(root)
-            remote, states = self.inference_remote(s3)
-            advance(self.admin, self.execution, root, settings, s3, transport=remote)
-            states.update(BINARY=('COMPLETED', 2), TYPE=('COMPLETED', 2))
-            def cancel(*args):
-                _download(*args)
-                self.admin.execute("UPDATE analysis.runs SET status='CANCEL_REQUESTED' WHERE run_id=%s", (self.run,))
-            with patch('scores.result_collection._download', side_effect=cancel), self.assertRaises(StaleExecution):
-                advance(self.admin, self.execution, root, settings, s3, transport=remote)
-            self.assertEqual(self.admin.execute('SELECT count(*) FROM analysis.model_tasks WHERE run_id=%s AND result_artifact IS NOT NULL', (self.run,)).fetchone()[0], 0)
-
     def test_abandoned_collection_is_fenced_and_new_parent_recovers_same_request(self):
         from inference.inference_dispatch import advance
         with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
@@ -1181,25 +1066,6 @@ class FrozenInputPostgresTests(unittest.TestCase):
             with self.assertRaisesRegex(ProtocolError, 'eligible'):
                 save_scores(self.admin, self.execution, root, settings, s3)
             self.assertEqual(self.admin.execute('SELECT count(*) FROM analysis.scores JOIN analysis.runs USING(run_id) WHERE job_id=%s', (self.job,)).fetchone()[0], 0)
-
-    def test_explicit_replacement_preserves_cancelled_run_scores(self):
-        from scores.result_collection import save_scores
-        with tempfile.TemporaryDirectory(prefix='aml-worker-test-') as root:
-            settings, s3 = self.collected_results(root)
-            self.scoring_stage()
-            previous = uuid4()
-            other = self.admin.execute("INSERT INTO analysis.jobs(analysis_date,business_at,analysis_cutoff_at,threshold_value,current_stage,status) VALUES(date '2100-01-01'+nextval('core.work_id')::int,now(),now(),.7,'FEATURES','FAILED') RETURNING job_id").fetchone()[0]
-            self.admin.execute("INSERT INTO analysis.runs(run_id,job_id,status) VALUES(%s,%s,'CANCELLED')", (previous, other))
-            self.admin.execute('UPDATE analysis.jobs SET current_run_id=%s WHERE job_id=%s', (previous, other))
-            self.admin.execute('INSERT INTO analysis.run_replacements(run_id,replaces_run_id) VALUES(%s,%s)', (self.run, previous))
-            self.admin.execute("INSERT INTO analysis.input_transactions SELECT %s,tx_id,input_role,occurred_at,business_date,from_bank_id,to_bank_id,from_account_id,to_account_id,from_owner_id,to_owner_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version FROM analysis.input_transactions WHERE run_id=%s AND tx_id=%s",(previous,self.run,self.ids[0]))
-            self.admin.execute('''INSERT INTO analysis.scores(type_class,tx_id,run_id,p_laundering,p_0,p_1,p_2,p_3,p_4,p_5,p_6,p_7,p_8)
-                VALUES(%s,%s,%s,0.8,1,0,0,0,0,0,0,0,0)''', (0, self.ids[0], previous))
-            save_scores(self.admin, self.execution, root, settings, s3)
-            self.assertEqual(self.admin.execute('SELECT p_laundering FROM analysis.scores JOIN analysis.runs USING(run_id) WHERE job_id=%s', (other,)).fetchone()[0], 0.8)
-            self.assertIsNone(self.admin.execute('SELECT run_id FROM analysis.current_scores WHERE tx_id=%s', (self.ids[0],)).fetchone())
-            self.assertEqual(self.admin.execute('SELECT count(*) FROM analysis.scores JOIN analysis.runs USING(run_id) WHERE job_id=%s', (self.job,)).fetchone()[0], 3)
-
 
     def placeholder_setup(self, root):
         from dataclasses import replace
