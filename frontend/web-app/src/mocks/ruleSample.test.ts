@@ -5,7 +5,7 @@ import {
   fetchRuleCatalog, fetchRules, requestBacktest, saveRuleDraft, validateRule, type RuleDefinition,
 } from '@/api/rules'
 import { previewAdmin, previewStaff, setPreviewUser } from '@/features/auth/preview-session-user'
-import { sampleCheckNote, sampleReadOnlyNote } from './ruleSample'
+import { sampleReadOnlyNote } from './ruleSample'
 
 // 서버 없이 실행할 때(VITE_API_MODE 가 live 가 아닐 때) 룰 API 가 주는 샘플 응답.
 // 화면은 서버에 붙였을 때와 같은 것이고, 요청은 하나도 나가지 않는다.
@@ -24,7 +24,9 @@ const definitionOf = async (key: string): Promise<RuleDefinition> => {
 
 it('목록의 룰마다 상세가 있고 상태별 개수가 목록과 맞는다', async () => {
   const list = await fetchRules()
-  expect(list.content.map(row => row.code)).toEqual(['RULE-001', 'RULE-002', 'RULE-003', 'RULE-004', 'RULE-005', 'RULE-006', 'RULE-007'])
+  expect(list.content.map(row => row.code)).toEqual([
+    'RULE-001', 'RULE-002', 'RULE-003', 'RULE-004', 'RULE-005', 'RULE-006', 'RULE-007', 'RULE-008', 'RULE-009',
+  ])
   for (const [status, count] of Object.entries(list.counts)) expect(list.content.filter(row => row.status === status)).toHaveLength(count)
   for (const row of list.content) {
     const detail = await fetchRule(row.ruleId)
@@ -59,16 +61,54 @@ it('샘플 룰의 버전 조건도 검증 결과가 있어 룰 만들기에서 �
   expect(check.sentence).toBe(draft.sentence)
 })
 
-it('고친 조건은 검사하지 않고 그렇다고 알린다', async () => {
+it('고친 조건의 값과 기간을 문장과 검토 항목에 반영한다', async () => {
   const definition = await definitionOf('FAN_OUT')
   definition.windowMinutes = 1440
-  const failure = await validateRule({ template: 'FAN_OUT', definition }).catch(error => error)
-  expect(failure).toBeInstanceOf(ApiError)
-  expect(failure.problem.detail).toBe(sampleCheckNote)
+  definition.where.items = [{ metric: 'DISTINCT_COUNTERPARTIES', value: 8, cmp: 'GT' }]
+  const check = await validateRule({ template: 'FAN_OUT', definition })
+  expect(check.sentence).toContain('한 송금 계좌에서 24시간 안에 서로 다른 수취 계좌 수가 8개 초과이면')
+  expect(check.items).toEqual([
+    expect.objectContaining({ key: 'FORMAT', ok: true }), expect.objectContaining({ key: 'CONDITIONS', ok: true }),
+    expect.objectContaining({ key: 'DATA', ok: true, message: expect.stringContaining('샘플 원장') }),
+    expect.objectContaining({ key: 'COST', ok: true, message: expect.stringContaining('24시간') }),
+  ])
+  expect(check.canRun).toBe(true)
+  expect(fetcher).not.toHaveBeenCalled()
+})
+
+it('값이 비었거나 범위를 넘으면 조건 오류를 보여 주고 입력한 정의의 미리보기는 유지한다', async () => {
+  const definition = await definitionOf('FAN_OUT')
+  definition.where.items = [{ metric: 'DISTINCT_COUNTERPARTIES', cmp: 'GTE' }, { metric: 'TX_COUNT', value: 0, cmp: 'LTE' }]
+  const check = await validateRule({ template: 'FAN_OUT', definition })
+  expect(check).toMatchObject({ canSave: true, canRun: false })
+  expect(check.sentence).toContain('서로 다른 수취 계좌 수가 ?개 이상이고 거래 건수가 0건 이하이면')
+  expect(check.items.find(item => item.key === 'CONDITIONS')?.errors).toEqual([
+    expect.stringContaining('값이 비어 있습니다'), expect.stringContaining('범위'),
+  ])
+})
+
+it('묶음의 연결 방식, 경로 값과 실행 비용 오류도 반영한다', async () => {
+  const definition = await definitionOf('RANDOM')
+  definition.filter.items = [{ op: 'ANY', items: [{ field: 'FIRST_PAIR' }, { field: 'FX_FOLLOW' }] }]
+  definition.path = { ...definition.path, maxHops: 13, stepRatioMin: 0.9 }
+  const check = await validateRule({ template: 'RANDOM', definition })
+  expect(check.sentence).toContain('(처음 거래하는 상대 또는 환전 직후 송금)인 거래만 세어')
+  expect(check.sentence).toContain('금액 비 0.9 ~ 1.25로 이어진 거래가 3건 이상(13건까지 따라감)이면')
+  expect(check).toMatchObject({ canSave: true, canRun: false })
+  expect(check.items.find(item => item.key === 'COST')?.errors[0]).toContain('12건')
+})
+
+it('목록에 없는 비교를 입력하면 형식 오류로 처리한다', async () => {
+  const definition = await definitionOf('FAN_OUT')
+  definition.where.items = [{ metric: 'DISTINCT_COUNTERPARTIES', value: 8, cmp: 'UNKNOWN' }]
+  const check = await validateRule({ template: 'FAN_OUT', definition })
+  expect(check).toMatchObject({ canSave: false, canRun: false, sentence: null, summary: null })
+  expect(check.items[0]).toMatchObject({ key: 'FORMAT', ok: false, errors: [expect.stringContaining('비교')] })
 })
 
 it('저장 · 명령 · 복제 · 백테스트 실행은 받지 않고 샘플이라고 알린다', async () => {
   const definition = await definitionOf('FAN_OUT')
+  const original = await fetchRules()
   const writes = [
     () => createRule({ name: '새 룰', template: 'FAN_OUT' }), () => saveRuleDraft(1, 8, { name: '분산 송금 감시', definition, revision: 0 }),
     () => createRuleVersion(2), () => cloneRule(2), () => commandRule(4, { action: 'APPROVE', versionId: 4, revision: 0 }),
@@ -79,7 +119,7 @@ it('저장 · 명령 · 복제 · 백테스트 실행은 받지 않고 샘플이
     expect(failure).toBeInstanceOf(ApiError)
     expect(failure.problem).toMatchObject({ code: 'SAMPLE_READ_ONLY', detail: sampleReadOnlyNote })
   }
-  expect((await fetchRules()).content).toHaveLength(7)
+  expect(await fetchRules()).toEqual(original)
   expect(fetcher).not.toHaveBeenCalled()
 })
 
@@ -105,9 +145,12 @@ it('백테스트 기록의 줄마다 결과가 있고 운영 버전과 비교한
 })
 
 it('응답을 고쳐 써도 샘플은 그대로다', async () => {
+  const original = await fetchRules()
   const list = await fetchRules()
+  list.content.find(row => row.code === 'RULE-009')!.name = '응답에서 바꾼 이름'
+  list.counts.ACTIVE = 0
   list.content.length = 0
-  expect((await fetchRules()).content).toHaveLength(7)
+  expect(await fetchRules()).toEqual(original)
 })
 
 it('없는 번호는 404 로 답하고 샘플 사건에는 걸린 룰이 없다', async () => {

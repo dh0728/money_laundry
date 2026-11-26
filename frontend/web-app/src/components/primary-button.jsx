@@ -29,21 +29,15 @@ export function WorkTabAddButton({ code, className = '', disabled, inline = fals
   </ActionButton>;
 }
 
-export function PrimaryButton({ children, className = '', disabled, radius, size, style, tone, onClick, onHold, ...buttonProps }) {
-  const buttonStyle = {
-    borderRadius: radius == null ? undefined : Math.max(0, radius),
-    ...style,
-  };
+export function PrimaryButton({ children, className = '', disabled, radius, size, tone, onClick, onHold, ...buttonProps }) {
   if (tone === 'brand' || tone === 'positive' || tone === 'negative') {
-    return <AccentButton tone={tone} className={className} disabled={disabled} radius={radius} style={style} data-button-size={size}
+    return <AccentButton tone={tone} className={className} disabled={disabled} radius={radius} data-button-size={size}
       activation={onHold ? 'hold' : 'press'} onHold={onHold} onClick={onClick} {...buttonProps}>{children}</AccentButton>;
   }
-  if (tone === 'inverse') {
-    return <ActionButton className={`screen-primary screen-primary--inverse ${className}`.trim()} shape="pill" surface="primary"
-      disabled={disabled} style={buttonStyle} onClick={onClick} data-button-size={size} {...buttonProps}>{children}</ActionButton>;
-  }
-  return <ActionButton className={`screen-primary glass ${className}`} shape="pill" surface="floating"
-    disabled={disabled} style={buttonStyle} onClick={onClick} data-button-size={size} {...buttonProps}>{children}</ActionButton>;
+  const inverse = tone === 'inverse';
+  return <ActionButton className={`screen-primary ${inverse ? 'screen-primary--inverse' : 'glass'} ${className}`.trim()}
+    shape="pill" surface={inverse ? 'primary' : 'floating'} disabled={disabled} onClick={onClick} data-button-size={size}
+    {...buttonProps} style={{ '--button-radius': radius == null ? undefined : `${Math.max(0, radius)}px` }}>{children}</ActionButton>;
 }
 
 function AccentButton({ tone = 'brand', activation = 'hold', radius = 'var(--aml-radius-full)',

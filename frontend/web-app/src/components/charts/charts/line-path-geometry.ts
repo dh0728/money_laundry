@@ -1,4 +1,7 @@
 import { area, type CurveFactory, line } from "d3-shape";
+
+// Re-exported so screens pick a curve through this shared chart module, not d3-shape directly.
+export { curveLinear } from "d3-shape";
 import { fastShapePath } from "./fast-path";
 
 /**

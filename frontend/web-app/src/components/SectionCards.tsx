@@ -1,5 +1,6 @@
 // v24 blocks/section-cards.tsx (shadcn dashboard-01 section-cards)
 import { TrendingDown, TrendingUp } from 'lucide-react'
+import type { CSSProperties } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -22,7 +23,7 @@ export function SectionCard({ item }: { item: SectionCardItem }) {
         <div className="flex flex-wrap items-center gap-2 font-medium">
           {item.trend}
           {Icon && item.delta !== undefined && (
-            <Badge variant={deltaTone ? 'default' : 'outline'} className={deltaTone ? 'border-transparent text-foreground' : undefined} style={deltaTone ? { backgroundColor: `var(--risk-${deltaTone === 'positive' ? 0 : 9})` } : undefined}>
+            <Badge variant={deltaTone ? 'default' : 'outline'} className={deltaTone ? 'border-transparent bg-(color:--section-card-delta-fill) text-foreground' : undefined} style={deltaTone ? { '--section-card-delta-fill': deltaTone === 'positive' ? 'var(--risk-0)' : 'var(--risk-9)' } as CSSProperties : undefined}>
               <Icon />
               {item.delta >= 0 ? '+' : ''}
               {item.delta}

@@ -1,20 +1,23 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { cloneRule, commandRule, createRuleVersion, deleteRuleDraft, fetchRule } from '@/api/rules';
 import { Textarea } from '@/components/ui/textarea';
-import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
+import { TableBody, TableCell, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
 import { DialogFrame } from '../../components/dialog-parts';
 import { Panel } from '../../components/panel';
 import { activateRecordCard } from '../../components/record-card';
 import { ScreenActions } from '../../components/screen-actions';
 import { StatusTag } from '../../components/semantic-tags';
-import { downloadCsv } from '../../components/query-controls';
+import { csvDownloadEntry, TableQueryTools } from '../../components/query-controls';
+import { SectionDownloadHeading } from '../../components/section-download';
 import { SortableTableHead, tableCount, useTableSort, WorkflowTable } from '../../components/workflow-table';
+import { sameDefinition } from './rule-definition';
 import {
   loadRuleCatalog, problemText, refreshLiveRules, ruleEventNames, ruleStatusNames, ruleStatusOrder, ruleStatusPresets,
 } from './live-rule-store';
 import './preview-rule-workspace.css';
 import './live-rule-engine.css';
+import { Box, Grid, Heading, Text } from '@/components/layout-primitives';
 
 // 룰 목록과 상세. 한 룰은 운영 버전 최대 1개와 작업 중 버전 최대 1개를 가진다.
 // 상태를 바꾸는 버튼은 서버가 상세에 실어 주는 commands(지금 상태에서 있는 명령, 내가 할 수 있는지, 못 하면 왜)대로 그린다.
@@ -43,9 +46,14 @@ const executionModes = { LIVE: '운영', SHADOW: '시험 운영' };
 const executionErrors = { TIMEOUT: '쿼리 120초 초과', BUDGET: '시간 한도 초과', INTERNAL: '실행 오류', INTERRUPTED: '중단됨' };
 const backtestNotes = { QUEUED: '백테스트 대기 중', RUNNING: '백테스트 실행 중', FAILED: '백테스트 실패', CANCELLED: '백테스트 취소됨' };
 
-function RuleTime({ value }) {
+function formatRuleTime(value) {
   const date = new Date(value);
-  return value && Number.isFinite(date.getTime()) ? <time dateTime={value}>{timeFormat.format(date)} KST</time> : '기록 없음';
+  return value && Number.isFinite(date.getTime()) ? timeFormat.format(date) + ' KST' : '';
+}
+
+function RuleTime({ value }) {
+  const label = formatRuleTime(value);
+  return label ? <Text as="time" dateTime={value}>{label}</Text> : '기록 없음';
 }
 
 const StatusChip = ({ status }) => <StatusTag preset={ruleStatusPresets[status]}>{ruleStatusNames[status]}</StatusTag>;
@@ -78,11 +86,11 @@ function DraftDelete({ rule, version, onClose, onDeleted }) {
       <ActionButton shape="pill" surface="floating" onClick={() => dialog.current.close()}>취소</ActionButton>
       <PrimaryButton type="submit" tone="negative" disabled={busy}>삭제</PrimaryButton>
     </>}>
-    <div className="case-judgment-body">
-      <p><code>{rule.code}</code> · {rule.name} · v{version.versionNo}</p>
-      <p>{only ? '이 룰에는 다른 버전이 없어 룰과 변경 기록도 함께 삭제합니다.' : '작성 중인 버전만 삭제합니다. 운영 버전과 변경 기록은 남습니다.'}</p>
-      {error && <p role="alert" data-rule-block-error>{error}</p>}
-    </div>
+    <Box className="case-judgment-body">
+      <Text><Text as="code">{rule.code}</Text> · {rule.name} · v{version.versionNo}</Text>
+      <Text>{only ? '이 룰에는 다른 버전이 없어 룰과 변경 기록도 함께 삭제합니다.' : '작성 중인 버전만 삭제합니다. 운영 버전과 변경 기록은 남습니다.'}</Text>
+      {error && <Text role="alert" data-rule-block-error>{error}</Text>}
+    </Box>
   </DialogFrame>;
 }
 
@@ -131,17 +139,17 @@ function RuleCommandDialog({ rule, command, onClose, onDone }) {
       <ActionButton shape="pill" surface="floating" onClick={() => dialog.current.close()}>취소</ActionButton>
       <PrimaryButton type="submit" tone={spec.tone} disabled={busy || (command.commentRequired && !comment.trim())}>{spec.label} 확인</PrimaryButton>
     </>}>
-    <div className="case-judgment-body">
-      <p><code>{rule.code}</code> · {rule.name}{version && ` · v${version.versionNo}`}</p>
-      {spec.after && <p>변경 후 상태 · {ruleStatusNames[spec.after]}</p>}
-      <p className="workflow-rule-note">{spec.note}
-        {command.action === 'APPROVE' && rule.operating && ` 지금 운영 버전 v${rule.operating.versionNo} 은 물러납니다.`}</p>
-      {!fresh && !cloning && <label className="case-judgment-field">{command.commentRequired ? '사유' : '메모 (선택)'}
+    <Box className="case-judgment-body">
+      <Text><Text as="code">{rule.code}</Text> · {rule.name}{version && ` · v${version.versionNo}`}</Text>
+      {spec.after && <Text>변경 후 상태 · {ruleStatusNames[spec.after]}</Text>}
+      <Text className="workflow-rule-note">{spec.note}
+        {command.action === 'APPROVE' && rule.operating && ` 지금 운영 버전 v${rule.operating.versionNo} 은 물러납니다.`}</Text>
+      {!fresh && !cloning && <Box as="label" className="case-judgment-field">{command.commentRequired ? '사유' : '메모 (선택)'}
         <Textarea ref={field} value={comment} rows={3} maxLength={commentLimit} required={command.commentRequired}
           onChange={event => { setComment(event.target.value); setError(''); }} />
-      </label>}
-      {error && <p role="alert" data-rule-block-error>{error}</p>}
-    </div>
+      </Box>}
+      {error && <Text role="alert" data-rule-block-error>{error}</Text>}
+    </Box>
   </DialogFrame>;
 }
 
@@ -153,85 +161,116 @@ function backtestNote(version) {
   return version.backtest.currentDefinition ? '지금 조건으로 백테스트를 끝냈습니다.' : '조건을 고친 뒤에는 백테스트를 돌리지 않았습니다.';
 }
 
-function VersionSummary({ label, version }) {
+function VersionSummary({ label, version, conditions, rowStatus }) {
   const note = backtestNote(version);
-  return <div className="rule-version-summary">
-    <div className="workflow-rule-detail-tags">
+  return <Box className="rule-version-summary">
+    <Box className="workflow-rule-detail-tags">
       <StatusTag preset="neutral">{label} · v{version.versionNo}</StatusTag>
-      <StatusChip status={version.status} />
-    </div>
-    <p>{version.sentence || version.summary}</p>
-    {note && <p className="workflow-rule-note">{note}</p>}
-  </div>;
+      {version.status !== rowStatus && <StatusChip status={version.status} />}
+    </Box>
+    {conditions && <Text>{conditions}</Text>}
+    {note && <Text className="workflow-rule-note">{note}</Text>}
+  </Box>;
 }
 
 function RuleDetail({ rule, row, subject }) {
+  const appliedVersions = [rule.operating, rule.working];
+  const operatingSummary = rule.operating?.summary || rule.operating?.sentence;
+  const workingSummary = rule.working?.summary || rule.working?.sentence;
+  const sameConditions = rule.operating?.definition && rule.working?.definition
+    && sameDefinition(rule.operating.definition, rule.working.definition);
+  const showSentences = rule.operating && rule.working && !sameConditions && operatingSummary === workingSummary;
+  const changeTime = formatRuleTime(row?.changedAt ?? rule.createdAt);
+  const details = csvDownloadEntry('룰 상세', rule.code + '-detail',
+    ['룰 ID', '이름', '상태', '템플릿', '대상', '담당자', '마지막 변경 (KST)', '운영 버전', '운영 조건', '작업 중 버전', '작업 중 조건',
+      '운영 적중', '마지막 적중일', '연결 Alert', '정상 판정 비율', '시험 운영 적중'],
+    [[rule.code, rule.name, ruleStatusNames[rule.status], rule.templateName, subject, rule.owner, changeTime,
+      rule.operating?.versionNo, rule.operating?.sentence || rule.operating?.summary, rule.working?.versionNo,
+      rule.working?.sentence || rule.working?.summary, row?.hitCount, row?.lastHitDate, row?.linkedAlertCount, row?.normalRate, row?.shadowHitCount]]);
+  const versions = csvDownloadEntry('버전 이력', rule.code + '-versions',
+    ['룰 ID', '버전', '상태', '작성자', '작성 시각 (KST)', '조건'],
+    rule.versions.map(version => [rule.code, version.versionNo, ruleStatusNames[version.status], version.author,
+      formatRuleTime(version.createdAt), version.summary]));
   return <Panel className="workflow-rule-detail" aria-label="룰 상세">
-    <h2><code>{rule.code}</code> {rule.name}</h2>
-    <div className="workflow-rule-detail-tags">
-      {rule.status && <StatusChip status={rule.status} />}
-      <StatusTag preset="neutral">{rule.templateName}</StatusTag>
-      {subject && <StatusTag preset="neutral">대상 · {subject}</StatusTag>}
-    </div>
-    <dl className="rule-condition-facts">
-      <div><dt>담당자</dt><dd>{rule.owner}</dd></div>
-      <div><dt>마지막 변경</dt><dd><RuleTime value={row?.changedAt ?? rule.createdAt} /></dd></div>
-      {/* 적중 수와 Alert 수는 따로다. 적중은 대상 × 날짜이고, 그중 Alert 의 거래와 겹친 것만 Alert 에 보인다. */}
-      {row?.hitCount != null && (rule.operating || row.hitCount > 0) && <div><dt>운영 적중</dt>
-        <dd>{countFormat.format(row.hitCount)}건{row.lastHitDate && ` · 마지막 ${row.lastHitDate}`}</dd></div>}
-      {row?.linkedAlertCount != null && (rule.operating || row.linkedAlertCount > 0) && <div><dt>연결 Alert</dt>
-        <dd>{countFormat.format(row.linkedAlertCount)}건{row.normalRate != null && ` · 정상 판정 ${row.normalRate}%`}</dd></div>}
-      {row?.shadowHitCount != null && <div><dt>시험 운영 적중</dt><dd>{countFormat.format(row.shadowHitCount)}건 · Alert 에는 보이지 않음</dd></div>}
-      {row?.lastRunFailed && <div><dt>최근 일일 실행</dt><dd><StatusTag preset="caution">실패</StatusTag></dd></div>}
-    </dl>
-    <h3>적용 조건</h3>
-    {rule.operating && <VersionSummary label="운영 버전" version={rule.operating} />}
-    {rule.working && <VersionSummary label={rule.operating ? '새 버전' : '작업 중 버전'} version={rule.working} />}
-    <h3>버전 이력</h3>
-    <ol className="workflow-rule-history">
-      {rule.versions.map(version => <li key={version.versionId}>
-        <div><strong>v{version.versionNo} · {ruleStatusNames[version.status]}</strong>
-          <span>{version.author} · <RuleTime value={version.createdAt} /></span></div>
-        <p>{version.summary}</p>
-      </li>)}
-    </ol>
+    <SectionDownloadHeading entries={versions.disabled ? [details] : [details, versions]}><Text as="code">{rule.code}</Text> {rule.name}</SectionDownloadHeading>
+    <Box as="dl" className="rule-condition-facts">
+      {rule.owner !== row?.owner && <Box><Box as="dt">담당자</Box><Box as="dd">{rule.owner}</Box></Box>}
+      <Box><Box as="dt">마지막 변경</Box><Box as="dd"><RuleTime value={row?.changedAt ?? rule.createdAt} /></Box></Box>
+      {row?.lastHitDate && <Box><Box as="dt">마지막 적중일</Box><Box as="dd">{row.lastHitDate}</Box></Box>}
+      {row?.normalRate != null && <Box><Box as="dt">연결 Alert 정상 판정 비율</Box><Box as="dd">{row.normalRate}%</Box></Box>}
+      {row?.shadowHitCount != null && <Box><Box as="dt">시험 운영 적중</Box><Box as="dd">{countFormat.format(row.shadowHitCount)}건</Box></Box>}
+    </Box>
+    <Heading level={3}>적용 조건</Heading>
+    {rule.operating && <VersionSummary label="운영 버전" version={rule.operating} rowStatus={row?.status}
+      conditions={showSentences ? rule.operating.sentence || operatingSummary : operatingSummary} />}
+    {rule.working && <VersionSummary label={rule.operating ? '새 버전' : '작업 중 버전'} version={rule.working} rowStatus={row?.status}
+      conditions={sameConditions ? '운영 버전과 같은 조건입니다.' : showSentences ? rule.working.sentence || workingSummary : workingSummary} />}
+    <Heading level={3}>버전 이력</Heading>
+    <Box as="ol" className="workflow-rule-history">
+      {rule.versions.map(version => <Box as="li" key={version.versionId}>
+        <Box><Text as="strong">v{version.versionNo} · {ruleStatusNames[version.status]}</Text>
+          <Text as="span">{version.author} · <RuleTime value={version.createdAt} /></Text></Box>
+        {!appliedVersions.some(applied => applied?.versionId === version.versionId && applied.summary === version.summary)
+          && <Text>{version.summary}</Text>}
+      </Box>)}
+    </Box>
   </Panel>;
 }
 
 /** 일일 실행 기록. 분석이 ALERTS 단계에 들어올 때 시험 운영 · 운영 중인 버전이 한 번씩 돈다. */
 function RuleExecutions({ rule }) {
   const executions = rule.executions ?? [];
+  const sorting = useTableSort(executions);
   if (!executions.length) return null;
-  return <Panel className="rule-executions" aria-label="룰 일일 실행">
-    <h2>일일 실행</h2>
-    <p className="workflow-rule-note">분석 때마다 그 분석이 새로 받은 날짜를 검사합니다. 최근 {executions.length}건입니다.</p>
-    <table className="rule-backtest-table">
-      <thead><tr><th scope="col">분석 날짜</th><th scope="col">버전</th><th scope="col">방식</th><th scope="col">결과</th>
-        <th scope="col">검사 시점</th><th scope="col">적중</th><th scope="col">건너뛴 바쁜 계좌</th></tr></thead>
-      <tbody>{executions.map((run, index) => <tr key={index}>
-        <th scope="row">{run.analysisDate ?? '—'}</th>
-        <td>v{run.versionNo}</td>
-        <td>{executionModes[run.mode] ?? run.mode}</td>
-        <td>{run.status === 'FAILED' ? `실패 · ${executionErrors[run.errorCode] ?? run.errorCode}` : '완료'}</td>
-        <td>{run.triggerCount == null ? '—' : countFormat.format(run.triggerCount)}</td>
-        <td>{run.hitCount == null ? '—' : countFormat.format(run.hitCount)}</td>
-        <td>{run.skippedBusySubjects == null ? '—' : countFormat.format(run.skippedBusySubjects)}</td>
-      </tr>)}</tbody>
-    </table>
-  </Panel>;
+  const mode = run => executionModes[run.mode] ?? run.mode;
+  const result = run => run.status === 'FAILED' ? '실패 · ' + (executionErrors[run.errorCode] ?? run.errorCode) : '완료';
+  const columns = [
+    { column: 'date', label: '분석 날짜', value: run => run.analysisDate },
+    { column: 'version', label: '버전', value: run => run.versionNo },
+    { column: 'kind', label: '방식', value: mode },
+    { column: 'status', label: '결과', value: result },
+    { column: '거래 건수', label: '검사 시점', value: run => run.triggerCount },
+    { column: 'value', label: '적중', value: run => run.hitCount },
+    { column: '관련 계좌 수', label: '건너뛴 바쁜 계좌', value: run => run.skippedBusySubjects },
+  ];
+  const rows = executions.map(run => [run.analysisDate, `v${run.versionNo}`, mode(run), result(run),
+    run.triggerCount, run.hitCount, run.skippedBusySubjects]);
+  const download = csvDownloadEntry('일일 실행', rule.code + '-executions', columns.map(({ label }) => label), rows);
+  const displayCount = value => value == null ? '—' : countFormat.format(value);
+  return <Box as="section" className="rule-executions" aria-label="룰 일일 실행">
+    <WorkflowTable label="일일 실행" summary={tableCount(executions.length)}
+      tools={<TableQueryTools actions={{ entries: [download] }} />}>
+      <TableHeader><TableRow>{columns.map(({ column, label, value }) => <SortableTableHead key={column} sorting={sorting}
+        column={column} value={value}>{label}</SortableTableHead>)}</TableRow></TableHeader>
+      <TableBody>{sorting.rows.map((run, index) => <TableRow key={index}>
+        <TableRowHead>{run.analysisDate ?? '—'}</TableRowHead>
+        <TableCell>v{run.versionNo}</TableCell>
+        <TableCell>{mode(run)}</TableCell>
+        <TableCell>{result(run)}</TableCell>
+        <TableCell numeric>{displayCount(run.triggerCount)}</TableCell>
+        <TableCell numeric>{displayCount(run.hitCount)}</TableCell>
+        <TableCell numeric>{displayCount(run.skippedBusySubjects)}</TableCell>
+      </TableRow>)}</TableBody>
+    </WorkflowTable>
+  </Box>;
 }
 
 function RuleEvents({ rule }) {
+  const changes = csvDownloadEntry('변경 기록', rule.code + '-history',
+    ['룰 ID', '시각 (KST)', '작업', '담당자', '버전', '본인 승인', '복제 원본', '복제 원본 버전', '사유'],
+    rule.events.map(event => [rule.code, formatRuleTime(event.at), ruleEventNames[event.action] ?? event.action,
+      event.actor ?? '시스템', event.versionNo, event.selfApproved ? '예' : '', event.clonedFrom?.code,
+      event.clonedFrom?.versionNo, event.comment]));
   return <Panel className="workflow-rule-reason" aria-label="룰 변경 기록">
-    <h2>변경 기록</h2>
-    {rule.events.length ? <ol className="workflow-rule-history">
-      {rule.events.map((event, index) => <li key={index}>
-        <div><strong>{ruleEventNames[event.action] ?? event.action}{event.versionNo ? ` · v${event.versionNo}` : ''}{event.selfApproved ? ' · 본인 승인' : ''}
-          {event.clonedFrom ? ` · ${event.clonedFrom.code}${event.clonedFrom.versionNo ? ` v${event.clonedFrom.versionNo}` : ''} 복제` : ''}</strong>
-          <span>{event.actor ?? '시스템'} · <RuleTime value={event.at} /></span></div>
-        {event.comment && <p>{event.comment}</p>}
-      </li>)}
-    </ol> : <p>기록된 변경 이력이 없습니다.</p>}
+    <SectionDownloadHeading entries={changes.disabled ? [] : [changes]}>변경 기록</SectionDownloadHeading>
+    {rule.events.length ? <Box as="ol" className="workflow-rule-history">
+      {rule.events.map((event, index) => <Box as="li" key={index}>
+        <Box><Text as="strong">{ruleEventNames[event.action] ?? event.action}{event.versionNo ? ` · v${event.versionNo}` : ''}{event.selfApproved ? ' · 본인 승인' : ''}
+          {event.clonedFrom ? ` · ${event.clonedFrom.code}${event.clonedFrom.versionNo ? ` v${event.clonedFrom.versionNo}` : ''} 복제` : ''}</Text>
+          <Text as="span">{event.actor ?? '시스템'} · <RuleTime value={event.at} /></Text></Box>
+        {event.comment && <Text>{event.comment}</Text>}
+      </Box>)}
+    </Box> : <Text>기록된 변경 이력이 없습니다.</Text>}
   </Panel>;
 }
 
@@ -278,21 +317,21 @@ export function LiveRuleList({ initialRule, registerTableTools, actionsHost }) {
 
   const backtestable = template => (catalog?.backtestTemplates ?? []).includes(template);
   const subjectOf = template => subjectNames[catalog?.templates.find(item => item.key === template)?.subject];
-  const breakdown = ruleStatusOrder.map(value => ({ value, label: ruleStatusNames[value], count: list?.counts[value] ?? 0 })).filter(({ count }) => count);
-  const ruleFilter = [{ value: 'all', label: '전체' }, ...breakdown.map(({ value, label }) => ({ value, label }))];
+  const breakdown = ruleStatusOrder.map(value => ({ value, label: ruleStatusNames[value], count: list?.counts[value] ?? 0 }));
+  const ruleFilter = [{ value: 'all', label: '전체' }, ...breakdown.filter(({ count }) => count).map(({ value, label }) => ({ value, label }))];
   useEffect(() => registerTableTools?.({
     filter: { label: '룰 상태', options: ruleFilter, value: status, onChange: setStatus },
-    entries: [{ label: '조회된 룰', format: 'CSV', count: sorting.rows.length,
-      download: () => downloadCsv('rules', ['상태', '룰 ID', '룰 이름', '템플릿', '조건', '버전', '담당자'],
-        sorting.rows.map(rule => [ruleStatusNames[rule.status], rule.code, rule.name, rule.templateName, rule.summary, rule.versionNo, rule.owner])) }],
+    panelDownload: false,
+    entries: [csvDownloadEntry('조회된 룰', 'rules', ['상태', '룰 ID', '룰 이름', '템플릿', '조건', '버전', '담당자'],
+      sorting.rows.map(rule => [ruleStatusNames[rule.status], rule.code, rule.name, rule.templateName, rule.summary, rule.versionNo, rule.owner]))],
   }));
 
-  if (failure) return <Panel className="glass rule-load-failure">
-    <h2>룰 목록을 열 수 없습니다.</h2>
-    <p role="alert">{failure}</p>
+  if (failure) return <Panel className="rule-load-failure">
+    <Heading>룰 목록을 열 수 없습니다.</Heading>
+    <Text role="alert">{failure}</Text>
     <ActionButton shape="pill" surface="floating" onClick={() => setAttempt(count => count + 1)}>다시 시도</ActionButton>
   </Panel>;
-  if (!list) return <Panel className="glass" aria-busy="true"><h2>룰 목록을 불러오는 중입니다.</h2></Panel>;
+  if (!list) return <Panel aria-busy="true"><Heading>룰 목록을 불러오는 중입니다.</Heading></Panel>;
 
   const shown = detail?.ruleId === selectedId ? detail : null;
   const working = shown?.working;
@@ -303,16 +342,16 @@ export function LiveRuleList({ initialRule, registerTableTools, actionsHost }) {
     disabled={!item.enabled} {...(item.reason ? { title: item.reason } : {})} aria-haspopup="dialog"
     onClick={() => setCommand(item)}>{commandSpecs[item.action].label}</PrimaryButton>;
   return <>
-    {notice && <p className="visually-hidden" role="status">{notice}</p>}
-    <dl className="workflow-rule-inventory" aria-label="룰 상태별 수">
-      <Panel as="div"><dt>등록된 룰</dt><dd>{countFormat.format(rules.length)}</dd></Panel>
+    {notice && <Text className="visually-hidden" role="status">{notice}</Text>}
+    <Box as="dl" className="workflow-rule-inventory" aria-label="룰 상태별 수">
+      <Panel as="div"><Box as="dt">등록된 룰</Box><Box as="dd">{countFormat.format(rules.length)}</Box></Panel>
       {breakdown.map(({ value, label, count }) => <Panel as="div" key={value}>
-        <dt><StatusTag preset={ruleStatusPresets[value]}>{label}</StatusTag></dt>
-        <dd>{countFormat.format(count)}</dd>
+        <Box as="dt"><StatusTag preset={ruleStatusPresets[value]}>{label}</StatusTag></Box>
+        <Box as="dd">{countFormat.format(count)}</Box>
       </Panel>)}
-    </dl>
-    <div className="screen-row screen-rule-list">
-      <Panel className="workflow-rule-list" aria-label="룰 목록">
+    </Box>
+    <Box className="screen-row screen-rule-list">
+      <Box as="section" className="workflow-rule-list" aria-label="룰 목록">
         <WorkflowTable label="룰 목록" summary={tableCount(rows.length, rules.length, '개')}>
           <TableHeader><TableRow>
             <SortableTableHead sorting={sorting} column="status" value={rule => ruleStatusNames[rule.status]}>상태</SortableTableHead>
@@ -328,11 +367,11 @@ export function LiveRuleList({ initialRule, registerTableTools, actionsHost }) {
           <TableBody>{sorting.rows.map(rule => <TableRow key={rule.ruleId} data-selected={rule.ruleId === selectedId}
             onClick={event => activateRecordCard(event, () => choose(rule.code))}>
             <TableCell><StatusChip status={rule.status} /></TableCell>
-            <th scope="row">
+            <TableRowHead>
               <ActionButton onClick={() => choose(rule.code)} aria-pressed={rule.ruleId === selectedId} className="workflow-rule-select">
-                <code>{rule.code}</code> {rule.name}
+                <Text as="code">{rule.code}</Text> {rule.name}
               </ActionButton>
-            </th>
+            </TableRowHead>
             <TableCell>{rule.templateName}</TableCell>
             <TableCell>{subjectOf(rule.template) ?? '—'}</TableCell>
             <TableCell className="workflow-rule-summary">{rule.summary}</TableCell>
@@ -344,15 +383,17 @@ export function LiveRuleList({ initialRule, registerTableTools, actionsHost }) {
             {!rows.length && <TableRow><TableCell colSpan={9}>{rules.length ? '조건에 맞는 룰이 없습니다.' : '등록된 룰이 없습니다. 룰 만들기에서 첫 룰을 만들어 주세요.'}</TableCell></TableRow>}
           </TableBody>
         </WorkflowTable>
-      </Panel>
-      {shown && <RuleDetail rule={shown} row={selected} subject={subjectOf(shown.template)} />}
+      </Box>
+      {shown && <Grid columns={12} className="workflow-rule-inspection">
+        <RuleDetail rule={shown} row={selected} subject={subjectOf(shown.template)} />
+        <RuleEvents rule={shown} />
+      </Grid>}
       {selected && !shown && <Panel className="workflow-rule-detail" aria-label="룰 상세" aria-busy={!detailFailure || undefined}>
-        <h2><code>{selected.code}</code> {selected.name}</h2>
-        {detailFailure ? <p role="alert">{detailFailure}</p> : <p className="workflow-rule-note">상세를 불러오는 중입니다.</p>}
+        <Heading><Text as="code">{selected.code}</Text> {selected.name}</Heading>
+        {detailFailure ? <Text role="alert">{detailFailure}</Text> : <Text className="workflow-rule-note">상세를 불러오는 중입니다.</Text>}
       </Panel>}
-    </div>
+    </Box>
     {shown && <RuleExecutions rule={shown} />}
-    {shown && <RuleEvents rule={shown} />}
     <ScreenActions host={actionsHost} stackOnNarrow>
       <PrimaryButton tone="negative" disabled={!working?.deletable} aria-haspopup="dialog" onClick={() => setDeleting(true)}>초안 삭제</PrimaryButton>
       {commands.filter(item => commandSpecs[item.action].tone === 'negative').map(commandButton)}

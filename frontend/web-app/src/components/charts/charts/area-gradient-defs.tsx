@@ -66,7 +66,8 @@ export const AreaGradientDefs = memo(function AreaGradientDefs({
             <stop
               key={stop.offset}
               offset={stop.offset}
-              style={{ stopColor: fill, stopOpacity: stop.opacity }}
+              stopColor={fill}
+              stopOpacity={stop.opacity}
             />
           ))}
         </linearGradient>
@@ -81,7 +82,8 @@ export const AreaGradientDefs = memo(function AreaGradientDefs({
             <stop
               key={stop.offset}
               offset={stop.offset}
-              style={{ stopColor: resolvedStroke, stopOpacity: stop.opacity }}
+              stopColor={resolvedStroke}
+              stopOpacity={stop.opacity}
             />
           ))}
         </linearGradient>
@@ -97,7 +99,8 @@ export const AreaGradientDefs = memo(function AreaGradientDefs({
               <stop
                 key={stop.offset}
                 offset={stop.offset}
-                style={{ stopColor: "white", stopOpacity: stop.opacity }}
+                stopColor="var(--aml-white-100)"
+                stopOpacity={stop.opacity}
               />
             ))}
           </linearGradient>

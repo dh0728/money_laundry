@@ -2,7 +2,7 @@ import { Radar } from 'lucide-react'
 
 // Library geometry stays crisp at the lockup's actual 20px size in either theme.
 export function RadarMark({ className = 'size-5' }: { className?: string }) {
-  return <Radar className={className} strokeWidth={1.8} aria-hidden="true" />
+  return <Radar className={`brand-radar-mark ${className}`} aria-hidden="true" />
 }
 
 export function BrandWordmark({ className = '' }: { className?: string }) {

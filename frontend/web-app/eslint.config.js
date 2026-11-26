@@ -4,7 +4,7 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
-import { plugin as shadcn } from '@shadcn/lint'
+import { designEslintConfig } from './scripts/design-lint-plugin.mjs'
 
 export default defineConfig([
   globalIgnores(['dist', 'storybook-static']),
@@ -24,19 +24,6 @@ export default defineConfig([
     // shadcn/ui 원본 파일과 테마 provider는 variant·hook을 컴포넌트와 함께 내보낸다
     files: ['src/components/ui/**/*.tsx', 'src/components/data-table/**/*.tsx', 'src/app/ThemeProvider.tsx'],
     rules: { 'react-refresh/only-export-components': 'off' },
-  },
-  {
-    files: ['src/{app,features,pages}/**/*.{jsx,tsx}'],
-    languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
-    rules: {
-      'no-restricted-syntax': ['error', {
-        selector: "JSXOpeningElement[name.name='dialog']",
-        message: 'Use DialogFrame from components/dialog-parts. It provides the title, close button, and full-width footer.',
-      }, {
-        selector: "JSXOpeningElement[name.name='input']:has(JSXAttribute[name.name='type'][value.value='search'])",
-        message: 'Use SearchField from components/search-field. Use its compact variant for in-panel search.',
-      }],
-    },
   },
   {
     // shadcn/ui 원본(사이드바 skeleton의 Math.random, use-mobile의 첫 측정)은 고치지 않고 둔다
@@ -60,27 +47,11 @@ export default defineConfig([
     rules: { '@typescript-eslint/no-unused-vars': 'off' },
   },
   {
-    // 새 UI(src/next)만 디자인 시스템 규칙을 지킨다. 기존 시연 화면은 전환 전까지 손대지 않는다.
-    files: ['src/next/**/*.{ts,tsx}'],
-    plugins: { shadcn },
-    settings: {
-      shadcn: {
-        ui: '@/next/ui',
-        note: '색·간격·글자 크기는 src/next/styles 토큰과 src/next/ui 컴포넌트만 쓴다.',
-      },
-    },
-    rules: {
-      'shadcn/no-raw-colors': 'error',
-      'shadcn/no-arbitrary-values': 'error',
-      'shadcn/no-restyle': 'error',
-      'shadcn/no-inline-styles': 'error',
-      'shadcn/no-unknown-classes': 'error',
-      'shadcn/require-static-classes': 'error',
-    },
+    // .js·.jsx는 디자인 규칙만 검사한다. 파일 안의 react-hooks 주석이 가리키는 규칙 정의만 등록한다.
+    files: ['src/**/*.{js,jsx}'],
+    ignores: ['src/test/**', 'src/mocks/**', '**/*.test.*', '**/*.stories.*'],
+    plugins: { 'react-hooks': reactHooks },
   },
-  {
-    // 컴포넌트 원본은 스스로의 모양을 정의하므로 restyle 검사에서 뺀다
-    files: ['src/next/ui/**/*.tsx'],
-    rules: { 'shadcn/no-restyle': 'off' },
-  },
+  // 디자인 규칙 트리를 편집 중에 표시하고, 커밋 전 lint:design에서 전체 상한을 검사한다.
+  ...designEslintConfig,
 ])

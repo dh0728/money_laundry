@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 
 const sourceDirectory = process.argv[2]
 if (!sourceDirectory) throw new Error('Usage: pnpm tokens:sync <v3 asset directory>')
-const destination = resolve(import.meta.dirname, '../src/next/styles')
+const destination = resolve(import.meta.dirname, '../src/styles')
 await mkdir(destination, { recursive: true })
 const hashes = {}
 for (const file of ['tokens.css', 'tokens.json']) {

@@ -4,8 +4,8 @@ import { resolve } from 'node:path'
 
 export const themes = ['light', 'dark', 'solarized-light', 'solarized-dark']
 export const accents = ['sky', 'violet', 'pink', 'lime']
-export const snapshotPath = resolve(import.meta.dirname, '../src/next/styles/figma-token-snapshot.json')
-export const cssPath = resolve(import.meta.dirname, '../src/next/styles/semantic-tokens.css')
+export const snapshotPath = resolve(import.meta.dirname, '../src/styles/figma-token-snapshot.json')
+export const cssPath = resolve(import.meta.dirname, '../src/styles/semantic-tokens.css')
 const property = name => `--aml-semantic-${name.replaceAll('/', '-')}`
 
 // Resolve each alias in its own collection's mode, including cross-collection Brand aliases.

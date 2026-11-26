@@ -1,5 +1,5 @@
 // biome-ignore-all lint/correctness/useExhaustiveDependencies: usePathStrokeMetrics intentionally accepts caller-controlled deps
-import { type RefObject, useEffect, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 
 export function findPathLengthAtX(
   path: SVGPathElement | null,
@@ -53,7 +53,15 @@ export function usePathStrokeMetrics(
 ): PathStrokeMetrics {
   const [metrics, setMetrics] = useState<PathStrokeMetrics>(EMPTY_METRICS);
 
+  // deps 배열은 렌더마다 새로 오므로 값을 직접 비교해, deps·enabled가 같으면 다시 측정하지 않는다.
+  const measured = useRef<{ enabled: boolean; deps: readonly unknown[] } | null>(null);
   useEffect(() => {
+    const previous = measured.current;
+    if (previous && previous.enabled === enabled && previous.deps.length === deps.length
+      && previous.deps.every((value, index) => Object.is(value, deps[index]))) {
+      return;
+    }
+    measured.current = { enabled, deps };
     const path = pathRef.current;
     if (!(enabled && path)) {
       return;
@@ -65,7 +73,7 @@ export function usePathStrokeMetrics(
         ? prev
         : { pathD: d, pathLength: len }
     );
-  }, [enabled, ...deps]);
+  }, [enabled, deps, pathRef]);
 
   return metrics;
 }

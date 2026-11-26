@@ -21,14 +21,16 @@ const queryLists = {
 };
 const detailDefaults = { A: 'alert/overview-allpanel', E: 'episode/overview' };
 export const loginRoute = { screen: 'login', code: '' };
-export const dashboardRoute = { screen: 'dashboard/mine', code: '' };
+export const dashboardRoute = { screen: 'dashboard/all', code: '' };
 
 export const validWorkCode = code => typeof code === 'string' && workCode.test(code);
 const transactionCode = code => validWorkCode(code) && code.startsWith('T-');
 export const isBenchmarkTransactionCode = code => transactionCode(code) && !isSampleTransactionCode(code);
 export const initialDetail = code => detailDefaults[code[0]] ?? ledger.screen;
+const acceptsTransaction = (code, serviceMode, benchmarkLedger) =>
+  transactionCode(code) && (serviceMode || benchmarkLedger || !isBenchmarkTransactionCode(code));
 
-export function readPreviewRoute(url) {
+export function readPreviewRoute(url, { serviceMode = false } = {}) {
   const path = url.pathname.replace(/\/$/, '') || '/';
   const params = url.searchParams;
   if (path === '/login') return loginRoute;
@@ -36,7 +38,7 @@ export function readPreviewRoute(url) {
     const code = params.get('transaction');
     const benchmarkLedger = path === benchmarkLedgerPath;
     return { screen: params.get('view') === 'table' ? ledgerTableScreen : ledger.screen,
-      code: transactionCode(code) && (benchmarkLedger || !isBenchmarkTransactionCode(code)) ? code : '',
+      code: acceptsTransaction(code, serviceMode, benchmarkLedger) ? code : '',
       ...(benchmarkLedger ? { benchmarkLedger } : {}) };
   }
   if (inverse.has(path)) return { screen: inverse.get(path), code: '' };
@@ -49,7 +51,7 @@ export function readPreviewRoute(url) {
   const [, family, code = '', extra] = path.split('/');
   if (extra || !validWorkCode(code)) return dashboardRoute;
   if (family === 'transactions' && transactionCode(code)) {
-    return { screen: ledger.screen, code: isBenchmarkTransactionCode(code) ? '' : code };
+    return { screen: ledger.screen, code: acceptsTransaction(code, serviceMode, false) ? code : '' };
   }
   const prefix = family === 'alerts' ? 'A' : family === 'episodes' ? 'E' : undefined;
   if (!prefix || !code.startsWith(`${prefix}-`)) return dashboardRoute;
@@ -72,9 +74,9 @@ export function readPreviewRoute(url) {
   return { screen: screens.has(baseScreen) ? screen : detailDefaults[prefix], code };
 }
 
-export function previewUrl({ screen, code, benchmarkLedger = false }, query = new URLSearchParams()) {
+export function previewUrl({ screen, code, benchmarkLedger = false, serviceMode = false }, query = new URLSearchParams()) {
   const params = new URLSearchParams(query);
-  let path = available.get(screen) ?? '/dashboard/mine';
+  let path = available.get(screen) ?? available.get(dashboardRoute.screen);
   if (screen === 'login') path = '/login';
   else if (screen?.startsWith('dashboard/')) params.delete('view');
   else if (isLedgerScreen(screen)) {
@@ -82,7 +84,7 @@ export function previewUrl({ screen, code, benchmarkLedger = false }, query = ne
     if (screen === ledgerTableScreen) params.set('view', 'table');
     else params.delete('view');
     params.delete('transaction');
-    if (transactionCode(code) && (benchmarkLedger || !isBenchmarkTransactionCode(code))) params.set('transaction', code);
+    if (acceptsTransaction(code, serviceMode, benchmarkLedger)) params.set('transaction', code);
   }
   else if (code && /^(alert|episode)\//.test(screen)) {
     const [family, part, ...variants] = screen.split('/');

@@ -19,11 +19,11 @@ import {
   animate,
   motion,
   useMotionValue,
-  useReducedMotion,
   useSpring,
   useTransform,
-  useVelocity
+  useVelocity,
 } from 'motion/react';
+import { useAppReducedMotion } from '@/hooks/use-reduced-motion';
 
 import './WarmTooltip.css';
 
@@ -31,12 +31,6 @@ const EASE_OUT = [0.23, 1, 0.32, 1];
 const LEAN_SPRING = { stiffness: 260, damping: 22, mass: 0.4 };
 const FULL_LEAN_SPEED = 1200;
 const SIGN = { top: 1, bottom: -1, left: -1, right: 1 };
-const ORIGIN = { top: 'center bottom', bottom: 'center top', left: 'right center', right: 'left center' };
-const SIZES = {
-  sm: { font: 11.5, px: 8, py: 5 },
-  md: { font: 12.5, px: 10, py: 6 },
-  lg: { font: 13.5, px: 12, py: 7 }
-};
 const MARGIN = 8;
 const HOLD_SLOP = 10;
 const SWAP = 0.14;
@@ -66,17 +60,15 @@ const layoutOf = (x, y, width, height, side) => {
 
 const LAYER = {
   enter: ({ dir, across }) => ({
-    opacity: dir === 0 ? 1 : 0,
+    '--wt-layer-visibility': dir === 0 ? 1 : 0,
     x: across ? 0 : SWAP_SHIFT * dir,
-    y: across ? SWAP_SHIFT * dir : 0,
-    filter: dir === 0 ? 'blur(0px)' : 'blur(3px)'
+    y: across ? SWAP_SHIFT * dir : 0
   }),
-  show: { opacity: 1, x: 0, y: 0, filter: 'blur(0px)' },
+  show: { '--wt-layer-visibility': 1, x: 0, y: 0 },
   exit: ({ dir, across }) => ({
-    opacity: 0,
+    '--wt-layer-visibility': 0,
     x: across ? 0 : -SWAP_SHIFT * dir,
-    y: across ? -SWAP_SHIFT * dir : 0,
-    filter: 'blur(3px)'
+    y: across ? -SWAP_SHIFT * dir : 0
   })
 };
 
@@ -86,7 +78,7 @@ export const WarmTooltipGroup = forwardRef(function WarmTooltipGroup(
   { delay = 400, warmWindow = 300, travel = 320, lean = 0, onWarmChange, children, portalTarget, reduceMotion = false },
   ref
 ) {
-  const systemReducedMotion = useReducedMotion();
+  const systemReducedMotion = useAppReducedMotion();
   const reduce = reduceMotion || systemReducedMotion;
   const id = useId();
   const [current, setCurrent] = useState(null);
@@ -110,6 +102,8 @@ export const WarmTooltipGroup = forwardRef(function WarmTooltipGroup(
   const ay = useMotionValue(0);
   const w = useMotionValue(0);
   const h = useMotionValue(0);
+  const widthStyle = useTransform(w, value => `${value}px`);
+  const heightStyle = useTransform(h, value => `${value}px`);
   const presence = useMotionValue(0);
   const vx = useVelocity(ax);
   const vy = useVelocity(ay);
@@ -130,7 +124,8 @@ export const WarmTooltipGroup = forwardRef(function WarmTooltipGroup(
   const arrowAt = useTransform([ax, ay, w, h], ([x, y, width, height]) => {
     const side = st.current.current ? st.current.current.side : 'top';
     const { X, Y } = layoutOf(x, y, width, height, side);
-    return horizontal(side) ? clamp(x - X, 10, width - 10) : clamp(y - Y, 10, height - 10);
+    const offset = horizontal(side) ? clamp(x - X, 10, width - 10) : clamp(y - Y, 10, height - 10);
+    return `${offset}px`;
   });
   const pop = useTransform([presence, leanUnit], ([p, l]) => {
     const c = st.current.current;
@@ -164,7 +159,9 @@ export const WarmTooltipGroup = forwardRef(function WarmTooltipGroup(
     notify();
   };
 
-  api.current.show = (payload, mode) => {
+  api.current.show = (options, mode) => {
+    const { gap = 8, arrow = true, popDuration = 160, popScale = 0.94, popBlur = 4 } = options;
+    const payload = { ...options, gap, arrow, popDuration, popScale, popBlur };
     clearTimeout(st.current.closeTimer);
     clearTimeout(st.current.leaveTimer);
     const prev = st.current.current;
@@ -220,6 +217,7 @@ export const WarmTooltipGroup = forwardRef(function WarmTooltipGroup(
       id,
       delay,
       warmWindow,
+      reduce,
       activeId: current ? current.id : null,
       isWarm,
       show: (payload, mode) => api.current.show(payload, mode),
@@ -233,8 +231,7 @@ export const WarmTooltipGroup = forwardRef(function WarmTooltipGroup(
         finishClose();
       }
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [id, delay, warmWindow, current]
+    [id, delay, warmWindow, current, reduce]
   );
   useImperativeHandle(ref, () => group, [group]);
 
@@ -250,8 +247,8 @@ export const WarmTooltipGroup = forwardRef(function WarmTooltipGroup(
     const text = textRef.current;
     if (!c || !text || state !== 'open') return;
     const [tx, ty] = anchorOf(c.trigger.getBoundingClientRect(), c.side, c.gap);
-    const tw = text.offsetWidth + c.px * 2;
-    const th = text.offsetHeight + c.py * 2;
+    const tw = text.offsetWidth;
+    const th = text.offsetHeight;
     const mode = st.current.mode;
     if (mode === 'move' && !reduce && travel > 0) {
       const spring = { type: 'spring', duration: travel / 1000, bounce: 0.1 };
@@ -272,8 +269,7 @@ export const WarmTooltipGroup = forwardRef(function WarmTooltipGroup(
     } else {
       presence.jump(1);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current, state]);
+  }, [current, state, reduce]);
 
   useEffect(() => {
     if (state === 'closed') return undefined;
@@ -300,7 +296,6 @@ export const WarmTooltipGroup = forwardRef(function WarmTooltipGroup(
       window.removeEventListener('resize', follow);
       document.removeEventListener('visibilitychange', onHidden);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
   useEffect(
@@ -314,7 +309,6 @@ export const WarmTooltipGroup = forwardRef(function WarmTooltipGroup(
 
   const canPortal = typeof document !== 'undefined';
   const side = current ? current.side : 'top';
-  const arrowStyle = horizontal(side) ? { left: arrowAt } : { top: arrowAt };
 
   return (
     <GroupContext.Provider value={group}>
@@ -326,18 +320,17 @@ export const WarmTooltipGroup = forwardRef(function WarmTooltipGroup(
               role="tooltip"
               className="warm-tooltip"
               data-side={side}
+              data-size={current.size}
               style={{
-                transform: place,
-                width: w,
-                height: h,
+                '--wt-placement': place,
+                '--wt-width': widthStyle,
+                '--wt-height': heightStyle,
                 '--wt-surface': current.surfaceColor,
                 '--wt-ink': current.inkColor,
-                '--wt-radius': `${current.radius}px`,
-                '--wt-font': `${current.font}px`,
-                '--wt-origin': ORIGIN[side]
+                '--wt-radius': current.radius == null ? undefined : `${current.radius}px`
               }}
             >
-              <motion.span className="warm-tooltip__box" style={{ transform: pop, opacity: presence, filter: blur }}>
+              <motion.span className="warm-tooltip__box" style={{ '--wt-pop': pop, '--wt-presence': presence, '--wt-pop-filter': blur }}>
                 <AnimatePresence initial={false} custom={st.current.swap}>
                   <motion.span
                     key={current.id}
@@ -361,7 +354,7 @@ export const WarmTooltipGroup = forwardRef(function WarmTooltipGroup(
                   </motion.span>
                 </AnimatePresence>
                 {current.arrow ? (
-                  <motion.span className="warm-tooltip__arrow" data-side={side} style={arrowStyle} aria-hidden="true" />
+                  <motion.span className="warm-tooltip__arrow" data-side={side} style={{ '--wt-arrow-position': arrowAt }} aria-hidden="true" />
                 ) : null}
               </motion.span>
             </motion.span>,
@@ -399,7 +392,6 @@ function Trigger({
   const [fuse, setFuse] = useState('idle');
   const [pressing, setPressing] = useState(false);
   const t = useRef({ open: undefined, press: undefined, press0: null, suppressClick: false });
-  const preset = SIZES[size] || SIZES.md;
   const coldDelay = delay ?? group.delay;
   const active = group.activeId === id;
 
@@ -414,9 +406,7 @@ function Trigger({
     surfaceColor,
     inkColor,
     radius,
-    font: preset.font,
-    px: preset.px,
-    py: preset.py,
+    size,
     popDuration,
     popScale,
     popBlur,
@@ -454,7 +444,6 @@ function Trigger({
       cancelPress();
       hide(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [disabled]);
 
   useEffect(() => {
@@ -464,7 +453,6 @@ function Trigger({
     };
     document.addEventListener('pointerdown', onOutside, true);
     return () => document.removeEventListener('pointerdown', onOutside, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
   useEffect(
@@ -534,6 +522,7 @@ function Trigger({
       ref={triggerRef}
       className={`warm-tooltip__trigger${className ? ` ${className}` : ''}`}
       data-pressing={pressing ? '' : undefined}
+      data-motion-reduced={group.reduce || undefined}
       style={{ '--wt-surface': surfaceColor, '--wt-fuse-ms': `${t.current.press0 ? longPress : coldDelay}ms` }}
       {...handlers}
     >
@@ -550,15 +539,15 @@ export default function WarmTooltip({
   side = 'top',
   delay,
   warmWindow,
-  surfaceColor = '#f5f5f5',
-  inkColor = '#18181b',
-  size = 'md',
-  radius = 8,
-  gap = 8,
-  arrow = true,
-  popDuration = 160,
-  popScale = 0.94,
-  popBlur = 4,
+  surfaceColor,
+  inkColor,
+  size,
+  radius,
+  gap,
+  arrow,
+  popDuration,
+  popScale,
+  popBlur,
   showFuse = false,
   longPress = 500,
   disabled = false,

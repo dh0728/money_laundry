@@ -1,0 +1,27 @@
+# 디자인 규칙을 사람·AI 모두 커밋 전에 걸리게 한다(frontend/web-app). 끄지 말고 고친다.
+# 설치: frontend/web-app에서 pnpm install(prepare가 lefthook install을 실행한다).
+pre-commit:
+  parallel: true
+  commands:
+    eslint:
+      root: frontend/web-app/
+      glob: "*.{js,jsx,ts,tsx}"
+      run: pnpm exec eslint {staged_files}
+    stylelint:
+      root: frontend/web-app/
+      glob: "*.css"
+      run: pnpm exec stylelint {staged_files}
+    design-rules:
+      root: frontend/web-app/
+      glob: "*.{js,jsx,ts,tsx,css,mjs,json}"
+      run: pnpm run lint:design:staged
+    workspace-scroll:
+      root: frontend/web-app/
+      glob: "*.{js,jsx,ts,tsx,css,mjs,json,html}"
+      run: pnpm run test:scroll
+
+pre-push:
+  commands:
+    design-rules:
+      root: frontend/web-app/
+      run: pnpm run lint:design

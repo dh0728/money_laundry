@@ -1,0 +1,22 @@
+:where([data-slot="sidebar-wrapper"]) {
+  --sidebar-width: var(--sidebar-default-width);
+  --sidebar-width-icon: var(--sidebar-default-icon-width);
+}
+
+[data-slot="sidebar"][data-mobile="true"] {
+  --sidebar-width: var(--sidebar-mobile-width);
+}
+
+[data-slot="sidebar-gap"] {
+  --sidebar-icon-gap: calc(var(--sidebar-width-icon) + var(--sidebar-icon-inset));
+}
+
+[data-slot="sidebar-container"] {
+  --sidebar-offcanvas-offset: calc(-1 * var(--sidebar-width));
+  --sidebar-icon-container: calc(var(--sidebar-width-icon) + var(--sidebar-icon-inset) + 2 * var(--aml-stroke-control));
+}
+
+[data-slot="sidebar-menu-button"] {
+  --sidebar-menu-outline-shadow: 0 0 0 var(--aml-stroke-control) var(--sidebar-border);
+  --sidebar-menu-outline-hover-shadow: 0 0 0 var(--aml-stroke-control) var(--sidebar-accent);
+}

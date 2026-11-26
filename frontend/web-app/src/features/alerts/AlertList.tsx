@@ -8,7 +8,8 @@ import { typeDisplay, type AlertStatus, type TypeCode } from '@/api/codes'
 import { useCurrentUser } from '@/app/session'
 import { DateRangeButton } from '@/components/DateRangeButton'
 import { FilterChip } from '@/components/FilterChip'
-import { AgeBadge, PatternBadge, RiskBadge, StatusBadge, alertStatusLabels } from '@/components/badges'
+import { AgeBadge, PatternBadge, RiskBadge, StatusBadge } from '@/components/badges'
+import { alertStatusLabels } from '@/api/codes'
 import { DataTable } from '@/components/data-table/data-table'
 import { DataTableColumnHeader } from '@/components/data-table/data-table-column-header'
 import { Badge } from '@/components/ui/badge'
@@ -20,8 +21,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useDataTable } from '@/hooks/use-data-table'
 import { useMemoryState } from '@/lib/memory'
+import { downloadBlob } from '@/lib/report-io'
 import { ageOptions, riskOptions, alertCode, episodeCode, filterFieldNames, filterLabel, matchesAlert, type AlertFilter, type AlertFilterField } from './alertFilters'
 import { canLink, episodeLinkReducer, initialLinkState, linkableEpisodes, type EpisodeTarget } from './episodeLink'
+import { Box, Text } from '@/components/layout-primitives'
 
 
 export type AlertListRow = Pick<AlertRow, 'alertId' | 'riskScore' | 'txCount' | 'assignee' | 'status' | 'createdAt' | 'ageDays' | 'episodeId' > & Partial<Pick<AlertRow, 'summary' | 'subjectAccount' | 'lastTxAt'>> & { primaryType: { code: TypeCode | null; name: string }; accountCount?: number; bankCount?: number; totalAmountUsd?: number; amountLabel?: string }
@@ -31,9 +34,9 @@ const baseColumns: ColumnDef<AlertListRow>[] = [
     id: 'alertId', accessorKey: 'alertId',
     header: ({ column }) => <DataTableColumnHeader column={column} label="ID" />,
     cell: ({ row }) => (
-      <div className="min-w-0 max-w-[340px]">
-        <p className="font-mono text-sm" translate="no">{alertCode(row.original.alertId)}</p>
-      </div>
+      <Box className="min-w-0 max-w-(--case-list-summary-max-width)">
+        <Text className="font-mono text-sm" translate="no">{alertCode(row.original.alertId)}</Text>
+      </Box>
     ),
   },
   { id: 'riskScore', accessorKey: 'riskScore', header: ({ column }) => <DataTableColumnHeader column={column} label="위험도" />, cell: ({ row }) => <RiskBadge score={row.original.riskScore} /> },
@@ -42,7 +45,7 @@ const baseColumns: ColumnDef<AlertListRow>[] = [
   {
     id: 'txCount', accessorKey: 'txCount',
     header: ({ column }) => <DataTableColumnHeader column={column} label="거래" className="flex-row-reverse justify-start" />,
-    cell: ({ row }) => <div className="text-right text-sm tabular-nums">{row.original.txCount}건</div>,
+    cell: ({ row }) => <Box className="text-right text-sm tabular-nums">{row.original.txCount}건</Box>,
   },
   { id: 'assignee', accessorFn: row => row.assignee.name, header: ({ column }) => <DataTableColumnHeader column={column} label="담당자" /> },
   { id: 'status', accessorKey: 'status', header: ({ column }) => <DataTableColumnHeader column={column} label="상태" />, cell: ({ row }) => <StatusBadge status={row.original.status} /> },
@@ -52,10 +55,10 @@ const baseColumns: ColumnDef<AlertListRow>[] = [
     cell: ({ row }) => {
       const { createdAt, ageDays } = row.original
       return (
-        <div className="flex items-center gap-2 whitespace-nowrap text-sm tabular-nums text-muted-foreground">
-          <span>{createdAt.slice(5, 10)}</span>
+        <Box className="flex items-center gap-2 whitespace-nowrap text-sm tabular-nums text-muted-foreground">
+          <Text as="span">{createdAt.slice(5, 10)}</Text>
           <AgeBadge days={ageDays} />
-        </div>
+        </Box>
       )
     },
   },
@@ -63,7 +66,7 @@ const baseColumns: ColumnDef<AlertListRow>[] = [
     id: 'episode', header: 'Episode 연결', enableSorting: false,
     cell: ({ row }) => row.original.episodeId != null
       ? <Badge variant="outline" className="font-mono text-xs font-normal">{episodeCode(row.original.episodeId)}</Badge>
-      : <span className="text-xs text-muted-foreground">미연결</span>,
+      : <Text as="span" className="text-xs text-muted-foreground">미연결</Text>,
   },
 ]
 
@@ -156,18 +159,16 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
       ['ID', '위험도', '탐지 유형', '거래', '담당자', '상태'],
       ...result.map(r => [alertCode(r.alertId), r.riskScore, r.primaryType.name, r.txCount, r.assignee.name, r.status]),
     ].map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
-    const a = document.createElement('a')
-    a.href = url; a.download = 'Alert-목록.csv'; a.click(); URL.revokeObjectURL(url)
+    downloadBlob('Alert-목록.csv', new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
   }
 
   return (
-    <div className="max-w-[1320px] space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative mr-1 w-64">
+    <Box className="max-w-(--case-list-max-width) space-y-4">
+      <Box className="flex flex-wrap items-center gap-2">
+        <Box className="relative mr-1 w-64">
           <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
           <Input aria-label="Alert 검색" placeholder="ID, 탐지 유형, 담당자 검색" value={query} onChange={e => { setQuery(e.target.value); toFirst() }} className="h-9 pl-9 text-xs" />
-        </div>
+        </Box>
         <DateRangeButton value={range} onChange={r => { setRange(r); toFirst() }} today={today} />
         <Popover open={filterOpen} onOpenChange={setFilterOpen}>
           <PopoverTrigger asChild>
@@ -175,8 +176,8 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
           </PopoverTrigger>
           <PopoverContent align="start" className="w-72 space-y-3">
             <Label>미리 정한 조건</Label>
-            <div className="grid grid-cols-2 gap-1.5">{([['내 담당 미처리', [{ field: 'assignee', value: me }, { field: 'status', value: 'OPEN' }]], ['고위험', [{ field: 'risk', value: 0.8 }]], ['3일 이상', [{ field: 'age', value: 3 }]], ['전체', []]] as [string, AlertFilter[]][]).map(([label, preset]) =>
-              <Button key={label} size="sm" variant="outline" className="h-8 text-xs" onClick={() => { setFilters(preset); toFirst(); setFilterOpen(false) }}>{label}</Button>)}</div>
+            <Box className="grid grid-cols-2 gap-1.5">{([['내 담당 미처리', [{ field: 'assignee', value: me }, { field: 'status', value: 'OPEN' }]], ['고위험', [{ field: 'risk', value: 0.8 }]], ['3일 이상', [{ field: 'age', value: 3 }]], ['전체', []]] as [string, AlertFilter[]][]).map(([label, preset]) =>
+              <Button key={label} size="sm" variant="outline" className="h-8 text-xs" onClick={() => { setFilters(preset); toFirst(); setFilterOpen(false) }}>{label}</Button>)}</Box>
             <Label>조건 추가</Label>
             <Select value={field} onValueChange={v => { const f = v as AlertFilterField; setField(f); setValue(valueOptions[f][0].value) }}>
               <SelectTrigger className="w-full" aria-label="필터 항목"><SelectValue /></SelectTrigger>
@@ -194,13 +195,13 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
           </PopoverContent>
         </Popover>
         {currentUser.role === 'STAFF' && link.mode === 'browse' && <Button variant="outline" size="sm" className="ml-auto" disabled={!rows.some(row => canLink(row, currentUser))} onClick={() => dispatchLink({ type: 'start' })}><Combine className="size-3.5" />Episode로 묶기</Button>}
-        <span className="text-xs text-muted-foreground">위험도순 · {result.length}건</span>
+        <Text as="span" className="text-xs text-muted-foreground">위험도순 · {result.length}건</Text>
         <Button variant="outline" size="sm" className={link.mode === 'browse' ? '' : 'ml-auto'} onClick={download}><Download className="size-3.5" />{remote ? '현재 페이지 다운로드' : '다운로드'}</Button>
-      </div>
+      </Box>
 
       {link.mode === 'link' && (
-        <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-md border bg-background/95 px-3 py-2 shadow-sm backdrop-blur" data-testid="episode-link-action-bar">
-          <strong className="mr-auto text-sm">{link.selected.size}건 선택 <span className="ml-1 text-xs font-normal text-muted-foreground">본인 담당 · 진행 중 단독 Alert만 고를 수 있습니다{target === 'new' && link.selected.size < 2 ? ' · 새 Episode는 2건 이상' : ''}</span></strong>
+        <Box className="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-md border bg-background/95 px-3 py-2 shadow-sm backdrop-blur" data-testid="episode-link-action-bar">
+          <Text as="strong" className="mr-auto text-sm">{link.selected.size}건 선택 <Text as="span" className="ml-1 text-xs font-normal text-muted-foreground">본인 담당 · 진행 중 단독 Alert만 고를 수 있습니다{target === 'new' && link.selected.size < 2 ? ' · 새 Episode는 2건 이상' : ''}</Text></Text>
           <Select value={target} onValueChange={setTarget}>
             <SelectTrigger size="sm" className="w-52" aria-label="Episode 연결 방식"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -213,31 +214,31 @@ export default function AlertList({ rows, today, onOpen, onLink, remote }: Props
             void Promise.resolve().then(() => onLink([...link.selected], target === 'new' ? 'new' : Number(target), comment.trim())).then(() => endLink('complete')).catch(() => undefined)
           }}>{target === 'new' ? '새 Episode 만들기' : 'Episode에 연결'}</Button>
           <Button size="sm" variant="outline" onClick={() => endLink('cancel')}>취소</Button>
-        </div>
+        </Box>
       )}
 
       {filters.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
+        <Box className="flex flex-wrap items-center gap-2">
           {filters.map((f, i) => (
             <FilterChip key={`${f.field}-${f.value}`} onRemove={() => { setFilters(prev => prev.filter((_, j) => j !== i)); toFirst() }}>
               {filterLabel(f, id => assignees.get(id) ?? String(id), me)}
             </FilterChip>
           ))}
           <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={reset}>모든 조건 지우기</Button>
-        </div>
+        </Box>
       )}
 
       {result.length
-        ? <DataTable pagination={!remote} table={table} columnWidths={link.mode === 'link' ? linkColumnWidths : browseColumnWidths} tableClassName="table-fixed min-w-[990px] [&_th]:px-2.5 [&_td]:px-2.5" onRowClick={link.mode === 'link' ? row => canLink(row, currentUser) && dispatchLink({ type: 'toggle', id: row.alertId }) : onOpen} data-testid="alert-table" />
+        ? <DataTable pagination={!remote} table={table} columnWidths={link.mode === 'link' ? linkColumnWidths : browseColumnWidths} tableClassName="table-fixed min-w-(--case-list-table-min-width) [&_th]:px-2.5 [&_td]:px-2.5" onRowClick={link.mode === 'link' ? row => canLink(row, currentUser) && dispatchLink({ type: 'toggle', id: row.alertId }) : onOpen} data-testid="alert-table" />
         : (
-          <div className="glass-surface rounded-md border py-20 text-center">
+          <Box className="glass-surface rounded-md border py-20 text-center">
             <Inbox className="mx-auto mb-4 size-7 text-muted-foreground" />
-            <p className="text-sm">조건에 맞는 Alert가 없습니다.</p>
-            <p className="mb-4 mt-2 text-xs text-muted-foreground">검색어와 필터를 확인하세요.</p>
+            <Text className="text-sm">조건에 맞는 Alert가 없습니다.</Text>
+            <Text className="mb-4 mt-2 text-xs text-muted-foreground">검색어와 필터를 확인하세요.</Text>
             <Button size="sm" variant="outline" onClick={reset}>전체 목록 보기</Button>
-          </div>
+          </Box>
         )}
       {remote?.footer}
-    </div>
+    </Box>
   )
 }

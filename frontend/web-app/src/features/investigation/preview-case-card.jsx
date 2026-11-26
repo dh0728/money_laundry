@@ -5,9 +5,12 @@ import { Panel } from '../../components/panel';
 import { ActionButton } from '../../components/primary-button';
 import { RecordCard } from '../../components/record-card';
 import MagicBento from '../../components/react-bits/MagicBento';
-import { CaseActorTag, CountTag, ModelScoreTag, PatternTag, ReviewStatusTag, reviewStates, StatusTag, VerdictTag } from '../../components/semantic-tags';
+import { CaseActorTag, CaseAgeTag, CountTag, ModelScoreTag, PatternTag, ReviewStatusTag, reviewStates, StatusTag, VerdictTag } from '../../components/semantic-tags';
 import { readWorkspaceGap } from '../dashboard/workspace-metrics';
 import './preview-case-card.css';
+import { Box, Heading, Text } from '../../components/layout-primitives';
+import { caseCsvDownloadEntry } from '../../components/query-controls';
+import { SectionDownloadHeading } from '../../components/section-download';
 
 const amount = new Intl.NumberFormat('ko-KR');
 const formatDate = new Intl.DateTimeFormat('sv-SE', { year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -20,7 +23,7 @@ function TransactionPeriod({ related }) {
   if (!dates.length) return '—';
   const start = formatDate.format(Math.min(...dates));
   const end = formatDate.format(Math.max(...dates));
-  return <><time dateTime={start}>{start}</time>{start !== end && <> ~ <time dateTime={end}>{end}</time></>}</>;
+  return <><Text as="time" dateTime={start}>{start}</Text>{start !== end && <> ~ <Text as="time" dateTime={end}>{end}</Text></>}</>;
 }
 
 function CaseCompletionTag({ completedAt }) {
@@ -30,41 +33,45 @@ function CaseCompletionTag({ completedAt }) {
   const label = `처리 완료 ${kst} KST`;
   return <StatusTag preset="neutral" className="case-completion-tag">
     <Clock aria-hidden="true" />
-    <time dateTime={completedAt} title={label} aria-label={label}>{kst.slice(5, 16)}</time>
+    <Text as="time" dateTime={completedAt} title={label} aria-label={label}>{kst.slice(5, 16)}</Text>
   </StatusTag>;
 }
 
 function Field({ label, children }) {
-  return <div><dt>{label}</dt><dd>{children}</dd></div>;
+  return <Box><Box as="dt">{label}</Box><Box as="dd">{children}</Box></Box>;
 }
 
 function EmptyState({ children, announce = false }) {
-  return <p className="case-progress-empty" role={announce ? 'status' : undefined}>{children}</p>;
+  return <Text className="case-progress-empty" role={announce ? 'status' : undefined}>{children}</Text>;
 }
 
-export function CaseProgressLanes({ renderLane, notice }) {
-  return <div className="case-progress-board">
+export function CaseProgressLanes({ renderLane, notice, className = '' }) {
+  return <Box className={`case-progress-board ${className}`.trim()}>
     {notice}
-    <div className="case-progress-lanes" style={{ '--case-progress-columns': reviewStates.length }}>
+    <Box className="case-progress-lanes" style={{ '--case-progress-columns': reviewStates.length }}>
       {reviewStates.map(renderLane)}
-    </div>
-  </div>;
+    </Box>
+  </Box>;
 }
 
-export function CaseProgressBoard({ rows, reduced, theme, orderRows, showAssignee = true, pageSize }) {
+export function CaseProgressBoard({ rows, reduced, theme, orderRows, showAssignee = true, plainCount = false,
+  pageSize, statusByCode, className }) {
   const [limits, setLimits] = React.useState({});
   const isEmpty = rows.length === 0;
   return <CaseProgressLanes
+    className={className}
     notice={isEmpty && <EmptyState announce>조회 조건에 해당하는 업무가 없습니다.</EmptyState>}
     renderLane={({ label, preset, value }) => {
-        const matching = rows.filter(row => row.status === value);
+        const matching = rows.filter(row => (statusByCode?.[row.code] ?? row.status) === value);
         const cards = orderRows ? orderRows(matching) : matching;
         const limit = limits[preset] ?? pageSize ?? cards.length;
+        const downloads = cards.length ? [caseCsvDownloadEntry(label + ' 업무', 'work-board-' + preset, cards)] : [];
         return <Panel className="case-progress-lane" data-review={preset} key={preset} aria-label={label}>
-          <h2 className="case-progress-heading">
+          <SectionDownloadHeading as={Heading} className="case-progress-lane-header"
+            headingClassName="case-progress-heading" entries={downloads}>
             <StatusTag preset={preset}>{label}</StatusTag>
-            <CountTag count={Math.min(limit, cards.length)} total={cards.length} />
-          </h2>
+            <CountTag count={Math.min(limit, cards.length)} total={cards.length} plain={plainCount} />
+          </SectionDownloadHeading>
           {cards.length > 0 ? <MagicBento key={reduced} className="case-progress-cards preview-tilt-cards"
             items={cards.slice(0, limit).map(row => ({ id: row.code, content: <PreviewCaseCard
               row={row} showReviewStatus={false} showAssignee={showAssignee} /> }))}
@@ -79,40 +86,41 @@ export function CaseProgressBoard({ rows, reduced, theme, orderRows, showAssigne
 }
 
 export function EpisodeAlertSummary({ codes, complete = Boolean(codes) }) {
-  if (!complete && !codes?.length) return <span>샘플에 소속 Alert 정보 없음</span>;
-  if (!codes.length) return <span>소속 Alert 0건</span>;
-  return <span className="semantic-tag-group">
-    <span>{complete ? `${codes.length}건` : `추가 연결 ${codes.length}건 · 기존 소속 정보 없음`}</span>
-    {codes.map(code => <code key={code}>{code}</code>)}
-  </span>;
+  if (!complete && !codes?.length) return <Text as="span">샘플에 소속 Alert 정보 없음</Text>;
+  if (!codes.length) return <Text as="span">소속 Alert 0건</Text>;
+  return <Text as="span" className="semantic-tag-group">
+    <Text as="span">{complete ? `${codes.length}건` : `추가 연결 ${codes.length}건 · 기존 소속 정보 없음`}</Text>
+    {codes.map(code => <Text as="code" key={code}>{code}</Text>)}
+  </Text>;
 }
 
 export function PreviewCaseCard({ row, selectedTransaction, className = '', selection, showAdd = true, sharedEvidence, drag,
-  showReviewStatus = true, showAssignee = true }) {
+  showReviewStatus = true, showAssignee = true, onAction }) {
   const { code, kind, score, status, pattern, assigned, elapsed, open, related } = row;
   const isEpisode = kind === 'Episode';
   const transaction = selectedTransaction ?? related[0];
   const source = transaction?.from?.code ?? transaction?.account;
   const destination = transaction?.to?.code ?? transaction?.counterparty;
   const flow = source && destination
-    ? `${source} → ${destination}${!selectedTransaction && related.length > 1 ? ` 외 ${related.length - 1}` : ''}`
+    ? <><Text as="code">{source}</Text> → <Text as="code">{destination}</Text>
+      {!selectedTransaction && related.length > 1 ? ` 외 ${related.length - 1}` : ''}</>
     : '—';
   const totals = Object.entries(row.amountByCurrency ?? {})
     .map(([currency, value]) => `${amount.format(value)} ${currency}`);
   const verdict = row.verdict;
   return <RecordCard className={`case-glow preview-case-card ${className}`} label={code}
     selected={selection?.checked} verdict={verdict} drag={drag} opensRecord>
-    <CardHeader code={code} selection={selection} showAdd={showAdd} draggableCard={Boolean(drag)} />
-    <div className="preview-case-card-body">
-      <div className="semantic-tag-group">
+    <CardHeader code={code} selection={selection} showAdd={showAdd} draggableCard={Boolean(drag)} onAction={onAction} />
+    <Box className="preview-case-card-body">
+      <Box className="semantic-tag-group">
         <VerdictTag verdict={verdict} />
-        {open && elapsed >= 3 && <StatusTag preset={elapsed > 7 ? 'elapsedOver1w' : 'elapsedUnder1w'}>{elapsed}일 경과</StatusTag>}
+        {open && <CaseAgeTag days={elapsed} />}
         {showReviewStatus && <ReviewStatusTag status={status} />}
         <ModelScoreTag score={score} />
         {showAssignee && <CaseActorTag>{assigned ? '내 담당' : '다른 담당자'}</CaseActorTag>}
         {status === '처리 완료' && <CaseCompletionTag completedAt={row.completedAt} />}
-      </div>
-      <dl>
+      </Box>
+      <Box as="dl">
         {sharedEvidence && <Field label="공통 근거">거래 {sharedEvidence.transactions}건 · 계좌 {sharedEvidence.accounts}개</Field>}
         <Field label="패턴"><PatternTag emphasis="solid">{pattern}</PatternTag></Field>
         <Field label="계좌 흐름">{flow}</Field>
@@ -123,7 +131,7 @@ export function PreviewCaseCard({ row, selectedTransaction, className = '', sele
           ? <Field label="소속 Alert"><EpisodeAlertSummary codes={row.linkedAlertCodes} complete={row.linkedAlertCodesComplete} /></Field>
           : <Field label="Alert 건수">{row.linkedAlerts}건</Field>)}
         {isEpisode && <Field label="관련 계좌">{row.relatedAccounts}개</Field>}
-      </dl>
-    </div>
+      </Box>
+    </Box>
   </RecordCard>;
 }

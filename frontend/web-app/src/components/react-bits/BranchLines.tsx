@@ -1,4 +1,5 @@
 import './BranchedMenu.css';
+import type { CSSProperties } from 'react';
 
 interface BranchLinesProps {
   rows: number[];
@@ -23,7 +24,7 @@ export function BranchLines({ rows, width, height, trunk, end, radius, activeInd
       {rows.map((y, index) => {
         const length = y - turn + (Math.PI * turn) / 2 + (end - trunk - turn);
         return <path key={index} className="branched-menu__reach" d={`M ${trunk} 0 V ${y - turn} ${curve(y)}`}
-          style={{ strokeDasharray: length, strokeDashoffset: index === activeIndex ? 0 : length }} />;
+          style={{ '--bm-branch-length': length, '--bm-branch-offset': index === activeIndex ? 0 : length } as CSSProperties} />;
       })}
     </svg>
   );

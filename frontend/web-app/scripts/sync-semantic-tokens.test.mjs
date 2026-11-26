@@ -98,16 +98,13 @@ describe('offline semantic token aliases', () => {
 
 // Frozen primitive/source files are excluded; component CSS must use a bridge role or
 // an explicitly inventoried primitive. This catches new color aliases left on v3.
-it('covers consumed semantic color aliases across next styles and components', async () => {
-  const { readdir } = await import('node:fs/promises')
+it('covers consumed semantic color aliases across the former next rule-condition files', async () => {
   const { resolve } = await import('node:path')
-  async function files(directory) {
-    const entries = await readdir(directory, { withFileTypes: true })
-    return (await Promise.all(entries.map(entry => entry.isDirectory() ? files(resolve(directory, entry.name)) : resolve(directory, entry.name)))).flat()
-  }
   const unmapped = new Set()
   const primitives = new Set(['black-020', 'black-050', 'gray-020', 'white-100'])
-  for (const path of await files(resolve(import.meta.dirname, '../src/next'))) {
+  // src/next 시험판을 지운 뒤 v3 별칭을 쓰는 화면 파일은 아래 두 개만 남았다(옛 src/next/features·styles).
+  const consumers = ['../src/features/rules/RuleConditionBlocks.tsx', '../src/features/rules/rule-condition-blocks.css']
+  for (const path of consumers.map(file => resolve(import.meta.dirname, file))) {
     if (!/\.(css|tsx)$/.test(path) || /(?:tokens\.css|\.test\.tsx)$/.test(path)) continue
     for (const match of (await readFile(path, 'utf8')).matchAll(/var\(--aml-([\w-]+)/g)) {
       const name = match[1]

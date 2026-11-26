@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
+import { Box, Text } from '@/components/layout-primitives'
 
 // 권한 후보(정의는 팀·Backend). high = 결과가 커서 STAFF 기본값을 꺼 둔다
 const PERMS = [
@@ -38,28 +39,28 @@ export function MembersTab({ role, me = 1 }: { role: MockRole; me?: number }) {
   const self = sel.id === me, base = defaults(sel.role)
   const changes = [...(draftRole !== sel.role ? [`역할 ${sel.role === 'ADMIN' ? '관리자' : '조사자'} → ${draftRole === 'ADMIN' ? '관리자' : '조사자'}`] : []), ...PERMS.filter(p => perms[p.k] !== base[p.k]).map(p => `${p.label} ${perms[p.k] ? '허용' : '해제'}`)]
   const locked = role !== 'ADMIN' || self
-  return <div className="grid grid-cols-1 items-start gap-4 @5xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+  return <Box className="grid grid-cols-1 items-start gap-4 @5xl:grid-cols-(--workspace-list-detail-columns)">
     <Card className="shadow-none"><CardContent><SectionTitle title="구성원" description={`${MEMBERS.length}명 · 행을 고르면 오른쪽에서 권한을 봅니다`} />
       <Table><TableHeader><TableRow><TableHead>이름</TableHead><TableHead>역할</TableHead><TableHead className="text-right">담당 미처리</TableHead><TableHead className="text-right">72시간 경과</TableHead><TableHead>마지막 활동</TableHead></TableRow></TableHeader>
         <TableBody>{MEMBERS.map(m => <TableRow key={m.id} aria-selected={sel.id === m.id} className={`cursor-pointer ${sel.id === m.id ? 'bg-muted/50' : ''}`} onClick={() => pick(m)}>
-          <TableCell>{m.name}<span className="ml-1.5 font-mono text-xs text-muted-foreground">{m.username}</span>{m.id === me && <Badge variant="outline" className="ml-2 font-normal">나</Badge>}</TableCell>
+          <TableCell>{m.name}<Text as="span" className="ml-1.5 font-mono text-xs text-muted-foreground">{m.username}</Text>{m.id === me && <Badge variant="outline" className="ml-2 font-normal">나</Badge>}</TableCell>
           <TableCell className="text-xs">{m.role === 'ADMIN' ? '관리자' : '조사자'}</TableCell><TableCell className="text-right tabular-nums">{m.open}</TableCell><TableCell className="text-right tabular-nums">{m.aged}</TableCell><TableCell className="tabular-nums text-xs">{m.last}</TableCell>
         </TableRow>)}</TableBody></Table>
     </CardContent></Card>
     <Card className="shadow-none"><CardContent className="space-y-4"><SectionTitle title={`${sel.name} 권한`} description={self ? '자기 권한은 바꿀 수 없습니다(직무 분리)' : '바꾼 내용은 저장 전에 요약해 보여 줍니다'} />
-      <label className="flex items-center gap-3 text-xs"><span className="w-12 text-muted-foreground">역할</span>
-        <Select value={draftRole} disabled={locked} onValueChange={v => { setDraftRole(v as MockRole); setPerms(defaults(v as MockRole)) }}><SelectTrigger size="sm" className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="STAFF">조사자</SelectItem><SelectItem value="ADMIN">관리자</SelectItem></SelectContent></Select></label>
-      <div className="grid grid-cols-1 gap-2 @3xl:grid-cols-2">{PERMS.map(p => <Label key={p.k} className="flex items-center gap-2.5 rounded-md border px-3 py-2 text-xs font-normal">
-        <Checkbox checked={perms[p.k]} disabled={locked || draftRole === 'ADMIN'} onCheckedChange={v => setPerms({ ...perms, [p.k]: Boolean(v) })} />{p.label}{p.high && <span className="ml-auto text-[0.6875rem] text-muted-foreground">영향 큼</span>}
-      </Label>)}</div>
-      {draftRole === 'ADMIN' && <p className="text-xs text-muted-foreground">관리자는 모든 권한을 가집니다(Q11).</p>}
-      {sel.open > 0 && <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-xs"><span>담당 미처리 {sel.open}건</span><AdminButton role={role} size="sm" variant="outline" onClick={() => toast('재배정 대상 고르기', { description: '시안이라 열지 않습니다.' })}>담당 재배정</AdminButton></div>}
-      <div className="rounded-md bg-muted/40 px-3 py-2 text-xs">{changes.length ? <><p className="font-medium">저장 전 변경 요약</p><ul className="mt-1 list-disc pl-4 text-muted-foreground">{changes.map(c => <li key={c}>{c}</li>)}</ul></> : <p className="text-muted-foreground">바뀐 내용이 없습니다.</p>}</div>
+      <Box as="label" className="flex items-center gap-3 text-xs"><Text as="span" className="w-12 text-muted-foreground">역할</Text>
+        <Select value={draftRole} disabled={locked} onValueChange={v => { setDraftRole(v as MockRole); setPerms(defaults(v as MockRole)) }}><SelectTrigger size="sm" className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="STAFF">조사자</SelectItem><SelectItem value="ADMIN">관리자</SelectItem></SelectContent></Select></Box>
+      <Box className="grid grid-cols-1 gap-2 @3xl:grid-cols-2">{PERMS.map(p => <Label key={p.k} className="flex items-center gap-2.5 rounded-md border px-3 py-2 text-xs font-normal">
+        <Checkbox checked={perms[p.k]} disabled={locked || draftRole === 'ADMIN'} onCheckedChange={v => setPerms({ ...perms, [p.k]: Boolean(v) })} />{p.label}{p.high && <Text as="span" className="ml-auto text-2xs text-muted-foreground">영향 큼</Text>}
+      </Label>)}</Box>
+      {draftRole === 'ADMIN' && <Text className="text-xs text-muted-foreground">관리자는 모든 권한을 가집니다(Q11).</Text>}
+      {sel.open > 0 && <Box className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-xs"><Text as="span">담당 미처리 {sel.open}건</Text><AdminButton role={role} size="sm" variant="outline" onClick={() => toast('재배정 대상 고르기', { description: '시안이라 열지 않습니다.' })}>담당 재배정</AdminButton></Box>}
+      <Box className="rounded-md bg-muted/40 px-3 py-2 text-xs">{changes.length ? <><Text className="font-medium">저장 전 변경 요약</Text><Box as="ul" className="mt-1 list-disc pl-4 text-muted-foreground">{changes.map(c => <Box as="li" key={c}>{c}</Box>)}</Box></> : <Text className="text-muted-foreground">바뀐 내용이 없습니다.</Text>}</Box>
       <Textarea className="min-h-16 text-sm" placeholder="바꾸는 이유(감사 이력에 남습니다)" value={reason} onChange={e => setReason(e.target.value)} disabled={locked} />
-      <div className="flex justify-end"><AdminButton role={role} size="sm" disabled={self || !changes.length || !reason.trim()} onClick={() => toast.success(`${sel.name} 권한 변경`, { description: '시안이라 저장하지 않습니다.' })}>적용</AdminButton></div>
+      <Box className="flex justify-end"><AdminButton role={role} size="sm" disabled={self || !changes.length || !reason.trim()} onClick={() => toast.success(`${sel.name} 권한 변경`, { description: '시안이라 저장하지 않습니다.' })}>적용</AdminButton></Box>
       <ProvenanceNote kind="proposal">권한 지정·재배정 API가 아직 없습니다(BE 149).</ProvenanceNote>
     </CardContent></Card>
-  </div>
+  </Box>
 }
 
 const AUDIT = [
@@ -74,12 +75,12 @@ export function AuditTab() {
   const [who, setWho] = useState('all'), [what, setWhat] = useState('all')
   const rows = AUDIT.filter(r => (who === 'all' || r[2] === who) && (what === 'all' || r[4] === what))
   return <Card className="shadow-none"><CardContent className="space-y-4"><SectionTitle title="감사 이력" description="누가 · 언제 · 무엇을 · 왜. 업무 시각과 실제 저장 시각을 함께 남깁니다" />
-    <div className="flex flex-wrap gap-3 text-xs">
-      <label className="space-y-1.5"><span className="block text-muted-foreground">사용자</span><Select value={who} onValueChange={setWho}><SelectTrigger size="sm" className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">전체</SelectItem>{MEMBERS.map(m => <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>)}</SelectContent></Select></label>
-      <label className="space-y-1.5"><span className="block text-muted-foreground">행동</span><Select value={what} onValueChange={setWhat}><SelectTrigger size="sm" className="w-36"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">전체</SelectItem>{[...new Set(AUDIT.map(r => r[4]))].map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent></Select></label>
-    </div>
-    <Table><TableHeader><TableRow><TableHead>업무 시각</TableHead><TableHead>저장 시각</TableHead><TableHead>사용자</TableHead><TableHead>행동</TableHead><TableHead>대상</TableHead><TableHead className="w-[32%]">사유</TableHead></TableRow></TableHeader>
-      <TableBody>{rows.map(r => <TableRow key={r[0] + r[2]}><TableCell className="tabular-nums text-xs">{r[0]}</TableCell><TableCell className="tabular-nums text-xs text-muted-foreground">{r[1]}</TableCell><TableCell className="text-xs">{r[2]}<span className="ml-1.5 text-muted-foreground">{r[3]}</span></TableCell><TableCell className="text-xs">{r[4]}</TableCell><TableCell className="font-mono text-xs">{r[5]}</TableCell><TableCell className="whitespace-normal text-xs text-muted-foreground">{r[6]}</TableCell></TableRow>)}</TableBody></Table>
+    <Box className="flex flex-wrap gap-3 text-xs">
+      <Box as="label" className="space-y-1.5"><Text as="span" className="block text-muted-foreground">사용자</Text><Select value={who} onValueChange={setWho}><SelectTrigger size="sm" className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">전체</SelectItem>{MEMBERS.map(m => <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>)}</SelectContent></Select></Box>
+      <Box as="label" className="space-y-1.5"><Text as="span" className="block text-muted-foreground">행동</Text><Select value={what} onValueChange={setWhat}><SelectTrigger size="sm" className="w-36"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">전체</SelectItem>{[...new Set(AUDIT.map(r => r[4]))].map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent></Select></Box>
+    </Box>
+    <Table><TableHeader><TableRow><TableHead>업무 시각</TableHead><TableHead>저장 시각</TableHead><TableHead>사용자</TableHead><TableHead>행동</TableHead><TableHead>대상</TableHead><TableHead className="w-(--audit-reason-column-width)">사유</TableHead></TableRow></TableHeader>
+      <TableBody>{rows.map(r => <TableRow key={r[0] + r[2]}><TableCell className="tabular-nums text-xs">{r[0]}</TableCell><TableCell className="tabular-nums text-xs text-muted-foreground">{r[1]}</TableCell><TableCell className="text-xs">{r[2]}<Text as="span" className="ml-1.5 text-muted-foreground">{r[3]}</Text></TableCell><TableCell className="text-xs">{r[4]}</TableCell><TableCell className="font-mono text-xs">{r[5]}</TableCell><TableCell className="whitespace-normal text-xs text-muted-foreground">{r[6]}</TableCell></TableRow>)}</TableBody></Table>
     <ProvenanceNote kind="proposal">사건별 이력은 지금 API에 있고(사건 상세 history), 사용자별·관리 행동(권한·룰·기준값) 조회는 없습니다(BE 149).</ProvenanceNote>
   </CardContent></Card>
 }

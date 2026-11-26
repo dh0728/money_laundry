@@ -1,3 +1,6 @@
+import { createExportCanvas } from '../components/export-canvas';
+import { downloadFile } from '../components/file-download';
+
 const svgNamespace = 'http://www.w3.org/2000/svg';
 const graphSnapshots = new WeakMap();
 
@@ -13,10 +16,10 @@ const visualSelector = [
   '[data-export-visualization]',
 ].join(', ');
 const omitted = [
-  'button', 'input', '.visually-hidden', '.screen-title-accessible', '.sr-only',
+  'button', 'input', '.icon', '.visually-hidden', '.screen-title-accessible', '.sr-only',
   '[role="tooltip"]',
 ].join(', ');
-const svgStyles = [
+const presentationAttributes = [
   'fill', 'fill-opacity', 'fill-rule', 'stroke', 'stroke-opacity', 'stroke-width',
   'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'stroke-dashoffset',
   'opacity', 'display', 'visibility', 'color', 'paint-order', 'vector-effect',
@@ -33,7 +36,7 @@ function svg(tag, attributes = {}) {
 
 export function makeGraphSnapshot({ width, height, nodes, edges, wraps = [] }) {
   const drawing = svg('svg', { width, height, viewBox: `0 0 ${width} ${height}` });
-  const textStyle = { 'font-family': 'sans-serif', 'font-size': 11, 'text-anchor': 'middle' };
+  const textStyle = { 'font-family': 'Pretendard', 'font-size': 11, 'text-anchor': 'middle' };
   const label = (text, attributes) => {
     const element = svg('text', { ...textStyle, ...attributes });
     element.textContent = text;
@@ -94,11 +97,16 @@ export function copySVG(source) {
   for (const [index, element] of [source, ...source.querySelectorAll('*')].entries()) {
     const target = index === 0 ? copy : descendants[index - 1];
     const style = getComputedStyle(element);
-    for (const property of svgStyles) {
+    for (const property of presentationAttributes) {
       const value = style.getPropertyValue(property);
-      if (value) target.style.setProperty(property, localReferences(value));
+      if (!value) continue;
+      // Resolve theme variables into portable SVG attributes. A cloned inline
+      // value could otherwise override the resolved value in the exported file.
+      target.setAttribute(property, localReferences(value));
+      target.style.removeProperty(property);
     }
-    if (element.matches('.ledger-arrow-shaft')) target.setAttribute('width', String(element.getBBox().width));
+    if (!target.style.length) target.removeAttribute('style');
+    if (element.hasAttribute('data-svg-width-from-layout')) target.setAttribute('width', String(element.getBBox().width));
   }
   copy.querySelectorAll('[data-graph-transient]').forEach(element => element.remove());
   copy.querySelectorAll('[data-graph-reveal]').forEach(element => {
@@ -116,12 +124,14 @@ function placeSVG(layer, source, bounds, visual = copySVG(source)) {
   }
   visual.style.removeProperty('transform');
   visual.style.removeProperty('position');
-  visual.style.setProperty('overflow', 'visible');
+  visual.style.removeProperty('overflow');
+  visual.setAttribute('overflow', 'visible');
+  if (!visual.style.length) visual.removeAttribute('style');
   layer.append(visual);
 }
 
 function opaquePaint(paint) {
-  return paint && paint !== 'transparent' && paint !== 'rgba(0, 0, 0, 0)';
+  return paint && paint !== 'transparent' && !/^(?:rgba\(|color\().*(?:,|\/)\s*0\)$/.test(paint);
 }
 
 function paintBox(layer, element, bounds, scale = 1) {
@@ -216,7 +226,7 @@ function paintVisual(layer, panel, bounds, textMeasure) {
 }
 
 function makeSVG(panels, format) {
-  const textMeasure = format === 'svg' ? document.createElement('canvas').getContext('2d') : null;
+  const textMeasure = format === 'svg' ? createExportCanvas(1, 1).context : null;
   const surfaces = panels.map(panel => ({ panel, bounds: panel.getBoundingClientRect() }));
   const theme = getComputedStyle(document.documentElement);
   const spacing = parseFloat(theme.getPropertyValue('--aml-space-16')) || 16;
@@ -253,14 +263,10 @@ async function toPNG({ image, width, height }) {
     illustration.src = url;
     await illustration.decode();
     const scale = Math.min(2, 4096 / width, 4096 / height, Math.sqrt(8_000_000 / (width * height)));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(width * scale));
-    canvas.height = Math.max(1, Math.round(height * scale));
-    canvas.getContext('2d').drawImage(illustration, 0, 0, canvas.width, canvas.height);
-    return await new Promise((resolve, reject) => canvas.toBlob(blob => {
-      if (blob) resolve(blob);
-      else reject(new Error('PNG 파일을 만들 수 없습니다.'));
-    }, 'image/png'));
+    const surface = createExportCanvas(Math.max(1, Math.round(width * scale)), Math.max(1, Math.round(height * scale)));
+    if (!surface.context) throw new Error('PNG 파일을 만들 수 없습니다.');
+    surface.context.drawImage(illustration, 0, 0, surface.width, surface.height);
+    return await surface.encode('image/png');
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -272,12 +278,5 @@ export async function downloadVisualizations({ format, filename, root = document
   if (!panels.length) throw new Error('이 화면에서 저장할 차트나 그래프를 찾을 수 없습니다.');
   const graphic = makeSVG(panels, format);
   const blob = format === 'png' ? await toPNG(graphic) : graphic.image;
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `${filename.replace(/\.(svg|png)$/i, '')}.${format}`;
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadFile(`${filename.replace(/\.(svg|png)$/i, '')}.${format}`, blob);
 }

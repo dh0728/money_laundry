@@ -89,25 +89,34 @@ const episode: ReviewCase = { ...alert, caseId: 50, kind: 'EPISODE', alertId: nu
   sourceAlertIds: [3002, 3003], primaryTypes: ['Fan-out'], groups: linkedAlerts.flatMap(row => row.groups ?? []).map(group => ({ ...group, members: group.members.map(row => ({ ...row, state: 'PENDING' as const })) })),
   history: [{ eventId: 3, action: 'TRANSFER', comment: '합성 예시: 동일한 account-b를 거치는 A-3002·A-3003을 묶어 조사합니다.', businessAt: at(14, 12), recordedAt: at(14, 12), actor: '가상 분석자' }] }
 
+const generatedEpisodeCount = 32
+const alertsPerGeneratedEpisode = 2
+const linkedAlertCount = generatedEpisodeCount * alertsPerGeneratedEpisode
+
 const generatedMember = (index: number, alertId: number, type: string): ReviewMember => {
   const from = accounts[(index * 7 + 4) % accounts.length]
-  const to = accounts[(index * 7 + 9) % accounts.length]
+  // The odd source is one day earlier. It funds the even source's sending account.
+  const offset = index < linkedAlertCount ? index % alertsPerGeneratedEpisode : 0
+  const toIndex = offset ? (index - offset) * 7 + 4 : index * 7 + 9
+  const to = accounts[toIndex % accounts.length]
   const currency = currencies[index % currencies.length]
   const amount = currency === 'KRW' ? 750_000 + index * 126_000 : currency === 'JPY' ? 80_000 + index * 3_700 : 750 + index * 87
   const row = member(201 + index, index % 4 === 0 ? 'SEED' : 'CONNECTION', amount, from.id, to.id, 15 - index % 14, currency, type, alertId)
   row.transaction.paymentFormat = formats[index % formats.length]
-  row.transaction.isSuspicious = index % 5 === 0 ? null : index % 3 === 0
   row.transaction.scores = index % 5 === 0 ? null : { p_laundering: 0.31 + index % 7 / 10, ...typeScores(generatedType(index), 0.51 + index % 4 / 10) }
   row.transaction.isSuspicious = row.transaction.scores === null ? null : row.transaction.scores.p_laundering >= 0.7
   // CaseSummary does not make code 0 a named representative pattern for an Alert.
   if (generatedType(index) === 0) row.sources = row.sources.map(source => ({ ...source, primaryType: '패턴 미특정' }))
   return row
 }
+const generatedMembers = Array.from({ length: 120 }, (_, index) =>
+  generatedMember(index, 3004 + index, types[generatedType(index)]))
+
 const makeAlert = (index: number, linkedEpisode?: number): ReviewCase => {
   const alertId = 3004 + index
   const type = types[generatedType(index)]
   const primaryType = generatedType(index) === 0 ? '패턴 미특정' : type
-  const member = generatedMember(index, alertId, type)
+  const member = generatedMembers[index]
   const { transaction } = member
   const day = 15 - index % 14
   const assignee = staff[index % 5 === 4 ? 1 + index % 2 : 0]
@@ -128,11 +137,19 @@ const makeAlert = (index: number, linkedEpisode?: number): ReviewCase => {
     history: [{ eventId: 100 + index, action: 'ASSIGN', comment: '합성 배정 기록', businessAt: at(day, 12), recordedAt: at(day, 12), actor: '시연 시스템' }],
   }
 }
-const generatedLinked = Array.from({ length: 64 }, (_, index) => makeAlert(index, 150 + Math.floor(index / 2)))
-const openAlerts = Array.from({ length: 42 }, (_, index) => makeAlert(index + 64))
-const generatedEpisodes: ReviewCase[] = Array.from({ length: 32 }, (_, index) => {
-  const sources = generatedLinked.slice(index * 2, index * 2 + 2)
+const generatedLinked = Array.from({ length: linkedAlertCount }, (_, index) =>
+  makeAlert(index, 150 + Math.floor(index / alertsPerGeneratedEpisode)))
+const openAlerts = Array.from({ length: 42 }, (_, index) => makeAlert(index + linkedAlertCount))
+const generatedEpisodes: ReviewCase[] = Array.from({ length: generatedEpisodeCount }, (_, index) => {
+  const start = index * alertsPerGeneratedEpisode
+  const sources = generatedLinked.slice(start, start + alertsPerGeneratedEpisode)
   const first = sources[0]
+  const caseId = 150 + index
+  const sharedAccountId = generatedMembers[start].transaction.fromAccountId
+  const sourceAlertIds = sources.map(source => source.alertId!)
+  const sourceLabels = sourceAlertIds.map(alertId => `A-${alertId}`).join('·')
+  const transferAt = first.assignedAt ?? businessAt
+  const caseAccounts = [...new Map(sources.flatMap(source => source.accounts ?? []).map(account => [account.id, account])).values()]
   const closed = index % 7 === 6
   const groups = sources.flatMap(source => source.groups ?? []).map(group => ({ ...group, label: `Alert A-${group.sourceAlertId}`,
     members: group.members.map(member => ({ ...member, state: closed ? 'DECIDED' as const : 'PENDING' as const, decision: closed ? 'NORMAL' as const : null })) }))
@@ -140,12 +157,14 @@ const generatedEpisodes: ReviewCase[] = Array.from({ length: 32 }, (_, index) =>
     Object.entries(source.summary.amountsByCurrency).forEach(([currency, amount]) => { amounts[currency] = (amounts[currency] ?? 0) + amount })
     return amounts
   }, {})
-  return { ...first, caseId: 150 + index, kind: 'EPISODE', alertId: null, status: closed ? 'CLOSED' : 'OPEN', outcome: closed ? 'NORMAL' : null,
-    episodeId: null, sourceAlertIds: sources.map(source => source.alertId ?? 0), primaryTypes: [...new Set(sources.map(source => source.summary.primaryType))],
+  return { ...first, caseId, kind: 'EPISODE', alertId: null, status: closed ? 'CLOSED' : 'OPEN', outcome: closed ? 'NORMAL' : null,
+    episodeId: null, sourceAlertIds, primaryTypes: [...new Set(sources.map(source => source.summary.primaryType))],
     summary: { ...first.summary, txCount: 2, subjectCount: 2, amountsByCurrency,
       totalAmountUsd: sources.reduce((sum, source) => sum + Number(source.summary.totalAmountUsd ?? 0), 0),
       riskScore: Math.max(...sources.map(source => source.summary.riskScore)) },
-    pendingCount: closed ? 0 : 2, groups, accounts: sources.flatMap(source => source.accounts ?? []),
+    pendingCount: closed ? 0 : 2, groups, accounts: caseAccounts,
+    history: [{ eventId: 2000 + caseId, action: 'TRANSFER', comment: `합성 예시: 공유 계좌 ${sharedAccountId}의 수취와 후속 송금을 대조하기 위해 ${sourceLabels}을 묶었습니다.`,
+      businessAt: transferAt, recordedAt: transferAt, actor: '가상 분석자' }],
     closedAt: closed ? at(15, 17) : null,
   }
 })
@@ -200,20 +219,18 @@ const transactions: LedgerTransaction[] = [
     amountUsd: transaction.amountUsd, paymentCurrency: 'KRW', receivingCurrency: 'KRW', paymentFormat: 'WIRE',
     launderingScore: transaction.scores?.p_laundering ?? null, threshold: 0.7, isSuspicious: transaction.isSuspicious,
     typeClass: 1, typeName: 'Fan-out', probabilities: probabilitiesFor(1), judgement: index === 0 ? 'SUSPICIOUS' as const : 'NORMAL' as const,
-    alertIds: [3001], episodeIds: index ? [50] : [] })),
-  ...Array.from({ length: 120 }, (_, index): LedgerTransaction => {
-    const source = generatedMember(index, 3004 + index % 106, types[generatedType(index)]).transaction
+    alertIds: [], episodeIds: [] })),
+  ...generatedMembers.map(({ txId, transaction: source }, index): LedgerTransaction => {
     const from = ownerOf(source.fromAccountId)
     const to = ownerOf(source.toAccountId)
     const judgement = source.isSuspicious == null ? 'UNANALYZED' : source.isSuspicious ? 'SUSPICIOUS' : 'NORMAL'
-    return { txId: 201 + index, occurredAt: source.occurredAt, fromAccountId: source.fromAccountId, toAccountId: source.toAccountId,
+    return { txId, occurredAt: source.occurredAt, fromAccountId: source.fromAccountId, toAccountId: source.toAccountId,
       fromOwnerId: from?.ownerId ?? '', toOwnerId: to?.ownerId ?? '', fromOwnerName: from?.ownerName, toOwnerName: to?.ownerName,
       fromBankId: source.fromBankId, toBankId: source.toBankId, amountPaid: source.amountPaid, amountReceived: source.amountPaid,
       amountUsd: source.amountUsd, paymentCurrency: source.paymentCurrency, receivingCurrency: source.paymentCurrency,
       paymentFormat: source.paymentFormat, launderingScore: source.scores?.p_laundering ?? null, threshold: 0.7,
       isSuspicious: source.isSuspicious, typeClass: source.scores ? generatedType(index) : null, typeName: source.scores ? types[generatedType(index)] : undefined,
-      probabilities: source.scores ? Array.from({ length: 9 }, (_, code) => source.scores![`p_${code}`]) : [], judgement, alertIds: [3004 + index % 106],
-      episodeIds: index < 64 ? [150 + Math.floor(index / 2)] : [] }
+      probabilities: source.scores ? Array.from({ length: 9 }, (_, code) => source.scores![`p_${code}`]) : [], judgement, alertIds: [], episodeIds: [] }
   }),
 ]
 

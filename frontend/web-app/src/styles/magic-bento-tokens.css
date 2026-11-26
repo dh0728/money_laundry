@@ -1,0 +1,117 @@
+.magic-bento {
+  --mb-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --mb-enter-opacity-duration: 420ms;
+  --mb-enter-motion-duration: 760ms;
+  --mb-enter-opacity-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --mb-enter-scale: 0.97;
+  --mb-perspective: 900px;
+  --mb-rest-scale: 1;
+  --mb-inactive-light-position: -999px;
+  --mb-light-layer: 1;
+  --mb-content-layer: 2;
+  --mb-rim-layer: 3;
+  --mb-border-layer: 4;
+  --mb-label-size: 12px;
+  --mb-label-line-height: 16px;
+  --mb-title-size: 15px;
+  --mb-title-line-height: 20px;
+  --mb-title-tracking: -0.01em;
+  --mb-description-size: 13px;
+  --mb-description-line-height: 1.45;
+  --mb-image-ink: #f4f4f5;
+  --mb-image-muted: rgba(244, 244, 245, 0.72);
+  --mb-image-scrim: linear-gradient(
+    to top,
+    rgba(10, 9, 13, 0.82) 0%,
+    rgba(10, 9, 13, 0.7) 14%,
+    rgba(10, 9, 13, 0.46) 30%,
+    rgba(10, 9, 13, 0.2) 46%,
+    rgba(10, 9, 13, 0.05) 60%,
+    rgba(10, 9, 13, 0) 72%
+  );
+}
+
+@supports (transition-timing-function: linear(0, 1)) {
+  .magic-bento {
+    --mb-spring: linear(
+      0,
+      0.0603,
+      0.2033,
+      0.3821,
+      0.5633,
+      0.7258,
+      0.8584,
+      0.9574,
+      1.0242,
+      1.0634,
+      1.0809,
+      1.0828,
+      1.0747,
+      1.0613,
+      1.046,
+      1.0313,
+      1.0186,
+      1.0085,
+      1.0012,
+      0.9965,
+      0.994,
+      0.9931,
+      0.9933,
+      0.9941,
+      0.9953,
+      0.9966,
+      0.9978,
+      0.9988,
+      1
+    );
+  }
+}
+
+.magic-bento[data-mb-theme="dark"] {
+  --mb-surface: linear-gradient(180deg, #1a1820 0%, #121116 100%);
+  --mb-edge: rgba(255, 255, 255, 0.07);
+  --mb-highlight: rgba(255, 255, 255, 0.06);
+  --mb-shadow: 0 24px 48px -28px rgba(0, 0, 0, 0.85), 0 8px 18px -12px rgba(0, 0, 0, 0.6);
+  --mb-ink: var(--mb-host-ink, #f4f4f5);
+  --mb-muted: var(--mb-host-muted, rgba(244, 244, 245, 0.6));
+  --mb-focus: rgba(244, 244, 245, 0.5);
+  --mb-glow-alpha: 0.85;
+  --mb-spot-alpha: 0.07;
+}
+
+.magic-bento[data-mb-theme="light"] {
+  --mb-surface: linear-gradient(180deg, #ffffff 0%, #f7f7f9 100%);
+  --mb-edge: rgba(24, 24, 27, 0.08);
+  --mb-highlight: rgba(255, 255, 255, 1);
+  --mb-shadow: 0 24px 48px -30px rgba(24, 24, 27, 0.28), 0 8px 18px -14px rgba(24, 24, 27, 0.16);
+  --mb-ink: var(--mb-host-ink, #18181b);
+  --mb-muted: var(--mb-host-muted, rgba(24, 24, 27, 0.6));
+  --mb-focus: rgba(24, 24, 27, 0.4);
+  --mb-glow-alpha: 0.5;
+  --mb-spot-alpha: 0.035;
+}
+
+/* Resolve the gradient stops at the layer that receives the animated alpha. */
+.magic-bento__light,
+.magic-bento__border {
+  --mb-light-falloff:
+    rgba(var(--mb-glow-rgb), calc(var(--mb-light-alpha) * 1)) 0%,
+    rgba(var(--mb-glow-rgb), calc(var(--mb-light-alpha) * 0.973)) 15%,
+    rgba(var(--mb-glow-rgb), calc(var(--mb-light-alpha) * 0.837)) 30%,
+    rgba(var(--mb-glow-rgb), calc(var(--mb-light-alpha) * 0.593)) 45%,
+    rgba(var(--mb-glow-rgb), calc(var(--mb-light-alpha) * 0.317)) 60%,
+    rgba(var(--mb-glow-rgb), calc(var(--mb-light-alpha) * 0.104)) 75%,
+    rgba(var(--mb-glow-rgb), calc(var(--mb-light-alpha) * 0.009)) 90%,
+    rgba(var(--mb-glow-rgb), 0) 100%;
+}
+
+.magic-bento__border {
+  --mb-wave-falloff:
+    rgba(var(--mb-glow-rgb), 0) calc(var(--mb-wr, 0px) - 110px),
+    rgba(var(--mb-glow-rgb), calc(var(--mb-glow-alpha) * var(--mb-wa, 0) * 0.1)) calc(var(--mb-wr, 0px) - 80px),
+    rgba(var(--mb-glow-rgb), calc(var(--mb-glow-alpha) * var(--mb-wa, 0) * 0.32)) calc(var(--mb-wr, 0px) - 52px),
+    rgba(var(--mb-glow-rgb), calc(var(--mb-glow-alpha) * var(--mb-wa, 0) * 0.68)) calc(var(--mb-wr, 0px) - 28px),
+    rgba(var(--mb-glow-rgb), calc(var(--mb-glow-alpha) * var(--mb-wa, 0) * 0.94)) calc(var(--mb-wr, 0px) - 10px),
+    rgba(var(--mb-glow-rgb), calc(var(--mb-glow-alpha) * var(--mb-wa, 0))) calc(var(--mb-wr, 0px) - 3px),
+    rgba(var(--mb-glow-rgb), 0) var(--mb-wr, 0px);
+}

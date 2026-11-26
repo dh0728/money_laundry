@@ -1,0 +1,29 @@
+.sparkline {
+  position: relative;
+  min-inline-size: 0;
+  width: var(--sparkline-width);
+  height: var(--sparkline-height);
+}
+
+.sparkline > svg {
+  display: block;
+  overflow: visible;
+}
+
+.sparkline > svg[data-interactive] { touch-action: pan-y }
+
+.sparkline-series {
+  transition: opacity var(--chart-hover-fade-duration) ease-in-out;
+}
+
+.sparkline-crosshair-line { stroke-width: var(--aml-stroke-divider) }
+
+.sparkline-crosshair-gradient {
+  width: var(--aml-stroke-divider);
+  x: calc(var(--aml-stroke-divider) / -2);
+}
+
+.sparkline-dot {
+  r: var(--aml-space-3);
+  stroke-width: var(--chart-sparkline-dot-outline);
+}

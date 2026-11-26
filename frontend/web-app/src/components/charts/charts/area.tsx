@@ -33,7 +33,7 @@ export interface AreaProps {
   baselineDataKey?: string;
   /** Y-scale group id (Recharts `yAxisId`). Default: `"left"`. */
   yAxisId?: string | number;
-  /** Fill color for the area gradient start. Default: var(--chart-line-primary) */
+  /** Fill color for the area gradient start. Default: var(--aml-sky-050) */
   fill?: string;
   /** Fill opacity at the top of the area. Default: 0.4 */
   fillOpacity?: number;

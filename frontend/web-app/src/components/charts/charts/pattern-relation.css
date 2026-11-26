@@ -1,0 +1,50 @@
+.pattern-relation-wide { height: var(--relation-height); }
+.pattern-relation-stack-scroll { height: var(--pattern-relation-stack-height); }
+
+.pattern-relation-panel {
+  left: var(--relation-x, 0);
+  width: var(--relation-width);
+}
+
+.pattern-relation-heading {
+  left: var(--relation-x);
+  top: var(--aml-space-8);
+}
+
+.pattern-relation-positioned {
+  left: var(--relation-x);
+  top: var(--relation-y);
+  width: var(--relation-width);
+  height: var(--relation-height);
+}
+
+.pattern-relation-segment { background: var(--relation-fill); }
+
+.pattern-relation-stack-segment {
+  flex-basis: 0;
+  flex-grow: var(--relation-share);
+}
+
+.pattern-relation-funnel { height: var(--pattern-relation-funnel-height); }
+.pattern-relation-funnel-stop { stop-color: var(--foreground); }
+.pattern-relation-funnel-stop:last-child { stop-opacity: var(--pattern-relation-funnel-end-opacity); }
+
+.pattern-relation-stack-patterns { grid-template-columns: auto minmax(0, 1fr); }
+.pattern-relation-bar { width: var(--relation-width); }
+
+.pattern-relation-connector {
+  stroke: var(--pattern-relation-connector-color);
+  stroke-opacity: var(--pattern-relation-connector-opacity);
+  stroke-width: var(--pattern-relation-connector-stroke);
+}
+
+.pattern-relation-leader {
+  stroke: var(--pattern-relation-connector-color);
+  stroke-opacity: var(--pattern-relation-leader-opacity);
+  stroke-width: var(--aml-stroke-divider);
+}
+
+.pattern-relation-dot {
+  fill: var(--pattern-relation-connector-color);
+  r: var(--pattern-relation-dot-radius);
+}

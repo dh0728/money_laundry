@@ -1,0 +1,33 @@
+/* Pretendard from orioncactus/pretendard v1.3.9, SIL OFL 1.1. Font and license are bundled locally. */
+@font-face {
+  font-family: 'Pretendard';
+  font-style: normal;
+  font-weight: 45 920;
+  font-display: swap;
+  src: url('/fonts/PretendardVariable.woff2') format('woff2-variations');
+}
+:root,
+[data-ui="aml-app"],
+[data-ui="shell-chrome"] {
+  --aml-font-family: Pretendard;
+  --aml-font-mono: Pretendard;
+  --aml-font-code: Pretendard;
+  --font-sans: Pretendard;
+  --font-mono: Pretendard;
+  --font-serif: Pretendard;
+  --default-font-family: Pretendard;
+  --default-mono-font-family: Pretendard;
+}
+html, body {
+  font-family: Pretendard;
+}
+code, kbd, samp, pre {
+  font-family: Pretendard;
+  font-variant-numeric: tabular-nums;
+}
+:where(button, input, select, textarea, optgroup) {
+  font: inherit;
+}
+.font-mono {
+  font-variant-numeric: tabular-nums;
+}

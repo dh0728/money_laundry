@@ -22,7 +22,7 @@
   display: grid;
   align-items: start;
   column-gap: var(--aml-space-8);
-  grid-template-columns: min(var(--aml-space-64), 42%) minmax(0, 1fr);
+  grid-template-columns: min(var(--aml-space-64), var(--case-card-label-max-share)) minmax(0, 1fr);
 }
 .preview-case-card dt { color: var(--muted-text); overflow-wrap: anywhere }
 .preview-case-card dd { margin: 0; min-width: 0; overflow-wrap: anywhere }
@@ -39,28 +39,30 @@
   flex: 1;
   min-block-size: 0;
   max-block-size: var(--workspace-list-limit);
-  overflow: auto;
-  padding: var(--record-card-shadow-gutter);
-  scrollbar-gutter: stable;
+  overflow-y: auto;
+  padding-block: var(--record-card-shadow-gutter);
+  padding-block-end: max(var(--record-card-shadow-gutter), var(--workspace-footer-inset));
+  scrollbar-gutter: auto;
 }
 @media (max-width: 768px), (max-height: 480px) {
   .case-list-panel > .case-progress-board {
     max-block-size: none;
     overflow: visible;
-    padding-block-end: max(var(--record-card-shadow-gutter), var(--account-footer-reserve));
+    padding-block-end: var(--record-card-shadow-gutter);
   }
 }
 .case-progress-lanes {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
-  gap: var(--aml-space-8);
+  gap: var(--workspace-panel-gap);
 }
 .case-progress-lane {
   min-inline-size: 0;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   align-content: start;
-  gap: var(--aml-space-12);
+  gap: var(--aml-space-8);
 }
 .case-progress-lane[data-review] {
   --panel-material-solid: color-mix(in srgb, var(--information-panel-surface), var(--review-status-accent) var(--review-lane-tint));
@@ -69,7 +71,10 @@
   --muted-text: var(--status-surface-secondary-ink);
 }
 .case-progress-lane.screen-panel {
-  padding: var(--aml-panel-inset);
+  --panel-content-padding: var(--aml-panel-inset);
+}
+.case-progress-lane-header {
+  min-block-size: var(--aml-panel-control-size);
 }
 .case-progress-lane .case-progress-heading {
   display: flex;
@@ -81,6 +86,22 @@
   font-size: var(--aml-type-caption-size);
   line-height: var(--aml-type-label-lineHeight);
 }
+.case-progress-cards {
+  align-self: start;
+  align-content: start;
+}
+@media screen {
+  .case-progress-lane:has(.magic-bento__cell:nth-child(8)) {
+    content-visibility: auto;
+    contain-intrinsic-block-size: auto calc(8 * (4 * var(--aml-space-48) - var(--aml-space-4)) + 7 * var(--workspace-gap) + var(--aml-panel-control-size) + var(--aml-space-8));
+    overflow-clip-margin: var(--record-card-shadow-gutter);
+  }
+  .case-progress-cards .magic-bento__content {
+    content-visibility: auto;
+    contain-intrinsic-block-size: auto calc(4 * var(--aml-space-48) - var(--aml-space-4));
+    overflow-clip-margin: var(--record-card-shadow-gutter);
+  }
+}
 .case-progress-empty {
   margin: 0;
   color: var(--muted-text);
@@ -91,5 +112,5 @@
   .case-progress-lanes { grid-template-columns: repeat(2, minmax(0, 1fr)) }
 }
 @container case-progress-board (min-width: 1056px) {
-  .case-progress-lanes { grid-template-columns: repeat(var(--case-progress-columns, 4), minmax(0, 1fr)) }
+  .case-progress-lanes { grid-template-columns: repeat(var(--case-progress-columns), minmax(0, 1fr)) }
 }

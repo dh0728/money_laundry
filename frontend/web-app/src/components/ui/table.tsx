@@ -1,5 +1,6 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
+import "./table.css"
 
 function Table({ className, containerRef, containerClassName, containerOnScroll, ...props }: React.ComponentProps<"table"> & { containerRef?: React.Ref<HTMLDivElement>; containerClassName?: string; containerOnScroll?: React.UIEventHandler<HTMLDivElement> }) {
   return (
@@ -22,7 +23,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("[&_tr]:border-b", className)}
+      className={className}
       {...props}
     />
   )
@@ -32,7 +33,7 @@ function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
   return (
     <tbody
       data-slot="table-body"
-      className={cn("[&_tr:last-child]:border-0", className)}
+      className={className}
       {...props}
     />
   )
@@ -43,7 +44,7 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
     <tfoot
       data-slot="table-footer"
       className={cn(
-        "border-t bg-muted/50 font-medium [&>tr]:last:border-b-0",
+        "bg-muted/50 font-medium",
         className
       )}
       {...props}
@@ -51,12 +52,14 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
   )
 }
 
-function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
+function TableRow({ className, related, level, ...props }: React.ComponentProps<"tr"> & { related?: boolean; level?: 1 | 2 | 3 }) {
   return (
     <tr
       data-slot="table-row"
+      data-related={related || undefined}
+      data-row-level={level}
       className={cn(
-        "border-b transition-colors hover:bg-(--hover-surface) has-aria-expanded:bg-(--hover-surface) data-[state=selected]:bg-muted",
+        "transition-colors hover:bg-(--hover-surface) has-aria-expanded:bg-(--hover-surface) data-[state=selected]:bg-muted",
         className
       )}
       {...props}
@@ -69,7 +72,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0",
         className
       )}
       {...props}
@@ -77,16 +80,32 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   )
 }
 
-function TableCell({ className, ...props }: React.ComponentProps<"td">) {
+function TableCell({ className, numeric, stacked, ...props }: React.ComponentProps<"td"> & { numeric?: boolean; stacked?: boolean }) {
   return (
     <td
       data-slot="table-cell"
+      data-numeric={numeric || undefined}
+      data-stacked={stacked || undefined}
       className={cn(
-        "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0",
         className
       )}
       {...props}
     />
+  )
+}
+
+function TableRowHead({ scope = "row", ...props }: React.ComponentProps<"th">) {
+  return <th data-slot="table-row-head" scope={scope} {...props} />
+}
+
+function TableColumns({ widths }: { widths: Array<{ key: React.Key; width?: React.CSSProperties["width"] }> }) {
+  return (
+    <colgroup data-slot="table-columns">
+      {widths.map(({ key, width }) => <col key={key} style={{
+        "--table-column-width": typeof width === "number" ? `${width}px` : width,
+      } as React.CSSProperties} />)}
+    </colgroup>
   )
 }
 
@@ -111,5 +130,7 @@ export {
   TableHead,
   TableRow,
   TableCell,
+  TableRowHead,
+  TableColumns,
   TableCaption,
 }

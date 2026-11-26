@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useCallback, useMemo } from "react";
+import { type CSSProperties, type ReactNode, useCallback, useMemo } from "react";
 import { clipRevealTransition } from "./animation";
 import {
   type ChartHoverContextValue,
@@ -16,6 +16,7 @@ import {
   type SeriesPointMarkerStyle,
   StaticSeriesPointMarker,
 } from "./series-point-marker";
+import "../chart-utilities.css";
 
 function getSeriesMarkerVisualExtent(
   style: Pick<
@@ -295,12 +296,11 @@ function SeriesMarkersDimWrapper({
   const dimBase = enabled && (isHovered || isLegendDimmed);
   return (
     <g
+      className="chart-marker-dimming"
       opacity={dimBase ? inactiveOpacity : 1}
       style={{
-        transition: "opacity 0.15s ease-in-out, filter 0.15s ease-in-out",
-        filter:
-          dimBase && inactiveBlur > 0 ? `blur(${inactiveBlur}px)` : "none",
-      }}
+        "--chart-marker-dim-filter": dimBase && inactiveBlur > 0 ? `blur(${inactiveBlur}px)` : undefined,
+      } as CSSProperties}
     >
       {children}
     </g>

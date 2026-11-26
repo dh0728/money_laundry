@@ -1,45 +1,32 @@
 :root:has(body[data-login-required]) { scrollbar-gutter: auto }
 
 #preview-login {
-  --login-travel-duration: 480ms;
   position: relative;
   isolation: isolate;
   overflow: clip;
-  background:
-    radial-gradient(ellipse at 16% 22%, light-dark(#b6dce9, #143b53), transparent 48%),
-    radial-gradient(ellipse at 86% 27%, light-dark(#d8d9f1, #25284c), transparent 46%),
-    radial-gradient(ellipse at 62% 87%, light-dark(#c7e6e3, #113b40), transparent 53%),
-    radial-gradient(ellipse at center, light-dark(#f7fcff, #172335), light-dark(#e6edf6, #09111f));
+  background: var(--login-scene-background);
 }
 
 :is(.login-scene, .login-particle-layer) {
   position: absolute;
   inset: 0;
-  z-index: -1;
+  z-index: var(--login-scene-background-layer);
   inline-size: 100%;
   block-size: 100%;
   pointer-events: none;
 }
 
 :root:not([data-glassmorphism="false"]) #preview-login .login-card {
-  --glass-optical-softness: .85px;
-  --glass-material-blur: blur(2px) saturate(1.28);
-  --glass-surface-face:
-    linear-gradient(150deg, light-dark(#ffffff83, #9ccbf45c), transparent 38%),
-    linear-gradient(335deg, light-dark(#ffffff52, #67c5c942), transparent 41%),
-    light-dark(#edf8ff68, #10233864);
-  border-color: light-dark(#ffffffe6, #c4e6fc77);
-  box-shadow:
-    inset 0 1px 1px light-dark(#fff, #dfedffc4),
-    inset 0 -1px 1px light-dark(#fffc, #9ff2fa75),
-    inset 0 0 16px light-dark(#ffffff85, #9cc9f44d),
-    0 24px 66px light-dark(#244e7030, #0008),
-    0 2px 8px light-dark(#244e7026, #030a144f);
+  --glass-optical-softness: var(--login-card-optical-softness);
+  --glass-material-blur: var(--login-card-backdrop);
+  --glass-surface-face: var(--login-card-glass-face);
+  border-color: var(--login-card-glass-edge);
+  box-shadow: var(--login-card-glass-shadow);
 }
 
 :root:not([data-glassmorphism="false"]) #preview-login .login-form input {
-  background: light-dark(#f7fbffe0, #081420da);
-  border-color: light-dark(#647b913b, #a4cbfc49);
+  background: var(--login-field-glass-face);
+  border-color: var(--login-field-glass-edge);
 }
 
 :root:not([data-glassmorphism="false"]) #preview-login .login-form input[aria-invalid="true"] {
@@ -48,12 +35,30 @@
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   :root:not([data-glassmorphism="false"]) #preview-login .login-card {
-    --glass-surface-face: light-dark(#eef8f999, #15253da8);
+    --glass-surface-face: var(--login-card-glass-fallback);
   }
 }
 
-#preview-login[data-login-motion="entering"] .login-card {
-  animation: preview-login-enter var(--login-travel-duration) cubic-bezier(.28, .12, .58, 1) both;
+.login-preparation:not([hidden]) {
+  display: grid;
+  justify-items: center;
+  gap: var(--aml-space-12);
+  text-align: center;
+}
+.login-preparation:focus { outline: none }
+.login-preparation p { margin: 0 }
+.login-preparation-indicator:not([hidden]) {
+  display: grid;
+  place-items: center;
+  inline-size: var(--aml-space-64);
+  block-size: var(--aml-space-64);
+  color: var(--text);
+}
+.login-preparation-indicator .aml-radar-symbol { --icon-size: var(--aml-space-40) }
+.login-preparation > div:last-child { display: grid; justify-items: center; gap: var(--aml-space-12) }
+
+#preview-login[data-login-motion="entering"] :is(.login-card, .login-preparation) {
+  animation: preview-login-enter var(--login-travel-duration) var(--login-travel-ease) both;
 }
 
 #preview-login[data-login-motion="entering"] .login-particle-layer {
@@ -62,16 +67,16 @@
 
 @keyframes preview-login-enter {
   0% { opacity: 1; scale: 1 }
-  24% { opacity: .86 }
-  100% { opacity: 0; scale: 1.12 }
+  24% { opacity: var(--login-travel-card-mid-opacity) }
+  100% { opacity: 0; scale: var(--login-travel-card-exit-scale) }
 }
 
 @keyframes preview-login-particles-pass {
-  to { opacity: 0; scale: 1.24 }
+  to { opacity: 0; scale: var(--login-travel-particle-exit-scale) }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #preview-login[data-login-motion] :is(.login-card, .login-particle-layer) { animation: none }
+  #preview-login[data-login-motion] :is(.login-card, .login-preparation, .login-particle-layer) { animation: none }
 }
 
-:root[data-reduced-motion="true"] #preview-login[data-login-motion] :is(.login-card, .login-particle-layer) { animation: none }
+:root[data-reduced-motion="true"] #preview-login[data-login-motion] :is(.login-card, .login-preparation, .login-particle-layer) { animation: none }

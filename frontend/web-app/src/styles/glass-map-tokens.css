@@ -1,0 +1,17 @@
+:root {
+  --glass-map-zero: black;
+  --glass-map-transparent: transparent;
+  --glass-map-horizontal-axis: red;
+  --glass-map-vertical-axis: blue;
+  --glass-map-center-channel: 127;
+  --glass-map-center-opacity: 0.93;
+  --glass-map-blend: difference;
+}
+
+.glass-map-vertical-layer {
+  mix-blend-mode: var(--glass-map-blend);
+}
+
+.glass-map-center {
+  fill: rgb(var(--glass-map-center-channel) var(--glass-map-center-channel) var(--glass-map-center-channel) / var(--glass-map-center-opacity));
+}

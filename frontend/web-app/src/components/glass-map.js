@@ -1,3 +1,5 @@
+import glassMapTokens from '../styles/glass-map-tokens.css?raw';
+
 // Rectangular displacement map from React Bits GlassSurface. See react-bits-LICENSE.md.
 function roundedShape(width, height, corners, inset = 0) {
   if (corners.every(radius => radius === corners[0])) {
@@ -24,22 +26,26 @@ export function glassDisplacementMap(width, height, radius, {
   const corners = Array.isArray(radius) ? radius : Array(4).fill(radius);
   const outline = roundedShape(width, height, corners);
   const inner = roundedShape(width, height, corners, edge);
-  const svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+  // Keep the original displacement midpoint at 127 when the channel is halfway.
+  const centerChannel = Math.ceil(brightness * 255 / 100 - 0.5);
+  const svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg"
+    style="--glass-map-center-channel:${centerChannel};--glass-map-center-opacity:${opacity};--glass-map-blend:${mixBlendMode}">
+    <style>${glassMapTokens}</style>
     <defs>
       <linearGradient id="red" x1="${reverseHorizontal ? '0%' : '100%'}" y1="0%" x2="${reverseHorizontal ? '100%' : '0%'}" y2="0%">
-        <stop offset="0%" stop-color="#0000"/><stop offset="100%" stop-color="red"/>
+        <stop offset="0%" stop-color="var(--glass-map-transparent)"/><stop offset="100%" stop-color="var(--glass-map-horizontal-axis)"/>
       </linearGradient>
       <linearGradient id="blue" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stop-color="#0000"/><stop offset="100%" stop-color="blue"/>
+        <stop offset="0%" stop-color="var(--glass-map-transparent)"/><stop offset="100%" stop-color="var(--glass-map-vertical-axis)"/>
       </linearGradient>
       <filter id="soft" filterUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${height}" color-interpolation-filters="sRGB">
         <feGaussianBlur stdDeviation="${blur}"/>
       </filter>
     </defs>
-    <rect width="${width}" height="${height}" fill="black"/>
+    <rect width="${width}" height="${height}" fill="var(--glass-map-zero)"/>
     ${outline} fill="url(#red)"/>
-    ${outline} fill="url(#blue)" style="mix-blend-mode: ${mixBlendMode}"/>
-    ${inner} fill="hsl(0 0% ${brightness}% / ${opacity})" filter="url(#soft)"/>
+    ${outline} fill="url(#blue)" class="glass-map-vertical-layer"/>
+    ${inner} class="glass-map-center" filter="url(#soft)"/>
   </svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }

@@ -216,12 +216,10 @@ function TooltipIndicatorInner({
             <stop
               key={stop.offset}
               offset={stop.offset}
-              style={{
-                stopColor: colorEnd
-                  ? verticalRampColor(indicatorFill, colorEnd, stop.offset)
-                  : indicatorFill,
-                stopOpacity: stop.opacity,
-              }}
+              stopColor={colorEnd
+                ? verticalRampColor(indicatorFill, colorEnd, stop.offset)
+                : indicatorFill}
+              stopOpacity={stop.opacity}
             />
           ))}
         </linearGradient>
