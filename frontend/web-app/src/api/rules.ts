@@ -328,13 +328,39 @@ export type BacktestResult = {
   /** 근거 거래가 32건을 넘는 대상 수 */
   chunkedCount: number
   skippedBusySubjects: number
-  busy: { maxTransactions: number; windowMinutes: number }
+  /** until 은 바쁜 계좌를 센 마지막 날(검사 마지막 날)이다. 그 뒤의 거래는 세지 않았다 */
+  busy: { maxTransactions: number; windowMinutes: number; until?: IsoDate }
+  /**
+   * 기간보다 앞선 거래를 어디부터 읽었나. from 은 룰의 기간만큼 돌아본 가장 이른 날, windowMinutes 는 그 룰의 기간이다(기간이 없는 템플릿은 둘 다 null).
+   * "처음 거래하는 상대"와 바쁜 계좌는 원장 첫날(ledgerFrom)부터 본다. 이 값을 넣기 전에 돌린 백테스트에는 없다.
+   */
+  lookback?: { from: IsoDate | null; windowMinutes: number | null; ledgerFrom: IsoDate | null }
   sweep?: { metric: string; label: string; unit: string; rows: BacktestSweepRow[] }
   cases: BacktestCase[]
 }
 export type Backtest = BacktestHead & Partial<BacktestResult>
 
-/** 백테스트를 접수한다. 비교 기준을 안 주면 그 룰의 운영 버전과 비교한다. */
+/** 백테스트로 검사할 수 있는 날짜 범위 */
+export type BacktestPeriod = {
+  /** 원장의 첫 거래 기준일과 마지막 거래 기준일 */
+  ledgerFrom: IsoDate
+  ledgerTo: IsoDate
+  /** 검사할 수 있는 가장 이른 날(원장 첫날 + warmupDays) */
+  earliest: IsoDate
+  /** 기간을 안 주고 접수했을 때 검사하는 날짜 */
+  from: IsoDate
+  to: IsoDate
+  days: number
+  /** 원장 첫날부터 이 날짜 수만큼은 이력으로만 쓰고 검사하지 않는다 */
+  warmupDays: number
+  /** 한 번에 검사하는 날짜 수의 상한 */
+  maxDays: number
+}
+
+/** 검사 기간을 고를 때 쓰는 범위. 원장이 비었거나 검사할 날짜가 없으면 400 이다. */
+export const fetchBacktestPeriod = () =>
+  sampleMode() ? sample().then(source => source.backtestPeriod()) : getJson<BacktestPeriod>('/api/v1/rule-backtests/period')
+/** 백테스트를 접수한다. 비교 기준을 안 주면 그 룰의 운영 버전과 비교한다. 기간(from ~ to)을 안 주면 검사할 수 있는 날짜 전부다. */
 export const requestBacktest = (input: { versionId: number; baselineVersionId?: number; from?: IsoDate; to?: IsoDate }) =>
   sampleMode() ? refused<{ backtestId: number; status: BacktestStatus }>()
     : postJson<{ backtestId: number; status: BacktestStatus }>('/api/v1/rule-backtests', input, silent)

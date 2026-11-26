@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { ApiError } from '@/api/common'
 import {
-  cancelBacktest, cloneRule, commandRule, createRule, createRuleVersion, deleteRuleDraft, fetchBacktest, fetchBacktests, fetchCaseRuleHits, fetchRule,
+  cancelBacktest, cloneRule, commandRule, createRule, createRuleVersion, deleteRuleDraft, fetchBacktest, fetchBacktestPeriod, fetchBacktests, fetchCaseRuleHits, fetchRule,
   fetchRuleCatalog, fetchRules, requestBacktest, saveRuleDraft, validateRule, type RuleDefinition,
 } from '@/api/rules'
 import { previewAdmin, previewStaff, setPreviewUser } from '@/features/auth/preview-session-user'
@@ -102,6 +102,15 @@ it('백테스트 기록의 줄마다 결과가 있고 운영 버전과 비교한
   const compared = await fetchBacktest((await fetchBacktests(1))[0].backtestId)
   expect(compared.baseline).toMatchObject({ versionNo: 1 })
   expect(compared.kpis).toMatchObject({ hits: 3, added: 2, dropped: 0, baseHits: 1 })
+})
+
+it('고를 수 있는 검사 기간은 떠 둔 백테스트의 기간과 같다', async () => {
+  const period = await fetchBacktestPeriod()
+  expect(period).toEqual({ ledgerFrom: '2023-09-01', ledgerTo: '2023-09-12', earliest: '2023-09-08', from: '2023-09-08', to: '2023-09-12', days: 5, warmupDays: 7, maxDays: 90 })
+  // 떠 둔 백테스트는 모두 이 기간(전체)으로 돌린 것이다
+  for (const row of (await fetchRules()).content)
+    for (const head of await fetchBacktests(row.ruleId)) expect(head.period).toEqual({ from: period.from, to: period.to, days: period.days })
+  expect(fetcher).not.toHaveBeenCalled()
 })
 
 it('응답을 고쳐 써도 샘플은 그대로다', async () => {

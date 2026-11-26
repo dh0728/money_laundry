@@ -200,6 +200,22 @@ button.rule-connector:hover { background: var(--hover) }
 .rule-backtest > * { grid-column: 1 / -1; min-inline-size: 0 }
 .rule-backtest > .backtest-comparison { margin-block: 0 }
 .rule-backtest-rule { inline-size: 100%; min-inline-size: 0 }
+/* 검사 기간: 타겟 날 · 검사 일수를 나란히 두고, 좁으면 아래로 내린다 */
+.rule-backtest-period {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+  gap: var(--aml-space-8);
+}
+.rule-backtest-period label {
+  display: grid;
+  gap: var(--aml-space-4);
+  color: var(--muted-text);
+  font-size: var(--aml-type-label-size);
+  line-height: var(--aml-type-label-lineHeight);
+}
+.rule-backtest-period .rule-select { inline-size: 100%; min-inline-size: 0 }
+.rule-backtest-period .rule-select[aria-invalid="true"] { border-color: var(--risk-high) }
+.rule-condition-facts.rule-backtest-preview { grid-template-columns: minmax(0, 1fr) }
 .rule-backtest-progress { inline-size: 100%; block-size: var(--aml-space-8); accent-color: var(--brand-accent) }
 .rule-backtest-blocked {
   margin: 0;

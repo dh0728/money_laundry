@@ -1,5 +1,5 @@
 import { ApiError } from '@/api/common'
-import type { Backtest, BacktestHead, RuleCatalog, RuleCheck, RuleDefinition, RuleDetail, RuleHitCard, RuleList } from '@/api/rules'
+import type { Backtest, BacktestHead, BacktestPeriod, RuleCatalog, RuleCheck, RuleDefinition, RuleDetail, RuleHitCard, RuleList } from '@/api/rules'
 import { currentPreviewUser } from '@/features/auth/preview-session-user'
 import { ruleSampleData, type RuleSampleViewer } from './ruleSampleData'
 
@@ -52,6 +52,14 @@ export async function backtest(backtestId: number): Promise<Backtest> {
   const found = ruleSampleData.backtests[String(backtestId)]
   if (!found) throw notFound('백테스트')
   return copy(found)
+}
+/**
+ * 샘플 원장에서 검사할 수 있는 날짜 범위. 떠 둔 백테스트는 모두 전체 기간으로 돌린 것이라 그 기간이 곧 기본 기간이다.
+ * 원장 첫날(2023-09-01)과 이력으로만 쓰는 7일은 응답을 뜰 때의 원장 · 서버 설정이다(룰엔진-샘플모드-구현노트 2장).
+ */
+export async function backtestPeriod(): Promise<BacktestPeriod> {
+  const { from, to, days } = Object.values(ruleSampleData.backtests)[0].period
+  return { ledgerFrom: '2023-09-01', ledgerTo: to, earliest: from, from, to, days, warmupDays: 7, maxDays: 90 }
 }
 /** 샘플 사건의 거래는 룰 평가를 돌린 원장의 거래가 아니라서 걸린 룰이 없다. */
 export const caseRuleHits = async (): Promise<RuleHitCard[]> => []
