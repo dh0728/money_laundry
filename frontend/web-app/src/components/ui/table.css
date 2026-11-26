@@ -67,3 +67,7 @@
 [data-slot="table"] tbody tr:nth-child(even) > :is(th, td) {
   background-image: linear-gradient(var(--table-stripe-tint), var(--table-stripe-tint));
 }
+@media (prefers-reduced-motion: reduce) {
+  [data-table-skeleton-row] [data-slot="skeleton"] { animation: none }
+}
+:root[data-reduced-motion="true"] [data-table-skeleton-row] [data-slot="skeleton"] { animation: none }

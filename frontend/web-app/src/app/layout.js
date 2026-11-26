@@ -30,6 +30,7 @@ import { editPreviewAlertTransactions } from '../features/investigation/case-mem
 import { markPreviewCaseRead, resetPreviewCaseRead } from '../features/investigation/case-read-state.js';
 import { mountTransactionEvidenceTable } from '../features/investigation/preview-case-table.jsx';
 import { mountWorkflows, mountWorkflowNotifications } from '../pages/workflow-components.jsx';
+import { mountInvestigationLoading } from '../features/investigation/investigation-skeletons.jsx';
 import { renderScreenNav, refreshScreenNav } from './screen-navigation.jsx';
 import { caseRoute, frameLabel, screenFrame, ScreenLayout, ScreenNavigation, sections } from './screen-layouts.js';
 import { BoxHTML, BrandSymbol, Button, DecorativeCanvasHTML, Divider, GlassDialog, HeadingHTML, HTMLFragment, HTMLNode,
@@ -615,6 +616,24 @@ function unmountWorkspace() {
   queryControls.unmountTags();
 }
 
+function loadInvestigationView(host, placeholder, load, mount, fallback) {
+  const loading = mountInvestigationLoading(host, placeholder);
+  unmountInvestigation = loading.unmount;
+  void load().then(module => {
+    if (!host.isConnected) return;
+    loading.unmount();
+    unmountInvestigation = undefined;
+    mount(module);
+  }, () => {
+    if (!host.isConnected) return;
+    if (fallback) fallback();
+    else loading.showError(() => {
+      loading.unmount();
+      loadInvestigationView(host, placeholder, load, mount);
+    });
+  });
+}
+
 function updateWorkspaceAddress(path, code, navigationMode, urlParams, { scroll = true } = {}) {
   if (code) document.querySelector(`.work-tabs [data-work-code="${code}"]`)?.setAttribute('aria-current', 'page');
   if (scroll) window.scrollTo(0, 0);
@@ -672,30 +691,32 @@ function showBenchmarkWorkspace(path, code, navigationMode, params) {
   queryControls.setScreen(dashboard || ledger ? path : undefined, [], { rows: [], dashboard }, params);
   const workflow = `benchmark-dashboard-${path.endsWith('/mine') ? 'mine' : 'all'}`;
   const content = ledger
-    ? BoxHTML(TextHTML('IBM AMLworld 거래를 불러오는 중입니다.', 'role="status"', 'p'), 'data-benchmark-content')
+    ? BoxHTML('', 'data-benchmark-content')
     : BoxHTML('', `data-benchmark-content data-workflow="${workflow}"`);
   const workspace = byId('workspace');
   workspace.replaceChildren(HTMLFragment(ScreenLayout(path, { code, hasQuery: dashboard, content })));
   updateWorkspaceAddress(path, code, navigationMode, queryControls.params(path));
 
   const host = workspace.querySelector('[data-benchmark-content]');
-  if (dashboard) mountedWorkflows = mountWorkflows(workspace);
-  const render = async dataset => {
+  if (ledger) {
+    const tableView = path === ledgerTableScreen;
+    loadInvestigationView(host, { label: 'IBM AMLworld 거래', kind: tableView ? 'benchmark-table' : 'benchmark-cards', columns: 8 },
+      () => Promise.all([loadBenchmarkDataset(), import('../features/investigation/ibm-ledger.jsx')]),
+      ([dataset, { mountBenchmarkLedger }]) => {
+        if (code) {
+          const entry = addWorkTab(code);
+          entry?.tab.setAttribute('aria-current', 'page');
+        }
+        benchmarkLedgerView = mountBenchmarkLedger(host, {
+          paginationHost: byId('footer-pagination'),
+          dataset, code, tableView,
+        });
+      }, () => showWorkspace('', '', path, 'replace', params, true));
+    return;
+  }
+  mountedWorkflows = mountWorkflows(workspace);
+  const render = dataset => {
     if (!host.isConnected) return;
-    if (ledger) {
-      host.replaceChildren();
-      const { mountBenchmarkLedger } = await import('../features/investigation/ibm-ledger.jsx');
-      if (!host.isConnected) return;
-      if (code) {
-        const entry = addWorkTab(code);
-        entry?.tab.setAttribute('aria-current', 'page');
-      }
-      benchmarkLedgerView = mountBenchmarkLedger(host, {
-        paginationHost: byId('footer-pagination'),
-        dataset, code, tableView: path === ledgerTableScreen,
-      });
-      return;
-    }
     queryControls.setScreen(path, [], { rows: [], asOf: new Date(dataset.period.end + 'T00:00:00'), dashboard: true });
     const { range } = queryControls.selection();
     queryControls.renderTags(workspace.querySelector('[data-query-tags]'));
@@ -706,11 +727,9 @@ function showBenchmarkWorkspace(path, code, navigationMode, params) {
       days.map(row => [row.date, row.total, row.labeled, row.newAccounts, row.newBanks]));
   };
   const load = () => {
-    if (dashboard) mountedWorkflows.updateDashboard(undefined);
-    void (ledger ? loadBenchmarkDataset() : loadBenchmarkSummary()).then(render).catch(() => {
-      if (!host.isConnected) return;
-      if (dashboard) mountedWorkflows.updateDashboard({ error: true, retry: load });
-      else showWorkspace('', '', path, 'replace', params, true);
+    mountedWorkflows.updateDashboard(undefined);
+    void loadBenchmarkSummary().then(render).catch(() => {
+      if (host.isConnected) mountedWorkflows.updateDashboard({ error: true, retry: load });
     });
   };
   load();
@@ -970,16 +989,21 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
   });
   const component = byId('workspace').querySelector('[data-investigation-component]');
   const caseTable = byId('workspace').querySelector('[data-case-list-table]');
-  if (caseTable) void import('../features/investigation/preview-case-list-table.jsx').then(({ mountPreviewCaseTable }) => {
-    if (!caseTable.isConnected) return;
-    dashboardSource ??= caseSource(groups);
-    const caseRows = new Map(dashboardSource.cases.map(row => [row.code, row]));
-    unmountInvestigation = mountPreviewCaseTable(caseTable, caseTable.dataset.caseListTable,
-      codes.map(recordCode => caseRows.get(recordCode)).filter(Boolean), groupPrefix === 'E', queryData.rows.length,
-      { ...caseListPaging, pageSize: 20 });
-  });
-  if (component) void import('../features/investigation/investigation-components.jsx').then(({ mountInvestigation }) => {
-    if (component.isConnected) {
+  if (caseTable) loadInvestigationView(caseTable,
+    { label: caseTable.dataset.caseListTable, kind: 'case-table', columns: groupPrefix === 'E' ? 13 : 11 },
+    () => import('../features/investigation/preview-case-list-table.jsx'), ({ mountPreviewCaseTable }) => {
+      dashboardSource ??= caseSource(groups);
+      const caseRows = new Map(dashboardSource.cases.map(row => [row.code, row]));
+      unmountInvestigation = mountPreviewCaseTable(caseTable, caseTable.dataset.caseListTable,
+        codes.map(recordCode => caseRows.get(recordCode)).filter(Boolean), groupPrefix === 'E', queryData.rows.length,
+        { ...caseListPaging, pageSize: 20 });
+    });
+  if (component) {
+    const ledger = component.dataset.investigationComponent === 'ledger';
+    const tableView = path === ledgerTableScreen;
+    const placeholder = ledger ? { label: '거래 원장', kind: tableView ? 'ledger-table' : 'ledger-cards', columns: 9, relatedColumns: 7 }
+      : { label: component.dataset.label, kind: 'case-cards' };
+    loadInvestigationView(component, placeholder, () => import('../features/investigation/investigation-components.jsx'), ({ mountInvestigation }) => {
       ({ unmount: unmountInvestigation, setLedgerView } = mountInvestigation(component, {
         codes,
         code,
@@ -987,11 +1011,11 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
         cases: serviceMode ? liveSource().cases : undefined,
         targetTransaction: serviceMode ? liveSource().transactions.find(row => row.code === code) : undefined,
         label: component.dataset.label,
-        tableView: path === ledgerTableScreen,
+        tableView,
         ...caseListPaging,
       }));
-    }
-  });
+    });
+  }
   if (path) {
     const urlParams = queryControls.params(path);
     if (initialPanel) urlParams.set('panel', initialPanel);

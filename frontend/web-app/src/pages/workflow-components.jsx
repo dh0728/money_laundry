@@ -21,6 +21,7 @@ import { liveSource } from '../features/investigation/live-data.js';
 import { readWorkspaceDuration } from '../features/dashboard/workspace-metrics';
 import { SortableTableHead, tableCount, useTableSort, WorkflowQueryHeading, WorkflowTable } from '../components/workflow-table';
 import { DashboardSkeleton } from '../features/dashboard/dashboard-layout';
+import { CaseOverviewSkeleton } from '../features/investigation/investigation-skeletons';
 import { PreviewEpisodeDialog } from '../features/investigation/preview-episode-dialog';
 import { canManagePreviewEpisodes, canTransferAlert } from '../features/investigation/preview-episode-transfer';
 import { CaseJudgment } from '../features/investigation/case-judgment';
@@ -415,7 +416,9 @@ function CaseOverview({ overview, appearance }) {
   }, []);
   // Episode 에서는 카드가 어느 Alert 의 것인지 화면 코드로 보여 준다
   const alertCode = id => liveSource().cases.find(row => row.kind === 'Alert' && row.caseId === id)?.code;
-  return <Suspense fallback={null}><PreviewCaseOverview {...overview} appearance={appearance}
+  const loading = overview?.row && <CaseOverviewSkeleton episode={overview.row.kind === 'Episode'}
+    perPanel={overview.perPanel} initialPanel={overview.initialPanel} />;
+  return <Suspense fallback={loading}><PreviewCaseOverview {...overview} appearance={appearance}
     history={reportHistory(overview?.reportData)} activeRules={liveActiveRules()}
     ruleHits={liveRules ? { ...hits, alertCode } : undefined} /></Suspense>;
 }

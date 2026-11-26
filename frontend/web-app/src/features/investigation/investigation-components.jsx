@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { SearchField } from '../../components/search-field';
 import GlideSelect from '../../components/react-bits/GlideSelect';
 import { TableBody, TableCell, TableColumns, TableHead, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
+import { DataTableSkeletonRows } from '@/components/data-table/data-table-skeleton';
 import { CardHeader } from '../../components/card-header';
 import { RecordCard, recordCardSurface } from '../../components/record-card';
 import { CountTag, LinkTag, ModelScoreTag, PatternTag, ReviewStatusTag, StatusTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
@@ -19,6 +20,7 @@ import { SectionDownload, SectionDownloadHeading } from '../../components/sectio
 import './investigation-components.css';
 import { Box, Text } from '@/components/layout-primitives';
 import { FlowConnectionOverlay, TransactionDirectionArrow } from '@/components/charts/charts/transaction-flow-graphics';
+import { LedgerPaneSkeleton } from './investigation-skeletons';
 
 export { sampleTransactions } from '../../mocks/transaction-fixtures';
 const amountFormat = new Intl.NumberFormat('ko-KR');
@@ -47,7 +49,7 @@ function LedgerConnections({ owner, account, transaction, version }) {
     const ledger = overlayRef.current.parentElement;
     const lists = ['owners', 'accounts', 'transactions'].map(name => {
       const viewport = ledger.querySelector(`.ledger-${name} .animated-list__viewport`);
-      return { viewport, rows: [...viewport.querySelectorAll('[data-index][data-state]')] };
+      return { viewport, rows: Array.from(viewport?.querySelectorAll('[data-index][data-state]') ?? []) };
     });
     const relations = [
       { name: 'owner', source: lists[0], target: lists[1], index: owner, selected: account },
@@ -61,6 +63,7 @@ function LedgerConnections({ owner, account, transaction, version }) {
       const bounds = ledger.getBoundingClientRect();
       const next = [];
       for (const { name, source, target, index, selected } of relations) {
+        if (!source.viewport || !target.viewport) continue;
         const sourceItem = source.rows[index];
         if (sourceItem?.dataset.state !== 'in') continue;
         const sourceRow = sourceItem.getBoundingClientRect();
@@ -103,7 +106,7 @@ function LedgerConnections({ owner, account, transaction, version }) {
     const observer = new ResizeObserver(schedule);
     observer.observe(ledger);
     for (const { viewport, rows } of lists) {
-      observer.observe(viewport);
+      if (viewport) observer.observe(viewport);
       rows.forEach(row => observer.observe(row));
     }
     ledger.addEventListener('scroll', schedule, true);
@@ -295,7 +298,7 @@ function LedgerSearch({ target, query, onChange }) {
 }
 
 function LedgerListStatus({ list, empty }) {
-  if (list.status === 'loading') return <Text className="ledger-status" role="status">불러오는 중…</Text>;
+  if (list.status === 'loading') return <Text className="visually-hidden" role="status">불러오는 중…</Text>;
   if (list.status === 'error' && !list.items.length) return <Text className="ledger-status" role="alert">{list.message}{' '}
     <ActionButton className="ledger-retry" onClick={list.retry}>다시 시도</ActionButton></Text>;
   if (list.status === 'success' && !list.items.length) return <Text className="ledger-status" role="status">{empty}</Text>;
@@ -331,6 +334,8 @@ function LedgerHierarchy({ owners, accounts, transactions, selection, select, se
   const transactionResults = searchTarget === 'transaction' && !account;
   const accountResults = searchTarget === 'account' && !owner;
   const resultList = transactionResults ? transactions : accountResults ? accounts : owners;
+  const loadingBranch = resultList.status === 'loading' || (owner && accounts.status === 'loading')
+    || (account && transactions.status === 'loading');
   // A search can reveal an ancestor outside the first page. Leave its open branch visible when switching targets.
   const withOpenBranch = (rows, current, target) => current && (!filtering || searchTarget !== target) && !rows.some(row => row.id === current.id)
     ? [current, ...rows] : rows;
@@ -349,6 +354,8 @@ function LedgerHierarchy({ owners, accounts, transactions, selection, select, se
   const emptyRow = (list, label) => list.status === 'success' && list.items.length === 0 && <TableRow>
     <TableCell colSpan={ledgerColumns.length}>조건과 일치하는 {label} 검색 결과가 없습니다.</TableCell>
   </TableRow>;
+  const loadingRows = (list, level) => list.status === 'loading'
+    && <DataTableSkeletonRows columnCount={ledgerColumns.length} rowCount={3} level={level} />;
 
   function transactionRows(ownerName, accountLabel) {
     return <>
@@ -368,6 +375,7 @@ function LedgerHierarchy({ owners, accounts, transactions, selection, select, se
           <TableCell><VerdictTag verdict={record.verdict} /></TableCell>
         </TableRow>;
       })}
+      {loadingRows(transactions, 3)}
       {emptyRow(transactions, '거래')}
       <LedgerMoreRow label={accountLabel ? `${accountLabel} 거래` : '거래'} list={transactions} level={3} />
     </>;
@@ -387,6 +395,7 @@ function LedgerHierarchy({ owners, accounts, transactions, selection, select, se
           {open && transactionRows(ownerName || item.ownerName, item.label)}
         </React.Fragment>;
       })}
+      {loadingRows(accounts, 2)}
       {emptyRow(accounts, '계좌')}
       <LedgerMoreRow label={ownerName ? `${ownerName} 계좌` : '계좌'} list={accounts} level={2} />
     </>;
@@ -413,7 +422,7 @@ function LedgerHierarchy({ owners, accounts, transactions, selection, select, se
       tools={entries.length > 0 && <TableQueryTools actions={{ entries, panelDownload: Boolean(transaction) }} />}>
       <TableColumns widths={ledgerColumns.map(([key, , width]) => ({ key, width: `${width}%` }))} />
       <LedgerColumns columns={ledgerColumns} />
-      <TableBody>
+      <TableBody aria-busy={loadingBranch || undefined}>
       {transactionResults && transactionRows()}
       {accountResults && accountRows()}
       {!transactionResults && !accountResults && withOpenBranch(owners.items, owner, 'owner').map(row => <React.Fragment key={row.id}>
@@ -425,10 +434,13 @@ function LedgerHierarchy({ owners, accounts, transactions, selection, select, se
         {ownerOpen(row) && accountRows(row.name)}
       </React.Fragment>)}
         {!transactionResults && !accountResults && emptyRow(owners, '소유주')}
+        {!transactionResults && !accountResults && loadingRows(owners, 1)}
         {!transactionResults && !accountResults && <LedgerMoreRow label="소유주" list={owners} level={1} />}
       </TableBody>
     </WorkflowTable>
     <LedgerListStatus list={resultList} empty="" />
+    {loadingBranch && resultList.status !== 'loading' &&
+      <Text className="visually-hidden" role="status">연결된 원장 항목 불러오는 중…</Text>}
   </Box>;
 }
 
@@ -540,7 +552,7 @@ export function LedgerWorkspace({ source, code, caseRows, tableView = false, tar
     <Box as="section" className={`ledger-pane ledger-${name}`} aria-labelledby={`ledger-${name}-title`} aria-busy={list.status === 'loading' || undefined}>
       <LedgerHeading id={`ledger-${name}-title`} title={title} count={list.items.length} total={list.total} suffix={suffix} entry={entry} />
       <LedgerListStatus list={list} empty={emptyText} />
-      {content}
+      {list.status === 'loading' ? <LedgerPaneSkeleton /> : content}
       <LedgerMore label={title} list={list} />
     </Box>;
 

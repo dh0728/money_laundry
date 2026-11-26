@@ -1,0 +1,32 @@
+.investigation-loading,
+.investigation-loading > [aria-hidden] { min-inline-size: 0 }
+.investigation-skeleton-title {
+  inline-size: min(100%, var(--loading-placeholder-title-width));
+  block-size: var(--aml-type-panel-title-lineHeight);
+  margin-block-end: var(--aml-space-4);
+}
+.investigation-skeleton-line {
+  inline-size: min(100%, var(--loading-placeholder-note-width));
+  block-size: var(--aml-type-body-lineHeight);
+  margin-block-start: var(--aml-space-4);
+}
+.investigation-skeleton-tag {
+  inline-size: var(--aml-space-64);
+  block-size: var(--aml-size-control-compact);
+  border-radius: var(--aml-radius-full);
+}
+.investigation-skeleton-bar { block-size: var(--aml-size-control-compact); }
+.investigation-skeleton-plot { inline-size: 100%; margin-block: var(--workspace-gap) }
+.investigation-skeleton-flow,
+.investigation-skeleton-overview-visual { block-size: var(--overview-score-plot-min-height) }
+.investigation-skeleton-score { block-size: var(--overview-score-compact-height) }
+.investigation-skeleton-distribution,
+.investigation-skeleton-card { block-size: calc(var(--aml-space-64) * 2) }
+.investigation-loading-lines { display: grid; gap: var(--aml-space-4) }
+
+@media (prefers-reduced-motion: reduce) {
+  .investigation-loading [data-slot="skeleton"],
+  .investigation-loading-lines [data-slot="skeleton"] { animation: none }
+}
+:root[data-reduced-motion="true"] .investigation-loading [data-slot="skeleton"],
+:root[data-reduced-motion="true"] .investigation-loading-lines [data-slot="skeleton"] { animation: none }
