@@ -161,8 +161,9 @@ function ResultNotifications() {
 }
 
 async function downloadReport(rows) {
-  const { downloadCaseReport } = await import('../features/investigation/case-report-pdf.js');
-  await downloadCaseReport(rows);
+  const [{ downloadCaseReport }, { attachAiReports }] = await Promise.all([
+    import('../features/investigation/case-report-pdf.js'), import('../features/investigation/case-ai-report.js')]);
+  await downloadCaseReport(await attachAiReports(rows));
 }
 
 function ReportAudit({ row }) {

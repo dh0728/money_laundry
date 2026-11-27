@@ -1,5 +1,6 @@
 import { buildImagePdf } from '../../lib/preview-pdf.js';
 import { downloadBlob } from '../../lib/report-io';
+import { narrativeSections } from './case-ai-report';
 import { createExportCanvas } from '../../components/export-canvas';
 import { judgmentReasonLabels } from './case-judgment-data.js';
 import { modelRiskBand, modelRiskLabels } from '../settings/model-risk-settings.js';
@@ -239,6 +240,27 @@ function evidenceCells(row) {
   ];
 }
 
+/** 판정 하나의 AI 분석 보고서(법정 STR 작성 참고용). 문장 끝의 [F번호] 는 서버가 만든 사실 목록의 근거다. */
+function aiReportSection(output, report, { colors, weight, measure }) {
+  output.ensure(measure('reference-clearance'));
+  output.text('AI 분석 보고서 · 법정 STR 작성 참고용(제출용 아님)', { fontWeight: weight('heading'), color: colors.brand,
+    bottom: measure('compact-gap') });
+  for (const [key, label] of narrativeSections) {
+    const sentences = report.narrative?.[key] ?? [];
+    if (!sentences.length) continue;
+    output.text(label, { fontWeight: weight('bold'), bottom: measure('compact-gap') });
+    for (const sentence of sentences) output.text(`- ${sentence.text} [${sentence.sources.join(', ')}]`);
+  }
+  if (report.needsBankCheck?.length) {
+    output.text('금융회사 확인 필요 사항', { fontWeight: weight('bold'), bottom: measure('compact-gap') });
+    for (const item of report.needsBankCheck) output.text(`- ${item}`);
+  }
+  output.text('근거 사실 목록', { fontWeight: weight('bold'), bottom: measure('compact-gap') });
+  for (const fact of report.facts ?? []) output.text(`${fact.id}  ${fact.text}`, { color: colors.muted });
+  output.text(`보고서 ${report.reportId} · ${report.model} · ${sourceTime(report.createdAt)} KST · 모델 추정은 담당자 판정과 별개`,
+    { color: colors.muted, bottom: measure('section-gap') });
+}
+
 export async function createCaseReportPdf(rows) {
   if (!rows.length) throw new Error('보고서에 포함할 판정을 선택해 주세요.');
   await document.fonts?.ready;
@@ -309,6 +331,9 @@ export async function createCaseReportPdf(rows) {
     } else {
       output.text('연결된 근거 거래 기록이 없습니다.', { color: colors.muted, bottom: measure('section-gap') });
     }
+    if (row.aiReport) aiReportSection(output, row.aiReport, style);
+    else if (row.aiReportError) output.text(`AI 분석 보고서를 만들지 못했습니다. (${row.aiReportError})`,
+      { color: colors.muted, bottom: measure('section-gap') });
   }
 
   output.setContinuation('후속 확인 사항');
