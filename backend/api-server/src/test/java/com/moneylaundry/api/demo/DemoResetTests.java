@@ -135,7 +135,7 @@ class DemoResetTests {
   @Test
   void cleanup_failure_is_retryable_and_same_request_never_deletes_new_data() {
     long id = job("FAILED");
-    String key = "uploads/12/" + id + "/file.csv";
+    String key = "uploads/ledger/" + id + "/file.csv";
     jdbc.update("update ingest.uploads set s3_key=? where upload_id=?", key, id);
     var request = input();
     assertThat(service.reset(admin, request).get("status")).isEqualTo("FILES_PENDING");

@@ -139,6 +139,8 @@ class LedgerUploadApiTests {
         jdbc.queryForObject(
             "select s3_key from ingest.uploads where upload_id=?", String.class, issued.uploadId());
     files.put(key, bytes);
+    // Demo reset must be able to clean every issued upload key.
+    com.moneylaundry.api.ingest.storage.DemoObjectKey.check(key, false);
     assertThat(service.complete(issued.uploadId()).status()).isEqualTo(UploadStatus.RECEIVED);
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
     while (System.nanoTime() < deadline) {

@@ -22,12 +22,12 @@ class DemoStorageCleanupTests {
               ((Consumer<DeleteObjectRequest.Builder>) call.getArgument(0)).accept(builder);
               var request = builder.build();
               assertThat(request.bucket()).isEqualTo("test");
-              assertThat(request.key()).isEqualTo("dev/db-v3/uploads/12/8/test.csv");
+              assertThat(request.key()).isEqualTo("dev/db-v3/uploads/ledger/8/test.csv");
               assertThat(request.versionId()).isNull();
               return DeleteObjectResponse.builder().build();
             });
     var store = new S3UploadStore(client, mock(S3Presigner.class), "test", "dev/db-v3/");
-    assertThat(store.removeDemoFiles("uploads/12/8/test.csv", false)).isTrue();
+    assertThat(store.removeDemoFiles("uploads/ledger/8/test.csv", false)).isTrue();
     verify(client).deleteObject(any(Consumer.class));
   }
 
@@ -69,7 +69,12 @@ class DemoStorageCleanupTests {
     var store = new S3UploadStore(client, mock(S3Presigner.class), "test", "dev/");
     for (String key :
         new String[] {
-          "", "requests/", "uploads/12/1/../../secret", "/uploads/12/1/a", "uploads/12/1/a/b"
+          "",
+          "requests/",
+          "uploads/ledger/1/../../secret",
+          "/uploads/ledger/1/a",
+          "uploads/ledger/1/a/b",
+          "uploads/12/1/a"
         })
       assertThatThrownBy(() -> store.removeDemoFiles(key, false))
           .isInstanceOf(IllegalArgumentException.class);
@@ -80,12 +85,12 @@ class DemoStorageCleanupTests {
   void local_cleanup_preserves_unrelated_files_and_handles_missing(@TempDir Path root)
       throws Exception {
     var store = new LocalFolderUploadStore(root.toString());
-    Path file = root.resolve("uploads/12/1/test.csv");
+    Path file = root.resolve("uploads/ledger/1/test.csv");
     Files.createDirectories(file.getParent());
     Files.writeString(file, "test");
     Files.writeString(root.resolve("keep.csv"), "keep");
-    assertThat(store.removeDemoFiles("uploads/12/1/test.csv", false)).isTrue();
-    assertThat(store.removeDemoFiles("uploads/12/1/test.csv", false)).isTrue();
+    assertThat(store.removeDemoFiles("uploads/ledger/1/test.csv", false)).isTrue();
+    assertThat(store.removeDemoFiles("uploads/ledger/1/test.csv", false)).isTrue();
     assertThat(Files.exists(root.resolve("keep.csv"))).isTrue();
   }
 }
