@@ -4,7 +4,7 @@ import { Text } from '@/components/layout-primitives';
 import { SectionDownloadHeading } from '@/components/section-download';
 import { CaseActorTag, CaseAgeTag, LinkTag, ModelScoreTag, PatternTag } from '@/components/semantic-tags';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
-import { TableFieldLabel, WorkflowTable } from '@/components/workflow-table';
+import { recordRowProps, TableFieldLabel, WorkflowTable } from '@/components/workflow-table';
 import { csvDownloadEntry } from '@/components/query-controls';
 import { workRequestUserName } from '../investigation/preview-work-requests';
 import { modelRiskBand } from '../settings/model-risk-settings';
@@ -62,7 +62,7 @@ export function DashboardPriorityQueue({ rows }) {
         <TableHeader><TableRow>
           {columns.map(({ key, label }) => <TableHead key={key} scope="col"><TableFieldLabel column={key}>{label}</TableFieldLabel></TableHead>)}
         </TableRow></TableHeader>
-        <TableBody>{queue.map(row => <TableRow key={row.code}>
+        <TableBody>{queue.map(row => <TableRow key={row.code} {...recordRowProps}>
           <TableRowHead><LinkTag code={row.code} /></TableRowHead>
           <TableCell><ModelScoreTag score={row.score} band={priorityScoreBand(row.score)} /></TableCell>
           <TableCell><CaseAgeTag days={row.elapsed} showRecent overdueFromDays={7} /></TableCell>

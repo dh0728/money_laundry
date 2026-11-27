@@ -4,7 +4,7 @@ import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/tab
 import { CaseDataTable, RecordIdCell } from './case-table-components';
 import { ModelScoreTag, ReviewStatusTag, reviewStatusLabel, VerdictTag, verdictLabels } from '../../components/semantic-tags';
 import { currencyColumn, SortableTableHead, tableCount,
-  useTableSelection, useTableSort } from '../../components/workflow-table';
+  recordRowProps, useTableSelection, useTableSort } from '../../components/workflow-table';
 import { csvDownloadEntry, dateFromCode, inDateRange, TableQueryTools } from '../../components/query-controls';
 import { Box, Text } from '@/components/layout-primitives';
 
@@ -63,7 +63,7 @@ export function TransactionEvidenceTable({ title, transactions = [], showScore =
       <TableBody>
         {sorting.rows.map(({ code, timestamp, from, to, amount, currency, method, status, verdict, score }) =>
           <TableRow key={code} data-verdict={verdict} data-selected={selection.has(code) || undefined}
-            related={highlightedCodes?.has(code)}>
+            related={highlightedCodes?.has(code)} {...recordRowProps}>
             <RecordIdCell code={code} />
             {scoresVisible && <TableCell>{Number.isFinite(score)
               ? <ModelScoreTag score={score} /> : '—'}</TableCell>}
