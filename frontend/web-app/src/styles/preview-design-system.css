@@ -372,7 +372,7 @@
   --risk-gauge-size: 200px;
   /* 미처리 경과일 원 가운데 숫자: 원 지름의 13%(cqi = 원 너비의 1%) */
   --overview-donut-value-size: 13cqi;
-  /* 종합 위험지수 카드 왼쪽 여백: 제목 아래 위쪽 여백과 비슷하게 */
+  /* 종합 위험지수 카드 왼쪽·원 아래 여백: 제목 아래 위쪽 여백과 비슷하게 */
   --risk-panel-inset: var(--aml-space-32);
   /* 원 지름에 비례하는 글자 크기(cqb = 원 높이의 1%) */
   --risk-gauge-score-size: 30cqb;

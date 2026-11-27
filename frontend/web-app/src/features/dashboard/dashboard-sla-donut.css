@@ -16,12 +16,21 @@
   container-type: size;
 }
 .dashboard-sla-plot > * { grid-area: 1 / 1 }
+/* 원 중앙에는 건수 줄만 맞추고, '미처리' 글자는 그 줄 바로 위에 붙인다 */
 .dashboard-sla-total {
+  position: relative;
   display: grid;
   justify-items: center;
   color: var(--muted-text);
   font-size: var(--aml-type-caption-size);
   pointer-events: none;
+}
+.dashboard-sla-total > span {
+  position: absolute;
+  inset-block-end: 100%;
+  inset-inline-start: 50%;
+  translate: -50% 0;
+  white-space: nowrap;
 }
 .dashboard-sla-total > strong {
   color: var(--text);
