@@ -44,8 +44,7 @@ class LedgerFilterTests {
   MockHttpSession session = new MockHttpSession();
 
   UUID ownerA = UUID.randomUUID(), ownerB = UUID.randomUUID(), ownerC = UUID.randomUUID();
-  UUID a1 = UUID.randomUUID(), a2 = UUID.randomUUID(), b1 = UUID.randomUUID();
-  UUID c1 = UUID.randomUUID();
+  String a1, a2, b1, c1;
   long t1, t2, t3, t4;
 
   @BeforeEach
@@ -55,13 +54,16 @@ class LedgerFilterTests {
         encoder.encode("Test-password-123"));
     jdbc.update("insert into core.banks(bank_id) values(9001) on conflict do nothing");
     long oa = owner(ownerA), ob = owner(ownerB), oc = owner(ownerC);
-    long ia1 = account(a1, oa), ia2 = account(a2, oa), ib1 = account(b1, ob);
-    long ic1 = account(c1, oc);
-    t1 = tx(ia1, ib1, "ACTIVE");
-    t2 = tx(ib1, ia2, "ACTIVE");
-    t3 = tx(ic1, ib1, "ACTIVE");
-    t4 = tx(ia2, ia1, "ACTIVE");
-    tx(ia1, ic1, "SUPERSEDED");
+    long ia1 = account(oa), ia2 = account(oa), ib1 = account(ob);
+    long ic1 = account(oc);
+    a1 = id(ia1);
+    a2 = id(ia2);
+    b1 = id(ib1);
+    c1 = id(ic1);
+    t1 = tx(ia1, ib1);
+    t2 = tx(ib1, ia2);
+    t3 = tx(ic1, ib1);
+    t4 = tx(ia2, ia1);
     login();
   }
 
@@ -74,9 +76,7 @@ class LedgerFilterTests {
                 .value(Matchers.containsInAnyOrder((int) t1, (int) t2, (int) t4)));
     get("/api/v1/ledger/accounts?owner=" + ownerA)
         .andExpect(jsonPath("$.totalElements").value(2))
-        .andExpect(
-            jsonPath("$.content[*].id")
-                .value(Matchers.containsInAnyOrder(a1.toString(), a2.toString())));
+        .andExpect(jsonPath("$.content[*].id").value(Matchers.containsInAnyOrder(a1, a2)));
     get("/api/v1/ledger/owners?owner=" + ownerA)
         .andExpect(
             jsonPath("$.content[*].id")
@@ -104,8 +104,7 @@ class LedgerFilterTests {
   void unknown_owner_or_account_is_empty() throws Exception {
     get("/api/v1/ledger/transactions?owner=" + UUID.randomUUID())
         .andExpect(jsonPath("$.totalElements").value(0));
-    get("/api/v1/ledger/accounts?account=" + UUID.randomUUID())
-        .andExpect(jsonPath("$.totalElements").value(0));
+    get("/api/v1/ledger/accounts?account=999-9999").andExpect(jsonPath("$.totalElements").value(0));
   }
 
   @Test
@@ -133,7 +132,7 @@ class LedgerFilterTests {
     // 필터가 있으면 거래에 나온 계좌만 센다.
     int active =
         jdbc.queryForObject(
-            "select count(*) from (select from_account_id from ledger.transactions where integration_status='ACTIVE' and payment_format='ACH' union select to_account_id from ledger.transactions where integration_status='ACTIVE' and payment_format='ACH') q",
+            "select count(*) from (select from_account_id from ledger.transactions where payment_format='ACH' union select to_account_id from ledger.transactions where payment_format='ACH') q",
             Integer.class);
     get("/api/v1/ledger/accounts?payments=ACH")
         .andExpect(jsonPath("$.totalElements").value(active));
@@ -154,21 +153,24 @@ class LedgerFilterTests {
         "가명-" + id);
   }
 
-  private long account(UUID id, long owner) {
+  private long account(long owner) {
     return jdbc.queryForObject(
-        "insert into core.accounts(service_account_id,bank_id,owner_id) values(?,9001,?) returning account_id",
+        "insert into core.accounts(bank_id,owner_id) values(9001,?) returning account_id",
         Long.class,
-        id,
         owner);
   }
 
-  private long tx(long from, long to, String status) {
+  private String id(long account) {
     return jdbc.queryForObject(
-        "insert into ledger.transactions(occurred_at,business_date,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,integration_status) values(now(),current_date,?,?,1,'USD',1,'USD','ACH',1,'fx_rates_usd_v1',?) returning tx_id",
+        "select service_account_id from core.accounts where account_id=?", String.class, account);
+  }
+
+  private long tx(long from, long to) {
+    return jdbc.queryForObject(
+        "insert into ledger.transactions(occurred_at,business_date,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version) values(now(),current_date,?,?,1,'USD',1,'USD','ACH',1,'fx_rates_usd_v1') returning tx_id",
         Long.class,
         from,
-        to,
-        status);
+        to);
   }
 
   private void login() throws Exception {

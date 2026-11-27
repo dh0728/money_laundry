@@ -65,9 +65,8 @@ class AlertPipelineTests {
             "select from_account_id from ledger.transactions where tx_id=?", Long.class, target);
     receiver =
         jdbc.queryForObject(
-            "insert into core.accounts(bank_id,service_account_id,owner_id) select bank_id,?,owner_id from core.accounts where account_id=? returning account_id",
+            "insert into core.accounts(bank_id,owner_id) select bank_id,owner_id from core.accounts where account_id=? returning account_id",
             Long.class,
-            UUID.randomUUID(),
             account);
     jdbc.update(
         "update ledger.transactions set to_account_id=?,occurred_at='2022-09-02 23:30+09',business_date='2022-09-02' where tx_id=?",
@@ -102,14 +101,12 @@ class AlertPipelineTests {
         day);
   }
 
-  /** Adds txId as another row of the report version that already carries sameReportAs. */
-  void attach(long txId, long sameReportAs) {
-    long report =
-        jdbc.queryForObject(
-            "insert into private.bank_reports(version_id,source_row,report_status) select br.version_id,(select max(source_row)+1 from private.bank_reports where version_id=br.version_id),'ACTIVE' from private.bank_reports br join ledger.transaction_reports tr using(report_id) where tr.tx_id=? returning report_id",
-            Long.class,
-            sameReportAs);
-    jdbc.update("insert into ledger.transaction_reports values(?,?,'INTERNAL')", txId, report);
+  /** Puts txId into the loaded file that already carries sameFileAs. */
+  void attach(long txId, long sameFileAs) {
+    jdbc.update(
+        "update ledger.transactions set upload_id=(select upload_id from ledger.transactions where tx_id=?) where tx_id=?",
+        sameFileAs,
+        txId);
   }
 
   void score(long txId, UUID scoreRun) {
@@ -146,36 +143,20 @@ class AlertPipelineTests {
   void report(long txId, String day, String received) {
     long upload =
         jdbc.queryForObject(
-            "insert into ingest.uploads(file_name,file_hash,size_bytes,status,bank_id,business_date,received_at) values('fixture.csv',repeat('a',64),1,'COMPLETED',12,?::date,?::timestamptz) returning upload_id",
+            """
+            with existing as (select upload_id from ingest.uploads where business_date=?::date and status='COMPLETED'),
+            added as (insert into ingest.uploads(file_name,file_hash,size_bytes,status,business_date,received_at)
+              select 'fixture.csv',repeat('a',64),1,'COMPLETED',?::date,?::timestamptz
+              where not exists(select 1 from existing) returning upload_id)
+            select upload_id from existing union all select upload_id from added
+            """,
             Long.class,
             day,
-            received);
-    long set =
-        jdbc.queryForObject(
-            "insert into ingest.report_sets(bank_id,business_date) values(12,?::date) returning set_id",
-            Long.class,
-            day);
-    long version =
-        jdbc.queryForObject(
-            "insert into ingest.report_versions(set_id,upload_id,version_no,received_at,stage_status,row_count) values(?,?,1,?::timestamptz,'ACTIVE',1) returning version_id",
-            Long.class,
-            set,
-            upload,
+            day,
             received);
     jdbc.update(
-        "update ingest.report_sets set current_version_id=?,generation=1 where set_id=?",
-        version,
-        set);
-    long report =
-        jdbc.queryForObject(
-            "insert into private.bank_reports(version_id,source_row,report_status) values(?,1,'ACTIVE') returning report_id",
-            Long.class,
-            version);
-    jdbc.update("insert into ledger.transaction_reports values(?,?,'INTERNAL')", txId, report);
-    jdbc.update(
-        "insert into ingest.reporting_scopes(business_date) values(?::date) on conflict do nothing",
-        day);
-    jdbc.update("insert into ingest.reporting_scope_banks values(?::date,1,12)", day);
+        "update ingest.uploads set received_at=?::timestamptz where upload_id=?", received, upload);
+    jdbc.update("update ledger.transactions set upload_id=? where tx_id=?", upload, txId);
   }
 
   long firstAlert() {
@@ -185,21 +166,6 @@ class AlertPipelineTests {
     }
     return jdbc.queryForObject(
         "select alert_id from review.alert_versions where run_id=?", Long.class, run);
-  }
-
-  /**
-   * Integration changes a transaction's status only together with its report version's revision,
-   * which marks the transaction for FREEZE_INPUT to re-evaluate; direct edits here do the same.
-   */
-  void reviseReportsOf(long... transactions) {
-    for (long id : transactions)
-      jdbc.update(
-          """
-          update ingest.report_versions set revision=revision+1 where version_id in(
-            select br.version_id from ledger.transaction_reports tr
-            join private.bank_reports br using(report_id) where tr.tx_id=?)
-          """,
-          id);
   }
 
   UUID freezeCheck() {
@@ -231,7 +197,7 @@ class AlertPipelineTests {
   void frozen_envelope_supports_rolling_paths_but_never_copies_future_transactions() {
     firstAlert();
     long distant = contextOn("2022-08-29");
-    long nearby = contextOn("2022-09-01");
+    long nearby = contextOn("2022-08-31");
     long future = contextOn("2022-09-05");
     UUID checking = freezeCheck();
     var ids =
@@ -249,8 +215,9 @@ class AlertPipelineTests {
   @Test
   void full_snapshot_rechecks_visible_origins_without_copying_future_sources() {
     long alert = firstAlert();
+    // A file dated and received after the check's cutoff is not part of its input.
     jdbc.update(
-        "insert into ingest.reporting_scopes(business_date) values('2020-01-01'),('2030-01-01')");
+        "insert into ingest.uploads(file_name,file_hash,size_bytes,status,business_date,received_at) values('future.csv',repeat('b',64),1,'COMPLETED','2030-01-01','2030-01-01 09:00+09')");
     UUID checking = freezeCheck();
     assertThat(
             jdbc.queryForObject(
@@ -260,78 +227,7 @@ class AlertPipelineTests {
         .isEqualTo(1);
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from analysis.source_manifest where run_id=? and business_date='2030-01-01'",
-                Integer.class,
-                checking))
-        .isZero();
-  }
-
-  @Test
-  void source_revision_rechecks_even_complete_windows_and_failed_checks_do_not_consume_change() {
-    long alert = firstAlert();
-    String frozen =
-        jdbc.queryForObject(
-            "select state::text from analysis.source_manifest where run_id=? and business_date='2022-09-02'",
-            String.class,
-            run);
-    jdbc.update(
-        "update ingest.report_versions set revision=revision+1 where set_id in(select set_id from ingest.report_sets where business_date='2022-09-02')");
-    UUID failed = freezeCheck();
-    assertThat(
-            jdbc.queryForList(
-                "select alert_id from analysis.run_alert_origins where run_id=?",
-                Long.class,
-                failed))
-        .containsExactly(alert);
-    assertThat(
-            jdbc.queryForObject(
-                "select state::text from analysis.source_manifest where run_id=? and business_date='2022-09-02'",
-                String.class,
-                run))
-        .isEqualTo(frozen);
-    jdbc.update(
-        "insert into review.alert_coverage_checks(alert_id,run_id,coverage,checked_at) values(?,?,'[]',clock_timestamp())",
-        alert,
-        failed);
-    jdbc.update("update analysis.runs set status='CANCELLED' where run_id=?", failed);
-    UUID retried = freezeCheck();
-    assertThat(
-            jdbc.queryForList(
-                "select alert_id from analysis.run_alert_origins where run_id=?",
-                Long.class,
-                retried))
-        .containsExactly(alert);
-    jdbc.update(
-        "insert into review.alert_coverage_checks(alert_id,run_id,coverage,checked_at) values(?,?,'[]',clock_timestamp())",
-        alert,
-        retried);
-    jdbc.update("update analysis.runs set status='COMPLETED' where run_id=?", retried);
-    jdbc.update(
-        "update analysis.jobs set status='COMPLETED' where job_id=(select job_id from analysis.runs where run_id=?)",
-        retried);
-    UUID unchanged = freezeCheck();
-    assertThat(
-            jdbc.queryForObject(
-                "select count(*) from analysis.run_alert_origins where run_id=?",
-                Integer.class,
-                unchanged))
-        .isEqualTo(1);
-  }
-
-  @Test
-  void scope_membership_change_rechecks_without_any_new_target_or_report() {
-    long alert = firstAlert();
-    jdbc.update("delete from ingest.reporting_scope_banks where business_date='2022-09-02'");
-    UUID checking = freezeCheck();
-    assertThat(
-            jdbc.queryForList(
-                "select alert_id from analysis.run_alert_origins where run_id=?",
-                Long.class,
-                checking))
-        .containsExactly(alert);
-    assertThat(
-            jdbc.queryForObject(
-                "select count(*) from analysis.input_transactions where run_id=? and input_role='TARGET'",
+                "select count(*) from analysis.source_manifest m join ingest.uploads u using(upload_id) where m.run_id=? and u.business_date='2030-01-01'",
                 Integer.class,
                 checking))
         .isZero();
@@ -487,13 +383,12 @@ class AlertPipelineTests {
     assertThat(alerts.detail(parent, null).get("version")).isEqualTo(1);
     assertThat(alerts.versions(parent)).hasSize(1);
     assertThatThrownBy(() -> alerts.detail(parent, 2)).isInstanceOf(ApiException.class);
-    runs.cancel(pending, "REPORT_CORRECTED");
     assertThat(alerts.detail(parent, null).get("transactions")).isEqualTo(old.get("transactions"));
     assertThat(alerts.versions(parent)).hasSize(1);
   }
 
   @Test
-  void completed_only_visibility_and_cancelled_evidence_remains_hidden() {
+  void completed_only_visibility_hides_prepared_evidence() {
     UUID token = UUID.randomUUID();
     jdbc.update(
         "update analysis.jobs set status='RUNNING',execution_owner=gen_random_uuid(),execution_id=? where job_id=?",
@@ -515,8 +410,6 @@ class AlertPipelineTests {
     long alert = Long.MAX_VALUE;
     assertThat(alerts.list(0, 20, null, null, null).get("totalElements")).isEqualTo(0L);
     assertThatThrownBy(() -> alerts.detail(alert, null)).isInstanceOf(ApiException.class);
-    runs.cancel(run, "REPORT_CORRECTED");
-    assertThat(alerts.list(0, 20, null, null, null).get("totalElements")).isEqualTo(0L);
   }
 
   @Test
@@ -525,8 +418,8 @@ class AlertPipelineTests {
     jdbc.update(
         "delete from analysis.input_transactions where run_id=? and tx_id=?", run, returnSeed);
     jdbc.update("delete from analysis.input_ledger where tx_id=?", returnSeed);
-    jdbc.update(
-        "update ledger.transactions set integration_status='HELD' where tx_id=?", returnSeed);
+    jdbc.update("delete from analysis.target_ownership where tx_id=?", returnSeed);
+    jdbc.update("delete from ledger.transactions where tx_id=?", returnSeed);
     try (var runner = new AnalysisRunner(service, executor("worker/analysis_entry.py"), runs)) {
       runner.scan();
       assertThat(service.job(job).status()).isEqualTo("COMPLETED");
@@ -537,9 +430,8 @@ class AlertPipelineTests {
     // (single-seed shape), without any new scored target.
     long middle =
         jdbc.queryForObject(
-            "insert into core.accounts(bank_id,service_account_id,owner_id) select bank_id,?,owner_id from core.accounts where account_id=? returning account_id",
+            "insert into core.accounts(bank_id,owner_id) select bank_id,owner_id from core.accounts where account_id=? returning account_id",
             Long.class,
-            UUID.randomUUID(),
             account);
     long connecting = transfer("2022-09-03 00:10+09", "2022-09-03", receiver, middle, 1);
     report(connecting, "2022-09-03", "2022-09-03 01:00+09");
@@ -606,7 +498,7 @@ class AlertPipelineTests {
   void publish(AnalysisStageExecutor.Context context, String artifact) {
     service.tx.executeWithoutResult(
         s -> {
-          AnalysisRunService.integrationLock(jdbc);
+          AnalysisRunService.ingestLock(jdbc);
           jdbc.queryForList("select pg_advisory_xact_lock(?)", AnalysisService.RECEIPT_LOCK);
           new com.moneylaundry.api.analysis.publish.AlertPublisher(jdbc)
               .publish(context.runId(), context.executionId(), artifact);
@@ -624,9 +516,8 @@ class AlertPipelineTests {
     for (int i = 1; i <= 99; i++) {
       long spokeReceiver =
           jdbc.queryForObject(
-              "insert into core.accounts(bank_id,service_account_id,owner_id) select bank_id,?,owner_id from core.accounts where account_id=? returning account_id",
+              "insert into core.accounts(bank_id,owner_id) select bank_id,owner_id from core.accounts where account_id=? returning account_id",
               Long.class,
-              UUID.randomUUID(),
               account);
       long spoke =
           transfer(
@@ -960,60 +851,6 @@ class AlertPipelineTests {
   }
 
   @Test
-  void held_fact_is_not_a_confirmed_withdrawal() {
-    long alert = firstAlert();
-    jdbc.update("update ledger.transactions set integration_status='HELD' where tx_id=?", target);
-    reviseReportsOf(target);
-    var context = nextPreparedContext();
-    publish(context, executor("worker/analysis_entry.py").prepare(context).artifact());
-    assertThat(
-            jdbc.queryForObject(
-                "select status from review.alerts where alert_id=?", String.class, alert))
-        .isEqualTo("OPEN");
-    assertThat(alerts.versions(alert)).hasSize(1);
-  }
-
-  @org.junit.jupiter.params.ParameterizedTest
-  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
-  void corrected_core_withdrawal_closes_the_alert_whether_or_not_review_started(boolean started) {
-    long alert = firstAlert();
-    long owner =
-        jdbc.queryForObject(
-            "select assignee_id from review.alerts where alert_id=?", Long.class, alert);
-    if (started)
-      jdbc.update(
-          "update review.alerts set review_started_at=now(),review_started_by=assignee_id where alert_id=?",
-          alert);
-    // Both PASS legs are corrected away, so no valid core remains.
-    jdbc.update(
-        "update ledger.transactions set integration_status='SUPERSEDED' where tx_id in (?,?)",
-        target,
-        returnSeed);
-    reviseReportsOf(target, returnSeed);
-    var context = nextPreparedContext();
-    publish(context, executor("worker/analysis_entry.py").prepare(context).artifact());
-    assertThat(jdbc.queryForMap("select status,outcome from review.alerts where alert_id=?", alert))
-        .containsEntry("status", "CLOSED")
-        .containsEntry("outcome", "SCOPE_CLEARED");
-    assertThat(
-            jdbc.queryForObject(
-                "select (summary->>'txCount')::int from review.alerts where alert_id=?",
-                Integer.class,
-                alert))
-        .isZero();
-    assertThat(
-            jdbc.queryForObject(
-                "select count(*) from review.current_members where case_id=?",
-                Integer.class,
-                alert))
-        .isZero();
-    assertThat(alerts.versions(alert)).hasSize(2);
-    var repeat = nextPreparedContext();
-    publish(repeat, executor("worker/analysis_entry.py").prepare(repeat).artifact());
-    assertThat(alerts.versions(alert)).hasSize(2);
-  }
-
-  @Test
   void staff_change_between_preparation_and_publication_rejects_entire_plan() {
     long alert = firstAlert();
     long added = seedOn("2022-09-03");
@@ -1030,14 +867,15 @@ class AlertPipelineTests {
   }
 
   @Test
-  void changed_report_manifest_rejects_automatic_addition_before_any_publication() {
+  void changed_file_manifest_rejects_automatic_addition_before_any_publication() {
     long alert = firstAlert();
     long added = seedOn("2022-09-03");
     var context = nextPreparedContext();
     promote(context, added);
     String artifact = executor("worker/analysis_entry.py").prepare(context).artifact();
+    // A file received before the run's cutoff appears after the freeze: the input is stale.
     jdbc.update(
-        "update ingest.report_sets set generation=generation+1 where business_date='2022-09-03'");
+        "insert into ingest.uploads(file_name,file_hash,size_bytes,status,business_date,received_at) values('late.csv',repeat('c',64),1,'COMPLETED','2022-08-01','2022-09-03 12:00+09')");
     assertThatThrownBy(() -> publish(context, artifact))
         .isInstanceOfSatisfying(
             AnalysisFailure.class,
@@ -1087,11 +925,9 @@ class AlertPipelineTests {
     assertThat(query.get("firstAt")).isEqualTo("2022-09-01T14:30:00+00:00");
     assertThat(query.get("lastAt")).isEqualTo("2022-09-04T01:00:00+00:00");
 
-    // Context is read from the current ledger: only ACTIVE rows of a focal account inside
-    // the window and outside the core count, without a new evidence version.
+    // Context is read from the current ledger: only rows of a focal account inside the window
+    // and outside the core count, without a new evidence version.
     transfer("2022-09-03 12:00+09", "2022-09-03", receiver, account, 5);
-    long held = transfer("2022-09-03 13:00+09", "2022-09-03", account, receiver, 5);
-    jdbc.update("update ledger.transactions set integration_status='HELD' where tx_id=?", held);
     transfer("2022-09-05 12:00+09", "2022-09-05", account, receiver, 5);
     var summary = (Map<?, ?>) alerts.detail(alert, null).get("summary");
     assertThat(summary.get("contextCount")).isEqualTo(1L);

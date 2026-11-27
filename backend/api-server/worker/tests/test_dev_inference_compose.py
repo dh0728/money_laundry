@@ -77,8 +77,7 @@ import os,sys,psycopg
 sys.path.insert(0,'/app/worker')
 import cryptography
 import ingest_entry
-from integrate import report_integration
-from integrate import report_correction
+from ingest import ledger_ingest
 from alerts import alert_lifecycle
 from alerts import alert_plan_preparation
 from alerts import alert_pipeline
@@ -88,12 +87,12 @@ from configure_analysis_db import configure
 with psycopg.connect(host='postgres',dbname='aml_check',user='aml_check',password=os.environ['SPRING_DATASOURCE_PASSWORD'],autocommit=True) as db:
     configure(db,os.environ['ANALYSIS_DB_USERNAME'],os.environ['ANALYSIS_DB_PASSWORD'])
     assert db.execute("select version from public.flyway_schema_history where success order by installed_rank").fetchall()==[('1',)]
-    for table in ('analysis.alert_plans','analysis.fact_ledger','review.alert_lineage',
+    for table in ('analysis.alert_plans','analysis.source_manifest','review.alert_lineage',
                   'review.alert_tx_edits','review.judgments','review.event_recipients'):
         assert db.execute('select to_regclass(%s)', (table,)).fetchone()[0] is not None
 with psycopg.connect(host='postgres',dbname='aml_check',user=os.environ['ANALYSIS_DB_USERNAME'],password=os.environ['ANALYSIS_DB_PASSWORD'],autocommit=True) as db:
     db.execute('select * from analysis.input_transactions')
-    for table in ('private.bank_reports','private.bank_report_payloads','evaluation.report_labels'):
+    for table in ('private.account_identities','private.owner_identities','evaluation.transaction_labels'):
         try:
             db.execute('select * from '+table)
         except psycopg.errors.InsufficientPrivilege:

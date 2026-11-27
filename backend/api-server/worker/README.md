@@ -8,8 +8,7 @@
 
 | 순서 | 단계 | 폴더 | 진입점 |
 |---|---|---|---|
-| ① | 파일 수집·적재 | `ingest/` | `ingest_entry.py` |
-| ③ | 거래 통합 | `integrate/` | `analysis_entry.py --stage INTEGRATE` |
+| ① | 원장 파일 수집·적재 | `ingest/` (`ledger_csv.py` 검사, `ledger_ingest.py` 적재) | `ingest_entry.py` |
 | ⑤ | 모델 입력 준비 | `features/` | `analysis_entry.py --stage FEATURES` |
 | ⑥ | 모델 추론 | `inference/` (상대편은 `backend/inference-server`) | `analysis_entry.py --stage INFERENCE` |
 | ⑦ | 점수 저장 | `scores/` | `analysis_entry.py --stage SCORES` |
@@ -37,7 +36,7 @@ Spring은 GET으로 상태를 확인한다. 콜백 환경변수는 비워 둔다
 
 기본 Flyway는 `db/migration/V1__initial_schema.sql` 하나다. Alert 거래에 당시 SEED 위험도를 함께 저장하여 목록 정렬의 JSON 반복 전개를 제거한다. 기존 V1이 적용된 dev는 사용자 결정에 따라 설정 백업 후 재초기화한다. 구 누적 이력이 있는 DB에 이 파일을 덮어 적용하지 않는다. [현재 ERD](../ERD.md)의 역할별 테이블과 [dev 업무 DB 재생성 절차](../../../deploy/split/README.md#dev-업무-db-재생성-초기-스키마-v1이-바뀐-경우)를 따른다. 스키마를 바꿀 때는 V2를 덧붙이지 않고 V1을 고친 뒤 DB를 다시 만든다.
 
-- 수신 `ingest_entry.py`와 `analysis_entry.py --stage INTEGRATE`는 원문 보호·보고 통합·정정을 수행하므로 API의 데이터 작업 계정을 사용한다. `cryptography`는 이 단계의 AES-GCM 암호화/복호화와 Java 호환 검증에 필요하다. 조회 속도를 높이기 위한 라이브러리가 아니다.
+- 수신 `ingest_entry.py`는 날짜별 원장 파일을 검사하고 계좌·개체 원문을 암호화해 원장에 바로 넣으므로 API의 데이터 작업 계정을 사용한다. 계좌 ID는 `은행번호-은행 안 일련번호`로 붙인다. 한 행이라도 오류이면 파일 전체를 적재하지 않는다. `cryptography`는 이 단계의 AES-GCM 암호화/복호화와 Java 호환 검증에 필요하다. 조회 속도를 높이기 위한 라이브러리가 아니다.
 - FEATURES/INFERENCE/SCORES/ALERTS는 `ANALYSIS_DB_USERNAME`·`ANALYSIS_DB_PASSWORD`의 별도 로그인으로 같은 DB에 접속한다. 누락 시 API 관리자 계정으로 대체하지 않는다. 자식 프로세스에서 원문 암호키와 API DB 환경변수를 제거한다.
 - DB 관리자가 새 스키마 적용 후 `configure_analysis_db.py`를 명시 실행한다. 관리자 연결은 `PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD`, 생성할 계정은 위 두 분석 환경변수로만 전달한다. 로그인 이름은 환경별로 다르게 지정하고 비밀번호는 24자 이상으로 준비한다. 이 도구는 DB를 만들지 않으며 `analysis_permissions.sql`의 권한만 부여한다.
 - 분석 역할은 보호·평가 스키마와 직원 비밀번호 해시를 읽지 못한다. 배정 후보는 `core.assignable_staff` 뷰로 읽고 배정 시각만 갱신한다. 분석 진입점도 보호 스키마 접근 권한이 있으면 실행을 거절한다.
@@ -84,20 +83,10 @@ Python의 S3 권한까지 확인된 것은 아니다.
 1. KubeSphere HTTPS `/health`가200인지 EC2에서 확인한다. 인증서 신뢰·DNS·라우팅을
    확인하며 `--insecure`로 우회하지 않는다. 추론 API의 무인증 GET은401이어야 한다.
 2. dev API `/actuator/health`가 UP인지 확인한다.
-3. 아직 제출하지 않은 테스트 보고라면 AML 루트 PowerShell에서 기존 은행 목업으로
-   세 파일을 올린다. `python`은 Python 3.13 환경을 가리켜야 한다(목업은 표준 라이브러리만 쓴다).
-
-```powershell
-$api = 'https://dev.aiaml.co.kr'
-foreach ($bank in 70, 12, 21174) {
-    python -B money_laundry/backend/bank-mock/bank_mock.py --api-url $api --bank-id $bank --file "money_laundry/backend/bank-mock/fixtures/bank_$bank.csv" --business-date 2022-09-01
-    if ($LASTEXITCODE -ne 0) { throw "은행 $bank 업로드 결과를 먼저 확인하세요." }
-}
-```
-
-동일 파일이 이미 수신됐다면409는 중복 접수 거절이다. 재전송이나 DB 삭제를 반복하지 말고
-기존 uploadId/분석 작업을 조회한다. 새 dev 배포 스크립트는 해당 세 은행과 fixture 기간을
-준비한다. 목업이 은행을 자동 등록하는 것은 아니다.
+3. 아직 적재하지 않은 날짜라면 조작패널(`demo/README.md`)로 그 날짜의 원장 파일
+   (`YYYY-MM-DD/ledger_YYYY-MM-DD.csv`)을 관리자 세션으로 올린다. 이미 적재된 날짜는409
+   `DATE_ALREADY_LOADED`, 같은 파일은409 `DUPLICATE_FILE`이다. 재전송이나 DB 삭제를 반복하지 말고
+   기존 uploadId/분석 작업을 조회한다.
 
 4. 신규 테스트 분석을 등록하고 작업 상세를 조회한다. 서비스 접근에 별도 인증이 있다면
    기존 인증 절차로 얻은 헤더를 `$headers`에 설정한다.
@@ -132,15 +121,11 @@ SELECT count(*), min(score_pct), max(score_pct) FROM analysis.scores
 WHERE run_id = (SELECT current_run_id FROM analysis.jobs WHERE job_id = :job_id);
 ```
 
-## 5. 취소·재기동 확인의 경계
+## 5. 재기동 확인의 경계
 
 - 배포 후 유휴 추론 서버를 같은 상태 폴더로 재기동하고 health 및 기존 요청의 GET 조회를
   확인한다. 진행 중 모델을 강제 종료하는 테스트와 분리한다.
-- 실제 취소는 Spring의 기존 보고 정정 절차가 만든 cancellation을 사용한다. 작업 상세의
-  `cancellations`에서 전달과 종료 확인을 구분한다. 운영 상태를 SQL로 임의 수정하지 않는다.
-- 더미는 빠르게 끝나므로 늦은 취소의 `ALREADY_FINISHED`는 정상 응답일 수 있다.
-  실행 중 중단 성공을 검증했다고 보고하지 않는다. 결정적 실행 중 취소·재시도 경합은
-  기존 로컬 테스트가 다루며 실환경에서는 실제 관찰된 상태를 기록한다.
+- 백엔드는 분석 실행을 취소하지 않는다(정정이 없으므로). 운영 상태를 SQL로 임의 수정하지 않는다.
 - 이번 패키징만으로 GNN 추론, 콜백, 독립 비동기 실행 슬롯 또는 원격 최종
   실패의 새 회차 재개가 완성된 것은 아니다.
 
@@ -148,7 +133,7 @@ WHERE run_id = (SELECT current_run_id FROM analysis.jobs WHERE job_id = :job_id)
 ## 맥락 조회·Alert 단계
 
 `analysis_entry.py --stage ALERTS`는 `alerts/alert_pipeline.py`를 호출한다. Spring FREEZE_INPUT이
-TARGET와 cutoff 이전에 유효하게 수신·통합된 전체 CONTEXT·기존 점수·날짜별 수신 범위를 동결한다.
+TARGET와 cutoff까지 적재된 원장 파일의 전체 CONTEXT·기존 점수·날짜별 적재 여부를 동결한다.
 실행 경로는 `alerts/alert_pipeline.py → alerts/block_graph.build_block_graphs` 하나다. Alert 구성은 새 씨앗에서 출발한다
 (`alerts/alert_scope.py`): 그날 가장 이른 TARGET보다 60일(`WINDOW_DAYS`) 앞부터의 고정 입력만 읽고, 창 시작+기간 상한 이후의
 씨앗만 묶으며, 그 범위에 닿는 OPEN Alert만 고정점으로 넣고, 그래프가 닿은 Alert와 직전 완료 실행 이후 멤버 사실이 바뀐 OPEN Alert만
@@ -157,8 +142,7 @@ TARGET와 cutoff 이전에 유효하게 수신·통합된 전체 CONTEXT·기존
 그다음 묶기 전에 씨앗을 보강한다(`alerts/seed_promotion.py`). 이진 모델 spec에 `ALERT_SEED_LOW`·`ALERT_CHAIN_FLOOR`가 있을 때만 하며, 매 실행 창의 저장된 점수로 새로 판단한다.
 ① 이중 임계값: 점수가 `ALERT_SEED_LOW` 이상이고 씨앗과 계좌를 공유하는 거래를 씨앗으로 올린다. ② 금액 비율 연결: 씨앗(①로 올린 거래 포함)에서 받은 계좌가 7일 안에 받은 금액의 0.5~1.05배를 보낸 거래와, 보낸 계좌가 7일 안에 같은 비율로 받은 앞 거래를 6단계까지 따라가 씨앗으로 올린다. 점수가 `ALERT_CHAIN_FLOOR` 이상이고 금액을 아는 거래만 따라간다.
 올린 씨앗은 점수가 임계값 미만이므로 근거 화면에서 의심 표시가 붙지 않는다. 올린 수는 아티팩트 `promotedSeedCount`, 계산 시간은 `timingsMs.seedPromotion`이다. 현재 값(0.1·0.01)은 이전 이진 모델로 Alert 생성기 연구(2026-11-04, HI-Small 조정·HI-Medium 시험)에서 정한 값을 임시로 쓴 것이며, 새 모델 결과를 본 뒤 다시 정한다.
-정책 `block-pin-4`(block-pin-3에 계좌 공유 단계를 더한 것. block-pin-3은 block-pin-2의 시간 상한을 늘린 것이고, 간격 7일·기간 14일은 실데이터 연구 범위를 덮는 넉넉한 상한이며, 합성 패턴에 맞춘 값이 아니다)는 씨앗 사이의 구조 관계(PASS·STAR_OUT/STAR_IN·RELAY·PATH·BRIDGE·CLOSURE·단독 모양)로 핵심을 만든다.
-그 뒤 계좌 공유(`SHARED_ACCOUNT`) 두 단계를 돈다. ① 셀프이체·연결만 있음·64건 상한으로 빠진 씨앗을 계좌를 가장 많이 공유하는 블록에 붙인다(구조 없음은 붙이지 않는다). ② 씨앗이 같은 계좌를 쓰는 블록끼리 시간 순으로 합친다. 두 단계 모두 허브 계좌로는 잇지 않고, 64건·14일을 넘으면 하지 않으며, 두 OPEN Alert는 합치지 않는다. 정책 스위치는 `attach_leftovers`·`merge_shared`다.
+정책 `block-pin-3`(block-pin-2의 시간 상한을 늘린 것. 간격 7일·기간 14일은 실데이터 연구 범위를 덮는 넉넉한 상한이며, 합성 패턴에 맞춘 값이 아니다)은 씨앗 사이의 구조 관계(PASS·STAR_OUT/STAR_IN·RELAY·PATH·BRIDGE·CLOSURE·단독 모양)로 핵심을 만든다.
 핵심은 씨앗과 연결 거래64건·기간336시간(14일) 이하이고, 이어지는 두 거래 간격은 168시간(7일) 이하다. 맥락 거래는 멤버가 아니라 근거의 `contextQuery`(초점 계좌·핵심 기간±24시간)이며
 조회할 때 원장에서 센다. 구조 관계가 없는 씨앗은 발행하지 않고 사유(`unassignedReasons`)와 함께 아티팩트에 남겨 다음 실행에 재검토한다.
 저의심비율 허브는512건/20% 기준으로 부채꼴 면과 통과 관계를 만들지 않는다.
@@ -198,12 +182,12 @@ Spring 분석 완료 경로는 공개 상태 반영 후 `AnalysisRunService.refr
 
 열린 Alert 하나에 연결된 새 거래는 조사 중에도 자동 편입하고 기존 직원 판정/제외/역할은 유지한다. 새 거래만 PENDING이다. 조사 중 사건 병합·기존 근거 제거·점수 재평가는 제안이며, 종결/이관 사건은 고정 범위를 보존한다. 자동 추가 이력은 추가 거래 ID·시각·연결 이유·전후 버전을 보존하고 동일 근거 재실행에서는 중복 알림을 만들지 않는다. 생애주기 전체의 배포 준비 여부는 현재 검증 상태 문서를 따른다.
 
-제안 수락은 통합 잠금 → review 잠금 → 업무 시각/영향 사건 잠금 순서를 사용한다. 일부 담당자의 동의만으로 공개하지 않고, 마지막 동의 시 현재 거래 상태와 점수 출처까지 다시 검사한다. 정정으로 근거가 빠져도 저장된 직원 판정을 EXCLUDED로 덮어쓰지 않는다. 현재 범위 투영에서 제외하고 API의 withdrawnMembers와 당시 근거 버전으로 보존한다.
+제안 수락은 원장 잠금 → review 잠금 → 업무 시각/영향 사건 잠금 순서를 사용한다. 일부 담당자의 동의만으로 공개하지 않고, 마지막 동의 시 현재 거래 상태와 점수 출처까지 다시 검사한다. 재평가로 근거가 빠져도 저장된 직원 판정을 EXCLUDED로 덮어쓰지 않는다. 현재 범위 투영에서 제외하고 API의 withdrawnMembers와 당시 근거 버전으로 보존한다.
 
 이번 생애주기 변경은 공개 포인터·계획·계보·제안 테이블 및 현재 요약을 V1에 포함한다. **이전 V1을 사용하는 dev에는 코드만 덮어 배포할 수 없다.** 설정 백업/업무 DB 재초기화 → 새 이미지 기동/Flyway V1 → 설정 복원 → configure_analysis_db.py로 분석 역할 권한 재설정 → 전송/분석 순서다. 기존 SSM 값과 원문 보호 키는 유지한다. 로컬 이미지 검증은 AML_TEST_DOCKER와 AML_TEST_API_IMAGE를 설정하고 `tests/test_dev_inference_compose.py`를 실행한다. 이 검증은 실제 dev Compose를 임의 프로젝트/볼륨/네트워크로 격리해 사용하며 EC2나 S3를 변경하지 않는다.
 
 ### 대시보드 집계와 분석 역할
 
-대시보드 조회 집계는 Spring의 `DashboardRefreshWorker`가 관리한다. Python의 통합/분석 쓰기는 DB statement trigger를 통해 같은 트랜잭션에 영향 component/거래일·사건 키 갱신 요청을 기록한다. 계산은 원본 커밋 후 백그라운드에서 수행하며 Python이 집계를 직접 갱신하거나 새 프로세스를 호출하지 않는다. 분석 역할의 ops 접근 금지는 유지한다. SECURITY DEFINER 트리거가 요청을 기록하므로 `analysis_permissions.sql`에 ops 쓰기 권한을 추가하지 않는다. 모델 점수 미공개/정정/공개 전환을 집계에서도 구분한다. 조회 API는 집계 작업을 실행하지 않는다.
+대시보드 조회 집계는 Spring의 `DashboardRefreshWorker`가 관리한다. Python의 적재/분석 쓰기는 DB statement trigger를 통해 같은 트랜잭션에 영향 component/거래일·사건 키 갱신 요청을 기록한다. 계산은 원본 커밋 후 백그라운드에서 수행하며 Python이 집계를 직접 갱신하거나 새 프로세스를 호출하지 않는다. 분석 역할의 ops 접근 금지는 유지한다. SECURITY DEFINER 트리거가 요청을 기록하므로 `analysis_permissions.sql`에 ops 쓰기 권한을 추가하지 않는다. 모델 점수 미공개/정정/공개 전환을 집계에서도 구분한다. 조회 API는 집계 작업을 실행하지 않는다.
 
 대시보드 변경 확인은 기본5초이며 계산은 별도 최대2개 작업자에서 수행한다. PIPELINE(MODEL/REPORTS/DELIVERY)과 INVESTIGATION(CASES)은 독립 공개한다. 진행 중 영역은 다음 확인 차례에 중복 실행하지 않고 후속 변경을 DB에 남긴다. 해당 영역 실패는5~60초 재시도 대기를 적용한다. 실제 성공/실패/대기 상태는 ops.dashboard_refresh_state와 dashboard_dirty에서 확인한다.

@@ -3,10 +3,10 @@
 Alerts start from the run's new seeds. A run reads the frozen input of a fixed window before
 its earliest TARGET (WINDOW_DAYS), groups only seeds from SPAN after the window start (so their
 blocks fit inside it), pins the OPEN Alerts reaching into that seed range, and plans only the
-Alerts its graphs touch plus those whose member facts changed since the previous completed run.
+Alerts its graphs touch plus those whose member input changed since the previous completed run.
 Everything is derived from the run's frozen input, so a retry reads the same scope.
 
-The window comes from the ledger's active-time index (ledger.transactions occurred_at); the
+The window comes from the ledger's time index (ledger.transactions occurred_at); the
 values are the run's frozen versions (its own rows, or input_ledger at its input_seq).
 """
 from datetime import timedelta
@@ -16,8 +16,7 @@ from alerts.block_graph import BlockPolicy
 WINDOW_DAYS = 60
 SPAN = timedelta(microseconds=BlockPolicy().span_max_us)
 
-_WINDOW_IDS = """ids AS (SELECT tx_id FROM ledger.transactions
-    WHERE integration_status='ACTIVE' AND occurred_at>=%(start)s)"""
+_WINDOW_IDS = """ids AS (SELECT tx_id FROM ledger.transactions WHERE occurred_at>=%(start)s)"""
 
 INPUT_ROWS = """WITH """ + _WINDOW_IDS + """, own AS (
       SELECT tx_id,input_role,occurred_at,from_bank_id,from_account_id,to_bank_id,to_account_id,amount_usd
@@ -30,13 +29,16 @@ INPUT_ROWS = """WITH """ + _WINDOW_IDS + """, own AS (
       AND l.occurred_at>=%(start)s AND NOT EXISTS(SELECT 1 FROM own o WHERE o.tx_id=l.tx_id)
     ORDER BY tx_id"""
 
-# Frozen score decisions of the window (p_laundering as stored jsonb, threshold of the scoring job).
+# Frozen score decisions of the window (p_laundering as stored jsonb, threshold of the scoring job),
+# only those a seed or seed promotion can use: at or above the job's threshold or the promotion
+# floor (%(floor)s, NULL = no promotion, which least() ignores).
 WINDOW_SCORES = """WITH """ + _WINDOW_IDS + """
     SELECT l.tx_id,to_jsonb(s.p_laundering),b.threshold_value
     FROM ids JOIN analysis.score_ledger l USING(tx_id)
     JOIN analysis.scores s ON s.run_id=l.score_run_id AND s.tx_id=l.tx_id
     JOIN analysis.runs r ON r.run_id=l.score_run_id JOIN analysis.jobs b ON b.job_id=r.job_id
-    WHERE l.valid_from_seq<=%(seq)s AND (l.valid_to_seq IS NULL OR l.valid_to_seq>%(seq)s)"""
+    WHERE l.valid_from_seq<=%(seq)s AND (l.valid_to_seq IS NULL OR l.valid_to_seq>%(seq)s)
+      AND s.p_laundering>=least(b.threshold_value,%(floor)s::float8)"""
 
 
 class Scope:
@@ -92,7 +94,7 @@ class Scope:
 
     def planned(self, connection, pinned_ids, core_ids):
         """Alerts to plan: pinned ones, Alerts owning a seed in the graphs' cores, OPEN Alerts with
-        a member whose input or facts changed since the previous completed run, then their
+        a member whose input changed since the previous completed run, then their
         follow-up ancestors and merge aliases (the lifecycle validates both)."""
         chosen = set(pinned_ids)
         if core_ids:
@@ -103,8 +105,7 @@ class Scope:
         if self.previous_seq is not None:
             chosen.update(key for key, in connection.execute('''WITH changed AS (
                   SELECT tx_id FROM analysis.input_ledger WHERE valid_from_seq>%(prev)s AND valid_from_seq<=%(seq)s
-                  UNION SELECT tx_id FROM analysis.input_ledger WHERE valid_to_seq>%(prev)s AND valid_to_seq<=%(seq)s
-                  UNION SELECT tx_id FROM analysis.fact_ledger WHERE valid_from_seq>%(prev)s AND valid_from_seq<=%(seq)s)
+                  UNION SELECT tx_id FROM analysis.input_ledger WHERE valid_to_seq>%(prev)s AND valid_to_seq<=%(seq)s)
                 SELECT DISTINCT m.alert_id FROM changed c JOIN review.alert_transactions m USING(tx_id)
                 JOIN analysis.run_alert_origins o ON o.alert_id=m.alert_id AND o.version=m.version AND o.run_id=%(run)s
                 JOIN review.alerts a ON a.alert_id=m.alert_id WHERE a.status='OPEN' ''',

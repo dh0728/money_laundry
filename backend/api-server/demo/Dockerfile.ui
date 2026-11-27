@@ -6,6 +6,5 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt \
     && groupadd --gid 10001 app \
     && useradd --uid 10001 --gid app --create-home app
 COPY api-server/demo /workspace/backend/api-server/demo
-COPY bank-mock/bank_mock.py /workspace/backend/bank-mock/bank_mock.py
 USER app:app
 ENTRYPOINT ["python", "-B", "runtime.py", "ui"]

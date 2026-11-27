@@ -54,14 +54,13 @@ public class LedgerQueryService {
       ) s on true
       """;
 
-  public static final String BASE =
-      ACCOUNTS + SCORE + TYPE + " where t.integration_status='ACTIVE'";
+  public static final String BASE = ACCOUNTS + SCORE + TYPE + " where true";
 
   public record Filter(
       LocalDate from,
       LocalDate to,
       UUID owner,
-      UUID account,
+      String account,
       List<String> judgement,
       List<String> payments,
       int page,
@@ -72,7 +71,7 @@ public class LedgerQueryService {
         LocalDate from,
         LocalDate to,
         UUID owner,
-        UUID account,
+        String account,
         List<String> judgement,
         List<String> payments,
         int page,
@@ -122,7 +121,7 @@ public class LedgerQueryService {
         new StringBuilder(
             (needsIdentity ? ACCOUNTS : " from ledger.transactions t ")
                 + (needsScores ? SCORE : "")
-                + " where t.integration_status='ACTIVE'");
+                + " where true");
     if (filter.from() != null) {
       sql.append(" and t.occurred_at>=?");
       args.add(Timestamp.from(filter.from().atStartOfDay(BusinessTime.KST).toInstant()));

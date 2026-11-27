@@ -16,7 +16,6 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.support.JdbcTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.postgresql.PostgreSQLContainer;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * The single V1 baseline is tested in a fresh DB, never layered over the former migration history.
@@ -45,7 +44,7 @@ class BaselineSchemaTests {
 
   @BeforeEach
   void reset() {
-    jdbc.execute("truncate core.users,core.banks,core.owners,analysis.jobs cascade");
+    jdbc.execute("truncate core.users,core.banks,core.owners,analysis.jobs,ingest.uploads cascade");
   }
 
   long staff() {
@@ -55,25 +54,44 @@ class BaselineSchemaTests {
         UUID.randomUUID().toString());
   }
 
+  static final String HEADER =
+      "Timestamp,From Bank,From Account,To Bank,To Account,Amount Received,Receiving Currency,Amount Paid,Payment Currency,Payment Format,From Bank Name,To Bank Name,From Entity ID,From Entity Name,To Entity ID,To Entity Name,Is Laundering\n";
+
+  long receivedUpload(String day, String name, byte[] source) {
+    return jdbc.queryForObject(
+        "insert into ingest.uploads(business_date,status,file_name,file_hash,size_bytes,s3_key,received_at) values(?::date,'RECEIVED',?,?,?,?,now()) returning upload_id",
+        Long.class,
+        day,
+        name,
+        "a".repeat(64),
+        source.length,
+        name);
+  }
+
   @Test
-  void real_python_ingest_publishes_encrypted_reports_and_separate_labels() throws Exception {
+  void real_python_ingest_loads_the_ledger_with_numbered_accounts_and_encrypted_identities()
+      throws Exception {
     String python = System.getenv("AML_TEST_PYTHON");
     org.junit.jupiter.api.Assumptions.assumeTrue(python != null);
-    jdbc.update("insert into core.banks(bank_id,is_reporting) values(10,true)");
-    jdbc.update(
-        "insert into core.bank_reporting_periods(bank_id,effective_from_date) values(10,'2023-01-01')");
-    byte[] source =
-        ("Timestamp,From Bank,From Account,To Bank,To Account,Amount Received,Receiving Currency,Amount Paid,Payment Currency,Payment Format,From Bank Name,To Bank Name,From Entity ID,From Entity Name,To Entity ID,To Entity Name,Is Laundering\n"
-                + "2023/09/01 09:00,10,001,20,002,100,US Dollar,100,US Dollar,ACH,Bank10,Bank20,E1,Alice,E2,Bob,1\n")
+    byte[] first =
+        (HEADER
+                + "2023/09/01 09:00,10,001,20,002,100,US Dollar,100,US Dollar,ACH,Bank10,Bank20,E1,Alice,E2,Bob,1\n"
+                + "2023/09/01 10:00,10,003,20,002,90,Euro,90,Euro,ACH,Bank10,Bank20,E3,Carol,E2,Bob,0\n")
             .getBytes(java.nio.charset.StandardCharsets.UTF_8);
-    long upload =
-        jdbc.queryForObject(
-            "insert into ingest.uploads(bank_id,business_date,status,file_name,file_hash,size_bytes,s3_key,received_at) values(10,'2023-09-01','RECEIVED','report.csv',? ,?,'fixture',now()) returning upload_id",
-            Long.class,
-            "a".repeat(64),
-            source.length);
+    byte[] second =
+        (HEADER
+                + "2023/09/02 09:00,10,004,10,001,5,US Dollar,5,US Dollar,ACH,Bank10,Bank10,E4,Dave,E1,Alice,0\n")
+            .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    // Account 001 suddenly belongs to someone else: the whole file is rejected.
+    byte[] conflicting =
+        (HEADER
+                + "2023/09/03 09:00,10,001,20,002,1,US Dollar,1,US Dollar,ACH,Bank10,Bank20,E9,Mallory,E2,Bob,0\n")
+            .getBytes(java.nio.charset.StandardCharsets.UTF_8);
     var store = mock(com.moneylaundry.api.ingest.storage.UploadStore.class);
-    when(store.open("fixture")).thenAnswer(invocation -> new java.io.ByteArrayInputStream(source));
+    var files = java.util.Map.of("first", first, "second", second, "conflicting", conflicting);
+    when(store.open(anyString()))
+        .thenAnswer(
+            invocation -> new java.io.ByteArrayInputStream(files.get(invocation.getArgument(0))));
     var database =
         new org.springframework.boot.jdbc.autoconfigure.JdbcConnectionDetails() {
           public String getJdbcUrl() {
@@ -103,161 +121,78 @@ class BaselineSchemaTests {
             encryption,
             search,
             "test",
+            "fx_rates_usd_v1",
             "Asia/Seoul");
+    long upload = receivedUpload("2023-09-01", "first", first);
     loader.load(upload);
     assertThat(
             jdbc.queryForObject(
                 "select status from ingest.uploads where upload_id=?", String.class, upload))
         .isEqualTo("COMPLETED");
-    var report =
-        jdbc.queryForMap(
-            "select * from private.bank_reports join private.bank_report_payloads using(report_id)");
+    assertThat(
+            jdbc.queryForList(
+                "select service_account_id from core.accounts order by account_id", String.class))
+        .containsExactly("10-0001", "20-0001", "10-0002");
+    assertThat(
+            jdbc.queryForList(
+                "select upload_id from ledger.transactions order by tx_id", Long.class))
+        .containsExactly(upload, upload);
+    assertThat(
+            jdbc.queryForList(
+                "select amount_usd from ledger.transactions order by tx_id",
+                java.math.BigDecimal.class))
+        .usingElementComparator(java.math.BigDecimal::compareTo)
+        .containsExactly(new java.math.BigDecimal("100"), new java.math.BigDecimal("105.460511"));
+    assertThat(
+            jdbc.queryForList(
+                "select is_laundering from evaluation.transaction_labels order by tx_id",
+                Boolean.class))
+        .containsExactly(true, false);
+    assertThat(jdbc.queryForObject("select count(*) from core.owners", Integer.class)).isEqualTo(3);
     var protector =
         new com.moneylaundry.api.ingest.load.PrivateDataProtector(encryption, search, "test");
-    String plain =
-        protector.decrypt(
-            "report:" + report.get("version_id") + ":" + report.get("source_row"),
-            report.get("payload_cipher").toString(),
-            "test");
-    assertThat(plain).contains("Alice", "\"isLaundering\":null");
-    assertThat(report.get("payload_cipher").toString()).doesNotContain("Alice", "001");
-    assertThat(
-            jdbc.queryForObject(
-                "select is_laundering from evaluation.report_labels", Boolean.class))
-        .isTrue();
+    var alice =
+        jdbc.queryForMap(
+            "select o.name_cipher,a.identity_cipher from core.accounts c join private.account_identities a using(account_id) join private.owner_identities o using(owner_id) where c.service_account_id='10-0001'");
+    assertThat(protector.decrypt("entity-name", alice.get("name_cipher").toString(), "test"))
+        .isEqualTo("Alice");
+    assertThat(protector.decrypt("account:10", alice.get("identity_cipher").toString(), "test"))
+        .isEqualTo("001");
+    assertThat(alice.values().toString()).doesNotContain("Alice", "001");
+    // Loading again changes nothing: the upload is no longer waiting.
     loader.load(upload);
-    assertThat(jdbc.queryForObject("select count(*) from ingest.report_versions", Integer.class))
-        .isEqualTo(1);
-    jdbc.update("insert into core.fx_rates values('test','USD',1)");
-    UUID token = UUID.randomUUID();
-    long job =
-        jdbc.queryForObject(
-            "insert into analysis.jobs(analysis_date,analysis_cutoff_at,business_at,threshold_value,status,current_stage,execution_id,execution_owner) values('2023-09-02',now(),now(),.7,'RUNNING','INTEGRATE',?,?) returning job_id",
-            Long.class,
-            token,
-            token);
-    jdbc.update("insert into analysis.receipts values(?,?)", job, upload);
-    var command =
-        new ProcessBuilder(
-            python,
-            "-B",
-            "worker/analysis_entry.py",
-            "--job-id",
-            Long.toString(job),
-            "--stage",
-            "INTEGRATE",
-            "--execution-id",
-            token.toString());
-    command
-        .environment()
-        .putAll(
-            java.util.Map.of(
-                "WORKER_DB_URL",
-                com.moneylaundry.api.analysis.worker.PythonAnalysisExecutor.workerDatabaseUrl(
-                    postgres.getJdbcUrl()),
-                "WORKER_DB_USER",
-                postgres.getUsername(),
-                "WORKER_DB_PASSWORD",
-                postgres.getPassword(),
-                "INGEST_ENCRYPTION_KEY",
-                encryption,
-                "INGEST_SEARCH_KEY",
-                search,
-                "INGEST_KEY_VERSION",
-                "test",
-                "INGEST_FX_VERSION",
-                "test"));
-    var process = command.start();
-    try {
-      assertThat(process.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
-      assertThat(process.exitValue()).isZero();
-    } finally {
-      if (process.isAlive()) process.destroyForcibly();
-    }
     assertThat(jdbc.queryForObject("select count(*) from ledger.transactions", Integer.class))
-        .isEqualTo(1);
-    assertThat(
-            jdbc.queryForObject(
-                "select count(*) from core.owners where display_name like '%#%'", Integer.class))
         .isEqualTo(2);
-    assertThat(jdbc.queryForObject("select count(*) from private.owner_identities", Integer.class))
-        .isEqualTo(2);
+
+    long next = receivedUpload("2023-09-02", "second", second);
+    loader.load(next);
+    assertThat(
+            jdbc.queryForList(
+                "select service_account_id from core.accounts order by account_id", String.class))
+        .containsExactly("10-0001", "20-0001", "10-0002", "10-0003");
     assertThat(
             jdbc.queryForObject(
-                "select completed from analysis.stage_results where job_id=? and stage='INTEGRATE'",
-                Boolean.class,
-                job))
-        .isTrue();
-    var runs = new AnalysisRunService(jdbc, tx, Clock.systemUTC(), new ObjectMapper());
-    UUID completed = runs.freeze(job, Instant.now());
-    runs.complete(completed);
-    jdbc.update(
-        "update analysis.jobs set status='COMPLETED',current_stage='COMPLETE',execution_id=null,execution_owner=null where job_id=?",
-        job);
-    long version = ((Number) report.get("version_id")).longValue();
-    long correction =
-        jdbc.queryForObject(
-            "insert into ingest.correction_requests(bank_id,business_date,version_id,reason_code,source_revision) values(10,'2023-09-01',?,'TEST',1) returning correction_id",
-            Long.class,
-            version);
-    byte[] changed =
-        new String(source, java.nio.charset.StandardCharsets.UTF_8)
-            .replace(",100,", ",110,")
-            .getBytes(java.nio.charset.StandardCharsets.UTF_8);
-    long replacement =
-        jdbc.queryForObject(
-            "insert into ingest.uploads(bank_id,business_date,status,file_name,file_hash,size_bytes,s3_key,received_at) values(10,'2023-09-01','RECEIVED','replacement.csv',?,?,'replacement',now()) returning upload_id",
-            Long.class,
-            "b".repeat(64),
-            changed.length);
-    jdbc.update(
-        "insert into ingest.correction_uploads values(?,?,?)",
-        replacement,
-        correction,
-        UUID.randomUUID());
-    when(store.open("replacement"))
-        .thenAnswer(invocation -> new java.io.ByteArrayInputStream(changed));
-    loader.load(replacement);
-    assertThat(
-            jdbc.queryForObject(
-                "select status from ingest.uploads where upload_id=?", String.class, replacement))
-        .isEqualTo("COMPLETED");
-    UUID secondToken = UUID.randomUUID();
-    long next =
-        jdbc.queryForObject(
-            "insert into analysis.jobs(analysis_date,analysis_cutoff_at,business_at,threshold_value,status,current_stage,execution_id,execution_owner) values('2023-09-03',now(),now(),.7,'RUNNING','INTEGRATE',?,?) returning job_id",
-            Long.class,
-            secondToken,
-            secondToken);
-    jdbc.update("insert into analysis.receipts values(?,?)", next, replacement);
-    command.command(
-        python,
-        "-B",
-        "worker/analysis_entry.py",
-        "--job-id",
-        Long.toString(next),
-        "--stage",
-        "INTEGRATE",
-        "--execution-id",
-        secondToken.toString());
-    var retry = command.start();
-    try {
-      assertThat(retry.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
-      assertThat(retry.exitValue()).isZero();
-    } finally {
-      if (retry.isAlive()) retry.destroyForcibly();
-    }
-    assertThat(
-            jdbc.queryForObject(
-                "select error_code from ingest.report_versions where upload_id=?",
+                "select a.service_account_id from ledger.transactions t join core.accounts a on a.account_id=t.to_account_id where t.upload_id=?",
                 String.class,
-                replacement))
-        .isEqualTo("COMPLETED_TARGET_CHANGE_OUT_OF_SCOPE");
+                next))
+        .isEqualTo("10-0001");
+
+    long rejected = receivedUpload("2023-09-03", "conflicting", conflicting);
+    loader.load(rejected);
+    assertThat(
+            jdbc.queryForMap(
+                "select status,validation_errors::text as errors from ingest.uploads where upload_id=?",
+                rejected))
+        .containsEntry("status", "VALIDATION_FAILED");
     assertThat(
             jdbc.queryForObject(
-                "select count(*) from ledger.transactions where integration_status='ACTIVE' and amount_paid=100",
-                Integer.class))
-        .isEqualTo(1);
+                "select validation_errors::text from ingest.uploads where upload_id=?",
+                String.class,
+                rejected))
+        .contains("IDENTITY_CONFLICT");
+    assertThat(jdbc.queryForObject("select count(*) from ledger.transactions", Integer.class))
+        .isEqualTo(3);
+    assertThat(jdbc.queryForObject("select count(*) from core.owners", Integer.class)).isEqualTo(4);
   }
 
   @Test
@@ -271,23 +206,35 @@ class BaselineSchemaTests {
             publicOwner);
     long account =
         jdbc.queryForObject(
-            "insert into core.accounts(service_account_id,bank_id,owner_id) values(gen_random_uuid(),1,?) returning account_id",
+            "insert into core.accounts(bank_id,account_no,owner_id) values(1,1,?) returning account_id",
             Long.class,
             owner);
+    long upload =
+        jdbc.queryForObject(
+            "insert into ingest.uploads(business_date,status,file_name,file_hash,size_bytes,received_at) values('2023-09-01','COMPLETED','ledger.csv',repeat('a',64),1,now()) returning upload_id",
+            Long.class);
     jdbc.update(
         """
-        insert into ledger.transactions(occurred_at,business_date,from_account_id,to_account_id,
+        insert into ledger.transactions(upload_id,occurred_at,business_date,from_account_id,to_account_id,
           amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version)
-        values('2023-09-01T00:00:00Z','2023-09-01',?,?,10,'USD',10,'USD','ACH',10,'test')
+        values(?,'2023-09-01T00:00:00Z','2023-09-01',?,?,10,'USD',10,'USD','ACH',10,'test')
         """,
+        upload,
         account,
         account);
+    assertThat(
+            jdbc.queryForObject(
+                "select service_account_id from core.accounts where account_id=?",
+                String.class,
+                account))
+        .isEqualTo("1-0001");
     var service = new LedgerQueryService(jdbc);
     var filter = new LedgerQueryService.Filter(null, null, null, null, null, null, 0, 20);
     var owners = service.query("owners", filter);
     assertThat(owners.get("totalElements")).isEqualTo(1L);
     assertThat(owners.get("content").toString()).contains("저장된가명#12345");
-    assertThat(service.query("accounts", filter).get("content").toString()).contains("저장된가명#12345");
+    assertThat(service.query("accounts", filter).get("content").toString())
+        .contains("저장된가명#12345", "1-0001");
     var transactions = service.query("transactions", filter);
     assertThat(transactions.get("totalElements")).isEqualTo(1L);
     assertThat(transactions.get("content").toString()).contains("UNANALYZED", "저장된가명#12345");
@@ -310,38 +257,54 @@ class BaselineSchemaTests {
   }
 
   @Test
-  void empty_run_freezes_once_and_cancellation_fences_registered_requests() {
+  void account_numbers_keep_four_digits_and_grow_past_them() {
+    jdbc.update("insert into core.banks(bank_id) values(3225455)");
+    long owner =
+        jdbc.queryForObject(
+            "insert into core.owners(service_owner_id,display_name) values(gen_random_uuid(),'가명#1') returning owner_id",
+            Long.class);
+    for (int number : new int[] {1, 9999, 10000})
+      jdbc.update(
+          "insert into core.accounts(bank_id,account_no,owner_id) values(3225455,?,?)",
+          number,
+          owner);
+    assertThat(
+            jdbc.queryForList(
+                "select service_account_id from core.accounts where bank_id=3225455 order by account_no",
+                String.class))
+        .containsExactly("3225455-0001", "3225455-9999", "3225455-10000");
+    assertThatThrownBy(
+            () ->
+                jdbc.update(
+                    "insert into core.accounts(bank_id,account_no,owner_id) values(3225455,1,?)",
+                    owner))
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
+  void empty_run_freezes_once_and_registers_requests() {
     long job =
         jdbc.queryForObject(
             "insert into analysis.jobs(analysis_date,analysis_cutoff_at,business_at,threshold_value,status,current_stage) values('2023-09-03',now(),now(),.7,'QUEUED','FREEZE_INPUT') returning job_id",
             Long.class);
-    var runs = new AnalysisRunService(jdbc, tx, Clock.systemUTC(), new ObjectMapper());
+    var runs = new AnalysisRunService(jdbc, tx, Clock.systemUTC());
     UUID run = runs.freeze(job, Instant.parse("2023-09-03T00:00:00Z"));
     assertThat(runs.freeze(job, Instant.parse("2023-09-03T00:00:00Z"))).isEqualTo(run);
     assertThat(runs.completedTarget(-1)).isFalse();
     runs.registerRequest(run, UUID.randomUUID(), 1, "BINARY");
-    runs.cancel(run, "REPORT_CORRECTED");
-    assertThat(
-            jdbc.queryForObject(
-                "select status from analysis.runs where run_id=?", String.class, run))
-        .isEqualTo("CANCELLED");
     assertThat(
             jdbc.queryForObject(
                 "select status from analysis.model_requests where run_id=?", String.class, run))
-        .isEqualTo("BLOCKED");
-    assertThat(
-            jdbc.queryForObject(
-                "select error_code from analysis.jobs where job_id=?", String.class, job))
-        .isEqualTo("RUN_CANCELLED");
+        .isEqualTo("REGISTERED");
   }
 
   @Test
   void baseline_has_independent_roles_and_no_legacy_business_tables() {
-    // V1 기준 스키마 + V2 룰 엔진(rules 스키마)
+    // V1 기준 스키마 + V2 룰 엔진(rules 스키마) + V3 룰 알림
     assertThat(
             jdbc.queryForObject(
                 "select count(*) from public.flyway_schema_history where success", Integer.class))
-        .isEqualTo(2);
+        .isEqualTo(3);
     assertThat(
             jdbc.queryForList(
                 "select table_name from information_schema.tables where table_schema='public'",

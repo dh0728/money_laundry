@@ -82,13 +82,6 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(plan.action, Action.UPDATE)
         self.assertEqual(plan.recipient_ids, (7,))
 
-    def test_corrected_fact_removal_updates_investigated_case_at_once(self):
-        plan, = self.plans([case(8, evidence([1], [2], [3]), started=True)],
-                          [evidence([1], [2])],
-                          validity=Validity(frozenset({3}), frozenset({3})))
-        self.assertEqual(plan.action, Action.UPDATE)
-        self.assertEqual(plan.reason, 'REPORT_CORRECTED')
-
     def test_merge_keeps_earliest_creation_not_smallest_id_and_both_owners(self):
         left = case(10, evidence([1], [2]), owner=7, age=2)
         right = case(20, evidence([3], [4]), owner=9, age=1)
@@ -228,39 +221,12 @@ class LifecycleTests(unittest.TestCase):
     def test_missing_graph_is_not_evidence_withdrawal(self):
         plan, = self.plans([case(1, evidence([1], [2]))], [])
         self.assertEqual(plan.action, Action.NOOP)
-        self.assertEqual(plan.invalid_tx_ids, frozenset())
 
-    def test_complete_correction_withdraws_whether_or_not_started(self):
-        validity = Validity(frozenset({1, 2}), frozenset({2}))
-        for started in (False, True):
-            plan, = self.plans([case(1, evidence([1], [2]), started=started)], [], validity=validity)
-            self.assertEqual(plan.action, Action.WITHDRAW)
-            self.assertEqual(plan.reason, 'EVIDENCE_WITHDRAWN')
-
-    def test_incomplete_core_checks_cannot_auto_withdraw(self):
-        plan, = self.plans([case(1, evidence([1], [2]))], [],
-                           validity=Validity(frozenset({2}), frozenset({2})))
-        self.assertEqual(plan.action, Action.NOOP)
-        self.assertEqual(plan.reason, 'INCOMPLETE_VALIDITY')
-
-    def test_score_decline_updates_and_is_not_report_withdrawal(self):
+    def test_score_decline_updates_case(self):
         plan, = self.plans([case(1, evidence([1], [2]))], [],
                            validity=Validity(reassessment_ids=frozenset({1})))
         self.assertEqual(plan.action, Action.UPDATE)
         self.assertEqual(plan.reason, 'SCORE_OR_POLICY_REASSESSMENT')
-
-    def test_partial_correction_with_remaining_relation_updates_without_split(self):
-        old = evidence([1, 3], [2, 4], witnesses=[Witness('FLOW', (1, 2)), Witness('FLOW', (3, 4))])
-        plan, = self.plans([case(1, old)], [],
-                           validity=Validity(frozenset({1, 2, 3, 4}), frozenset({2})))
-        self.assertEqual(plan.action, Action.UPDATE)
-        self.assertEqual(plan.reason, 'REPORT_CORRECTED')
-
-    def test_invalid_context_is_removed_without_withdrawing_valid_core(self):
-        plan, = self.plans([case(1, evidence([1], [2], [3]))], [],
-                           validity=Validity(frozenset({3}), frozenset({3})))
-        self.assertEqual(plan.action, Action.UPDATE)
-        self.assertEqual(plan.invalid_tx_ids, frozenset({3}))
 
     def test_complete_composed_digest_suppresses_false_updates_from_split(self):
         old = case(1, evidence([1, 3], [2, 4]))
@@ -339,9 +305,6 @@ class LifecycleTests(unittest.TestCase):
             ([old], [replace(graph, context_ids=frozenset({1}))], {}),
             ([old], [replace(graph, witnesses=())], {}),
             ([old], [replace(graph, witnesses=(Witness('FLOW', (1, 3)),))], {}),
-            ([old], [graph], {'validity': Validity(invalid_ids=frozenset({2}))}),
-            ([old], [graph], {'validity': Validity(frozenset({2}), frozenset({2}))}),
-            ([old], [], {'validity': Validity(frozenset({1}), frozenset({1}), frozenset({1}))}),
         ]
         for cases, graphs, options in invalid_cases:
             with self.subTest(cases=cases, graphs=graphs, options=options):

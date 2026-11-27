@@ -27,16 +27,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 class UploadCompletionConcurrencyTests {
   @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
 
-  @org.junit.jupiter.api.BeforeEach
-  void reportingBank() {
-    jdbc.update(
-        "insert into core.banks(bank_id, is_reporting) values (70, true) on conflict do nothing");
-    jdbc.update(
-        "insert into core.bank_reporting_periods(bank_id,effective_from_date) select 70,date"
-            + " '2022-01-01' where not exists(select 1 from core.bank_reporting_periods where"
-            + " bank_id=70)");
-  }
-
   @Autowired UploadService service;
   @Autowired UploadRepository repository;
   @MockitoBean UploadStore store;
@@ -48,7 +38,6 @@ class UploadCompletionConcurrencyTests {
     Upload job =
         repository.save(
             Upload.urlIssued(
-                70,
                 "concurrent.csv",
                 "c".repeat(64),
                 1,
@@ -90,7 +79,6 @@ class UploadCompletionConcurrencyTests {
     Upload old =
         repository.save(
             Upload.urlIssued(
-                70,
                 "race-old.csv",
                 hash,
                 1,
@@ -122,7 +110,6 @@ class UploadCompletionConcurrencyTests {
       try {
         issued =
             service.issue(
-                70,
                 new IssueUploadRequest(
                     "race-new.csv", 1, checksum, java.time.LocalDate.of(2022, 9, 1)));
       } finally {
@@ -144,7 +131,6 @@ class UploadCompletionConcurrencyTests {
     Upload old =
         repository.save(
             Upload.urlIssued(
-                70,
                 "receive-first.csv",
                 hash,
                 1,
@@ -158,7 +144,6 @@ class UploadCompletionConcurrencyTests {
     org.assertj.core.api.Assertions.assertThatThrownBy(
             () ->
                 service.issue(
-                    70,
                     new IssueUploadRequest(
                         "too-late.csv", 1, checksum, java.time.LocalDate.of(2022, 9, 1))))
         .isInstanceOfSatisfying(
@@ -179,7 +164,6 @@ class UploadCompletionConcurrencyTests {
     Upload issued =
         repository.save(
             Upload.urlIssued(
-                70,
                 "lost-response.csv",
                 hash,
                 1,
@@ -193,18 +177,16 @@ class UploadCompletionConcurrencyTests {
                 "https://example.com/lost-response", "PUT", java.util.Map.of()));
     var again =
         service.issue(
-            70,
             new IssueUploadRequest(
                 "lost-response.csv", 1, checksum, java.time.LocalDate.of(2022, 9, 2)));
     assertThat(again.uploadId()).isEqualTo(issued.getId());
     assertThat(again.url()).isEqualTo("https://example.com/lost-response");
     assertThat(again.expiresAt()).isEqualTo(issued.getUrlExpiresAt());
-    assertThat(repository.findByBankIdAndFileHashOrderByIdDesc(70, hash)).hasSize(1);
+    assertThat(repository.findByFileHashOrderByIdDesc(hash)).hasSize(1);
     // Same bytes for another business date is a different submission: still in progress.
     org.assertj.core.api.Assertions.assertThatThrownBy(
             () ->
                 service.issue(
-                    70,
                     new IssueUploadRequest(
                         "lost-response.csv", 1, checksum, java.time.LocalDate.of(2022, 9, 3))))
         .isInstanceOfSatisfying(
@@ -214,7 +196,7 @@ class UploadCompletionConcurrencyTests {
 
   private String complete(long uploadId) {
     try {
-      return service.complete(70, uploadId).status().name();
+      return service.complete(uploadId).status().name();
     } catch (ApiException e) {
       assertThat(e.status()).isEqualTo(HttpStatus.CONFLICT);
       return e.code();

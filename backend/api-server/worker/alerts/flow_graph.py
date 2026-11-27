@@ -94,11 +94,16 @@ class EdgeTable:
             if len({len(self.tx_ids), len(self.occurred_us), len(self.from_accounts),
                     len(self.to_accounts), len(self.amount_usd_micros)}) != 1:
                 raise ValueError("Edge column lengths differ")
-            if not all(tx_id == pos + 1 for pos, tx_id in enumerate(self.tx_ids)):
-                positions = {tx_id: pos for pos, tx_id in enumerate(self.tx_ids)}
-                if len(positions) != len(self):
-                    raise ValueError("Duplicate transaction ID")
-                self._positions = positions
+            ids = self.tx_ids
+            if not all(tx_id == pos + 1 for pos, tx_id in enumerate(ids)):
+                if all(ids[i] < ids[i + 1] for i in range(len(ids) - 1)):
+                    # Ascending IDs (a window that does not start at 1): binary search, no dict.
+                    self._positions = "sorted"
+                else:
+                    positions = {tx_id: pos for pos, tx_id in enumerate(ids)}
+                    if len(positions) != len(self):
+                        raise ValueError("Duplicate transaction ID")
+                    self._positions = positions
             for name in ("tx_ids", "occurred_us", "from_accounts", "to_accounts",
                          "amount_usd_micros"):
                 setattr(self, name, memoryview(getattr(self, name)).toreadonly())
@@ -114,10 +119,79 @@ class EdgeTable:
             if 1 <= tx_id <= len(self):
                 return tx_id - 1
             raise ValueError("Unknown seed transaction")
+        if self._positions == "sorted":
+            pos = bisect_left(self.tx_ids, tx_id)
+            if pos < len(self) and self.tx_ids[pos] == tx_id:
+                return pos
+            raise ValueError("Unknown seed transaction")
         try:
             return self._positions[tx_id]
         except KeyError as exc:
             raise ValueError("Unknown seed transaction") from exc
+
+
+class _Rows:
+    """One account's positions inside a shared int64 array: indexing gives an int, slicing a list."""
+
+    __slots__ = ("view",)
+
+    def __init__(self, view):
+        self.view = view
+
+    def __len__(self):
+        return len(self.view)
+
+    def __getitem__(self, item):
+        return list(self.view[item]) if isinstance(item, slice) else self.view[item]
+
+    def __iter__(self):
+        return iter(self.view)
+
+
+class _Adjacency:
+    """account -> its positions ordered by (time, tx_id), stored as one int64 array plus offsets.
+
+    Same answers as a dict of lists, at 8 bytes per position instead of a Python list entry
+    (alert stage memory, 2026-11-27). Used when account codes are dense small integers, as
+    _EdgeInput assigns them; otherwise FlowIndex keeps the dict of lists.
+    """
+
+    __slots__ = ("starts", "positions")
+
+    def __init__(self, keys, edges, top):
+        times, ids = edges.occurred_us, edges.tx_ids
+        starts = array("q", bytes(8 * (top + 2)))
+        for key in keys:
+            starts[key + 1] += 1
+        for key in range(1, top + 2):
+            starts[key] += starts[key - 1]
+        cursor = array("q", starts)
+        positions = array("q", bytes(8 * len(keys)))
+        for pos, key in enumerate(keys):
+            positions[cursor[key]] = pos
+            cursor[key] += 1
+        del cursor
+        # Positions are in row order inside each account; re-sort only accounts that are not
+        # already in (time, tx_id) order.
+        for key in range(top + 1):
+            begin, end = starts[key], starts[key + 1]
+            if end - begin < 2:
+                continue
+            if any(times[a] > times[b] or (times[a] == times[b] and ids[a] > ids[b])
+                   for a, b in ((positions[i], positions[i + 1]) for i in range(begin, end - 1))):
+                segment = sorted(positions[begin:end], key=lambda pos: (times[pos], ids[pos]))
+                positions[begin:end] = array("q", segment)
+        self.starts, self.positions = starts, memoryview(positions).toreadonly()
+
+    def get(self, account, default=()):
+        if type(account) is not int or not 0 <= account < len(self.starts) - 1:
+            return default
+        begin, end = self.starts[account], self.starts[account + 1]
+        return _Rows(self.positions[begin:end]) if end > begin else default
+
+    def __getitem__(self, account):
+        # As the former defaultdict(list): an account without rows reads as empty.
+        return self.get(account, [])
 
 
 class FlowIndex:
@@ -125,6 +199,11 @@ class FlowIndex:
 
     def __init__(self, edges: EdgeTable):
         self.edges = edges.freeze()
+        top = max(max(edges.to_accounts, default=0), max(edges.from_accounts, default=0))
+        if top <= 2 * len(edges) + 1024:
+            self.incoming = _Adjacency(edges.to_accounts, edges, top)
+            self.outgoing = _Adjacency(edges.from_accounts, edges, top)
+            return
         self.incoming = defaultdict(list)
         self.outgoing = defaultdict(list)
         for pos in range(len(edges)):

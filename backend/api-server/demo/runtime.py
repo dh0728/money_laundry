@@ -1,10 +1,8 @@
 """Persistent, local-only demo bootstrap. Never imported by API or worker code."""
 import base64
-from datetime import date
 import hashlib
 import os
 from pathlib import Path
-import re
 import secrets
 import subprocess
 import sys
@@ -104,31 +102,11 @@ def configure():
         INFERENCE_OBJECT_BASE_URL='https://' + BUCKET + '.s3.ap-northeast-2.amazonaws.com/demo/')
 
 
-def bank_days(root):
-    result = set()
-    for folder in sorted(root.iterdir()):
-        if not folder.is_dir():
-            continue
-        try:
-            day = date.fromisoformat(folder.name)
-        except ValueError:
-            continue
-        for file in folder.glob('*.csv'):
-            match = re.fullmatch(r'bank_(\d+)(?:_' + re.escape(folder.name) + r')?\.csv', file.name)
-            if not match or not file.resolve().is_relative_to(root.resolve()):
-                raise ValueError('Invalid demo bank file name/path')
-            result.add((int(match[1]), day))
-    if not result:
-        raise ValueError('No dated bank files found')
-    return sorted(result)
-
-
 def seed():
     import boto3
     from botocore.config import Config
     from botocore.exceptions import ClientError
     import psycopg
-    registrations = bank_days(Path('/data-input'))
     with psycopg.connect(host='postgres', dbname='aml_demo', user='aml_demo',
                          password=(SECRET_DIR / 'postgres-password').read_text().strip()) as db:
         sys.path.insert(0, '/app/worker')
@@ -139,13 +117,6 @@ def seed():
         salt = secrets.token_bytes(16)
         demo_hash = (salt + hashlib.pbkdf2_hmac('sha256', b'1234', salt, 310000, 32)).hex()
         db.execute("UPDATE core.users SET password_hash=%s WHERE coalesce(password_hash,'')=''", (demo_hash,))
-        for bank, day in registrations:
-            # Bank names are established from validated reports, never invented here.
-            db.execute("INSERT INTO core.banks(bank_id,is_reporting,report_format) VALUES(%s,true,'AML17') ON CONFLICT(bank_id) DO NOTHING", (bank,))
-            db.execute('''INSERT INTO core.bank_reporting_periods(bank_id,effective_from_date,effective_to_date)
-                SELECT %s,%s,%s WHERE NOT EXISTS(SELECT 1 FROM core.bank_reporting_periods
-                WHERE bank_id=%s AND effective_from_date<=%s AND (effective_to_date IS NULL OR effective_to_date>=%s))''',
-                (bank, day, day, bank, day, day))
     s3 = boto3.client('s3', config=Config(signature_version='s3v4'))
     try:
         s3.head_bucket(Bucket=BUCKET)
@@ -153,7 +124,7 @@ def seed():
         if error.response['ResponseMetadata']['HTTPStatusCode'] != 404:
             raise
         s3.create_bucket(Bucket=BUCKET, CreateBucketConfiguration={'LocationConstraint': 'ap-northeast-2'})
-    print(f'Local demo ready: {len(registrations)} bank/day registrations; existing records preserved', flush=True)
+    print('Local demo ready; existing records preserved', flush=True)
 
 
 def launch(mode):

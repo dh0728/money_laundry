@@ -49,7 +49,7 @@ class DemoResetTests {
 
   long job(String status) {
     return jdbc.queryForObject(
-        "insert into ingest.uploads(bank_id,business_date,file_name,file_hash,size_bytes,status) values(12,'2023-09-01','fixture.csv',repeat('a',64),1,?) returning upload_id",
+        "insert into ingest.uploads(business_date,file_name,file_hash,size_bytes,status) values('2023-09-01','fixture.csv',repeat('a',64),1,?) returning upload_id",
         Long.class,
         status);
   }
@@ -74,27 +74,8 @@ class DemoResetTests {
     var banks = jdbc.queryForList("select * from core.banks order by bank_id");
     var fx = jdbc.queryForList("select * from core.fx_rates order by currency");
     jdbc.update(
-        "insert into core.banks(bank_id,name,is_reporting) values(999999,'reset-test',true) on conflict(bank_id) do nothing");
-    jdbc.update(
-        "insert into core.bank_reporting_periods(bank_id,effective_from_date) select 999999,'2023-01-01' where not exists(select 1 from core.bank_reporting_periods where bank_id=999999)");
-    var periods = jdbc.queryForList("select * from core.bank_reporting_periods order by period_id");
+        "insert into core.banks(bank_id,name) values(999999,'reset-test') on conflict(bank_id) do nothing");
     long old = job("COMPLETED");
-    long reportSet =
-        jdbc.queryForObject(
-            "insert into ingest.report_sets(bank_id,business_date) values(999999,'2023-09-01') returning set_id",
-            Long.class);
-    long version =
-        jdbc.queryForObject(
-            "insert into ingest.report_versions(set_id,upload_id,version_no,received_at,stage_status) values(?,?,1,now(),'ACTIVE') returning version_id",
-            Long.class,
-            reportSet,
-            old);
-    long report =
-        jdbc.queryForObject(
-            "insert into private.bank_reports(version_id,source_row) values(?,2) returning report_id",
-            Long.class,
-            version);
-    jdbc.update("insert into evaluation.report_labels values(?,true)", report);
     jdbc.update(
         "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,now(),now())",
         admin);
@@ -105,9 +86,8 @@ class DemoResetTests {
             UUID.randomUUID());
     long account =
         jdbc.queryForObject(
-            "insert into core.accounts(bank_id,service_account_id,owner_id) values(999999,?,?) returning account_id",
+            "insert into core.accounts(bank_id,owner_id) values(999999,?) returning account_id",
             Long.class,
-            UUID.randomUUID(),
             entity);
     jdbc.update(
         "insert into ledger.transactions(occurred_at,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version,business_date) values(now(),?,?,10,'USD',10,'USD','ACH',10,'test','2023-09-01')",
@@ -125,8 +105,6 @@ class DemoResetTests {
     assertThat(jdbc.queryForList("select * from core.banks where bank_id<>999999 order by bank_id"))
         .containsAll(
             banks.stream().filter(b -> !Integer.valueOf(999999).equals(b.get("bank_id"))).toList());
-    assertThat(jdbc.queryForList("select * from core.bank_reporting_periods order by period_id"))
-        .isEqualTo(periods);
     assertThat(jdbc.queryForList("select * from core.fx_rates order by currency")).isEqualTo(fx);
     assertThat(clock.view().get("configured")).isEqualTo(false);
     clock.set(

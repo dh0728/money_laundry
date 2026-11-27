@@ -17,6 +17,7 @@ import { LiveRuleBacktest } from '../features/rules/live-rule-backtest';
 import { LiveRuleList } from '../features/rules/live-rule-list';
 import { liveActiveRules, liveRules, refreshLiveRules } from '../features/rules/live-rule-store';
 import { useCaseRuleHits } from '../features/rules/case-rule-hits';
+import { useCaseAiSummary } from '../features/investigation/case-ai-summary';
 import { liveSource } from '../features/investigation/live-data.js';
 import { readWorkspaceDuration } from '../features/dashboard/workspace-metrics';
 import { SortableTableHead, tableCount, useTableSort, WorkflowQueryHeading, WorkflowTable } from '../components/workflow-table';
@@ -26,6 +27,7 @@ import { PreviewEpisodeDialog } from '../features/investigation/preview-episode-
 import { canManagePreviewEpisodes, canTransferAlert } from '../features/investigation/preview-episode-transfer';
 import { CaseJudgment } from '../features/investigation/case-judgment';
 import { CaseTransactionEdit } from '../features/investigation/case-transaction-edit';
+import { AiReportPreview } from '../features/investigation/case-ai-report-preview';
 import { useCaseEvidenceSelection } from '../features/investigation/case-evidence-selection';
 import { previewAlertEditUnavailable, previewAlertMembershipTargets } from '../features/investigation/case-membership-data';
 import { currentPreviewUser, subscribePreviewUser } from '../features/auth/preview-session-user';
@@ -160,8 +162,9 @@ function ResultNotifications() {
 }
 
 async function downloadReport(rows) {
-  const { downloadCaseReport } = await import('../features/investigation/case-report-pdf.js');
-  await downloadCaseReport(rows);
+  const [{ downloadCaseReport }, { attachAiReports }] = await Promise.all([
+    import('../features/investigation/case-report-pdf.js'), import('../features/investigation/case-ai-report.js')]);
+  await downloadCaseReport(await attachAiReports(rows));
 }
 
 function ReportAudit({ row }) {
@@ -203,6 +206,7 @@ function Report({ view, data, registerTableTools, documentId, actionsHost }) {
   const [range, setRange] = useState(() => target ? undefined : reportSelection.range);
   const [order, setOrder] = useState(reportSelection.order);
   const [status, setStatus] = useState('pending');
+  const [preview, setPreview] = useState(null);
   const tableView = view !== 'card';
   const records = history.filter(row => (!tableView || filter === 'all' || row.verdict === filter)
     && (!range || row.at && inDateRange(reportDate(row.at), range)));
@@ -230,13 +234,13 @@ function Report({ view, data, registerTableTools, documentId, actionsHost }) {
     reportSelection.ids = [...next];
     setSelected(reportSelection.ids);
   }
-  async function download() {
-    if (!selectedRows.length || status === 'running') return;
+  async function download(rows = selectedRows) {
+    if (!rows.length || status === 'running') return;
     setStatus('running');
     try {
-      await downloadReport(selectedRows);
+      await downloadReport(rows);
       setStatus('done');
-      announce({ status: 'done', title: 'PDF 생성 완료', description: `판정 ${selectedRows.length}건을 내보냈습니다.` });
+      announce({ status: 'done', title: 'PDF 생성 완료', description: `판정 ${rows.length}건을 내보냈습니다.` });
     } catch (error) {
       setStatus('failed');
       announce({ status: 'failed', title: 'PDF 생성 실패', description: error.message });
@@ -289,6 +293,7 @@ function Report({ view, data, registerTableTools, documentId, actionsHost }) {
             </Box>
             <Box as="dl"><Box><Box as="dt">대상 ID</Box><Box as="dd">{targets(row)}</Box></Box></Box>
             <ReportAudit row={row} />
+            <ActionButton shape="pill" surface="ghost" aria-haspopup="dialog" onClick={() => setPreview(row)}>보고서 미리보기</ActionButton>
           </Box>
           </RecordCard>)}
           {!rows.length && <Text tone="muted">표시할 판정이 없습니다.</Text>}
@@ -317,7 +322,8 @@ function Report({ view, data, registerTableTools, documentId, actionsHost }) {
           </TableRow></TableHeader>
           <TableBody>
             {sorting.rows.map(row => <TableRow key={row.id} data-selected={selected.includes(row.id) || undefined}>
-              <TableRowHead><Text as="code">{row.id}</Text></TableRowHead>
+              <TableRowHead><ActionButton shape="pill" surface="ghost" aria-haspopup="dialog" aria-label={`${row.id} 보고서 미리보기`}
+                onClick={() => setPreview(row)}><Text as="code">{row.id}</Text></ActionButton></TableRowHead>
               <TableCell>{targets(row)}</TableCell>
               <TableCell>{row.kind}</TableCell>
               <TableCell><Box className="workflow-report-patterns">{patterns(row)}</Box></TableCell>
@@ -328,8 +334,10 @@ function Report({ view, data, registerTableTools, documentId, actionsHost }) {
           </TableBody>
       </WorkflowTable>}
     {status !== 'pending' && <ResultStatus status={status} />}
+    <AiReportPreview row={preview} onClose={() => setPreview(null)} downloading={status === 'running'}
+      onDownload={row => download([row])} />
     <ScreenActions host={actionsHost} stackOnNarrow><PrimaryButton tone="brand"
-      disabled={selectedRows.length === 0 || status === 'running'} onHold={download}>AI 보고서 다운로드</PrimaryButton></ScreenActions>
+      disabled={selectedRows.length === 0 || status === 'running'} onHold={() => download()}>AI 보고서 다운로드</PrimaryButton></ScreenActions>
   </Box>;
 }
 
@@ -409,6 +417,7 @@ function CaseReviewActions({ overview }) {
  */
 function CaseOverview({ overview, appearance }) {
   const hits = useCaseRuleHits(liveRules ? overview?.row?.caseId : undefined);
+  const aiSummary = useCaseAiSummary(liveRules ? overview?.row?.caseId : undefined);
   // 서비스 모드는 로그인할 때 룰 목록을 읽어 둔다. 샘플 모드는 여기서 읽고, 읽고 나면 다시 그린다.
   const [, setRulesLoaded] = useState(false);
   useEffect(() => {
@@ -420,7 +429,8 @@ function CaseOverview({ overview, appearance }) {
     perPanel={overview.perPanel} initialPanel={overview.initialPanel} />;
   return <Suspense fallback={loading}><PreviewCaseOverview {...overview} appearance={appearance}
     history={reportHistory(overview?.reportData)} activeRules={liveActiveRules()}
-    ruleHits={liveRules ? { ...hits, alertCode } : undefined} /></Suspense>;
+    ruleHits={liveRules ? { ...hits, alertCode } : undefined}
+    aiSummary={liveRules ? aiSummary : undefined} /></Suspense>;
 }
 
 function Workflow({ kind, view, dashboard, overview }) {

@@ -6,7 +6,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.moneylaundry.api.ingest.bank.BankIdentityInterceptor;
 import com.moneylaundry.api.ingest.upload.UploadController;
 import com.moneylaundry.api.ingest.upload.UploadService;
 import org.junit.jupiter.api.Test;
@@ -22,20 +21,14 @@ class ApiExceptionHandlerTests {
 
   @Test
   void 잘못된_JSON은_400이다() throws Exception {
-    mvc.perform(
-            post("/api/v1/bank/uploads")
-                .requestAttr(BankIdentityInterceptor.BANK_ID, 70)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{"))
+    mvc.perform(post("/api/v1/ledger-uploads").contentType(MediaType.APPLICATION_JSON).content("{"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
   }
 
   @Test
   void 숫자가_아닌_업로드_ID는_400이다() throws Exception {
-    mvc.perform(
-            get("/api/v1/bank/uploads/not-a-number")
-                .requestAttr(BankIdentityInterceptor.BANK_ID, 70))
+    mvc.perform(get("/api/v1/ledger-uploads/not-a-number"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
   }

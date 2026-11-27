@@ -23,28 +23,8 @@ CREATE VIEW core.assignable_staff AS
  SELECT user_id FROM core.users WHERE role='STAFF' AND password_hash IS NOT NULL AND password_hash<>'';
 CREATE TABLE core.banks (
  bank_id INTEGER PRIMARY KEY, name VARCHAR(100), country VARCHAR(50),
- is_reporting BOOLEAN NOT NULL DEFAULT false,
- report_format TEXT NOT NULL DEFAULT 'AML17' CHECK(report_format='AML17'),
  created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE TABLE core.bank_reporting_periods (
- period_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
- bank_id INTEGER NOT NULL REFERENCES core.banks,
- effective_from_date DATE NOT NULL, effective_to_date DATE,
- CHECK(effective_to_date IS NULL OR effective_to_date>=effective_from_date)
-);
-CREATE FUNCTION core.reject_reporting_overlap() RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
- PERFORM 1 FROM core.banks WHERE bank_id=NEW.bank_id FOR UPDATE;
- IF EXISTS(SELECT 1 FROM core.bank_reporting_periods p WHERE p.bank_id=NEW.bank_id
- AND p.period_id<>NEW.period_id AND daterange(p.effective_from_date,p.effective_to_date,'[]')
- && daterange(NEW.effective_from_date,NEW.effective_to_date,'[]')) THEN
-  RAISE EXCEPTION 'REPORTING_PERIOD_OVERLAP' USING ERRCODE='23514';
- END IF;
- RETURN NEW;
-END $$;
-CREATE TRIGGER reporting_period_overlap BEFORE INSERT OR UPDATE ON core.bank_reporting_periods
- FOR EACH ROW EXECUTE FUNCTION core.reject_reporting_overlap();
 CREATE TABLE core.fx_rates (
  fx_rate_version VARCHAR(50) NOT NULL, currency CHAR(3) NOT NULL,
  units_per_usd NUMERIC(20,8) NOT NULL CHECK(units_per_usd>0),
@@ -53,7 +33,7 @@ CREATE TABLE core.fx_rates (
 CREATE TABLE core.owners (
  owner_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
  service_owner_id UUID NOT NULL UNIQUE, display_name TEXT NOT NULL UNIQUE,
- -- Name-free category extracted during 거래 통합 (the only stage that sees plaintext names);
+ -- Name-free category extracted during ledger loading (the only stage that sees plaintext names);
  -- with banks.country it is all analysis may read about an owner. NULL means not derivable.
  entity_type TEXT
 );
@@ -64,9 +44,13 @@ CREATE TABLE private.owner_identities (
 );
 CREATE TABLE core.accounts (
  account_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
- service_account_id UUID NOT NULL UNIQUE, bank_id INTEGER NOT NULL REFERENCES core.banks,
+ bank_id INTEGER NOT NULL REFERENCES core.banks,
+ -- Pseudonymous number: bank number, then the account's order of appearance within that bank.
+ account_no INTEGER NOT NULL CHECK(account_no>0),
+ service_account_id TEXT GENERATED ALWAYS AS (bank_id::text||'-'||
+  CASE WHEN account_no<10000 THEN lpad(account_no::text,4,'0') ELSE account_no::text END) STORED UNIQUE,
  owner_id BIGINT NOT NULL REFERENCES core.owners,
- created_at TIMESTAMPTZ NOT NULL DEFAULT now(), UNIQUE(account_id,bank_id)
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(), UNIQUE(account_id,bank_id), UNIQUE(bank_id,account_no)
 );
 CREATE INDEX accounts_owner_bank ON core.accounts(owner_id,bank_id);
 CREATE TABLE private.account_identities (
@@ -75,9 +59,10 @@ CREATE TABLE private.account_identities (
  FOREIGN KEY(account_id,bank_id) REFERENCES core.accounts(account_id,bank_id),
  UNIQUE(bank_id,lookup_token)
 );
+-- One ledger file per business date, uploaded by an operator and loaded straight into the ledger.
 CREATE TABLE ingest.uploads (
  upload_id BIGINT PRIMARY KEY DEFAULT nextval('core.work_id'),
- bank_id INTEGER NOT NULL REFERENCES core.banks, business_date DATE NOT NULL,
+ business_date DATE NOT NULL,
  status TEXT NOT NULL CHECK(status IN ('URL_ISSUED','RECEIVED','RUNNING','COMPLETED','VALIDATION_FAILED','FAILED','EXPIRED')),
  file_name VARCHAR(255) NOT NULL, file_hash CHAR(64) NOT NULL,
  size_bytes BIGINT NOT NULL CHECK(size_bytes>0), s3_key VARCHAR(512),
@@ -90,105 +75,26 @@ CREATE TABLE ingest.uploads (
  CHECK((execution_id IS NULL)=(execution_owner IS NULL))
 );
 CREATE INDEX uploads_file_hash ON ingest.uploads(file_hash);
-CREATE INDEX uploads_bank_received ON ingest.uploads(bank_id,received_at DESC);
-CREATE TABLE ingest.reporting_scopes (
- business_date DATE PRIMARY KEY, scope_revision BIGINT NOT NULL DEFAULT 1,
- UNIQUE(business_date,scope_revision)
-);
-CREATE TABLE ingest.reporting_scope_banks (
- business_date DATE NOT NULL, scope_revision BIGINT NOT NULL,
- bank_id INTEGER NOT NULL REFERENCES core.banks,
- PRIMARY KEY(business_date,bank_id),
- FOREIGN KEY(business_date,scope_revision) REFERENCES ingest.reporting_scopes(business_date,scope_revision)
-);
-CREATE TABLE ingest.report_sets (
- set_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
- bank_id INTEGER NOT NULL REFERENCES core.banks, business_date DATE NOT NULL,
- current_version_id BIGINT, generation BIGINT NOT NULL DEFAULT 0,
- UNIQUE(bank_id,business_date)
-);
-CREATE TABLE ingest.report_versions (
- version_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
- set_id BIGINT NOT NULL REFERENCES ingest.report_sets,
- upload_id BIGINT NOT NULL UNIQUE REFERENCES ingest.uploads,
- version_no INTEGER NOT NULL CHECK(version_no>0), received_at TIMESTAMPTZ NOT NULL,
- stage_status TEXT NOT NULL CHECK(stage_status IN ('VALIDATED_WAITING_INTEGRATION','ACTIVE','PARTIALLY_HELD','HELD','WAITING_COUNTERPART','WAITING_ANALYSIS_RELEASE','SUPERSEDED')),
- error_code TEXT, row_count INTEGER CHECK(row_count>=0), revision BIGINT NOT NULL DEFAULT 1,
- correction_of_version_id BIGINT REFERENCES ingest.report_versions,
- self_valid BOOLEAN NOT NULL DEFAULT true,
- UNIQUE(set_id,version_no), UNIQUE(set_id,version_id)
-);
-ALTER TABLE ingest.report_sets ADD FOREIGN KEY(set_id,current_version_id)
- REFERENCES ingest.report_versions(set_id,version_id);
-CREATE TABLE private.bank_reports (
- report_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
- version_id BIGINT NOT NULL REFERENCES ingest.report_versions,
- source_row INTEGER NOT NULL CHECK(source_row>0),
- report_status TEXT NOT NULL DEFAULT 'WAITING' CHECK(report_status IN ('WAITING','ACTIVE','HELD','DEPENDENCY_HELD')),
- error_code TEXT, UNIQUE(version_id,source_row)
-);
--- Encrypted report rows, written once at ingest and read only when their date is integrated, so
--- status changes and the daily joins over private.bank_reports never touch them.
-CREATE TABLE private.bank_report_payloads (
- report_id BIGINT PRIMARY KEY REFERENCES private.bank_reports,
- payload_cipher TEXT NOT NULL, key_version TEXT NOT NULL
-);
-CREATE TABLE ingest.integration_attempts (
- attempt_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
- business_date DATE NOT NULL, cutoff_at TIMESTAMPTZ NOT NULL, scope_revision BIGINT NOT NULL,
- status TEXT NOT NULL CHECK(status IN ('PREPARING','COMPLETED')),
- FOREIGN KEY(business_date,scope_revision) REFERENCES ingest.reporting_scopes(business_date,scope_revision)
-);
-CREATE TABLE ingest.integration_attempt_versions (
- attempt_id BIGINT NOT NULL REFERENCES ingest.integration_attempts,
- version_id BIGINT NOT NULL REFERENCES ingest.report_versions,
- generation BIGINT NOT NULL, revision BIGINT NOT NULL, PRIMARY KEY(attempt_id,version_id)
-);
-CREATE TABLE ingest.correction_requests (
- correction_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
- bank_id INTEGER NOT NULL REFERENCES core.banks, business_date DATE NOT NULL,
- version_id BIGINT REFERENCES ingest.report_versions, reason_code TEXT NOT NULL,
- source_revision BIGINT NOT NULL, revision BIGINT NOT NULL DEFAULT 1,
- status TEXT NOT NULL DEFAULT 'OPEN' CHECK(status IN ('OPEN','REPLACEMENT_RECEIVED','VALIDATING','WAITING_COUNTERPART','WAITING_ANALYSIS_RELEASE','RESOLVED')),
- replacement_version_id BIGINT REFERENCES ingest.report_versions,
- created_at TIMESTAMPTZ NOT NULL DEFAULT now(), resolved_at TIMESTAMPTZ,
- UNIQUE NULLS NOT DISTINCT(bank_id,business_date,version_id,reason_code,source_revision)
-);
-CREATE INDEX corrections_bank_status_date ON ingest.correction_requests(bank_id,status,business_date);
-CREATE TABLE ingest.correction_errors (
- correction_id BIGINT NOT NULL REFERENCES ingest.correction_requests,
- ordinal INTEGER NOT NULL, source_row INTEGER, column_name TEXT NOT NULL,
- code TEXT NOT NULL, reason TEXT NOT NULL, PRIMARY KEY(correction_id,ordinal)
-);
-CREATE TABLE ingest.correction_uploads (
- upload_id BIGINT PRIMARY KEY REFERENCES ingest.uploads,
- correction_id BIGINT NOT NULL REFERENCES ingest.correction_requests,
- submission_id UUID NOT NULL, UNIQUE(correction_id,submission_id)
-);
+CREATE INDEX uploads_received ON ingest.uploads(received_at DESC);
+-- A date is loaded once; a failed or rejected file can be sent again.
+CREATE UNIQUE INDEX uploads_loaded_date ON ingest.uploads(business_date) WHERE status='COMPLETED';
 CREATE TABLE ledger.transactions (
  tx_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ upload_id BIGINT NOT NULL REFERENCES ingest.uploads,
  occurred_at TIMESTAMPTZ NOT NULL, business_date DATE NOT NULL,
  from_account_id BIGINT NOT NULL REFERENCES core.accounts,
  to_account_id BIGINT NOT NULL REFERENCES core.accounts,
  amount_received NUMERIC(24,6) NOT NULL CHECK(amount_received>=0), receiving_currency CHAR(3) NOT NULL,
  amount_paid NUMERIC(24,6) NOT NULL CHECK(amount_paid>=0), payment_currency CHAR(3) NOT NULL,
  payment_format VARCHAR(30) NOT NULL, amount_usd NUMERIC(24,6) NOT NULL,
- fx_rate_version VARCHAR(50) NOT NULL, generation BIGINT NOT NULL DEFAULT 1,
- integration_status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(integration_status IN ('ACTIVE','HELD','SUPERSEDED')),
+ fx_rate_version VARCHAR(50) NOT NULL,
  ingested_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX transactions_active_time ON ledger.transactions(occurred_at DESC,tx_id) WHERE integration_status='ACTIVE';
+CREATE INDEX transactions_time ON ledger.transactions(occurred_at DESC,tx_id);
 CREATE INDEX transactions_from_time ON ledger.transactions(from_account_id,occurred_at);
 CREATE INDEX transactions_to_time ON ledger.transactions(to_account_id,occurred_at);
 CREATE INDEX transactions_day ON ledger.transactions(business_date);
--- Alert publication checks that no frozen transaction has left ACTIVE; without this it scans every transaction.
-CREATE INDEX transactions_inactive ON ledger.transactions(tx_id) WHERE integration_status<>'ACTIVE';
-CREATE TABLE ledger.transaction_reports (
- tx_id BIGINT NOT NULL REFERENCES ledger.transactions,
- report_id BIGINT NOT NULL UNIQUE REFERENCES private.bank_reports,
- report_role TEXT NOT NULL CHECK(report_role IN ('SENDER','RECEIVER','INTERNAL')),
- PRIMARY KEY(tx_id,report_id)
-);
+CREATE INDEX transactions_upload ON ledger.transactions(upload_id);
 CREATE TABLE ops.business_clock (
  id BOOLEAN PRIMARY KEY DEFAULT true CHECK(id), business_at TIMESTAMPTZ,
  revision BIGINT NOT NULL DEFAULT 0, updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -206,7 +112,7 @@ CREATE TABLE analysis.jobs (
  analysis_date DATE NOT NULL UNIQUE, analysis_cutoff_at TIMESTAMPTZ NOT NULL,
  business_at TIMESTAMPTZ NOT NULL, threshold_value DOUBLE PRECISION NOT NULL CHECK(threshold_value>0 AND threshold_value<=1),
  status TEXT NOT NULL CHECK(status IN ('SCHEDULED','QUEUED','RUNNING','RETRY_WAIT','FAILED','COMPLETED')),
- current_stage TEXT NOT NULL CHECK(current_stage IN ('WAIT_INGEST','INTEGRATE','FREEZE_INPUT','FEATURES','INFERENCE','SCORES','ALERTS','COMPLETE')),
+ current_stage TEXT NOT NULL CHECK(current_stage IN ('WAIT_INGEST','FREEZE_INPUT','FEATURES','INFERENCE','SCORES','ALERTS','COMPLETE')),
  current_run_id UUID, execution_id UUID, execution_owner UUID,
  attempt_count INTEGER NOT NULL DEFAULT 0, stage_attempt_count INTEGER NOT NULL DEFAULT 0,
  consecutive_failures INTEGER NOT NULL DEFAULT 0, retry_at TIMESTAMPTZ,
@@ -222,30 +128,20 @@ CREATE TABLE analysis.receipts (
  job_id BIGINT NOT NULL REFERENCES analysis.jobs, upload_id BIGINT NOT NULL REFERENCES ingest.uploads,
  PRIMARY KEY(job_id,upload_id)
 );
-CREATE TABLE analysis.selected_versions (
- job_id BIGINT NOT NULL REFERENCES analysis.jobs, set_id BIGINT NOT NULL,
- version_id BIGINT NOT NULL, generation BIGINT NOT NULL, PRIMARY KEY(job_id,set_id),
- FOREIGN KEY(set_id,version_id) REFERENCES ingest.report_versions(set_id,version_id)
-);
 CREATE TABLE analysis.runs (
  run_id UUID PRIMARY KEY, job_id BIGINT NOT NULL REFERENCES analysis.jobs,
  input_revision BIGINT NOT NULL DEFAULT 1,
- status TEXT NOT NULL CHECK(status IN ('READY','ACTIVE','CANCEL_REQUESTED','CANCELLED','COMPLETED')),
- created_at TIMESTAMPTZ NOT NULL DEFAULT now(), cancel_requested_at TIMESTAMPTZ,
- cancel_reason TEXT, completed_at TIMESTAMPTZ,
- -- Position in the shared input ledgers, issued by FREEZE_INPUT under the integration lock.
+ status TEXT NOT NULL CHECK(status IN ('READY','ACTIVE','COMPLETED')),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(), completed_at TIMESTAMPTZ,
+ -- Position in the shared input ledgers, issued by FREEZE_INPUT under the ingest lock.
  input_seq BIGINT UNIQUE,
- -- The cutoff and blocked report sets FREEZE_INPUT applied. The next freeze re-evaluates only the
- -- transactions whose eligibility can differ from this one.
- input_cutoff_at TIMESTAMPTZ, input_blocked_sets BIGINT[],
+ -- The cutoff FREEZE_INPUT applied. The next freeze re-evaluates only the transactions whose
+ -- eligibility can differ from this one.
+ input_cutoff_at TIMESTAMPTZ,
  UNIQUE(job_id,run_id)
 );
 CREATE SEQUENCE analysis.input_seq;
 ALTER TABLE analysis.jobs ADD FOREIGN KEY(job_id,current_run_id) REFERENCES analysis.runs(job_id,run_id);
-CREATE TABLE analysis.run_replacements (
- run_id UUID NOT NULL REFERENCES analysis.runs, replaces_run_id UUID NOT NULL UNIQUE REFERENCES analysis.runs,
- PRIMARY KEY(run_id,replaces_run_id), CHECK(run_id<>replaces_run_id)
-);
 CREATE TABLE analysis.stage_results (
  job_id BIGINT NOT NULL REFERENCES analysis.jobs, stage TEXT NOT NULL,
  run_id UUID, execution_id UUID NOT NULL, artifact TEXT, completed BOOLEAN NOT NULL,
@@ -262,7 +158,7 @@ CREATE TABLE analysis.input_transactions (
  input_role TEXT NOT NULL CHECK(input_role IN ('TARGET','CONTEXT')),
  occurred_at TIMESTAMPTZ NOT NULL, business_date DATE NOT NULL,
  from_bank_id INTEGER NOT NULL, to_bank_id INTEGER NOT NULL,
- from_account_id UUID NOT NULL, to_account_id UUID NOT NULL,
+ from_account_id TEXT NOT NULL, to_account_id TEXT NOT NULL,
  from_owner_id UUID NOT NULL, to_owner_id UUID NOT NULL,
  amount_received NUMERIC(24,6) NOT NULL, receiving_currency TEXT NOT NULL,
  amount_paid NUMERIC(24,6) NOT NULL, payment_currency TEXT NOT NULL, payment_format TEXT NOT NULL,
@@ -277,7 +173,7 @@ CREATE TABLE analysis.input_ledger (
  valid_from_seq BIGINT NOT NULL, valid_to_seq BIGINT,
  occurred_at TIMESTAMPTZ NOT NULL, business_date DATE NOT NULL,
  from_bank_id INTEGER NOT NULL, to_bank_id INTEGER NOT NULL,
- from_account_id UUID NOT NULL, to_account_id UUID NOT NULL,
+ from_account_id TEXT NOT NULL, to_account_id TEXT NOT NULL,
  from_owner_id UUID NOT NULL, to_owner_id UUID NOT NULL,
  amount_received NUMERIC(24,6) NOT NULL, receiving_currency TEXT NOT NULL,
  amount_paid NUMERIC(24,6) NOT NULL, payment_currency TEXT NOT NULL, payment_format TEXT NOT NULL,
@@ -289,23 +185,21 @@ CREATE UNIQUE INDEX input_ledger_open ON analysis.input_ledger(tx_id) WHERE vali
 -- Versions opened or closed after a position: the changes a ledger copy needs since its base.
 CREATE INDEX input_ledger_from_seq ON analysis.input_ledger(valid_from_seq);
 CREATE INDEX input_ledger_to_seq ON analysis.input_ledger(valid_to_seq) WHERE valid_to_seq IS NOT NULL;
--- Report sets behind a run's input; a cancelled run is replaced only when these are ready again.
-CREATE TABLE analysis.input_report_sets (
- run_id UUID NOT NULL REFERENCES analysis.runs, set_id BIGINT NOT NULL,
- PRIMARY KEY(run_id,set_id)
-);
 CREATE TABLE analysis.target_ownership (
  tx_id BIGINT PRIMARY KEY REFERENCES ledger.transactions, run_id UUID NOT NULL,
  FOREIGN KEY(run_id,tx_id) REFERENCES analysis.input_transactions
 );
+-- Per business date: whether that date's ledger file was loaded by the run's cutoff.
 CREATE TABLE analysis.input_coverage (
  run_id UUID NOT NULL REFERENCES analysis.runs, business_date DATE NOT NULL,
- expected_banks INTEGER NOT NULL, complete_banks INTEGER NOT NULL,
- complete BOOLEAN NOT NULL, reports JSONB NOT NULL, PRIMARY KEY(run_id,business_date)
+ complete BOOLEAN NOT NULL, row_count INTEGER NOT NULL CHECK(row_count>=0),
+ PRIMARY KEY(run_id,business_date)
 );
+-- Loaded ledger files a run's input stands on (received by its cutoff). The next freeze
+-- re-evaluates the transactions of files that differ, and publication rejects a changed list.
 CREATE TABLE analysis.source_manifest (
- run_id UUID NOT NULL REFERENCES analysis.runs, business_date DATE NOT NULL,
- state JSONB NOT NULL, PRIMARY KEY(run_id,business_date)
+ run_id UUID NOT NULL REFERENCES analysis.runs,
+ upload_id BIGINT NOT NULL REFERENCES ingest.uploads, PRIMARY KEY(run_id,upload_id)
 );
 CREATE TABLE analysis.model_requests (
  request_id UUID NOT NULL, execution_round INTEGER NOT NULL CHECK(execution_round>0),
@@ -334,12 +228,6 @@ CREATE TABLE analysis.model_tasks (
  CHECK(result_artifact IS NULL OR jsonb_typeof(result_artifact)='object')
 );
 CREATE INDEX model_tasks_due ON analysis.model_tasks(status,retry_at,next_poll_at) WHERE status IN ('READY','WAITING','RETRY_WAIT');
-CREATE TABLE analysis.cancel_outbox (
- cancel_id UUID PRIMARY KEY, request_id UUID NOT NULL, execution_round INTEGER NOT NULL,
- payload JSONB NOT NULL, requested_at TIMESTAMPTZ NOT NULL, delivered_at TIMESTAMPTZ,
- acknowledged_at TIMESTAMPTZ, attempts INTEGER NOT NULL DEFAULT 0, retry_at TIMESTAMPTZ, error_code TEXT,
- UNIQUE(request_id,execution_round), FOREIGN KEY(request_id,execution_round) REFERENCES analysis.model_requests
-);
 CREATE TABLE analysis.features (
  run_id UUID NOT NULL, tx_id BIGINT NOT NULL,
  model_kind TEXT NOT NULL CHECK(model_kind IN ('BINARY','TYPE')),
@@ -423,7 +311,7 @@ CREATE TABLE analysis.alert_plans (
  run_id UUID NOT NULL REFERENCES analysis.runs, plan_key INTEGER NOT NULL,
  execution_id UUID NOT NULL, build_generation INTEGER NOT NULL CHECK(build_generation>0),
  plan_digest CHAR(64) NOT NULL, action TEXT NOT NULL
- CHECK(action IN ('NEW','UPDATE','MERGE','PROPOSE','FOLLOWUP','WITHDRAW','NOOP')),
+ CHECK(action IN ('NEW','UPDATE','MERGE','PROPOSE','FOLLOWUP','NOOP')),
  payload TEXT NOT NULL, PRIMARY KEY(run_id,plan_key)
 );
 CREATE TABLE review.alert_transactions (
@@ -438,8 +326,7 @@ CREATE TABLE review.alert_coverage_checks (
  coverage JSONB NOT NULL, checked_at TIMESTAMPTZ,
  PRIMARY KEY(alert_id,run_id)
 );
--- Published version of every Alert, and the integration status of those versions' member
--- transactions, versioned like input_ledger.
+-- Published version of every Alert, versioned like input_ledger.
 CREATE TABLE analysis.alert_origin_ledger (
  alert_id BIGINT NOT NULL, version INTEGER NOT NULL,
  valid_from_seq BIGINT NOT NULL, valid_to_seq BIGINT,
@@ -448,14 +335,6 @@ CREATE TABLE analysis.alert_origin_ledger (
  CHECK(valid_to_seq IS NULL OR valid_to_seq > valid_from_seq)
 );
 CREATE UNIQUE INDEX alert_origin_ledger_open ON analysis.alert_origin_ledger(alert_id) WHERE valid_to_seq IS NULL;
-CREATE TABLE analysis.fact_ledger (
- tx_id BIGINT NOT NULL REFERENCES ledger.transactions,
- integration_status TEXT NOT NULL CHECK(integration_status IN ('ACTIVE','HELD','SUPERSEDED')),
- valid_from_seq BIGINT NOT NULL, valid_to_seq BIGINT,
- PRIMARY KEY(tx_id,valid_from_seq),
- CHECK(valid_to_seq IS NULL OR valid_to_seq > valid_from_seq)
-);
-CREATE UNIQUE INDEX fact_ledger_open ON analysis.fact_ledger(tx_id) WHERE valid_to_seq IS NULL;
 
 -- What each run saw: its own TARGET rows plus the ledger versions valid at its input_seq.
 CREATE VIEW analysis.run_inputs AS
@@ -483,9 +362,6 @@ CREATE VIEW analysis.run_scores AS
 CREATE VIEW analysis.run_alert_origins AS
  SELECT r.run_id,l.alert_id,l.version FROM analysis.runs r
  JOIN analysis.alert_origin_ledger l ON l.valid_from_seq <= r.input_seq AND (l.valid_to_seq IS NULL OR l.valid_to_seq > r.input_seq);
-CREATE VIEW analysis.run_fact_checks AS
- SELECT r.run_id,l.tx_id,l.integration_status FROM analysis.runs r
- JOIN analysis.fact_ledger l ON l.valid_from_seq <= r.input_seq AND (l.valid_to_seq IS NULL OR l.valid_to_seq > r.input_seq);
 -- Episode는 Alert를 통째로 묶는다. 거래는 묶인 Alert의 현재 근거 거래를 그대로 따른다.
 CREATE TABLE review.episode_alerts (
  alert_id BIGINT PRIMARY KEY REFERENCES review.alerts,
@@ -538,6 +414,20 @@ CREATE TABLE review.judgments (
 );
 CREATE UNIQUE INDEX judgments_alert ON review.judgments(alert_id) WHERE superseded_at IS NULL;
 CREATE UNIQUE INDEX judgments_episode ON review.judgments(episode_id) WHERE superseded_at IS NULL;
+-- 법정 STR 작성을 위한 분석 보고서. '의심' 판정 하나를 근거로 만든다. 다시 만들면 새 줄을 쌓고 최신 줄을 보여 준다.
+-- facts는 코드가 만든 사실 목록·표(Claude 입력), ai_output은 Claude 서술, edited_output은 담당자 수정본이다.
+CREATE TABLE review.ai_reports (
+ report_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+ judgment_id BIGINT NOT NULL REFERENCES review.judgments,
+ status TEXT NOT NULL CHECK(status IN ('GENERATED','FAILED')),
+ facts JSONB NOT NULL, ai_output JSONB, edited_output JSONB,
+ CHECK(status='FAILED' OR ai_output IS NOT NULL),
+ input_digest TEXT NOT NULL, model TEXT NOT NULL, prompt_version TEXT NOT NULL, error_code TEXT,
+ created_by BIGINT NOT NULL REFERENCES core.users, created_at TIMESTAMPTZ NOT NULL,
+ edited_by BIGINT REFERENCES core.users, edited_at TIMESTAMPTZ,
+ CHECK(num_nonnulls(edited_by,edited_at) IN (0,2))
+);
+CREATE INDEX ai_reports_judgment ON review.ai_reports(judgment_id,report_id DESC);
 -- 보관함의 업무 요청. 분석가가 관리자에게 요청하거나 관리자가 분석가에게 지시한다.
 -- 재검토(다시 열기)·담당 변경·처리 상태·처리 기한은 적용될 때 applied_at과 적용 전 상태(before)를 남긴다.
 CREATE TABLE review.work_requests (
@@ -614,9 +504,6 @@ CREATE TABLE ops.reset_files (
  reset_id UUID NOT NULL REFERENCES ops.resets, object_key TEXT NOT NULL,
  is_prefix BOOLEAN NOT NULL, done BOOLEAN NOT NULL DEFAULT false, PRIMARY KEY(reset_id,object_key)
 );
-CREATE TABLE evaluation.report_labels (
- report_id BIGINT PRIMARY KEY REFERENCES private.bank_reports, is_laundering BOOLEAN NOT NULL
-);
 CREATE TABLE evaluation.transaction_labels (
  tx_id BIGINT PRIMARY KEY REFERENCES ledger.transactions, is_laundering BOOLEAN NOT NULL,
  pattern_label SMALLINT, attempt_id INTEGER
@@ -634,7 +521,7 @@ CREATE VIEW ops.work_items AS
  threshold_value,suspicious_tx_count,alert_count,missing_count,duplicate_count,current_run_id
  FROM analysis.jobs
  UNION ALL
- SELECT upload_id,'INGEST',status,NULL::date,bank_id,
+ SELECT upload_id,'INGEST',status,NULL::date,NULL::integer,
  NULL,attempt_count,0,0,NULL::timestamptz,error_code,error_message,
  started_at,finished_at,row_count,NULL,NULL::timestamptz,
  NULL,NULL,NULL,NULL,NULL::double precision,NULL::integer,NULL::integer,missing_count,duplicate_count,NULL::uuid
@@ -845,15 +732,15 @@ language plpgsql security definer set search_path=pg_catalog as $$
 begin
   if TG_OP='INSERT' then
     insert into ops.dashboard_dirty(component,bucket)
-      with changed as (select tx_id,business_date,integration_status from new_rows)
+      with changed as (select tx_id,business_date from new_rows)
       select 'MODEL',bucket from (select distinct business_date::text from changed) dates(bucket) on conflict do nothing;
   elsif TG_OP='DELETE' then
     insert into ops.dashboard_dirty(component,bucket)
-      with changed as (select tx_id,business_date,integration_status from old_rows)
+      with changed as (select tx_id,business_date from old_rows)
       select 'MODEL',bucket from (select distinct business_date::text from changed) dates(bucket) on conflict do nothing;
   elsif TG_OP='UPDATE' then
     insert into ops.dashboard_dirty(component,bucket)
-      with changed as ((select tx_id,business_date,integration_status from new_rows except select tx_id,business_date,integration_status from old_rows) union (select tx_id,business_date,integration_status from old_rows except select tx_id,business_date,integration_status from new_rows))
+      with changed as ((select tx_id,business_date from new_rows except select tx_id,business_date from old_rows) union (select tx_id,business_date from old_rows except select tx_id,business_date from new_rows))
       select 'MODEL',bucket from (select distinct business_date::text from changed) dates(bucket) on conflict do nothing;
   end if;
   return null;
@@ -1146,34 +1033,6 @@ create trigger dashboard_uploads_delete after delete on ingest.uploads referenci
 create trigger dashboard_uploads_update after update on ingest.uploads referencing old table as old_rows new table as new_rows
   for each statement execute function ops.dashboard_mark_uploads();
 create trigger dashboard_uploads_truncate after truncate on ingest.uploads
-  for each statement execute function ops.dashboard_mark_scope('REPORTS');
-
-create function ops.dashboard_mark_reports() returns trigger
-language plpgsql security definer set search_path=pg_catalog as $$
-begin
-  if TG_OP='INSERT' then
-    insert into ops.dashboard_dirty(component,bucket)
-      with changed as (select upload_id,stage_status from new_rows)
-      select 'REPORTS',bucket from (select distinct u.business_date::text from changed c join ingest.uploads u using(upload_id)) affected(bucket) on conflict do nothing;
-  elsif TG_OP='DELETE' then
-    insert into ops.dashboard_dirty(component,bucket)
-      with changed as (select upload_id,stage_status from old_rows)
-      select 'REPORTS',bucket from (select distinct u.business_date::text from changed c join ingest.uploads u using(upload_id)) affected(bucket) on conflict do nothing;
-  elsif TG_OP='UPDATE' then
-    insert into ops.dashboard_dirty(component,bucket)
-      with changed as ((select upload_id,stage_status from new_rows except select upload_id,stage_status from old_rows) union (select upload_id,stage_status from old_rows except select upload_id,stage_status from new_rows))
-      select 'REPORTS',bucket from (select distinct u.business_date::text from changed c join ingest.uploads u using(upload_id)) affected(bucket) on conflict do nothing;
-  end if;
-  return null;
-end $$;
-revoke all on function ops.dashboard_mark_reports() from public;
-create trigger dashboard_reports_insert after insert on ingest.report_versions referencing new table as new_rows
-  for each statement execute function ops.dashboard_mark_reports();
-create trigger dashboard_reports_delete after delete on ingest.report_versions referencing old table as old_rows
-  for each statement execute function ops.dashboard_mark_reports();
-create trigger dashboard_reports_update after update on ingest.report_versions referencing old table as old_rows new table as new_rows
-  for each statement execute function ops.dashboard_mark_reports();
-create trigger dashboard_reports_truncate after truncate on ingest.report_versions
   for each statement execute function ops.dashboard_mark_scope('REPORTS');
 
 create function ops.dashboard_mark_delivery() returns trigger

@@ -30,7 +30,7 @@ class FlywayMigrationTests {
             jdbc.queryForList(
                 "select version from flyway_schema_history where success and version is not null order by installed_rank",
                 String.class))
-        .containsExactly("1", "2");
+        .containsExactly("1", "2", "3");
     assertThat(
             jdbc.queryForList(
                 "select role||'='||count(*) from core.users group by role", String.class))
@@ -48,6 +48,13 @@ class FlywayMigrationTests {
                 "select table_schema||'.'||table_name from information_schema.tables where table_name in ('rules','rule_history','rule_versions') order by 1",
                 String.class))
         .containsExactly("rules.rule_versions", "rules.rules");
+    // V3: 룰 알림. 사건 알림 뷰는 이름을 바꿔 두고, 사건 알림과 룰 알림을 합친 뷰가 예전 이름을 갖는다.
+    assertThat(
+            jdbc.queryForList(
+                "select table_schema||'.'||table_name from information_schema.views where table_name in ('notifications','case_notifications') order by 1",
+                String.class))
+        .containsExactly(
+            "review.case_notifications", "review.notifications", "rules.notifications");
     assertThat(
             jdbc.queryForList(
                 "select table_name from information_schema.tables where table_schema='public'",
@@ -65,12 +72,12 @@ class FlywayMigrationTests {
             Long.class);
     long first =
         jdbc.queryForObject(
-            "insert into core.accounts(bank_id,service_account_id,owner_id) values(999001,gen_random_uuid(),?) returning account_id",
+            "insert into core.accounts(bank_id,owner_id) values(999001,?) returning account_id",
             Long.class,
             owner);
     long second =
         jdbc.queryForObject(
-            "insert into core.accounts(bank_id,service_account_id,owner_id) values(999001,gen_random_uuid(),?) returning account_id",
+            "insert into core.accounts(bank_id,owner_id) values(999001,?) returning account_id",
             Long.class,
             owner);
     jdbc.update(
@@ -136,9 +143,6 @@ class FlywayMigrationTests {
           List.of(
               "private.owner_identities",
               "private.account_identities",
-              "private.bank_reports",
-              "private.bank_report_payloads",
-              "evaluation.report_labels",
               "evaluation.transaction_labels")) {
         assertThatThrownBy(
                 () ->

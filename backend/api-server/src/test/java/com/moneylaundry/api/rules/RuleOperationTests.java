@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.moneylaundry.api.TestcontainersConfiguration;
 import com.moneylaundry.api.analysis.AnalysisScheduler;
 import com.moneylaundry.api.common.BusinessTime;
+import com.moneylaundry.api.review.NotificationService;
 import com.moneylaundry.api.rules.catalog.RuleCatalog;
 import com.moneylaundry.api.rules.engine.RuleEvaluator;
 import com.moneylaundry.api.rules.engine.RuleRunStep;
@@ -46,6 +47,7 @@ class RuleOperationTests {
   @Autowired RuleHitQuery hitQuery;
   @Autowired RuleEvaluator evaluator;
   @Autowired RuleRunStep step;
+  @Autowired NotificationService notifications;
   @MockitoBean AnalysisScheduler scheduler;
   MockHttpSession session;
   String token;
@@ -76,7 +78,7 @@ class RuleOperationTests {
 
   long account() {
     return jdbc.queryForObject(
-        "insert into core.accounts(bank_id,service_account_id,owner_id) values(999017,gen_random_uuid(),?) returning account_id",
+        "insert into core.accounts(bank_id,owner_id) values(999017,?) returning account_id",
         Long.class,
         owner);
   }
@@ -494,10 +496,35 @@ class RuleOperationTests {
     assertThat(list.get(0).get("lastRunFailed")).isEqualTo(false);
     assertThat(list.get(1).get("lastRunFailed")).isEqualTo(true);
 
+    // 실패는 그때의 룰 담당자와 관리자 전원에게 알린다. 잘 돈 룰은 알리지 않는다.
+    assertThat(failures(user("l1a"))).containsExactly("RULE_RUN_FAILED 깨진 룰 v1 · 운영");
+    assertThat(failures(user("admin"))).containsExactly("RULE_RUN_FAILED 깨진 룰 v1 · 운영");
+    assertThat(failures(user("l1b"))).isEmpty();
+
     // 룰 전체에 쓰는 시간을 넘기면 남은 버전은 BUDGET 으로 남긴다
+    jdbc.update(
+        "update rules.rules set owner_id=? where name='운영 6개'",
+        user("admin")); // 담당자가 관리자여도 한 번만 받는다
+    jdbc.update("update rules.rule_versions set status='SHADOW' where version_id=?", broken);
     var hasty = new RuleRunStep(jdbc, tx, time, evaluator, 7, Duration.ZERO);
     assertThat(hasty.run(analysis(2, "ACTIVE", "2023-09-09")).get(0).errorCode())
         .isEqualTo("BUDGET");
+    assertThat(failures(user("admin")))
+        .containsExactlyInAnyOrder(
+            "RULE_RUN_FAILED 깨진 룰 v1 · 운영",
+            "RULE_RUN_FAILED 운영 6개 v1 · 운영",
+            "RULE_RUN_FAILED 깨진 룰 v1 · 시험 운영");
+    assertThat(failures(user("l1a")))
+        .containsExactlyInAnyOrder(
+            "RULE_RUN_FAILED 깨진 룰 v1 · 운영", "RULE_RUN_FAILED 깨진 룰 v1 · 시험 운영");
+  }
+
+  /** 그 사람이 받은 알림을 "종류 내용" 으로. */
+  List<String> failures(long user) {
+    var out = new ArrayList<String>();
+    for (var row : rows(notifications.list(user, null, null, null, 0, 100).get("content")))
+      out.add(row.get("kind") + " " + row.get("description"));
+    return out;
   }
 
   // ---- 사건의 룰 적중 ----
@@ -532,7 +559,7 @@ class RuleOperationTests {
     assertThat(card.get("subject").toString())
         .isEqualTo(
             jdbc.queryForObject(
-                "select left(service_account_id::text,8) from core.accounts where account_id=?",
+                "select service_account_id from core.accounts where account_id=?",
                 String.class,
                 six));
     assertThat(card.get("hitDates")).isEqualTo(List.of("2023-09-09"));

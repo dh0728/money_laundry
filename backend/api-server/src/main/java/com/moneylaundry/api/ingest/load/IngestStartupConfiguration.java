@@ -5,7 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 
-/** Deployed services must be able to protect reports before accepting uploads. */
+/** Deployed services must be able to protect identities before accepting uploads. */
 @Configuration(proxyBeanMethods = false)
 @Profile({"dev", "prod"})
 public class IngestStartupConfiguration {

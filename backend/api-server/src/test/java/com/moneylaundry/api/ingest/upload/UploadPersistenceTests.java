@@ -19,37 +19,34 @@ class UploadPersistenceTests {
   @Autowired UploadRepository uploads;
   @Autowired JdbcTemplate jdbc;
   @MockitoBean AnalysisScheduler scheduler;
+  final String hash = "9".repeat(64);
 
   @Test
   void upload_receipt_is_persisted_without_an_analysis_job() {
     long jobsBefore = jdbc.queryForObject("select count(*) from analysis.jobs", Long.class);
-    jdbc.update("insert into core.banks(bank_id) values(901)");
     Instant now = Instant.parse("2023-09-02T00:00:00Z");
     var upload =
         uploads.saveAndFlush(
             Upload.urlIssued(
-                901,
-                "report.csv",
-                "a".repeat(64),
+                "ledger_2023-09-01.csv",
+                hash,
                 100,
                 LocalDate.parse("2023-09-01"),
-                "test/report.csv",
+                "test/ledger.csv",
                 now,
                 now.plusSeconds(900)));
-    assertThat(uploads.markReceived(upload.getId(), 901, now.plusSeconds(10))).isEqualTo(1);
-    assertThat(uploads.markReceived(upload.getId(), 901, now.plusSeconds(20))).isZero();
+    assertThat(uploads.markReceived(upload.getId(), now.plusSeconds(10))).isEqualTo(1);
+    assertThat(uploads.markReceived(upload.getId(), now.plusSeconds(20))).isZero();
     var stored = uploads.findById(upload.getId()).orElseThrow();
     assertThat(stored.getStatus()).isEqualTo(UploadStatus.RECEIVED);
     assertThat(stored.getReceivedAt()).isEqualTo(now.plusSeconds(10));
-    assertThat(uploads.findByBankIdAndFileHashOrderByIdDesc(901, "a".repeat(64))).hasSize(1);
-    assertThat(uploads.latestArrival(901, now, now.plusSeconds(60))).isPresent();
+    assertThat(uploads.findByFileHashOrderByIdDesc(hash)).hasSize(1);
     assertThat(jdbc.queryForObject("select count(*) from analysis.jobs", Long.class))
         .isEqualTo(jobsBefore);
   }
 
   @org.junit.jupiter.api.AfterEach
   void cleanup() {
-    jdbc.update("delete from ingest.uploads where bank_id=901");
-    jdbc.update("delete from core.banks where bank_id=901");
+    jdbc.update("delete from ingest.uploads where file_hash=?", hash);
   }
 }

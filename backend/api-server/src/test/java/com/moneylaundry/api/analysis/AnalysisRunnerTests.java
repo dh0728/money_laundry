@@ -72,7 +72,7 @@ class AnalysisRunnerTests {
 
   long upload(String status, Instant at) {
     return jdbc.queryForObject(
-        "insert into ingest.uploads(bank_id,business_date,file_name,file_hash,size_bytes,status,received_at) values(12,'2026-09-09','fixture.csv',repeat('a',64),1,?,?) returning upload_id",
+        "insert into ingest.uploads(business_date,file_name,file_hash,size_bytes,status,received_at) values('2026-09-09','fixture.csv',repeat('a',64),1,?,?) returning upload_id",
         Long.class,
         status,
         at == null ? null : Timestamp.from(at));
@@ -122,9 +122,13 @@ class AnalysisRunnerTests {
     jdbc.update("update ingest.uploads set status='VALIDATION_FAILED' where upload_id=?", upload);
     service.resume(id);
     runner.scan();
-    assertThat(service.job(id).stage()).isEqualTo(AnalysisStage.INTEGRATE);
+    assertThat(service.job(id).stage()).isEqualTo(AnalysisStage.FREEZE_INPUT);
     runner.close();
-    AnalysisRunner resumed = runner(c -> new AnalysisStageExecutor.Result("empty integration"));
+    AnalysisRunner resumed =
+        runner(
+            c -> {
+              throw new AssertionError("an empty input runs no worker stage");
+            });
     resumed.scan();
     resumed.scan();
     assertThat(service.job(id).status()).isEqualTo("COMPLETED");

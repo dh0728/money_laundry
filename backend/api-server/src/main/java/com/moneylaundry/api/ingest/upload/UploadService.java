@@ -1,7 +1,6 @@
 package com.moneylaundry.api.ingest.upload;
 
 import com.moneylaundry.api.common.ApiException;
-import com.moneylaundry.api.ingest.bank.BankRepository;
 import com.moneylaundry.api.ingest.load.LedgerLoader;
 import com.moneylaundry.api.ingest.load.ValidationError;
 import com.moneylaundry.api.ingest.storage.UploadStore;
@@ -23,13 +22,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
-/** 은행 수집 API 3단계(API.md §1.1): URL 발급 → (은행이 PUT) → 완료 통지 → 비동기 적재. */
+/** 원장 파일 수집 3단계(API.md §1.1): URL 발급 → (관리자가 PUT) → 완료 통지 → 비동기 적재. 거래 기준일마다 원장 파일 하나가 적재된다. */
 @Slf4j
 @Service
 public class UploadService {
 
   private final UploadRepository uploadRepository;
-  private final BankRepository banks;
   private final org.springframework.jdbc.core.JdbcTemplate jdbc;
   private final UploadStore uploadStore;
   private final LedgerLoader ledgerLoader;
@@ -52,7 +50,6 @@ public class UploadService {
 
   public UploadService(
       UploadRepository uploadRepository,
-      BankRepository banks,
       org.springframework.jdbc.core.JdbcTemplate jdbc,
       UploadStore uploadStore,
       LedgerLoader ledgerLoader,
@@ -65,7 +62,6 @@ public class UploadService {
     this.clock = clock;
     this.businessTime = businessTime;
     this.uploadRepository = uploadRepository;
-    this.banks = banks;
     this.jdbc = jdbc;
     this.uploadStore = uploadStore;
     this.ledgerLoader = ledgerLoader;
@@ -76,8 +72,25 @@ public class UploadService {
     this.maxSizeBytes = maxSizeBytes;
   }
 
+  private void receiptLock() {
+    jdbc.query(
+        "select pg_advisory_xact_lock(?)",
+        ps -> ps.setLong(1, com.moneylaundry.api.analysis.AnalysisService.RECEIPT_LOCK),
+        rs -> {});
+  }
+
+  private void requireNotLoaded(java.time.LocalDate date) {
+    if (Boolean.TRUE.equals(
+        jdbc.queryForObject(
+            "select exists(select 1 from ingest.uploads where business_date=? and status='COMPLETED')",
+            Boolean.class,
+            date)))
+      throw new ApiException(
+          HttpStatus.CONFLICT, "DATE_ALREADY_LOADED", "이 거래 기준일의 원장은 이미 적재되었습니다.");
+  }
+
   @Transactional
-  public IssueUploadResponse issue(int bankId, IssueUploadRequest request) {
+  public IssueUploadResponse issue(IssueUploadRequest request) {
     String fileName = request.fileName().trim();
     if (fileName.contains("/") || fileName.contains("\\") || fileName.contains("..")) {
       throw new ApiException(
@@ -93,58 +106,9 @@ public class UploadService {
       throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "SHA-256 Base64 형식 오류");
     }
     String hash = HexFormat.of().formatHex(digest);
-    requireReporting(bankId, request.businessDate());
-    banks.lockById(bankId).orElseThrow(() -> ApiException.notFound("은행 없음"));
+    receiptLock();
     Instant now = clock.instant();
-    if ((request.correctionRequestId() == null) != (request.correctionSubmissionId() == null))
-      throw com.moneylaundry.api.analysis.AnalysisService.invalid();
-    if (request.correctionRequestId() != null) {
-      var corrections =
-          jdbc.queryForList(
-              "select * from ingest.correction_requests where correction_id=? and bank_id=? for update",
-              request.correctionRequestId(),
-              bankId);
-      if (corrections.isEmpty()) throw ApiException.notFound("정정 요청 없음");
-      var correction = corrections.getFirst();
-      if (!request
-          .businessDate()
-          .equals(((java.sql.Date) correction.get("business_date")).toLocalDate()))
-        throw com.moneylaundry.api.analysis.AnalysisService.invalid();
-      var prior =
-          jdbc.queryForList(
-              "select upload_id from ingest.correction_uploads where correction_id=? and submission_id=?",
-              Long.class,
-              request.correctionRequestId(),
-              request.correctionSubmissionId());
-      if (!prior.isEmpty()) {
-        Upload previous = findIngest(prior.getFirst(), bankId);
-        if (!previous.getFileHash().equals(hash)
-            || !previous.getSizeBytes().equals(request.sizeBytes())
-            || !previous.getFileName().equals(fileName))
-          throw new ApiException(
-              HttpStatus.CONFLICT, "CORRECTION_SUBMISSION_MISMATCH", "같은 제출 식별자의 파일이 다릅니다.");
-        if (previous.getStatus() != UploadStatus.URL_ISSUED)
-          return new IssueUploadResponse(
-              previous.getId(), bankId, null, null, null, java.util.Map.of(), false);
-        if (!previous.getUrlExpiresAt().isAfter(now))
-          throw new ApiException(
-              HttpStatus.CONFLICT, "UPLOAD_URL_EXPIRED", "URL이 만료되었습니다. 새 제출 식별자로 제출하세요.");
-        UploadTarget priorTarget =
-            uploadStore.issue(
-                previous.getS3Key(), previous.getUrlExpiresAt(), request.checksumSha256());
-        return new IssueUploadResponse(
-            previous.getId(),
-            bankId,
-            priorTarget.url(),
-            priorTarget.method(),
-            previous.getUrlExpiresAt(),
-            priorTarget.headers());
-      }
-      if ("RESOLVED".equals(correction.get("status")))
-        throw new ApiException(HttpStatus.CONFLICT, "CORRECTION_RESOLVED", "이미 해결된 정정 요청입니다.");
-    }
-    for (Upload previous : uploadRepository.findByBankIdAndFileHashOrderByIdDesc(bankId, hash)) {
-      if (request.correctionRequestId() != null) continue;
+    for (Upload previous : uploadRepository.findByFileHashOrderByIdDesc(hash)) {
       if (previous.getStatus() == UploadStatus.COMPLETED) {
         throw new DuplicateFileException(
             previous.getId(), previous.getFileName(), previous.getReceivedAt());
@@ -158,10 +122,9 @@ public class UploadService {
         UploadTarget priorTarget =
             uploadStore.issue(
                 previous.getS3Key(), previous.getUrlExpiresAt(), request.checksumSha256());
-        log.info("업로드 URL 재발급 uploadId={} bankId={} file={}", previous.getId(), bankId, fileName);
+        log.info("업로드 URL 재발급 uploadId={} file={}", previous.getId(), fileName);
         return new IssueUploadResponse(
             previous.getId(),
-            bankId,
             priorTarget.url(),
             priorTarget.method(),
             previous.getUrlExpiresAt(),
@@ -174,11 +137,11 @@ public class UploadService {
         throw new UploadInProgressException(previous.getId());
       }
     }
+    requireNotLoaded(request.businessDate());
     Instant expiresAt = now.plus(urlTtl);
     Upload job =
         uploadRepository.save(
             Upload.urlIssued(
-                bankId,
                 fileName,
                 hash,
                 request.sizeBytes(),
@@ -186,25 +149,16 @@ public class UploadService {
                 null,
                 businessTime.now(),
                 expiresAt));
-    if (request.correctionRequestId() != null) {
-      uploadRepository.flush();
-      jdbc.update(
-          "insert into ingest.correction_uploads(upload_id,correction_id,submission_id) values(?,?,?)",
-          job.getId(),
-          request.correctionRequestId(),
-          request.correctionSubmissionId());
-    }
-    job.setS3Key("uploads/" + bankId + "/" + job.getId() + "/" + fileName);
+    job.setS3Key("uploads/ledger/" + job.getId() + "/" + fileName);
     uploadRepository.save(job);
     UploadTarget target = uploadStore.issue(job.getS3Key(), expiresAt, request.checksumSha256());
-    log.info("업로드 URL 발급 uploadId={} bankId={} file={}", job.getId(), bankId, fileName);
+    log.info("업로드 URL 발급 uploadId={} file={}", job.getId(), fileName);
     return new IssueUploadResponse(
-        job.getId(), bankId, target.url(), target.method(), expiresAt, target.headers());
+        job.getId(), target.url(), target.method(), expiresAt, target.headers());
   }
 
-  public UploadStatusResponse complete(int bankId, long uploadId) {
-    Upload job = findIngest(uploadId, bankId);
-    requireReporting(bankId, job.getBusinessDate());
+  public UploadStatusResponse complete(long uploadId) {
+    Upload job = findIngest(uploadId);
     if (job.getStatus() != UploadStatus.URL_ISSUED) {
       return toResponse(job);
     }
@@ -220,26 +174,19 @@ public class UploadService {
     Completion completion =
         completionTx.execute(
             status -> {
-              banks.lockById(bankId).orElseThrow(() -> ApiException.notFound("은행 없음"));
+              receiptLock();
               // S3 확인 중 재발급/다른 완료가 가능하므로 잠금 후 새 영속 컨텍스트에서 다시 읽는다.
-              Upload current = findIngest(uploadId, bankId);
-              requireReporting(bankId, current.getBusinessDate());
+              Upload current = findIngest(uploadId);
               if (current.getStatus() != UploadStatus.URL_ISSUED) {
                 return new Completion(toResponse(current), false);
               }
               requireLatestUrl(current);
-              jdbc.query(
-                  "select pg_advisory_xact_lock(?)",
-                  ps -> ps.setLong(1, com.moneylaundry.api.analysis.AnalysisService.RECEIPT_LOCK),
-                  rs -> {});
-              // Compared with the business-time analysis cutoff (receipts, CUTOFF_SUPERSEDED).
+              requireNotLoaded(current.getBusinessDate());
+              // Compared with the business-time analysis cutoff (receipts).
               Instant receivedAt = businessTime.now();
-              if (uploadRepository.markReceived(uploadId, bankId, receivedAt) != 1) {
+              if (uploadRepository.markReceived(uploadId, receivedAt) != 1) {
                 throw ApiException.invalidTransition("완료 통지 전이 실패");
               }
-              jdbc.update(
-                  "update ingest.correction_requests c set status='REPLACEMENT_RECEIVED',revision=revision+1 from ingest.correction_uploads u where u.correction_id=c.correction_id and u.upload_id=?",
-                  uploadId);
               current.setStatus(UploadStatus.RECEIVED);
               current.setReceivedAt(receivedAt);
               return new Completion(toResponse(current), true);
@@ -251,12 +198,8 @@ public class UploadService {
 
   private void requireLatestUrl(Upload job) {
     boolean superseded =
-        uploadRepository
-            .findByBankIdAndFileHashOrderByIdDesc(job.getBankId(), job.getFileHash())
-            .stream()
-            .anyMatch(
-                newer ->
-                    newer.getId() > job.getId() && sameUploadContext(newer.getId(), job.getId()));
+        uploadRepository.findByFileHashOrderByIdDesc(job.getFileHash()).stream()
+            .anyMatch(newer -> newer.getId() > job.getId());
     if (superseded) {
       throw new ApiException(
           HttpStatus.CONFLICT, "UPLOAD_SUPERSEDED", "새 업로드가 발급되었습니다. 최신 업로드 번호를 사용하세요.");
@@ -271,45 +214,13 @@ public class UploadService {
         : local.toLocalDate();
   }
 
-  private boolean sameUploadContext(long first, long second) {
-    var a =
-        jdbc.queryForList(
-            "select correction_id from ingest.correction_uploads where upload_id=?",
-            Long.class,
-            first);
-    var b =
-        jdbc.queryForList(
-            "select correction_id from ingest.correction_uploads where upload_id=?",
-            Long.class,
-            second);
-    return a.isEmpty() && b.isEmpty();
+  public UploadStatusResponse status(long uploadId) {
+    return toResponse(findIngest(uploadId));
   }
 
-  public UploadStatusResponse status(int bankId, long uploadId) {
-    Upload job = findIngest(uploadId, bankId);
-    requireReporting(bankId, job.getBusinessDate());
-    return toResponse(job);
-  }
-
-  private void requireReporting(int bankId, java.time.LocalDate date) {
-    Boolean allowed =
-        jdbc.queryForObject(
-            "select exists(select 1 from core.banks b join core.bank_reporting_periods p using(bank_id) where"
-                + " bank_id=? and b.is_reporting and p.effective_from_date<=? and"
-                + " (p.effective_to_date is null or p.effective_to_date>=?))",
-            Boolean.class,
-            bankId,
-            date,
-            date);
-    if (!Boolean.TRUE.equals(allowed))
-      throw new ApiException(
-          HttpStatus.FORBIDDEN, "REPORTING_NOT_REGISTERED", "사전 등록된 보고 은행/기준일만 수집합니다.");
-  }
-
-  private Upload findIngest(long uploadId, Integer bankId) {
+  private Upload findIngest(long uploadId) {
     return uploadRepository
         .findById(uploadId)
-        .filter(j -> bankId == null || bankId.equals(j.getBankId()))
         .orElseThrow(() -> ApiException.notFound("업로드 없음: " + uploadId));
   }
 
@@ -318,34 +229,14 @@ public class UploadService {
         job.getValidationErrors() == null
             ? List.of()
             : objectMapper.readValue(job.getValidationErrors(), new TypeReference<>() {});
-    if (errors.isEmpty())
-      errors =
-          jdbc.query(
-              "select r.source_row,r.error_code from private.bank_reports r join ingest.report_versions v"
-                  + " using(version_id) where v.upload_id=? and r.error_code is not null order by"
-                  + " r.source_row limit 100",
-              (rs, n) -> new ValidationError(rs.getInt(1), "", rs.getString(2)),
-              job.getId());
-    var versions =
-        jdbc.queryForList(
-            "select version_id from ingest.report_versions where upload_id=?",
-            Long.class,
-            job.getId());
-    var corrections =
-        jdbc.queryForList(
-            "select c.correction_id,rv.upload_id from ingest.correction_requests c left join ingest.report_versions rv on rv.version_id=c.replacement_version_id where (c.version_id in (select version_id from ingest.report_versions where upload_id=?) or c.correction_id in (select correction_id from ingest.correction_uploads where upload_id=?)) and c.status<>'RESOLVED' order by c.correction_id desc",
-            job.getId(),
-            job.getId());
     return new UploadStatusResponse(
         job.getId(),
-        job.getBankId(),
         job.getFileName(),
         job.getBusinessDate(),
         job.getSizeBytes(),
         job.getRowCount(),
         jdbc.queryForObject(
-            "select count(*) from ledger.transaction_reports tr join private.bank_reports r"
-                + " using(report_id) join ingest.report_versions v using(version_id) where v.upload_id=?",
+            "select count(*) from ledger.transactions where upload_id=?",
             Integer.class,
             job.getId()),
         job.getMissingCount(),
@@ -358,18 +249,6 @@ public class UploadService {
         job.getReceivedAt(),
         job.getStartedAt(),
         job.getFinishedAt(),
-        jdbc
-            .query(
-                "select stage_status from ingest.report_versions where upload_id=?",
-                (rs, n) -> rs.getString(1),
-                job.getId())
-            .stream()
-            .findFirst()
-            .orElse(null),
-        versions.isEmpty() ? null : versions.getFirst(),
-        !corrections.isEmpty(),
-        corrections.isEmpty() ? null : (Long) corrections.getFirst().get("correction_id"),
-        corrections.isEmpty() ? null : (Long) corrections.getFirst().get("upload_id"),
         nextDate(job.getReceivedAt()));
   }
 }

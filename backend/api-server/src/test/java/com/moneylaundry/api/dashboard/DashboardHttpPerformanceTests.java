@@ -46,7 +46,7 @@ class DashboardHttpPerformanceTests {
     jdbc.execute(
         "insert into core.owners(owner_id,service_owner_id,display_name) overriding system value select n,gen_random_uuid(),'fixture#'||n from generate_series(1,50381) n");
     jdbc.execute(
-        "insert into core.accounts(account_id,bank_id,service_account_id,owner_id) overriding system value select n,(n%10)+1,gen_random_uuid(),(n%50381)+1 from generate_series(1,76754) n");
+        "insert into core.accounts(account_id,bank_id,account_no,owner_id) overriding system value select n,(n%10)+1,n,(n%50381)+1 from generate_series(1,76754) n");
     jdbc.execute(
         "insert into ledger.transactions(tx_id,occurred_at,business_date,from_account_id,to_account_id,amount_received,receiving_currency,amount_paid,payment_currency,payment_format,amount_usd,fx_rate_version) overriding system value select n,'2023-08-31 09:00+09'::timestamptz+(n%10)*interval '1 day','2023-08-31'::date+(n%10)::int,(n%76754)+1,((n+1)%76754)+1,1,'USD',1,'USD','ACH',1,'fixture' from generate_series(1,690519) n");
     long job =
@@ -171,9 +171,7 @@ class DashboardHttpPerformanceTests {
                         return null;
                       }));
             start.countDown();
-            // A real source correction and a case assignment-time change while users poll.
-            jdbc.update(
-                "update ledger.transactions set integration_status=case when integration_status='ACTIVE' then 'HELD' else 'ACTIVE' end where tx_id=1");
+            // A case assignment-time change while users poll.
             jdbc.update(
                 "update review.alerts set assigned_at=assigned_at+interval '1 second' where alert_id=1");
             for (var task : tasks) task.get(15, TimeUnit.SECONDS);

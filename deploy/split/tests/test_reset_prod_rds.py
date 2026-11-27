@@ -14,7 +14,7 @@ spec = importlib.util.spec_from_file_location("reset_prod_rds", ROOT / "reset_pr
 reset = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(reset)
 
-TABLES = {"users": [], "banks": [], "bank_reporting_periods": [], "fx_rates": []}
+TABLES = {"users": [], "fx_rates": []}
 
 
 class Engine:

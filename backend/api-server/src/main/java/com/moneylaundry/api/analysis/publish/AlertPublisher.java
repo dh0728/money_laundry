@@ -47,9 +47,8 @@ public final class AlertPublisher {
         execution)) throw new IllegalStateException("ALERT_PLAN_FENCED");
     validateFrozenInput(run);
     if (jdbc.queryForObject(
-        "select exists(select 1 from analysis.run_fact_checks f join ledger.transactions t using(tx_id) where f.run_id=? and f.integration_status<>t.integration_status) or exists(select 1 from analysis.run_scores i left join analysis.current_scores c using(tx_id) where i.run_id=? and i.score_run_id is distinct from c.run_id)",
+        "select exists(select 1 from analysis.run_scores i left join analysis.current_scores c using(tx_id) where i.run_id=? and i.score_run_id is distinct from c.run_id)",
         Boolean.class,
-        run,
         run))
       throw new com.moneylaundry.api.analysis.AnalysisFailure(
           "STALE_INPUT", com.moneylaundry.api.analysis.AnalysisFailure.Kind.PERMANENT);
@@ -126,34 +125,16 @@ public final class AlertPublisher {
         jdbc.queryForObject(
             """
         with cutoff as (
-          select b.analysis_cutoff_at as at from analysis.runs r join analysis.jobs b using(job_id) where r.run_id=?
+          select r.input_cutoff_at as at from analysis.runs r where r.run_id=?
         ), current_manifest as (
-          select d.business_date,jsonb_build_object(
-            'scopeRevision',s.scope_revision,
-            'banks',coalesce((select jsonb_agg(sb.bank_id order by sb.bank_id)
-              from ingest.reporting_scope_banks sb where sb.business_date=d.business_date),'[]'::jsonb),
-            'reports',coalesce((select jsonb_agg(jsonb_build_object(
-              'setId',rs.set_id,'bankId',rs.bank_id,'versionId',rv.version_id,
-              'revision',rv.revision,'generation',rs.generation,'status',rv.stage_status)
-              order by rs.set_id) from ingest.report_sets rs
-              join ingest.report_versions rv on rv.version_id=rs.current_version_id
-              where rs.business_date=d.business_date and rv.received_at<=cutoff.at),'[]'::jsonb)) as state
-          from (select business_date from ingest.reporting_scopes union select business_date from ingest.report_sets) d
-          cross join cutoff left join ingest.reporting_scopes s using(business_date)
-          where d.business_date <= (cutoff.at at time zone 'Asia/Seoul')::date
+          select u.upload_id from ingest.uploads u cross join cutoff
+          where u.status='COMPLETED' and u.received_at<=cutoff.at
         )
         select exists(select 1 from current_manifest c full join
-          (select business_date,state from analysis.source_manifest where run_id=?) f using(business_date)
-          where c.state is distinct from f.state)
-          or exists(select 1 from analysis.input_transactions i join ledger.transactions t using(tx_id)
-            where i.run_id=? and t.integration_status<>'ACTIVE')
-          or exists(select 1 from analysis.runs r join analysis.input_ledger l
-            on l.valid_from_seq<=r.input_seq and (l.valid_to_seq is null or l.valid_to_seq>r.input_seq)
-            join ledger.transactions t using(tx_id) where r.run_id=? and t.integration_status<>'ACTIVE')
+          (select upload_id from analysis.source_manifest where run_id=?) f using(upload_id)
+          where c.upload_id is null or f.upload_id is null)
         """,
             Boolean.class,
-            run,
-            run,
             run,
             run);
     if (changed)
@@ -221,7 +202,7 @@ public final class AlertPublisher {
       var changes = publicationChanges(target, version, evidence);
       publishVersion(target, version, evidence, plan, at);
       // 점수 재평가로 근거가 모두 사라진 경우도 근거 소멸로 닫는다.
-      boolean withdrawn = "WITHDRAW".equals(action) || rows(evidence.get("seeds")).isEmpty();
+      boolean withdrawn = rows(evidence.get("seeds")).isEmpty();
       String eventAction =
           withdrawn
               ? "EVIDENCE_WITHDRAWN"
@@ -411,7 +392,7 @@ public final class AlertPublisher {
         "update review.alerts set published_version=?,revision=revision+1 where alert_id=?",
         version,
         target);
-    if ("WITHDRAW".equals(plan.get("action")) || rows(evidence.get("seeds")).isEmpty())
+    if (rows(evidence.get("seeds")).isEmpty())
       jdbc.update(
           "update review.alerts set status='CLOSED',outcome='SCOPE_CLEARED',closed_at=? where alert_id=?",
           at,
