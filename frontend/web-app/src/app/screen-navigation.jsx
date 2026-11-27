@@ -67,14 +67,17 @@ function WorkspaceIcons({ items, onRoute, reduced }) {
 
 export function WorkspaceNavigation({ global = [], location, primary, secondary = [], onRoute, reduced }) {
   const showLocation = location?.text && (location.record || !global.some(item => item.current));
+  const currentLocation = showLocation && <Text as="span" className="screen-location" data-record={location.record || undefined}>
+    <Text as="span" className="screen-title-accessible">현재 위치 </Text>
+    {location.record ? <Text as="code">{location.text}</Text> : location.text}
+  </Text>;
+  // 기록 코드(A-…, E-…, T-…)는 탭·보기 방식 뒤 맨 끝에 둔다. 다른 위치 표시는 주 메뉴 바로 뒤에 둔다.
   return <>
     {global.length > 0 && <WorkspaceIcons items={global} onRoute={onRoute} reduced={reduced} />}
-    {showLocation && <Text as="span" className="screen-location" data-record={location.record || undefined}>
-      <Text as="span" className="screen-title-accessible">현재 위치 </Text>
-      {location.record ? <Text as="code">{location.text}</Text> : location.text}
-    </Text>}
+    {!location?.record && currentLocation}
     {primary.length > 0 && <NavGroup id="screen-sections" label="세부 화면" items={primary} onRoute={onRoute} reduced={reduced} />}
     {secondary.length > 0 && <NavGroup id="screen-views" label="보기 방식" items={secondary} onRoute={onRoute} reduced={reduced} />}
+    {location?.record && currentLocation}
   </>;
 }
 
