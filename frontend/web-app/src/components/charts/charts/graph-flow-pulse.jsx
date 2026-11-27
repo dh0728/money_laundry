@@ -15,6 +15,22 @@ export function readGraphCanvasPulse() {
   };
 }
 
+// 선 위를 계속 흐르는 표식(관계 그래프). 간격·속도는 화면 px 기준이다.
+export function readGraphFlowMarkers() {
+  return {
+    spacing: readChartNumber('--graph-flow-marker-spacing', 64),
+    speed: readChartNumber('--graph-flow-marker-speed', 36),
+    markerRadius: readChartNumber('--graph-flow-marker-radius', 4.5),
+    dotRadius: readChartNumber('--graph-flow-dot-radius', 3.5),
+    dotOpacity: readChartNumber('--graph-flow-dot-opacity', .75),
+    outline: readChartNumber('--graph-flow-marker-outline', 1.5),
+    fadeShare: readChartNumber('--graph-flow-marker-fade-share', .08),
+    denseEdges: readChartNumber('--graph-flow-marker-dense-edges', 40),
+    badgeHeight: readChartNumber('--graph-shared-badge-height', 14),
+    badgeWidth: readChartNumber('--graph-shared-badge-width', 42),
+  };
+}
+
 export function GraphTransferParticle({ path, radius, duration }) {
   return <circle r={radius} fill="var(--foreground)" className="timeline-edge-particle" aria-hidden="true">
     <animateMotion dur={`${duration}ms`} repeatCount="indefinite" path={path} />

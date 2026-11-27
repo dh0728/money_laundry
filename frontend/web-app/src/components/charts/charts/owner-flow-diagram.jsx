@@ -1,14 +1,12 @@
 import { useId } from 'react';
 import { readChartNumber } from '../chart-design-values';
 import { GraphFlowReveal, GraphFlowStroke } from './graph-flow-pulse';
+import { caseShapePath } from '../../../features/graph/graph-case-groups';
 
 export function readOwnerFlowDesign() {
   return {
     periodStroke: readChartNumber('--owner-flow-period-stroke', 4),
     periodMarkerRadius: readChartNumber('--owner-flow-period-marker-radius', 3),
-    membershipBaseWidth: readChartNumber('--owner-flow-membership-base-width', 22),
-    membershipStepWidth: readChartNumber('--owner-flow-membership-step-width', 5),
-    membershipMinWidth: readChartNumber('--owner-flow-membership-min-width', 8),
     edgeStroke: readChartNumber('--owner-flow-edge-stroke', 2.5),
     edgeSelectedStroke: readChartNumber('--owner-flow-edge-selected-stroke', 4),
     edgeTargetWidth: readChartNumber('--owner-flow-edge-target-width', 18),
@@ -54,18 +52,22 @@ export function OwnerFlowPeriods({ periods, design }) {
   </g>;
 }
 
-// Alert마다 소속 선을 한 덩어리 영역으로 칠한다. 그룹 전체에 투명도를 주므로 같은 Alert 안에서 겹친 곳이 진해지지 않는다.
-export function OwnerFlowRegions({ regions }) {
-  return <g className="owner-case-regions" aria-hidden="true">
-    {regions.map(({ id, color, emphasis, width, paths }) => <g key={id} className="owner-case-region" data-emphasis={emphasis}>
-      {paths.map(({ key, path }) => <path key={key} d={path} fill="none" stroke={color} strokeWidth={width}
-        strokeLinecap="round" strokeLinejoin="round" />)}
-    </g>)}
+// 선 위를 송금 방향으로 계속 흐르는 표식. 비교 중이면 Alert별 모양·색이다. still이면 제자리에 멈춰 찍는다.
+// 표식마다 같은 속도로 선을 따라 돌고, 시작 시각을 자기 위치만큼 당겨 간격과 순서를 지킨다.
+function OwnerFlowMarkers({ path, markers, duration, still }) {
+  return <g className="owner-flow-markers" aria-hidden="true" pointerEvents="none">
+    {markers.map(({ t, shape, radius, fill, stroke, strokeWidth, opacity }, index) => <path key={index} className="owner-flow-marker"
+      d={caseShapePath(shape, 0, 0, radius)} strokeWidth={strokeWidth} opacity={opacity}
+      style={{ '--owner-marker-fill': fill, '--owner-marker-stroke': stroke ?? 'none' }}>
+      {still
+        ? <animateMotion path={path} dur="1s" keyPoints={`${t};${t}`} keyTimes="0;1" calcMode="linear" fill="freeze" />
+        : <animateMotion path={path} dur={`${duration}s`} begin={`${-t * duration}s`} repeatCount="indefinite" />}
+    </path>)}
   </g>;
 }
 
 export function OwnerFlowEdge({ path, label, pressed, muted, onSelect, memberships, color, reveal, design,
-  pulse, pulseColor, width, height, ambientDelay, detail }) {
+  pulse, pulseColor, width, height, markers, detail }) {
   const line = <path className="owner-edge-visible" d={path} stroke={color}
     strokeWidth={pressed ? design.edgeSelectedStroke : design.edgeStroke} />;
   return <g className="owner-time-edge" role="button" tabIndex={0} aria-label={label} aria-pressed={pressed}
@@ -74,8 +76,8 @@ export function OwnerFlowEdge({ path, label, pressed, muted, onSelect, membershi
     {reveal ? <GraphFlowReveal key={`reveal-${pulse.startedAt}`} path={path} pulse={pulse} width={width} height={height}>
       {line}
     </GraphFlowReveal> : line}
-    {pulse ? <GraphFlowStroke key={`stroke-${pulse.startedAt}`} path={path} pulse={pulse} color={pulseColor} />
-      : ambientDelay !== undefined && <GraphFlowStroke path={path} color={color} ambientDelay={ambientDelay} />}
+    {markers && !reveal && <OwnerFlowMarkers path={path} {...markers} />}
+    {pulse && <GraphFlowStroke key={`stroke-${pulse.startedAt}`} path={path} pulse={pulse} color={pulseColor} />}
     <path className="owner-edge-hit" d={path} stroke="transparent" strokeWidth={design.edgeTargetWidth} />
     {detail && <text x={detail.x} y={detail.y - 7}>{detail.count}건</text>}
   </g>;
@@ -98,16 +100,20 @@ export function OwnerFlowLane({ name, x, y, width, height, headerHeight, offset,
 }
 
 export function OwnerFlowAccount({ id, owner, x, y, width, height, offset, pressed, muted, dragging, design,
-  incoming, outgoing, color, onSelect, dragHandlers }) {
+  incoming, outgoing, color, shared, badge, onSelect, dragHandlers }) {
   const centerY = y + height / 2;
   return <g className="owner-time-node" role="button" tabIndex={0}
     transform={`translate(${offset.x} ${offset.y})`}
     data-account={id} data-dragging={dragging || undefined} data-muted={muted || undefined}
-    aria-label={`${id} · ${owner}`} aria-pressed={pressed} {...dragHandlers}
+    aria-label={`${id} · ${owner}${shared ? ` · Alert ${shared}건 공유` : ''}`} aria-pressed={pressed} {...dragHandlers}
     onClick={onSelect} onKeyDown={event => selectWithKeyboard(event, onSelect)}>
     <rect x={x + 2} y={y} width={width - 4} height={height} rx={design.accountRadius} />
     <path className="owner-account-divider" d={`M ${x + 2} ${y} h ${width - 4}`} />
     <text x={x + 12} y={centerY}>{id}</text>
+    {shared && <g className="owner-account-shared">
+      <rect x={x + width - badge.width - 10} y={centerY - badge.height / 2} width={badge.width} height={badge.height} rx={badge.height / 2} />
+      <text x={x + width - badge.width / 2 - 10} y={centerY}>공유 {shared}</text>
+    </g>}
     {incoming && <circle className="owner-account-port" data-port="receive" cx={x} cy={centerY} r={design.accountPortRadius} fill={color} />}
     {outgoing && <circle className="owner-account-port" data-port="send" cx={x + width} cy={centerY} r={design.accountPortRadius} fill={color} />}
   </g>;

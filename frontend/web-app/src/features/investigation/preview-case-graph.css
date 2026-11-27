@@ -301,9 +301,9 @@
 .preview-graph-case-chip { display: inline-flex; align-items: center; gap: var(--aml-space-4); font-size: var(--aml-type-caption-size) }
 .preview-graph-case-chip[aria-pressed="true"] { box-shadow: inset 0 0 0 var(--aml-stroke-focus) var(--case-graph-swatch-ink) }
 .preview-graph-chip-swatch {
-  display: block; flex: none; inline-size: var(--aml-space-12); block-size: var(--aml-space-12); border-radius: 50%;
-  background: color-mix(in srgb, var(--case-graph-swatch-ink, var(--muted-text)) var(--case-graph-chip-fill-share), transparent);
-  box-shadow: inset 0 0 0 var(--aml-stroke-focus) var(--case-graph-swatch-ink, var(--muted-text));
+  display: block; flex: none; inline-size: var(--aml-space-12); block-size: var(--aml-space-12);
+  background: var(--case-graph-swatch-ink, var(--muted-text));
+  clip-path: var(--case-graph-swatch-clip);
 }
 .preview-case-network {
   --case-graph-risk-high: var(--risk-high);
@@ -362,9 +362,10 @@
 .owner-account-divider { fill: none; stroke: var(--divider); }
 .owner-account-port { stroke: var(--information-panel-surface); stroke-width: var(--case-graph-owner-port-stroke) }
 .owner-time-edge path { fill: none }
-.owner-case-region { opacity: var(--case-graph-region-opacity) }
-.owner-case-region[data-emphasis="strong"] { opacity: var(--case-graph-region-strong-opacity) }
-.owner-case-region[data-emphasis="faint"] { opacity: var(--case-graph-region-faint-opacity) }
+.owner-time-edge .owner-flow-marker {
+  fill: var(--owner-marker-fill); stroke: var(--owner-marker-stroke); stroke-linejoin: round;
+}
+
 .owner-edge-visible { stroke-linecap: round }
 .owner-time-edge text {
   paint-order: stroke;
@@ -381,6 +382,11 @@
   pointer-events: none;
 }
 .preview-owner-timeline .owner-time-node text { font-family: var(--aml-font-code) }
+.preview-owner-timeline .owner-time-node .owner-account-shared rect { fill: var(--text); stroke: none }
+.preview-owner-timeline .owner-time-node .owner-account-shared text {
+  fill: var(--inner-surface); font-family: inherit; font-size: var(--graph-shared-badge-font-size);
+  font-weight: var(--aml-type-body-strong-weight); text-anchor: middle;
+}
 .preview-graph-controls output {
   display: grid;
   place-items: center;

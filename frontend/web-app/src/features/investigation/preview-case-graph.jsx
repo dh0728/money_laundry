@@ -23,7 +23,7 @@ import { complexSankeySampleCode } from '../../mocks/dashboard-fixtures';
 import { buildCaseNetwork, casePlaybackCursor, graphRiskBand, graphTableSelection, graphVerdict, graphVerdictLabels,
   mergeCaseTransactions, sharedCaseEvidence, transactionsWithinHops } from './case-graph-scope';
 import { CountTag, LinkTag, ModelScoreTag } from '../../components/semantic-tags';
-import { assignCaseColorSlots, caseGroupColor, caseMembership } from '../graph/graph-case-groups';
+import { assignCaseColorSlots, caseGroupColor, caseGroupShape, caseMembership, caseShapeClip } from '../graph/graph-case-groups';
 import { ForceCaseCanvas } from '../graph/force-case-canvas';
 import { GraphIconButton, GraphPlayback, GraphZoomControls } from '../graph/preview-graph-controls';
 import { GraphFlowStroke, readGraphFlowDuration } from '../../components/charts/charts/graph-flow-pulse';
@@ -65,12 +65,13 @@ function GraphSettings({ id, groups, showDetails, onDetailsChange, ownerView, sa
     setExpanded(false);
     trigger.current?.focus({ preventScroll: true });
   }
-  const caseEntry = ({ id, color }) => {
+  const caseEntry = ({ id, color, shape }) => {
     const isBase = id === groups[0].id;
     const hidden = !isBase && hiddenCases.has(id);
     const interactive = shownCases.has(id);
     const membership = <>
-      <Text as="i" className="preview-graph-chip-swatch" style={{ '--case-graph-swatch-ink': color }} aria-hidden="true" />
+      <Text as="i" className="preview-graph-chip-swatch" style={{ '--case-graph-swatch-ink': color,
+        '--case-graph-swatch-clip': caseShapeClip(shape) }} aria-hidden="true" />
       <Text as="code">{id}</Text>{isBase && <Text as="span">기준</Text>}
       {hidden ? <Text as="span">숨김</Text> : !interactive && <Text as="span">범위 밖</Text>}
     </>;
@@ -437,10 +438,11 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
     if (related) onComparedCases?.(compared, bundleNoticeHost.current);
   }, [related, compared, onComparedCases]);
   const comparedCases = useMemo(() => [active, ...compared].filter(Boolean), [active, compared]);
-  const groups = useMemo(() => related ? comparedCases.map(record => ({
-    id: record.code, transactionIds: new Set(record.related.map(row => row.code)),
-    color: caseGroupColor(record === active ? 0 : colorSlots.get(record.code) ?? 1),
-  })) : [], [active, colorSlots, comparedCases, related]);
+  const groups = useMemo(() => related ? comparedCases.map(record => {
+    const slot = record === active ? 0 : colorSlots.get(record.code) ?? 1;
+    return { id: record.code, transactionIds: new Set(record.related.map(row => row.code)),
+      color: caseGroupColor(slot), shape: caseGroupShape(slot) };
+  }) : [], [active, colorSlots, comparedCases, related]);
   const shownGroups = useMemo(() => groups.filter(group => group.id === active?.code || !hiddenCases.has(group.id)),
     [active, groups, hiddenCases]);
   const transactions = useMemo(() => mergeCaseTransactions(comparedCases.filter(record => record === active || !hiddenCases.has(record.code))),
@@ -691,7 +693,7 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
                       aria-pressed={shownHighlight === group.id} disabled={!shown || sankeyView}
                       title={sankeyView ? '생키 보기에서는 Alert별 강조를 하지 않습니다' : hidden ? '그래프 설정에서 숨긴 Alert'
                         : !shown ? '현재 표시 범위에 거래가 없습니다' : undefined}
-                      style={{ '--case-graph-swatch-ink': group.color }}
+                      style={{ '--case-graph-swatch-ink': group.color, '--case-graph-swatch-clip': caseShapeClip(group.shape) }}
                       onClick={() => setHighlightedCase(previous => previous === group.id ? undefined : group.id)}>
                       <Text as="i" className="preview-graph-chip-swatch" aria-hidden="true" />
                       <Text as="code">{group.id}</Text>{isBase && <Text as="span">기준</Text>}

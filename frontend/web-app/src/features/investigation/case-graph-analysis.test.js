@@ -6,7 +6,7 @@ import { caseAccountLayout } from './case-pattern-layout';
 import { caseSankeyGraph, layoutCaseSankey } from './case-sankey-data';
 import { sankeyLinkPath } from '@/components/charts/charts/sankey/sankey-path';
 import { ownerGraphLayout, ownerTransferPath } from '../graph/owner-graph-layout';
-import { assignCaseColorSlots, caseGroupColor, caseRegionOpacity, caseRegionWidth, caseShortLabel } from '../graph/graph-case-groups';
+import { assignCaseColorSlots, caseGroupColor, caseGroupShape, caseShapeClip, caseShapePath, caseShortLabel, flowMarkers } from '../graph/graph-case-groups';
 import { mountCaseGraph } from './preview-case-graph';
 import { previewUrl, readPreviewRoute } from '../../app/preview-route';
 import { ScreenLayout, ScreenNavigation } from '../../app/screen-layouts';
@@ -42,13 +42,38 @@ describe('case graph analysis', () => {
     expect(slots.get('A-3')).toBe(3);
   });
 
-  it('labels shared nodes and edges with short Alert numbers and fades the other Alerts on highlight', () => {
+  it('labels shared nodes and edges with short Alert numbers', () => {
     expect(caseShortLabel('A-230908-000117')).toBe('117');
     expect(caseShortLabel('A-230915-001880')).toBe('1880');
-    expect(caseRegionOpacity('A-1')).toBeCloseTo(.2);
-    expect(caseRegionOpacity('A-1', 'A-1')).toBeGreaterThan(caseRegionOpacity('A-1'));
-    expect(caseRegionOpacity('A-2', 'A-1')).toBeLessThan(caseRegionOpacity('A-2'));
-    expect([0, 1, 2, 3, 4].map(index => caseRegionWidth(index, 26, 5, 12))).toEqual([26, 21, 16, 12, 12]);
+  });
+
+  it('gives every color slot its own marker shape for the legend, canvas and image export', () => {
+    const shapes = Array.from({ length: 8 }, (_, slot) => caseGroupShape(slot));
+    expect(new Set(shapes).size).toBe(8);
+    expect(caseGroupShape(8)).toBe(caseGroupShape(0));
+    expect(caseShapeClip('circle')).toBe('circle(42%)');
+    expect(caseShapeClip('square')).toMatch(/^polygon\(/);
+    expect(caseShapePath('triangle', 10, 10, 2)).toMatch(/^M 10 7\.7 L /);
+    expect(caseShapePath('circle', 10, 10, 2)).toContain(' a 2 2 ');
+  });
+
+  it('spaces flow markers per Alert and alternates shapes where transactions are shared', () => {
+    expect(flowMarkers([], 130, 64).map(marker => marker.caseId)).toEqual([undefined, undefined]);
+    const shared = flowMarkers(['A', 'B', 'C'], 130, 64);
+    expect(shared.map(marker => marker.caseId)).toEqual(['A', 'B', 'C', 'A', 'B', 'C']);
+    expect(shared.map(marker => marker.t)).toEqual(shared.map((_, index) => (index + .5) / 6));
+    expect(flowMarkers(['A'], 10, 64)).toHaveLength(1);
+  });
+
+  it('keeps each moving marker on its Alert as it passes into the next slot', () => {
+    const before = flowMarkers(['A', 'B'], 128, 64, 2.99);
+    const after = flowMarkers(['A', 'B'], 128, 64, 3.01);
+    // 한 칸을 넘어가면 index가 하나 밀린다. 같은 자리 근처의 표식은 같은 Alert다.
+    for (const marker of after.slice(1)) {
+      const previous = before.find(entry => Math.abs(entry.t - marker.t) < .01);
+      expect(previous.caseId).toBe(marker.caseId);
+    }
+    expect(after[0].t).toBeLessThan(.01);
   });
 
   it('shows a chip for every compared Alert and highlights one on press', async () => {

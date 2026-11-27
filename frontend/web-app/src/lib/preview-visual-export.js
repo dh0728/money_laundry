@@ -1,5 +1,6 @@
 import { createExportCanvas } from '../components/export-canvas';
 import { downloadFile } from '../components/file-download';
+import { caseShapePath } from '../features/graph/graph-case-groups';
 
 const svgNamespace = 'http://www.w3.org/2000/svg';
 const graphSnapshots = new WeakMap();
@@ -34,7 +35,7 @@ function svg(tag, attributes = {}) {
   return element;
 }
 
-export function makeGraphSnapshot({ width, height, nodes, edges, regions = [] }) {
+export function makeGraphSnapshot({ width, height, nodes, edges, markers = [] }) {
   const drawing = svg('svg', { width, height, viewBox: `0 0 ${width} ${height}` });
   const textStyle = { 'font-family': 'Pretendard', 'font-size': 11, 'text-anchor': 'middle' };
   const label = (text, attributes) => {
@@ -42,21 +43,29 @@ export function makeGraphSnapshot({ width, height, nodes, edges, regions = [] })
     element.textContent = text;
     return element;
   };
-  for (const { color, opacity, shapes } of regions) {
-    const layer = svg('g', { opacity });
-    for (const { path, width: thickness } of shapes) {
-      layer.append(svg('path', {
-        d: path, fill: 'none', stroke: color, 'stroke-width': thickness, 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
-      }));
-    }
-    drawing.append(layer);
-  }
   for (const { path, stroke, width: thickness, text, x, y, textColor = stroke } of edges) {
     drawing.append(svg('path', { d: path, fill: 'none', stroke, 'stroke-width': thickness, 'stroke-linecap': 'round' }));
     if (text) drawing.append(label(text, { x, y: y - 4, fill: textColor }));
   }
-  for (const { x, y, r, fill, stroke, text, textColor } of nodes) {
+  for (const { x, y, r, shape, fill, stroke, strokeWidth, opacity } of markers) {
+    drawing.append(svg('path', { d: caseShapePath(shape, x, y, r), fill, opacity,
+      ...(stroke ? { stroke, 'stroke-width': strokeWidth, 'stroke-linejoin': 'round' } : {}) }));
+  }
+  for (const { x, y, r, fill, stroke, text, textColor, ring, badge, badgeFill, badgeInk, badgeHeight } of nodes) {
     drawing.append(svg('circle', { cx: x, cy: y, r, fill, ...(stroke ? { stroke, 'stroke-width': 2 } : {}) }));
+    if (ring) {
+      const reach = r + 3;
+      const circumference = 2 * Math.PI * reach;
+      ring.forEach((color, index) => drawing.append(svg('circle', { cx: x, cy: y, r: reach, fill: 'none', stroke: color,
+        'stroke-width': 3, 'stroke-dasharray': `${circumference / ring.length} ${circumference}`,
+        'stroke-dashoffset': -index * circumference / ring.length, transform: `rotate(-90 ${x} ${y})` })));
+    }
+    if (badge) {
+      const left = x + r + 1;
+      const top = y - r - badgeHeight - 1;
+      drawing.append(svg('rect', { x: left, y: top, width: badge.length * 8 + 6, height: badgeHeight, rx: badgeHeight / 2, fill: badgeFill }));
+      drawing.append(label(badge, { x: left + 5, y: top + badgeHeight - 3, fill: badgeInk, 'text-anchor': 'start', 'font-size': 10 }));
+    }
     if (text) drawing.append(label(text, { x, y: y + r + 4, fill: textColor, 'dominant-baseline': 'hanging' }));
   }
   return drawing;
