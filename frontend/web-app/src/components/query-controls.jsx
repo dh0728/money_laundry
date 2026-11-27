@@ -188,7 +188,7 @@ const hasLocalTableTools = path => /^(add-tab\/(alerts|episodes)-table|report\/w
   .test(path?.replace(/\/(no-filter|sidebar-collapsed)$/, '') ?? '');
 const allowsAssignment = scope => scope !== 'dashboard-mine';
 
-function parseQuery(params, scope, rows) {
+function parseQuery(params, scope, rows, defaultAssignment) {
   const parseDate = value => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? '')) return undefined;
     const date = new Date(`${value}T00:00:00`);
@@ -203,7 +203,8 @@ function parseQuery(params, scope, rows) {
     ...Object.fromEntries(filterGroups(rows, scope).filter(group => group.name).map(({ key, name, options }) => [
       key, options.map(option => option.value).filter(value => params.getAll(name).includes(value)),
     ])),
-    assignment: allowsAssignment(scope) && params.get('assignment') === 'assigned' ? 'assigned' : 'all',
+    assignment: !allowsAssignment(scope) ? 'all'
+      : ['assigned', 'all'].includes(params.get('assignment')) ? params.get('assignment') : defaultAssignment,
     range: from && to && from <= to ? { from, to } : undefined,
   };
 }
@@ -483,8 +484,9 @@ function DownloadOptions({ entries, onDone }) {
 
 let nextPopoverId = 0;
 
+// defaultAssignment(scope): 주소에 담당 조건이 없을 때의 기본값('assigned' = 내 담당, 'all' = 전체).
 export function setupQueryControls({ onChange, workspace, controls, embedded = false, downloadSurface = 'ghost',
-  tooltip = document.getElementById('tooltip') }) {
+  tooltip = document.getElementById('tooltip'), defaultAssignment = () => 'all' }) {
   const events = new AbortController();
   const eventOptions = { signal: events.signal };
   const pageDownload = controls.querySelector('#page-download [data-query-tool]');
@@ -531,7 +533,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
   let resumeTableFocus;
   const queries = new Map();
   const current = () => {
-    const value = queries.get(scope) ?? defaultQuery;
+    const value = queries.get(scope) ?? { ...defaultQuery, assignment: allowsAssignment(scope) ? defaultAssignment(scope) : 'all' };
     return localTable && value.sort ? { ...value, sort: '' } : value;
   };
   const tableArea = () => embedded ? controls : workspace.querySelector('[data-table-tools]');
@@ -855,7 +857,8 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
       if (value) filterGroups(rows, scope).filter(group => group.name).forEach(({ key, name }) => {
         value[key].forEach(option => result.append(name, option));
       });
-      if (allowsAssignment(scope) && value?.assignment === 'assigned') result.set('assignment', 'assigned');
+      // 기본값과 다를 때만 주소에 남긴다(분석가가 '전체'로 바꾸면 assignment=all).
+      if (allowsAssignment(scope) && value && value.assignment !== defaultAssignment(scope)) result.set('assignment', value.assignment);
       if (value?.range) {
         result.set('from', formatDate(value.range.from));
         result.set('to', formatDate(value.range.to));
@@ -876,7 +879,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
       tableTools = undefined;
       rows = data?.rows ?? (scope ? caseFixtureRows(codes) : []);
       if (scope && params) {
-        const value = parseQuery(params, scope, rows);
+        const value = parseQuery(params, scope, rows, defaultAssignment(scope));
         queries.set(scope, localTable ? { ...value, sort: queries.get(scope)?.sort ?? '' } : value);
       }
       periodAnchor = data?.asOf;
