@@ -53,3 +53,31 @@ test('server cases become screen rows with KST display codes and three-step stat
   expect(serverIdFromCode('A-230906-000005')).toBe(5);
   // The cold import pulls in query-controls.jsx (date picker, icons) and exceeds 5s on loaded CI runners.
 }, 30_000);
+
+test('조사 시작·판정은 board 를 다시 받기 전에 먼저 보이고, 그 전에 출발한 board 가 늦게 와도 덮이지 않는다', async () => {
+  const fresh = () => structuredClone(board);
+  const confirmed = fresh();
+  Object.assign(confirmed.cases.find(item => item.caseId === 6), {
+    status: 'CLOSED', outcome: 'NORMAL', closedAt: '2023-09-08T10:00:00Z', reviewStartedAt: '2023-09-08T09:30:00Z' });
+  const getJson = vi.fn().mockImplementationOnce(async () => fresh()).mockImplementationOnce(async () => fresh())
+    .mockImplementation(async () => confirmed);
+  vi.doMock('@/api/common', () => ({ getJson }));
+  const { loadLiveSource, markLiveJudged, markLiveReviewStarted, rebuildLiveSource } = await import('./live-data.js');
+  const row = () => rebuildLiveSource().cases.find(item => item.code === 'A-230905-000006');
+  await loadLiveSource();
+  expect(row()).toMatchObject({ status: '처리 전', unread: true });
+
+  markLiveReviewStarted(6);
+  expect(row()).toMatchObject({ status: '처리 중', unread: false });
+
+  const judgment = { id: 'J-230908-000001', verdict: 'NORMAL', reasonCategory: 'OTHER', reason: '정상 거래', at: '2023-09-08T10:00:00Z', reviewer: '직원' };
+  markLiveJudged({ kind: 'Alert', caseId: 6 }, judgment);
+  expect(row()).toMatchObject({ status: '처리 완료', verdict: 'normal', open: false, judgment: { id: 'J-230908-000001', verdict: 'normal' } });
+
+  // 판정 전에 출발한 board 가 늦게 와도 판정이 남는다
+  await loadLiveSource();
+  expect(row()).toMatchObject({ status: '처리 완료', verdict: 'normal' });
+  // 서버에 반영된 board 가 오면 그 값을 쓴다
+  await loadLiveSource();
+  expect(row()).toMatchObject({ status: '처리 완료', verdict: 'normal', completedAt: '2023-09-08T10:00:00Z' });
+}, 30_000);

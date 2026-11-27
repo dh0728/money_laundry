@@ -3,10 +3,10 @@ import { createPortal } from 'react-dom';
 import ForceGraph2D from 'react-force-graph-2d';
 import { configureDevAccountForces, seedComponentPositions } from './0.24.0/force-layout';
 import { graphRiskBand, graphVerdict, graphVerdictLabels } from '../investigation/case-graph-scope';
-import { caseMembership, caseRegionOpacity, caseRegionWidth, caseShortLabel, readCaseRegionOpacity } from './graph-case-groups';
+import { caseMembership, caseShapePoints, caseShortLabel, flowMarkers } from './graph-case-groups';
 import { GraphZoomControls } from './preview-graph-controls';
-import { readGraphCanvasPulse } from '../../components/charts/charts/graph-flow-pulse';
-import { readCanvasColors, readChartNumber } from '../../components/charts/chart-design-values';
+import { readGraphCanvasPulse, readGraphFlowMarkers } from '../../components/charts/charts/graph-flow-pulse';
+import { readCanvasColors } from '../../components/charts/chart-design-values';
 import { makeGraphSnapshot, registerGraphSnapshot } from '../../lib/preview-visual-export';
 import { buildHopTimePlan, readGraphTimeAxisDesign, projectGraphTimeTicks,
   patternHomeForce, patternVelocityDecay } from './pattern-graph-time';
@@ -91,6 +91,9 @@ function graphGeometry(coords, visible, groups, colors, selection, highlight, po
     const label = [node.id, ownerView && `계좌 ${node.accounts.size}개`, shared && caseIds.map(caseShortLabel).join('·')].filter(Boolean).join(' · ');
     return [{ id: node.id, ...point(position.x, position.y), r: renderedRadius(node, zoom) * unit, caseIds,
       fill: dimmed ? colors.dimmed : colors[graphRiskBand(node.peakScore)],
+      // 여러 Alert가 함께 쓰는 계좌는 Alert 색을 나눈 고리와 '공유 N' 배지로 표시한다.
+      ring: shared ? caseIds.map(id => highlight && highlight !== id ? colors.dimmed : colors[id]) : undefined,
+      badge: shared ? `공유 ${caseIds.length}` : undefined, badgeFill: colors.ink, badgeInk: colors.axisFill,
       stroke: selection?.has(node.id) ? colors.accent : undefined,
       text: visible.nodes.length <= 25 || selection?.has(node.id) || caseIds.includes(highlight) ? label : undefined,
       textColor: colors.ink }];
@@ -111,44 +114,7 @@ function graphGeometry(coords, visible, groups, colors, selection, highlight, po
       textColor: colors.ink }];
   });
   if (showDetails) avoidEdgeLabelCollisions(nodes, edges, selection, unit / zoom);
-  // Alert마다 소속 선·노드를 한 덩어리 영역으로 칠한다. 같은 Alert 안은 고르게, 다른 Alert와 겹친 곳만 색이 섞인다.
-  const regions = groups.length < 2 ? [] : groups.map((group, index) => {
-    // 확대 배율과 관계없이 화면에서 같은 폭(기준 26px부터 5px씩 좁게)으로 보이게 한다.
-    const width = caseRegionWidth(index, 26, 5, 12) * unit / zoom;
-    return { id: group.id, color: colors[group.id], opacity: caseRegionOpacity(group.id, highlight, colors.regionOpacity), shapes: [
-      ...edges.filter(edge => edge.caseIds.includes(group.id)).map(edge => ({ edgeId: edge.id, path: edge.path, width })),
-      ...nodes.filter(node => node.caseIds.includes(group.id)).map(node => ({ path: `M ${node.x} ${node.y} h .1`, width: 2 * node.r + width })),
-    ] };
-  });
-  return { nodes, edges, regions };
-}
-
-const regionLayers = new WeakMap();
-// 영역을 투명도 없이 따로 그린 뒤 한 번에 반투명하게 얹는다. 겹치는 선·노드가 같은 Alert 안에서 진해지지 않는다.
-function paintRegion(context, region, pathFor) {
-  if (!region.shapes.length) return;
-  const { canvas } = context;
-  let layer = regionLayers.get(canvas);
-  if (!layer || layer.width !== canvas.width || layer.height !== canvas.height) {
-    layer = new OffscreenCanvas(canvas.width, canvas.height);
-    regionLayers.set(canvas, layer);
-  }
-  const scratch = layer.getContext('2d');
-  scratch.setTransform(1, 0, 0, 1, 0, 0);
-  scratch.clearRect(0, 0, layer.width, layer.height);
-  scratch.setTransform(context.getTransform());
-  scratch.strokeStyle = region.color;
-  scratch.lineCap = 'round';
-  scratch.lineJoin = 'round';
-  for (const shape of region.shapes) {
-    scratch.lineWidth = shape.width;
-    scratch.stroke(new Path2D(pathFor(shape)));
-  }
-  context.save();
-  context.setTransform(1, 0, 0, 1, 0, 0);
-  context.globalAlpha = region.opacity;
-  context.drawImage(layer, 0, 0);
-  context.restore();
+  return { nodes, edges };
 }
 
 function paintLine(context, { path, stroke, width, opacity = 1 }) {
@@ -168,6 +134,85 @@ function curvePoint(points, progress) {
     x: points[index].x + (point.x - points[index].x) * progress,
     y: points[index].y + (point.y - points[index].y) * progress,
   })), progress);
+}
+
+// 선 위를 송금 방향으로 흐르는 표식. 비교 중이면 Alert별 모양·색, 아니면 작은 점이다.
+// elapsed(초)가 없으면 멈춘 자리에 찍는다(동작 줄이기, 재생 중, 이미지 내려받기).
+function edgeMarkers(edge, { pixel, design, elapsed, shapes, colors, highlight, dense }) {
+  const samples = Array.from({ length: 9 }, (_, index) => curvePoint(edge.curve, index / 8));
+  const length = samples.slice(1).reduce((sum, point, index) =>
+    sum + Math.hypot(point.x - samples[index].x, point.y - samples[index].y), 0) / pixel;
+  const spacing = design.spacing * (dense ? 2 : 1);
+  const kinds = Math.max(1, edge.caseIds.length);
+  const count = Math.max(1, Math.round(length / spacing)) * kinds;
+  const shift = elapsed === undefined ? .5 : elapsed * design.speed / Math.max(length / count, 1);
+  const outside = highlight && !edge.caseIds.includes(highlight);
+  return flowMarkers(edge.caseIds, length, spacing, shift).map(({ t, caseId }) => {
+    const { x, y } = curvePoint(edge.curve, t);
+    const fade = elapsed === undefined ? 1 : Math.max(0, Math.min(1, t / design.fadeShare, (1 - t) / design.fadeShare));
+    if (caseId === undefined) {
+      return { x, y, r: design.dotRadius * pixel, fill: colors.ink, opacity: fade * design.dotOpacity * (outside ? .3 : 1) };
+    }
+    const dimmed = highlight && caseId !== highlight;
+    return { x, y, r: design.markerRadius * pixel, shape: shapes.get(caseId), fill: dimmed ? colors.dimmed : colors[caseId],
+      stroke: colors.flowHighlight, strokeWidth: design.outline * pixel, opacity: fade * (dimmed ? .45 : 1) };
+  });
+}
+
+function traceShape(context, { x, y, r, shape }) {
+  context.beginPath();
+  const points = caseShapePoints(shape);
+  if (!points) {
+    context.arc(x, y, r, 0, Math.PI * 2);
+    return;
+  }
+  points.forEach(([px, py], index) => context[index ? 'lineTo' : 'moveTo'](x + px * r, y + py * r));
+  context.closePath();
+}
+
+function paintMarker(context, marker) {
+  if (marker.opacity <= 0) return;
+  context.save();
+  context.globalAlpha = marker.opacity;
+  traceShape(context, marker);
+  context.fillStyle = marker.fill;
+  context.fill();
+  if (marker.stroke) {
+    context.strokeStyle = marker.stroke;
+    context.lineWidth = marker.strokeWidth;
+    context.lineJoin = 'round';
+    context.stroke();
+  }
+  context.restore();
+}
+
+// 공유 계좌: 노드 둘레에 Alert 색을 똑같이 나눈 고리, 오른쪽 위에 '공유 N' 배지.
+function paintSharedNode(context, dot, pixel, badgeHeight) {
+  const width = 3 * pixel;
+  const reach = dot.r + 3 * pixel;
+  const part = Math.PI * 2 / dot.ring.length;
+  context.save();
+  context.lineWidth = width;
+  dot.ring.forEach((color, index) => {
+    context.beginPath();
+    context.arc(dot.x, dot.y, reach, -Math.PI / 2 + index * part, -Math.PI / 2 + (index + 1) * part);
+    context.strokeStyle = color;
+    context.stroke();
+  });
+  context.font = `600 ${10 * pixel}px Pretendard`;
+  const textWidth = context.measureText(dot.badge).width;
+  const height = badgeHeight * pixel;
+  const left = dot.x + reach - 2 * pixel;
+  const top = dot.y - reach - height + 2 * pixel;
+  context.fillStyle = dot.badgeFill;
+  context.beginPath();
+  context.roundRect(left, top, textWidth + 10 * pixel, height, height / 2);
+  context.fill();
+  context.fillStyle = dot.badgeInk;
+  context.textAlign = 'left';
+  context.textBaseline = 'middle';
+  context.fillText(dot.badge, left + 5 * pixel, top + height / 2 + .5 * pixel);
+  context.restore();
 }
 
 function revealedEdge(edge, progress) {
@@ -285,32 +330,19 @@ export function ForceCaseCanvas({
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [zoom, setZoom] = useState(100);
   const [colors, setColors] = useState({});
-  const [idleFlow, setIdleFlow] = useState();
   const [pulseDesign] = useState(readGraphCanvasPulse);
+  const [markerDesign] = useState(readGraphFlowMarkers);
+  const [flowStart] = useState(() => performance.now());
+  const shapes = useMemo(() => new Map(groups.map(group => [group.id, group.shape])), [groups]);
   const [axisDesign] = useState(readGraphTimeAxisDesign);
   const timePlan = useMemo(() => buildHopTimePlan(records ?? [], network.nodes), [records, network]);
   const [data, setData] = useState(() => simulationData(network, positions, timePlan));
   const currentLayout = useRef({ network, positions, timePlan });
   const reducedMotion = useAppReducedMotion();
   const activeFlow = reducedMotion ? undefined : flowPulse;
-  const ambientFlow = reducedMotion || playing || activeFlow ? undefined : idleFlow;
-  useEffect(() => {
-    if (reducedMotion || playing || activeFlow || !visible.edges.length) return;
-    let index = 0;
-    let timer;
-    function sweep() {
-      if (!document.hidden) {
-        const edge = visible.edges[index++ % visible.edges.length];
-        setIdleFlow({ edgeId: edge.id, startedAt: performance.now() });
-      }
-      timer = setTimeout(() => {
-        setIdleFlow(undefined);
-        timer = setTimeout(sweep, 840);
-      }, pulseDesign.duration);
-    }
-    timer = setTimeout(sweep, 440);
-    return () => clearTimeout(timer);
-  }, [activeFlow, playing, pulseDesign.duration, reducedMotion, visible.edges]);
+  // 모든 선에서 표식이 계속 흐른다. 동작 줄이기·재생 중·한 거래 강조 중에는 멈춘 자리에 찍는다.
+  const flowing = !reducedMotion && !playing && !activeFlow && visible.edges.length > 0;
+  const dense = visible.edges.length > markerDesign.denseEdges;
   useLayoutEffect(() => {
     const observer = new ResizeObserver(([{ contentRect }]) => {
       setSize({ width: Math.floor(contentRect.width), height: Math.floor(contentRect.height) });
@@ -319,7 +351,7 @@ export function ForceCaseCanvas({
     return () => observer.disconnect();
   }, []);
   useLayoutEffect(() => {
-    const refresh = () => setColors({ ...tokenColors(host.current, groups), regionOpacity: readCaseRegionOpacity(readChartNumber) });
+    const refresh = () => setColors(tokenColors(host.current, groups));
     refresh();
     document.addEventListener('aml:appearance', refresh);
     return () => document.removeEventListener('aml:appearance', refresh);
@@ -382,7 +414,10 @@ export function ForceCaseCanvas({
     if (!engine || !ready || !visible.nodes.length) return null;
     const detail = graphGeometry(coordinates(), visible, groups, colors, selection, highlightedCase,
       (x, y) => engine.graph2ScreenCoords(x, y), engine.zoom(), showDetails, ownerView);
-    const snapshot = makeGraphSnapshot({ ...size, ...detail });
+    const markers = detail.edges.flatMap(edge => edgeMarkers(edge,
+      { pixel: 1, design: markerDesign, shapes, colors, highlight: highlightedCase, dense }));
+    const nodes = detail.nodes.map(node => ({ ...node, badgeHeight: markerDesign.badgeHeight }));
+    const snapshot = makeGraphSnapshot({ ...size, ...detail, nodes, markers });
     if (timePlan) addTimeAxisSnapshot(snapshot, timeAxisMarks(timePlan, engine, size, axisDesign), colors);
     return snapshot;
   }));
@@ -392,7 +427,7 @@ export function ForceCaseCanvas({
     aria-label={timePlan ? '홉-시간순 관계 그래프 · 가로는 돈이 출발한 계좌에서 건너간 횟수 · 같은 홉 안에서는 위가 이른 시각'
       : ownerView ? '소유주 관계 그래프' : '계좌 관계 그래프'}>
     {ready && <ForceGraph2D ref={graph} width={size.width} height={size.height} graphData={data}
-      autoPauseRedraw={!activeFlow && !ambientFlow}
+      autoPauseRedraw={!activeFlow && !flowing}
       cooldownTime={4000} cooldownTicks={timePlan ? 96 : positions ? 1 : undefined}
       d3VelocityDecay={timePlan ? patternVelocityDecay : .4} backgroundColor="transparent" minZoom={.12} maxZoom={12}
       nodeVisibility={node => visibleNodes.has(node.id)} linkVisibility={link => visibleEdges.has(link.id)}
@@ -459,10 +494,8 @@ export function ForceCaseCanvas({
           return codes?.size === 1 && codes.has(activeFlow.code);
         });
         if (growing) drawing.edges.set(growing.id, revealedEdge(growing, reveal));
-        for (const region of model.regions) {
-          paintRegion(context, region, shape => shape.edgeId === growing?.id && growing
-            ? drawing.edges.get(shape.edgeId).path : shape.path);
-        }
+        drawing.growing = growing?.id;
+        drawing.elapsed = flowing ? (performance.now() - flowStart) / 1000 : undefined;
         context.font = `${11 / scale}px Pretendard`;
       }}
       onRenderFramePost={(context, scale) => {
@@ -473,10 +506,12 @@ export function ForceCaseCanvas({
         const edge = drawing?.edges.get(link.id);
         if (!edge) return;
         paintLine(context, edge);
+        if (drawing.growing !== link.id) {
+          for (const marker of edgeMarkers(edge, { pixel: 1 / scale, design: markerDesign, elapsed: drawing.elapsed,
+            shapes, colors, highlight: highlightedCase, dense })) paintMarker(context, marker);
+        }
         if (activeFlow && visibleEdges.get(link.id).codes.has(activeFlow.code)) {
           paintFlow(context, edge, activeFlow, colors[activeFlow.risk] ?? edge.stroke, colors.flowHighlight, scale, pulseDesign);
-        } else if (ambientFlow?.edgeId === link.id) {
-          paintFlow(context, edge, ambientFlow, edge.stroke, colors.flowHighlight, scale, pulseDesign);
         }
         if (!edge.text) return;
         context.font = `${11 / scale}px Pretendard`;
@@ -493,6 +528,7 @@ export function ForceCaseCanvas({
         context.fillStyle = dot.fill;
         context.fill();
         if (dot.stroke) { context.strokeStyle = dot.stroke; context.lineWidth = 2 / scale; context.stroke(); }
+        if (dot.ring) paintSharedNode(context, dot, 1 / scale, markerDesign.badgeHeight);
         if (!dot.text) return;
         context.font = `${11 / scale}px Pretendard`;
         context.textAlign = 'center';

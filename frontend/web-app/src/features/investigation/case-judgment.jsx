@@ -40,7 +40,8 @@ function JudgmentDetails({ evidence, observations, reason }) {
   </Box>;
 }
 
-export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onReport, onBundle, onTransfer, bundleBlocked, onRelationRequest }) {
+export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onReport, onBundle, onTransfer, bundleBlocked, onRelationRequest,
+  nextCase, onOpenNext, onOpenList }) {
   const dialog = useRef(null);
   const title = useRef(null);
   const [verdict, setVerdict] = useState('');
@@ -50,9 +51,10 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [requestSent, setRequestSent] = useState(false);
+  const [starting, setStarting] = useState(false);
   const pending = row.status === '처리 전';
   const canStart = canStartPreviewReview(row, actor);
-  const actionLabel = pending && !onBundle && !bundleBlocked ? '처리 중 상태로 변환' : '판정';
+  const actionLabel = pending && !onBundle && !bundleBlocked ? '조사 시작' : '판정';
   const eligible = canJudgePreviewCase(row, actor);
   const actionEnabled = Boolean(bundleBlocked || onBundle) || (pending ? canStart : eligible && !result);
   const reasonLabel = judgmentReasonLabels[reasonCategory];
@@ -69,13 +71,20 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
     title.current?.focus();
   };
 
+  // 조사 시작 요청이 끝날 때까지 버튼을 막아 같은 요청을 여러 번 보내지 않는다.
+  function begin() {
+    if (starting) return;
+    setStarting(true);
+    Promise.resolve(startReview(row.code)).finally(() => setStarting(false));
+  }
+
   function open() {
     if (onBundle) {
       onBundle();
       return;
     }
     if (pending && !bundleBlocked) {
-      startReview(row.code);
+      begin();
       return;
     }
     dialog.current.showModal();
@@ -99,6 +108,15 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
     requestAnimationFrame(focusTitle);
   }
 
+  const reportLink = result && {
+    as: 'a', href: `/report?selected=${encodeURIComponent(result.id)}`,
+    onClick: event => {
+      if (event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      onReport(result.id);
+    },
+  };
+
   async function commit() {
     if (!valid || !confirm || result) return;
     const response = await save(row.code, verdict, details, reasonCategory);
@@ -111,7 +129,8 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
   }
 
   return <>
-    <PrimaryButton tone="brand" className="case-judgment-trigger" disabled={!actionEnabled}
+    <PrimaryButton tone="brand" className="case-judgment-trigger" disabled={!actionEnabled || starting}
+      aria-busy={starting || undefined}
       aria-haspopup={pending && !onBundle && !bundleBlocked ? undefined : 'dialog'}
       aria-controls={onBundle ? 'case-bundle-dialog' : pending && !bundleBlocked ? undefined : 'case-judgment-dialog'}
       onHold={open}>{actionLabel}</PrimaryButton>
@@ -119,16 +138,20 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
       titleId="case-judgment-title" titleRef={title} closeLabel="판정 창 닫기"
       title={result ? '판정 완료' : confirm ? '판정 내용 확인' : `${row.kind} 판정`}
       actions={<>
-        {bundleBlocked && canStart && <ActionButton shape="pill" surface="floating"
-          onClick={() => startReview(row.code)}>처리 중으로 변경</ActionButton>}
+        {bundleBlocked && canStart && <ActionButton shape="pill" surface="floating" disabled={starting}
+          onClick={begin}>조사 시작</ActionButton>}
         {onRelationRequest && !requestSent && <ActionButton shape="pill" surface="floating"
           onClick={() => onRelationRequest(rationale.trim(), () => setRequestSent(true))}>관리자에게 요청 보내기</ActionButton>}
-        {result ? <PrimaryButton as="a" tone="brand" href={`/report?selected=${encodeURIComponent(result.id)}`}
-          onClick={event => {
-            if (event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-            event.preventDefault();
-            onReport(result.id);
-          }}>보고서 보기</PrimaryButton> : eligible && <>
+        {result ? <>
+          {/* 판정을 마치면 대시보드를 거치지 않고 다음 건이나 보던 목록으로 바로 간다. */}
+          {onOpenList && <ActionButton shape="pill" surface="floating" onClick={onOpenList}>{row.kind} 목록으로</ActionButton>}
+          {nextCase && onOpenNext
+            ? <>
+              <ActionButton shape="pill" surface="floating" {...reportLink}>보고서 보기</ActionButton>
+              <PrimaryButton tone="brand" onClick={() => onOpenNext(nextCase.code)}>다음 건 열기</PrimaryButton>
+            </>
+            : <PrimaryButton tone="brand" {...reportLink}>보고서 보기</PrimaryButton>}
+        </> : eligible && <>
             {confirm && <ActionButton shape="pill" surface="floating" onClick={() => {
               setConfirm(false);
               setError('');
@@ -148,6 +171,9 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
         <JudgmentTargets row={row} />
         {result ? <Box className="case-judgment-summary">
           <Text role="status"><Text as="code">{result.id}</Text>에 판정이 저장되었습니다.</Text>
+          {/* 버튼에는 이름만 두고, 어느 건으로 가는지는 본문에 다른 코드와 같은 모양으로 보여 준다. */}
+          {onOpenNext && (nextCase ? <Text>다음 건 · <Text as="code">{nextCase.code}</Text></Text>
+            : <Text>남은 내 업무가 없습니다.</Text>)}
           <Text><VerdictTag verdict={result.verdict} /></Text>
           <Text><Text as="strong">{reasonLabel}</Text></Text>
           <JudgmentDetails {...result} />
@@ -162,12 +188,13 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
               options={[
                 { value: 'normal', label: row.kind === 'Alert' ? '정상 종결' : '정상' },
                 { value: 'abnormal', label: row.kind === 'Alert' ? '단독 의심 종결' : '이상' },
-                ...(onTransfer ? [{ value: 'transfer', label: '기존 Episode에 편입' }] : []),
+                ...(onTransfer ? [{ value: 'transfer', label: '기존 Episode에 편입' },
+                  ...(row.kind === 'Alert' ? [{ value: 'create', label: '새 Episode 만들기' }] : [])] : []),
               ]}
               onChange={value => {
-                if (value === 'transfer') {
+                if (value === 'transfer' || value === 'create') {
                   dialog.current.close();
-                  onTransfer();
+                  onTransfer(value === 'create');
                 } else {
                   setVerdict(value);
                 }

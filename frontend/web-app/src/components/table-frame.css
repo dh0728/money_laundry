@@ -299,3 +299,6 @@
     overflow-wrap: anywhere;
   }
 }
+
+/* 행을 누르면 첫 칸의 기록을 연다(workflow-table.jsx 의 recordRowProps). 강조 배경은 TableRow 의 hover 를 그대로 쓴다. */
+[data-slot="table-row"][data-opens-record] { cursor: pointer }

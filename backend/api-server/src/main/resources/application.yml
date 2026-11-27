@@ -22,6 +22,11 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
   shutdown: graceful
+  # 화면 board 응답(수 MB JSON)을 gzip으로 보낸다. 같은 응답이 약 1/15로 준다.
+  compression:
+    enabled: true
+    mime-types: application/json,application/problem+json
+    min-response-size: 2KB
 
 management:
   endpoints:

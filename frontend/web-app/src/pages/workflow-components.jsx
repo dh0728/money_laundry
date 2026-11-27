@@ -31,7 +31,7 @@ import { AiReportPreview } from '../features/investigation/case-ai-report-previe
 import { useCaseEvidenceSelection } from '../features/investigation/case-evidence-selection';
 import { previewAlertEditUnavailable, previewAlertMembershipTargets } from '../features/investigation/case-membership-data';
 import { currentPreviewUser, subscribePreviewUser } from '../features/auth/preview-session-user';
-import { judgmentReasonLabels } from '../features/investigation/case-judgment-data';
+import { judgmentReasonLabels, nextReviewCase } from '../features/investigation/case-judgment-data';
 import '../features/investigation/preview-case-card.css';
 import './workflow-components.css';
 import { Box, Heading, Text } from '@/components/layout-primitives';
@@ -399,13 +399,14 @@ function CaseReviewActions({ overview }) {
       {canManageEpisodes && row.kind === 'Episode' && row.open && row.assigned && Boolean(row.linkedAlertCodes?.length)
         && <PrimaryButton tone="inverse" aria-haspopup="dialog" onClick={() => setEpisodeAction('unlink')}>Alert 연결 해제</PrimaryButton>}
       {episodeAction && <PreviewEpisodeDialog cases={reportData.cases} save={overview.saveEpisode} row={row}
-        bundle={episodeAction === 'bundle' ? bundle : undefined} unlink={episodeAction === 'unlink'}
+        bundle={episodeAction === 'bundle' ? bundle : undefined} unlink={episodeAction === 'unlink'} startNew={episodeAction === 'create'}
         onRelationRequest={episodeAction === 'bundle' ? onRelationRequest : undefined}
         onClose={saved => saved ? overview.refreshEpisode() : setEpisodeAction(null)} />}
       <CaseJudgment actor={user} bundleBlocked={bundleBlocked} onBundle={bundle ? () => setEpisodeAction('bundle') : undefined}
         onRelationRequest={onRelationRequest}
-        onTransfer={!bundleBlocked && canManageEpisodes && canTransferAlert(row) ? () => setEpisodeAction('transfer') : undefined} row={row} startReview={overview.startReview} save={overview.saveJudgment}
-        onSavedClose={overview.onJudgmentClose} onReport={overview.onJudgmentReport} />
+        onTransfer={!bundleBlocked && canManageEpisodes && canTransferAlert(row) ? create => setEpisodeAction(create ? 'create' : 'transfer') : undefined} row={row} startReview={overview.startReview} save={overview.saveJudgment}
+        onSavedClose={overview.onJudgmentClose} onReport={overview.onJudgmentReport}
+        nextCase={nextReviewCase(reportData?.cases, row.code)} onOpenNext={overview.onJudgmentNext} onOpenList={overview.onJudgmentList} />
     </ScreenActions>
   </>;
 }

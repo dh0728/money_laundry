@@ -5,16 +5,19 @@ import { QueryCheck } from '../../components/selection-check';
 import { Textarea } from '../../components/ui/textarea';
 import { ActionButton, PrimaryButton } from '../../components/primary-button';
 import { EpisodeAlertSummary } from './preview-case-card';
-import { canTransferAlert, nextPreviewEpisodeCode, previewEpisodeWillDissolve } from './preview-episode-transfer';
+import { canTransferAlert, nextPreviewEpisodeCode, previewEpisodeCompanions, previewEpisodeWillDissolve } from './preview-episode-transfer';
 import { Box, Text } from '../../components/layout-primitives';
 
-export function PreviewEpisodeDialog({ cases, row, save, onClose, unlink = false, bundle, onRelationRequest }) {
+export function PreviewEpisodeDialog({ cases, row, save, onClose, unlink = false, bundle, onRelationRequest, startNew = false }) {
   const titleId = useId();
-  const fixedAlertCodes = bundle?.alerts ?? (!unlink && row ? [row.code] : undefined);
+  // Alert 상세에서 열면 이 Alert는 고정하고, 계좌·거래를 공유하는 내 담당 Alert를 골라 함께 묶을 수 있다.
+  const companionMode = !bundle && !unlink && row?.kind === 'Alert';
+  const companions = companionMode ? previewEpisodeCompanions(cases, row) : [];
+  const fixedAlertCodes = bundle?.alerts ?? (!unlink && row && !companionMode ? [row.code] : undefined);
   const [pickedAlertCodes, setPickedAlertCodes] = useState([]);
-  const selected = fixedAlertCodes ?? pickedAlertCodes;
+  const selected = companionMode ? [row.code, ...pickedAlertCodes] : fixedAlertCodes ?? pickedAlertCodes;
   const [target, setTarget] = useState(bundle?.target ?? '');
-  const [creating, setCreating] = useState(Boolean(bundle?.alerts.length >= 2 && !bundle.target));
+  const [creating, setCreating] = useState(startNew || Boolean(bundle?.alerts.length >= 2 && !bundle.target));
   const [reason, setReason] = useState('');
   const [confirmed, setConfirmed] = useState(false);
   const [confirmedNewCode, setConfirmedNewCode] = useState('');
@@ -25,8 +28,9 @@ export function PreviewEpisodeDialog({ cases, row, save, onClose, unlink = false
   const episodes = cases.filter(item => item.kind === 'Episode' && item.open);
   const visibleAlerts = fixedAlertCodes ? alerts.filter(item => fixedAlertCodes.includes(item.code)) : alerts;
   const targetEpisode = episodes.find(item => item.code === target);
-  const useNewEpisode = creating && selected.length >= 2;
-  const newEpisodeCode = useNewEpisode ? nextPreviewEpisodeCode(cases, selected[0]) : '';
+  const useNewEpisode = creating && (companionMode || selected.length >= 2);
+  const needsCompanion = useNewEpisode && selected.length < 2;
+  const newEpisodeCode = useNewEpisode && !needsCompanion ? nextPreviewEpisodeCode(cases, selected[0]) : '';
   const valid = Boolean(reason.trim() && selected.length && (unlink || newEpisodeCode || targetEpisode));
   const dissolves = unlink && previewEpisodeWillDissolve(row, selected.length);
   const label = unlink ? 'Alert 연결 해제' : 'Episode로 묶기';
@@ -72,12 +76,13 @@ export function PreviewEpisodeDialog({ cases, row, save, onClose, unlink = false
             <GlideSelect fullWidth ariaLabel="편입 방식" value={useNewEpisode ? 'new' : 'existing'}
               options={[
                 { value: 'existing', label: '기존 Episode에 편입' },
-                ...(selected.length >= 2 ? [{ value: 'new', label: '새 Episode 생성' }] : []),
+                ...(companionMode || selected.length >= 2 ? [{ value: 'new', label: '새 Episode 생성' }] : []),
               ]}
               onChange={value => setCreating(value === 'new')} />
-            {useNewEpisode ? <Box as="dl" className="case-judgment-details">
-              <Box><Box as="dt">생성 예정 ID</Box><Box as="dd"><Text as="code">{newEpisodeCode}</Text></Box></Box>
-            </Box> : <Box className="case-judgment-field">
+            {useNewEpisode ? needsCompanion ? <Text role="status">새 Episode는 Alert 2건 이상이 필요합니다. 함께 묶을 Alert를 골라 주세요.</Text>
+              : <Box as="dl" className="case-judgment-details">
+                <Box><Box as="dt">생성 예정 ID</Box><Box as="dd"><Text as="code">{newEpisodeCode}</Text></Box></Box>
+              </Box> : <Box className="case-judgment-field">
               <Text as="span">대상 Episode ID</Text>
               <GlideSelect fullWidth ariaLabel="대상 Episode" placeholder="Episode ID 선택"
                 value={target} onChange={setTarget} options={episodes.map(item => item.code)}
@@ -89,14 +94,25 @@ export function PreviewEpisodeDialog({ cases, row, save, onClose, unlink = false
             <Box><Box as="dt">대상 Episode의 소속 Alert</Box><Box as="dd"><EpisodeAlertSummary codes={targetEpisode.linkedAlertCodes}
               complete={targetEpisode.linkedAlertCodesComplete} /></Box></Box>
           </Box>}
-          <Box as="fieldset" className="case-judgment-evidence">
+          {companionMode ? <Box as="fieldset" className="case-judgment-evidence">
+            <Box as="legend">묶을 Alert</Box>
+            <QueryCheck label={<Text as="code">{row.code}</Text>} ariaLabel={`${row.code} (지금 보는 Alert)`} checked disabled />
+            {companions.map(({ item, accounts, transactions }) => <QueryCheck key={item.code} ariaLabel={item.code}
+              label={<><Text as="code">{item.code}</Text> <Text as="span">{[
+                transactions.length && `공유 거래 ${transactions.length}건`, accounts.length && `공유 계좌 ${accounts.length}개`,
+              ].filter(Boolean).join(' · ')}</Text></>}
+              checked={selected.includes(item.code)}
+              onChange={checked => setPickedAlertCodes(previous => checked
+                ? [...previous, item.code] : previous.filter(code => code !== item.code))} />)}
+            {!companions.length && <Text>계좌·거래를 공유하는 내 담당 Alert가 없습니다.</Text>}
+          </Box> : <Box as="fieldset" className="case-judgment-evidence">
             <Box as="legend">{fixedAlertCodes ? '편입할 Alert' : 'Alert 선택'}</Box>
             {visibleAlerts.map(item => <QueryCheck key={item.code} label={<Text as="code">{item.code}</Text>} ariaLabel={item.code}
               checked={selected.includes(item.code)} disabled={Boolean(fixedAlertCodes)}
               onChange={checked => setPickedAlertCodes(previous => checked
                 ? [...previous, item.code] : previous.filter(code => code !== item.code))} />)}
             {!visibleAlerts.length && <Text>선택 가능한 Alert가 없습니다.</Text>}
-          </Box>
+          </Box>}
           <Box as="label" className="case-judgment-field">변경 사유
             <Textarea required maxLength={4000} value={reason} onChange={event => setReason(event.target.value)} />
           </Box>
