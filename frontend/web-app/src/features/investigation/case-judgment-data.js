@@ -78,6 +78,21 @@ function currentJudgment(row) {
   return judgment && (!row.reviewStateAt || judgment.at > row.reviewStateAt) ? judgment : undefined;
 }
 
+// 판정을 마친 뒤 열 다음 건. 내 담당·열림·미판정 건 가운데
+// ① 처리 기한이 빠른 건(기한 없는 건은 뒤) ② 처리 중인 건 ③ 위험 점수 × 경과일이 높은 건(대시보드 '우선 처리 목록'과 같은 기준) ④ 코드 순으로 고른다.
+const noDueDate = '9999-12-31';
+const dueDate = row => /^\d{4}-\d{2}-\d{2}/.test(row.reviewDueOn ?? '') ? row.reviewDueOn.slice(0, 10) : noDueDate;
+const urgency = row => (Number.isFinite(row.score) ? row.score : 0) * (Number.isFinite(row.elapsed) ? row.elapsed : 0);
+
+export function nextReviewCase(rows = [], currentCode) {
+  return rows.filter(row => row.code !== currentCode && row.assigned && row.open && row.verdict === 'unjudged'
+      && row.status !== '처리 완료' && !currentJudgment(row))
+    .sort((a, b) => dueDate(a).localeCompare(dueDate(b))
+      || Number(b.status === '처리 중') - Number(a.status === '처리 중')
+      || urgency(b) - urgency(a)
+      || a.code.localeCompare(b.code))[0];
+}
+
 function reviewStarted(row) {
   return started.has(row.code) && (!row.reviewStateAt || started.get(row.code) > row.reviewStateAt);
 }

@@ -16,7 +16,7 @@ import { reviewStatusLabels } from '../lib/review-status.js';
 import { csvDownloadEntry, inDateRange, QueryRadio, setupQueryControls, WorkspaceQueryDock } from '../components/query-controls.jsx';
 import { dashboardFixtureBoardPage, dashboardFixtureResponse, dashboardFixtures, dashboardPeriodEnd, dashboardRecordCodes } from '../mocks/dashboard-fixtures.js';
 import { personalWorkHistory } from '../features/dashboard/personal-work-history.js';
-import { liveCodes, liveSource, liveSourceLoaded, loadLiveSource, rebuildLiveSource, resetLiveSource } from '../features/investigation/live-data.js';
+import { liveCodes, liveSource, liveSourceLoaded, loadLiveSource, markLiveJudged, markLiveReviewStarted, rebuildLiveSource, resetLiveSource } from '../features/investigation/live-data.js';
 import { changeLiveEpisode, editLiveTransactions, markLiveRead, saveLiveJudgment, startLiveReview } from '../features/investigation/live-actions.js';
 import { liveWorkRequests, liveWorkRequestsReady, loadLiveWorkRequests, readLiveWorkRequests, resetLiveWorkRequests, resolveLiveWorkRequest,
   sendLiveWorkRequest } from '../features/investigation/live-work-requests.js';
@@ -82,9 +82,10 @@ const defaultTabs = tabGroups.flatMap(group => tabCodes(group).slice(0, 2));
 const initialWorkTabs = restoreWorkTabCodes(storedWorkTabs, defaultTabs, tabGroups.flatMap(tabCodes))
   .filter(code => serviceMode || benchmarkLedgerRoute || !isBenchmarkTransactionCode(code));
 
-// 거래·Alert·Episode 메뉴마다 마지막에 본 목록(표·카드와 조건)을 기억해 메뉴로 돌아올 때 그대로 연다.
+// 대시보드·거래·Alert·Episode 메뉴마다 마지막에 본 화면(전체·개인, 표·카드와 조건)을 기억해 메뉴로 돌아올 때 그대로 연다.
 const lastListsStorageKey = benchmarkLedgerRoute ? 'aml-live-layout-ibm-last-lists' : 'aml-live-layout-last-lists';
 const listScreens = {
+  D: path => /^dashboard\/(?:all|mine)$/.test(path),
   T: path => isLedgerScreen(path),
   A: path => /^add-tab\/alerts-(?:cards|table)(?:\/no-filter)?$/.test(path),
   E: path => /^add-tab\/episodes(?:-table)?(?:\/no-filter)?$/.test(path),
@@ -111,7 +112,7 @@ function rememberList(path, params) {
   try { sessionStorage.setItem(lastListsStorageKey, JSON.stringify(lastLists)); } catch { /* 이번 페이지에서만 기억한다. */ }
 }
 
-const listDestination = prefix => lastLists[prefix]?.path ?? sections[prefix];
+const listDestination = prefix => lastLists[prefix]?.path ?? (prefix === 'D' ? sections.dashboard : sections[prefix]);
 // 기억한 목록으로 갈 때만 그때의 조건을 함께 넘긴다.
 const rememberedParams = path => {
   const entry = lastLists[listPrefix(path)];
@@ -625,7 +626,7 @@ function showWorkspaceNavigation(path, code) {
     navigation.global = navigation.global.map(item => item.value === sections.T
       ? { ...item, label: '은행·계좌·거래' } : item);
   }
-  // 거래·Alert·Episode 메뉴는 지금 보는 목록, 아니면 마지막에 본 목록으로 보낸다.
+  // 대시보드·거래·Alert·Episode 메뉴는 지금 보는 화면, 아니면 마지막에 본 화면으로 보낸다.
   navigation.global = navigation.global?.map(item => {
     const prefix = listPrefix(item.value);
     if (!prefix) return item;
@@ -1005,18 +1006,22 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
       if (serviceMode) {
         const mounted = mountedWorkflows;
         if (!canStartPreviewReview(current, currentPreviewUser())) return;
-        void startLiveReview(current).then(result => {
+        const show = () => {
+          if (mountedWorkflows !== mounted) return;
+          dashboardSource = caseSource(groups);
+          mountedWorkflows.updateCase(dashboardSource.cases.find(item => item.code === target), dashboardSource);
+        };
+        // 버튼은 이 약속이 끝날 때까지 막혀 있다. board 는 오래 걸릴 수 있어 기다리지 않는다.
+        return startLiveReview(current).then(result => {
           if (!result.ok) {
-            document.dispatchEvent(new CustomEvent('aml:notice', { detail: { status: 'failed', title: '상태를 바꾸지 못했습니다.', description: result.error } }));
+            document.dispatchEvent(new CustomEvent('aml:notice', { detail: { status: 'failed', title: '조사를 시작하지 못했습니다.', description: result.error } }));
             return;
           }
-          return loadLiveSource().then(() => {
-            if (mountedWorkflows !== mounted) return;
-            dashboardSource = caseSource(groups);
-            mountedWorkflows.updateCase(dashboardSource.cases.find(item => item.code === target), dashboardSource);
-          });
+          // 받아 둔 응답에 착수를 먼저 반영해 바로 [판정]으로 바꾸고, 전체 board 는 뒤에서 다시 받아 맞춘다.
+          markLiveReviewStarted(current.caseId);
+          show();
+          void loadLiveSource().then(show, () => undefined);
         });
-        return;
       }
       if (!startPreviewReview(current, currentPreviewUser())) return;
       dashboardSource = caseSource(groups);
@@ -1025,8 +1030,14 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     saveJudgment: (target, verdict, details, reasonCategory) => {
       const row = !readOnly && activeWorkCode === target ? dashboardSource.cases.find(item => item.code === target) : undefined;
       if (serviceMode) {
-        return saveLiveJudgment(row, verdict, details, reasonCategory).then(result => result.ok
-          ? loadLiveSource().then(() => { dashboardSource = caseSource(groups); return result; }) : result);
+        return saveLiveJudgment(row, verdict, details, reasonCategory).then(result => {
+          if (!result.ok) return result;
+          // 판정 응답만으로 완료 창을 띄운다. 받아 둔 board 에 판정을 먼저 반영하고, 전체 board 는 뒤에서 다시 받아 맞춘다.
+          markLiveJudged(row, result.judgment);
+          dashboardSource = caseSource(groups);
+          void loadLiveSource().then(() => { dashboardSource = caseSource(groups); }, () => undefined);
+          return result;
+        });
       }
       const actor = currentPreviewUser();
       const result = savePreviewJudgment(row, verdict, details, reasonCategory, actor?.username ?? '', actor);
@@ -1039,6 +1050,13 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     },
     onJudgmentReport: id => {
       showWorkspace('', '', sections.report, 'push', new URLSearchParams({ selected: id }));
+      workspace.querySelector('h1')?.focus({ preventScroll: true });
+    },
+    onJudgmentNext: nextCode => openWorkCode(nextCode),
+    // 판정한 건의 목록(Alert·Episode)으로, 마지막에 본 보기와 조건 그대로 돌아간다.
+    onJudgmentList: () => {
+      const destination = listDestination(code[0]);
+      showWorkspace(code[0], '', destination, 'push', rememberedParams(destination));
       workspace.querySelector('h1')?.focus({ preventScroll: true });
     },
     registerTableTools: queryControls.registerTableTools,
