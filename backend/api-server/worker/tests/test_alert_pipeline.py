@@ -78,6 +78,22 @@ class AlertPostgresTests(unittest.TestCase):
         self.assertEqual(self.admin.execute('SELECT count(*) FROM review.alerts').fetchone()[0],0)
         self.assertEqual(before,self.admin.execute('SELECT user_id,last_assigned_at FROM core.users ORDER BY user_id').fetchall())
 
+    def test_context_members_need_the_context_score(self):
+        # ids[1] becomes c -> b at 10:00, within ±24h of the core's a -> b at 23:30, below the seed bars.
+        self.admin.execute("UPDATE analysis.input_transactions SET to_account_id=%s WHERE run_id=%s AND tx_id=%s",
+                           (self.b, self.run, self.ids[1]))
+        for score, expected in ((.05, ['CONTEXT']), (.005, [])):
+            with self.subTest(score=score):
+                self.admin.execute("DELETE FROM analysis.alert_plans WHERE run_id=%s", (self.run,))
+                self.admin.execute("DELETE FROM analysis.stage_results WHERE run_id=%s AND stage='ALERTS'", (self.run,))
+                self.admin.execute("UPDATE analysis.scores SET p_laundering=%s WHERE run_id=%s AND tx_id=%s",
+                                   (score, self.run, self.ids[1]))
+                save_alerts(self.admin, self.execution)
+                plan, = self.plans()
+                roles = {m['txId']: m['role'] for m in plan['evidence']['transactions']}
+                self.assertEqual([roles[k] for k in roles if k == self.ids[1]], expected)
+                self.assertEqual(sorted(k for k, r in roles.items() if r != 'CONTEXT'), sorted([self.ids[0], self.ids[2]]))
+
     def test_payload_checksum_and_manifest_cover_every_operation(self):
         import hashlib
         save_alerts(self.admin,self.execution)
@@ -475,6 +491,29 @@ class AlertExtensionTests(unittest.TestCase):
         self.assertEqual(doc['contextQuery']['lastAt'], (base + timedelta(hours=6) + pad).astimezone(timezone.utc).isoformat())
         self.assertEqual(doc['policyVersion'], 'block-pin-3')
         self.assertEqual(doc['summary']['txCount'], 2)
+
+    def test_neighbour_transactions_render_as_context_members(self):
+        from alerts.alert_pipeline import _build_graphs, _evidence
+        from decimal import Decimal
+        base = datetime.fromisoformat('2022-09-02T10:00:00+09:00')
+        # One bank: an account is (bank, account), so the spoke r1 is the same account on both sides.
+        rows = {key: dict(occurred_at=base + timedelta(hours=hours), from_bank_id=1, to_bank_id=1,
+                          from_account_id=sender, to_account_id=receiver, amount_received=Decimal(1),
+                          receiving_currency='USD', amount_paid=Decimal(1), payment_currency='USD',
+                          amount_usd=Decimal(1000), payment_format='ACH')
+                for key, hours, sender, receiver in ((301, 0, 'hub', 'r0'), (302, 6, 'hub', 'r1'),
+                                                     (303, 20, 'r1', 'x'), (304, 40, 'hub', 'y'))}
+        batch = _build_graphs(rows, [301, 302])
+        graph, = batch.graphs
+        self.assertEqual(graph.context_ids, (303,))
+        seed_info = {key: dict(txId=key, occurredAt=rows[key]['occurred_at'].isoformat(), score=.9, threshold=.7)
+                     for key in (301, 302)}
+        doc = _evidence(graph, rows, {301: dict(p_laundering=.9), 302: dict(p_laundering=.9)}, seed_info,
+                        batch.account_keys)
+        roles = {m['txId']: (m['role'], m['includedReasons']) for m in doc['transactions']}
+        self.assertEqual(roles[303], ('CONTEXT', ['CONTEXT']))
+        self.assertEqual(sorted(roles), [301, 302, 303])
+        self.assertEqual([s['txId'] for s in doc['seeds']], [301, 302])
 
     def test_links_follow_the_current_run_and_stay_out_of_the_fingerprint(self):
         from alerts.alert_pipeline import _extend, _fingerprint, _member_digest
