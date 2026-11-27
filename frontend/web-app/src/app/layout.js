@@ -16,7 +16,7 @@ import { reviewStatusLabels } from '../lib/review-status.js';
 import { csvDownloadEntry, inDateRange, QueryRadio, setupQueryControls, WorkspaceQueryDock } from '../components/query-controls.jsx';
 import { dashboardFixtureBoardPage, dashboardFixtureResponse, dashboardFixtures, dashboardPeriodEnd, dashboardRecordCodes } from '../mocks/dashboard-fixtures.js';
 import { personalWorkHistory } from '../features/dashboard/personal-work-history.js';
-import { liveCodes, liveSource, liveSourceLoaded, loadLiveSource, rebuildLiveSource, resetLiveSource } from '../features/investigation/live-data.js';
+import { liveCodes, liveSource, liveSourceLoaded, loadLiveSource, markLiveJudged, markLiveReviewStarted, rebuildLiveSource, resetLiveSource } from '../features/investigation/live-data.js';
 import { changeLiveEpisode, editLiveTransactions, markLiveRead, saveLiveJudgment, startLiveReview } from '../features/investigation/live-actions.js';
 import { liveWorkRequests, liveWorkRequestsReady, loadLiveWorkRequests, readLiveWorkRequests, resetLiveWorkRequests, resolveLiveWorkRequest,
   sendLiveWorkRequest } from '../features/investigation/live-work-requests.js';
@@ -82,6 +82,48 @@ try {
 const defaultTabs = tabGroups.flatMap(group => tabCodes(group).slice(0, 2));
 const initialWorkTabs = restoreWorkTabCodes(storedWorkTabs, defaultTabs, tabGroups.flatMap(tabCodes))
   .filter(code => serviceMode || benchmarkLedgerRoute || !isBenchmarkTransactionCode(code));
+
+// 대시보드·거래·Alert·Episode 메뉴마다 마지막에 본 화면(전체·개인, 표·카드와 조건)을 기억해 메뉴로 돌아올 때 그대로 연다.
+const lastListsStorageKey = benchmarkLedgerRoute ? 'aml-live-layout-ibm-last-lists' : 'aml-live-layout-last-lists';
+const listScreens = {
+  D: path => /^dashboard\/(?:all|mine)$/.test(path),
+  T: path => isLedgerScreen(path),
+  A: path => /^add-tab\/alerts-(?:cards|table)(?:\/no-filter)?$/.test(path),
+  E: path => /^add-tab\/episodes(?:-table)?(?:\/no-filter)?$/.test(path),
+};
+const listPrefix = path => Object.keys(listScreens).find(prefix => listScreens[prefix](path ?? ''));
+let lastLists = {};
+try {
+  const stored = JSON.parse(sessionStorage.getItem(lastListsStorageKey)) ?? {};
+  for (const [prefix, entry] of Object.entries(stored)) {
+    if (listPrefix(entry?.path) === prefix && typeof entry.search === 'string') lastLists[prefix] = entry;
+  }
+} catch {
+  // 저장소를 쓸 수 없으면 기본 목록부터 연다.
+}
+
+function rememberList(path, params) {
+  const prefix = listPrefix(path);
+  if (!prefix) return;
+  const search = new URLSearchParams(params);
+  search.delete('data');
+  // 거래 메뉴는 보기(표·카드)와 조건만 기억한다. 고른 거래는 작업 탭이 맡는다.
+  search.delete('transaction');
+  lastLists = { ...lastLists, [prefix]: { path, search: search.toString() } };
+  try { sessionStorage.setItem(lastListsStorageKey, JSON.stringify(lastLists)); } catch { /* 이번 페이지에서만 기억한다. */ }
+}
+
+const listDestination = prefix => lastLists[prefix]?.path ?? (prefix === 'D' ? sections.dashboard : sections[prefix]);
+// 기억한 목록으로 갈 때만 그때의 조건을 함께 넘긴다.
+const rememberedParams = path => {
+  const entry = lastLists[listPrefix(path)];
+  return entry?.path === path ? new URLSearchParams(entry.search) : undefined;
+};
+
+function forgetLists() {
+  lastLists = {};
+  try { sessionStorage.removeItem(lastListsStorageKey); } catch { /* 저장소를 쓸 수 없으면 메모리만 비운다. */ }
+}
 let benchmarkDataset;
 let benchmarkSummaryLoading;
 let benchmarkLoading;
@@ -582,9 +624,15 @@ function showWorkspaceNavigation(path, code) {
   headerCode = code;
   const navigation = path ? ScreenNavigation(path, code) : { primary: [] };
   if (benchmarkLedgerRoute && isLedgerScreen(path)) {
-    navigation.primary = navigation.primary.map(item => item.value === sections.T
+    navigation.global = navigation.global.map(item => item.value === sections.T
       ? { ...item, label: '은행·계좌·거래' } : item);
   }
+  // 대시보드·거래·Alert·Episode 메뉴는 지금 보는 화면, 아니면 마지막에 본 화면으로 보낸다.
+  navigation.global = navigation.global?.map(item => {
+    const prefix = listPrefix(item.value);
+    if (!prefix) return item;
+    return { ...item, value: listPrefix(path) === prefix ? path : listDestination(prefix) };
+  });
   renderScreenNav(navigation, navigateFromHeader);
 }
 
@@ -596,7 +644,7 @@ function navigateFromHeader(path) {
   cancelAnimationFrame(navigationFrame);
   // Let the persistent header paint before unmounting or building the next workspace.
   navigationFrame = requestAnimationFrame(() => {
-    navigationFrame = requestAnimationFrame(() => showWorkspace('', code, path));
+    navigationFrame = requestAnimationFrame(() => showWorkspace('', code, path, 'push', rememberedParams(path)));
   });
 }
 
@@ -636,6 +684,7 @@ function loadInvestigationView(host, placeholder, load, mount, fallback) {
 }
 
 function updateWorkspaceAddress(path, code, navigationMode, urlParams, { scroll = true } = {}) {
+  rememberList(path, urlParams);
   if (code) document.querySelector(`.work-tabs [data-work-code="${code}"]`)?.setAttribute('aria-current', 'page');
   if (scroll) window.scrollTo(0, 0);
   if (navigationMode === 'none' || !path || /\/judge(?:-|\/|$)/.test(path)) return;
@@ -958,18 +1007,22 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
       if (serviceMode) {
         const mounted = mountedWorkflows;
         if (!canStartPreviewReview(current, currentPreviewUser())) return;
-        void startLiveReview(current).then(result => {
+        const show = () => {
+          if (mountedWorkflows !== mounted) return;
+          dashboardSource = caseSource(groups);
+          mountedWorkflows.updateCase(dashboardSource.cases.find(item => item.code === target), dashboardSource);
+        };
+        // 버튼은 이 약속이 끝날 때까지 막혀 있다. board 는 오래 걸릴 수 있어 기다리지 않는다.
+        return startLiveReview(current).then(result => {
           if (!result.ok) {
-            document.dispatchEvent(new CustomEvent('aml:notice', { detail: { status: 'failed', title: '상태를 바꾸지 못했습니다.', description: result.error } }));
+            document.dispatchEvent(new CustomEvent('aml:notice', { detail: { status: 'failed', title: '조사를 시작하지 못했습니다.', description: result.error } }));
             return;
           }
-          return loadLiveSource().then(() => {
-            if (mountedWorkflows !== mounted) return;
-            dashboardSource = caseSource(groups);
-            mountedWorkflows.updateCase(dashboardSource.cases.find(item => item.code === target), dashboardSource);
-          });
+          // 받아 둔 응답에 착수를 먼저 반영해 바로 [판정]으로 바꾸고, 전체 board 는 뒤에서 다시 받아 맞춘다.
+          markLiveReviewStarted(current.caseId);
+          show();
+          void loadLiveSource().then(show, () => undefined);
         });
-        return;
       }
       if (!startPreviewReview(current, currentPreviewUser())) return;
       dashboardSource = caseSource(groups);
@@ -978,8 +1031,14 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     saveJudgment: (target, verdict, details, reasonCategory) => {
       const row = !readOnly && activeWorkCode === target ? dashboardSource.cases.find(item => item.code === target) : undefined;
       if (serviceMode) {
-        return saveLiveJudgment(row, verdict, details, reasonCategory).then(result => result.ok
-          ? loadLiveSource().then(() => { dashboardSource = caseSource(groups); return result; }) : result);
+        return saveLiveJudgment(row, verdict, details, reasonCategory).then(result => {
+          if (!result.ok) return result;
+          // 판정 응답만으로 완료 창을 띄운다. 받아 둔 board 에 판정을 먼저 반영하고, 전체 board 는 뒤에서 다시 받아 맞춘다.
+          markLiveJudged(row, result.judgment);
+          dashboardSource = caseSource(groups);
+          void loadLiveSource().then(() => { dashboardSource = caseSource(groups); }, () => undefined);
+          return result;
+        });
       }
       const actor = currentPreviewUser();
       const result = savePreviewJudgment(row, verdict, details, reasonCategory, actor?.username ?? '', actor);
@@ -992,6 +1051,13 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     },
     onJudgmentReport: id => {
       showWorkspace('', '', sections.report, 'push', new URLSearchParams({ selected: id }));
+      workspace.querySelector('h1')?.focus({ preventScroll: true });
+    },
+    onJudgmentNext: nextCode => openWorkCode(nextCode),
+    // 판정한 건의 목록(Alert·Episode)으로, 마지막에 본 보기와 조건 그대로 돌아간다.
+    onJudgmentList: () => {
+      const destination = listDestination(code[0]);
+      showWorkspace(code[0], '', destination, 'push', rememberedParams(destination));
       workspace.querySelector('h1')?.focus({ preventScroll: true });
     },
     registerTableTools: queryControls.registerTableTools,
@@ -1177,7 +1243,11 @@ document.addEventListener('click', event => {
 document.addEventListener('click', event => {
   const button = event.target.closest('button');
   if (button?.matches('.group-toggle')) toggleDisclosure(button);
-  if (button?.dataset.investigation) showWorkspace(button.dataset.investigation);
+  if (button?.dataset.investigation) {
+    const prefix = button.dataset.investigation;
+    const destination = listDestination(prefix);
+    showWorkspace(prefix, '', destination, 'push', rememberedParams(destination));
+  }
   if (button?.dataset.workCode) {
     const { workCode } = button.dataset;
     if (button.hasAttribute('data-add-work-tab')) addWorkTabFromCard(button, workCode);
@@ -2059,6 +2129,7 @@ async function signOut() {
 }
 function clearWorkspaceSession() {
   setPreviewSession(null);
+  forgetLists();
   activeEvidence = undefined;
   resetPreviewCaseRead();
   resetLiveSource();

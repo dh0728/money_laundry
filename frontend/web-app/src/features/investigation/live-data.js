@@ -14,6 +14,40 @@ const empty = { transactions: [], cases: [], mine: [], businessAt: undefined };
 let board;
 let source;
 let loading;
+// 서버가 받아들인 조사 시작·판정을 board 를 다시 받기 전에 받아 둔 응답에 먼저 반영한다.
+// 그 동작 전에 출발한 board 응답이 늦게 와도 덮이지 않게 두었다가, 서버 응답에 반영된 것이 보이면 지운다.
+const startedLocally = new Map(); // Alert caseId → 착수 시각
+const judgedLocally = new Map(); // 'ALERT:caseId' · 'EPISODE:caseId' → 판정 응답
+const caseKey = (kind, caseId) => `${kind}:${caseId}`;
+
+function applyLocalChanges() {
+  for (const [caseId, at] of startedLocally) {
+    const item = board?.cases.find(entry => entry.kind === 'ALERT' && entry.caseId === caseId);
+    if (!item) continue;
+    if (item.reviewStartedAt) startedLocally.delete(caseId);
+    else {
+      item.reviewStartedAt = at;
+      item.readAt ??= at;
+    }
+  }
+  for (const [key, judgment] of judgedLocally) {
+    const item = board?.cases.find(entry => caseKey(entry.kind, entry.caseId) === key);
+    if (!item) continue;
+    if (item.status === 'CLOSED') judgedLocally.delete(key);
+    else Object.assign(item, { status: 'CLOSED', outcome: judgment.verdict, closedAt: judgment.at, judgment });
+  }
+}
+
+export function markLiveReviewStarted(caseId) {
+  startedLocally.set(caseId, new Date().toISOString());
+  applyLocalChanges();
+}
+
+/** judgment 는 서버의 판정 응답 그대로다(board 의 judgment 와 같은 모양). */
+export function markLiveJudged(row, judgment) {
+  judgedLocally.set(caseKey(row.kind === 'Episode' ? 'EPISODE' : 'ALERT', row.caseId), judgment);
+  applyLocalChanges();
+}
 
 export const caseCode = item =>
   `${item.kind === 'EPISODE' ? 'E' : 'A'}-${stamp(item.createdAt)}-${String(item.caseId).padStart(6, '0')}`;
@@ -109,6 +143,7 @@ export const liveCodes = prefix => prefix === 'T' ? [] : liveSource().cases
 export function loadLiveSource() {
   loading ??= getJson('/api/v1/review/board').then(next => {
     board = next;
+    applyLocalChanges();
     source = build();
     return source;
   }).finally(() => { loading = undefined; });
@@ -124,4 +159,6 @@ export function rebuildLiveSource() {
 export function resetLiveSource() {
   board = undefined;
   source = undefined;
+  startedLocally.clear();
+  judgedLocally.clear();
 }

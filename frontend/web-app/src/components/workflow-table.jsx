@@ -5,8 +5,17 @@ import { Activity, ArrowDown, ArrowDownLeft, ArrowUp, ArrowUpDown, ArrowUpRight,
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRowHead } from '@/components/ui/table';
 import { ActionButton } from './primary-button';
 import SpringCheck from './react-bits/SpringCheck';
+import { activateRecordCard } from './record-card';
 import { CountTag } from './semantic-tags';
 import './table-frame.css';
+
+// 표도 카드처럼 행 아무 데나 누르면 첫 칸(행 머리)의 기록 링크를 연다. 체크박스·버튼·링크와 글자 선택은 그대로 둔다.
+function openRecordRow(event) {
+  const link = event.currentTarget.querySelector('[data-slot="table-row-head"] [data-tag="link"]');
+  if (link) activateRecordCard(event, () => link.click());
+}
+
+export const recordRowProps = { 'data-opens-record': '', onClick: openRecordRow };
 
 const textOrder = new Intl.Collator(['ko', 'en'], { numeric: true, sensitivity: 'base' });
 const compareValues = (a, b) => typeof a === 'number' && typeof b === 'number' ? a - b : textOrder.compare(a, b);
