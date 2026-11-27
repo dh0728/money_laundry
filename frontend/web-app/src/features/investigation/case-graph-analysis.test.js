@@ -6,7 +6,7 @@ import { caseAccountLayout } from './case-pattern-layout';
 import { caseSankeyGraph, layoutCaseSankey } from './case-sankey-data';
 import { sankeyLinkPath } from '@/components/charts/charts/sankey/sankey-path';
 import { ownerGraphLayout, ownerTransferPath } from '../graph/owner-graph-layout';
-import { caseGroupColor } from '../graph/graph-case-groups';
+import { assignCaseColorSlots, caseGroupColor, caseRegionOpacity, caseRegionWidth, caseShortLabel } from '../graph/graph-case-groups';
 import { mountCaseGraph } from './preview-case-graph';
 import { previewUrl, readPreviewRoute } from '../../app/preview-route';
 import { ScreenLayout, ScreenNavigation } from '../../app/screen-layouts';
@@ -24,12 +24,59 @@ const account = (code, owner = code) => ({ code, owner });
 const transfer = (code, from, to, score, verdict = 'unjudged') => ({ code, from, to, score, verdict });
 
 describe('case graph analysis', () => {
-  it('reserves the reference color while cycling through the comparison case colors', () => {
-    const reference = caseGroupColor(0);
-    const comparison = [1, 2, 3, 4].map(caseGroupColor);
-    expect(new Set(comparison).size).toBe(4);
-    expect(comparison).not.toContain(reference);
-    expect([5, 6, 7, 8].map(caseGroupColor)).toEqual(comparison);
+  it('gives the reference and seven compared Alerts their own colors, none of them a risk color', () => {
+    const colors = [0, 1, 2, 3, 4, 5, 6, 7].map(caseGroupColor);
+    expect(new Set(colors).size).toBe(8);
+    expect(colors.every(color => color.startsWith('var(--case-group-'))).toBe(true);
+    expect(colors.some(color => /risk|brand-accent/.test(color))).toBe(false);
+    expect(caseGroupColor(8)).toBe(colors[0]);
+  });
+
+  it('colors compared Alerts in the order they were added and keeps colors when one is removed', () => {
+    let slots = assignCaseColorSlots(new Map(), ['A-1', 'A-2', 'A-3']);
+    expect([...slots]).toEqual([['A-1', 1], ['A-2', 2], ['A-3', 3]]);
+    slots = assignCaseColorSlots(slots, ['A-1', 'A-3']);
+    expect([...slots]).toEqual([['A-1', 1], ['A-3', 3]]);
+    slots = assignCaseColorSlots(slots, ['A-1', 'A-3', 'A-9']);
+    expect(slots.get('A-9')).toBe(2);
+    expect(slots.get('A-3')).toBe(3);
+  });
+
+  it('labels shared nodes and edges with short Alert numbers and fades the other Alerts on highlight', () => {
+    expect(caseShortLabel('A-230908-000117')).toBe('117');
+    expect(caseShortLabel('A-230915-001880')).toBe('1880');
+    expect(caseRegionOpacity('A-1')).toBeCloseTo(.2);
+    expect(caseRegionOpacity('A-1', 'A-1')).toBeGreaterThan(caseRegionOpacity('A-1'));
+    expect(caseRegionOpacity('A-2', 'A-1')).toBeLessThan(caseRegionOpacity('A-2'));
+    expect([0, 1, 2, 3, 4].map(index => caseRegionWidth(index, 26, 5, 12))).toEqual([26, 21, 16, 12, 12]);
+  });
+
+  it('shows a chip for every compared Alert and highlights one on press', async () => {
+    const row = (index, from, to) => ({ ...transfer(`T-261111-0000000${index}`, account(from, from), account(to, to), 90),
+      timestamp: `2026-11-11 13:0${index}`, method: '계좌이체', currency: 'KRW', amount: 100, status: '처리 전' });
+    const active = { code: 'A-261111-000001', kind: 'Alert', related: [row(1, 'A', 'B'), row(2, 'B', 'C')] };
+    const other = { code: 'A-261111-000002', kind: 'Alert', related: [row(3, 'B', 'D')] };
+    const host = document.createElement('div');
+    host.innerHTML = '<div data-case-flow="related" data-lens="owner"></div><div data-case-evidence="연결 거래"></div><div data-case-accounts></div>';
+    document.body.append(host);
+    const graph = within(host);
+    let cleanup;
+    try {
+      await act(async () => { cleanup = mountCaseGraph(host.children[0], { active, cases: [active, other] }); });
+      expect(graph.queryByRole('list', { name: '그래프의 Alert 구분' })).not.toBeInTheDocument();
+      fireEvent.click(graph.getByRole('checkbox', { name: `${other.code} 그래프에서 비교` }));
+      const chips = within(graph.getByRole('list', { name: '그래프의 Alert 구분' })).getAllByRole('button');
+      expect(chips.map(chip => chip.textContent)).toEqual([`${active.code}기준2건`, `${other.code}1건`]);
+      expect(chips[0].style.getPropertyValue('--case-graph-swatch-ink')).toBe(caseGroupColor(0));
+      expect(chips[1].style.getPropertyValue('--case-graph-swatch-ink')).toBe(caseGroupColor(1));
+      fireEvent.click(chips[1]);
+      expect(chips[1]).toHaveAttribute('aria-pressed', 'true');
+      fireEvent.click(chips[1]);
+      expect(chips[1]).toHaveAttribute('aria-pressed', 'false');
+    } finally {
+      await act(async () => { cleanup?.(); });
+      host.remove();
+    }
   });
 
   it('distinguishes score zero, exact thresholds and missing scores', () => {

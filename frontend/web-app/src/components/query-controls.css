@@ -37,31 +37,64 @@
   block-size: var(--query-control-size, var(--header-control-size));
 }
 .query-control:has(.query-trigger[hidden]) { display: none }
-#workspace-query-dock {
-  --query-dock-padding: var(--aml-space-4);
-  --query-dock-width: calc(var(--header-control-size) + 2 * var(--query-dock-padding));
-  --query-dock-inline-end: max(var(--workspace-inset), calc(var(--app-inline-gutter) - var(--query-dock-width) - var(--workspace-panel-gap)));
-  position: fixed;
-  inset-block-end: var(--workspace-footer-inset);
-  inset-inline-end: var(--query-dock-inline-end);
-  z-index: var(--layer-shell);
+/* 조회 도구는 화면 맨 위 줄(.screen-query-row)에 붙는다. 처음 만들어 두는 자리(#workspace-query-dock)는 보이지 않는다. */
+#workspace-query-dock { display: none }
+.screen-query-row > .query-bar {
+  flex: 1 1 100%;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  row-gap: var(--aml-space-6);
+}
+/* 검색·기간·필터는 한 줄로 두고(검색창이 줄어든다), 정렬·다운로드는 남는 자리 오른쪽 끝에 둔다. 좁으면 오른쪽 묶음만 다음 줄로 간다. */
+:is(.query-bar-main, .query-bar-side) {
+  display: flex;
+  align-items: center;
+  gap: var(--aml-space-6);
+  min-inline-size: 0;
+}
+.query-bar-main { flex: 1 1 auto }
+.query-bar-side { flex: none; margin-inline-start: auto }
+.query-bar .query-control { flex: none; inline-size: auto; align-items: center }
+.query-bar .query-control > .query-bar-trigger {
+  display: inline-flex;
+  align-items: center;
+  inline-size: auto;
+  gap: var(--aml-space-6);
+  padding-inline: var(--aml-space-12);
+  white-space: nowrap;
+}
+/* 기간과 지우기(×)는 구분선이 있는 한 칩으로 붙인다. */
+.query-bar .query-control:has(> .query-clear:not([hidden])) > .query-bar-trigger {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+.query-bar .query-control > .query-clear {
+  inline-size: var(--header-control-size);
+  block-size: var(--header-control-size);
+  border-inline-start: var(--aml-stroke-control) solid var(--divider);
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+}
+.query-count {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: var(--aml-space-20);
+  block-size: var(--aml-space-20);
+  padding-inline: var(--aml-space-4);
   border-radius: var(--aml-radius-full);
-  transition: inset-inline-end var(--aml-duration-fast) ease-out;
+  background-color: var(--selection-ink);
+  color: var(--selection-surface);
+  font-size: var(--aml-type-caption-size);
+  font-variant-numeric: tabular-nums;
 }
-#workspace-query-dock:not(:has(> .context-query-tools:not([hidden]))) { display: none }
-body:has(#inbox:not([hidden])) #workspace-query-dock {
-  inset-inline-end: max(var(--query-dock-inline-end), calc(var(--inbox-width) + var(--aml-space-8)));
+.query-count[hidden] { display: none }
+/* 검색창은 헤더 검색과 같은 공용 SearchField(compact)이고 높이만 도구 버튼에 맞춘다. */
+.query-bar .query-search {
+  flex: 0 1 calc(var(--header-control-size) * 8);
+  min-inline-size: calc(var(--header-control-size) * 4);
 }
-:root[data-reduced-motion="true"] #workspace-query-dock { transition: none }
-@media (prefers-reduced-motion: reduce) {
-  #workspace-query-dock { transition: none }
-}
-#workspace-query-dock > .context-query-tools {
-  flex-direction: column;
-  gap: var(--aml-space-4);
-  padding: var(--query-dock-padding);
-}
-:root[data-workspace-width="wide"] #workspace-query-dock { --query-dock-inline-end: var(--workspace-inset) }
+.query-bar .query-search[hidden] { display: none }
+.query-bar .query-search > .search-field { --search-field-size: var(--header-control-size) }
 .screen-layout:has(.dashboard-work-details > [data-dashboard-section-content][inert]) {
   padding-block-end: calc(var(--workspace-footer-inset) + 4 * var(--header-control-size) + 5 * var(--aml-space-4));
 }

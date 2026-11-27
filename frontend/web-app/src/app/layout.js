@@ -8,7 +8,7 @@ import { ApiError } from '@/api/common';
 import { alternatePreviewStaff, currentPreviewUser, previewAdmin, previewStaff, setPreviewUser, subscribePreviewUser } from '../features/auth/preview-session-user.js';
 import { fetchNotificationCases, fetchNotifications, setNotificationsRead } from '@/api/notifications';
 import { bindCardGlow } from '../components/card-glow.js';
-import { ConfirmHoldButton, PrimaryButton } from '../components/primary-button.jsx';
+import { PrimaryButton } from '../components/primary-button.jsx';
 import { DialogClose, DialogFooter, DialogHeader } from '../components/dialog-parts.jsx';
 import { FooterPagination } from '../components/footer-pagination.jsx';
 import { SearchField } from '../components/search-field.jsx';
@@ -47,6 +47,7 @@ import { mountNotificationPreference, receivesSampleNotifications } from '../fea
 import { notificationRowTitle, ruleNotificationLink, RuleNotificationLink } from '../features/rules/rule-notification.jsx';
 import { getModelRiskThresholds, loadLiveModelRiskThresholds } from '../features/settings/model-risk-settings.js';
 import { restoreWorkTabCodes, setWorkTabCodes } from './work-tab-state.js';
+import { startSessionKeepalive } from './session-keepalive.js';
 import { benchmarkLedgerPath, dashboardRoute, initialDetail, isBenchmarkTransactionCode, isLedgerScreen, ledgerTableScreen, loginRoute, previewUrl, readPreviewRoute, validWorkCode } from './preview-route.js';
 import { appMotionPreference, appReducedMotion, systemReducedMotion } from '@/hooks/use-reduced-motion';
 
@@ -2143,7 +2144,8 @@ for (const host of document.querySelectorAll('[data-dialog-heading]')) {
   }));
 }
 createRoot(byId('preview-sign-out')).render(createElement(DialogFooter, null,
-  createElement(ConfirmHoldButton, { tone: 'negative', onHold: signOut, doneLabel: '로그아웃' }, '길게 눌러 로그아웃')));
+  // 계정 창을 열어야 보이는 버튼이고 다시 로그인하면 되므로 한 번 누르면 로그아웃한다.
+  createElement(PrimaryButton, { tone: 'negative', onClick: signOut }, '로그아웃')));
 window.addEventListener('popstate', restoreLocation);
 document.addEventListener('aml:model-risk', () => {
   if (signedIn && activePath) showWorkspace('', activeWorkCode, activePath, 'none', new URLSearchParams(location.search));
@@ -2153,6 +2155,14 @@ if (serviceMode) {
     if (!signedIn) return;
     clearWorkspaceSession();
     restoreLocation();
+  });
+  // 클릭·키 입력이 이어지는 동안 서버 세션이 만료되지 않게 한다. 이미 만료됐으면 그때 로그인 화면으로 보낸다.
+  startSessionKeepalive({
+    isActive: () => signedIn,
+    ping: () => restoreSession().catch(error => {
+      if (error instanceof ApiError && error.problem.status === 401) window.dispatchEvent(new Event('auth-expired'));
+      throw error;
+    }),
   });
   // 서버 세션을 확인하기 전에는 로그인 화면 대신 준비 화면을 보여준다.
   if (location.pathname === '/login') restoreLocation();
