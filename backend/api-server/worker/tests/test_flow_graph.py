@@ -208,6 +208,34 @@ class FlowGraphTests(unittest.TestCase):
             self.assertEqual(count, len(full))
             self.assertLessEqual(examined, 3 * (limit + 1))
 
+    def test_array_index_answers_like_the_dict_index_and_ids_not_starting_at_one(self):
+        rng = random.Random(1127)
+        rows = []
+        for tx_id in range(5_000_001, 5_003_001):
+            # Times out of tx_id order, many ties, a few hub accounts.
+            rows.append((tx_id, rng.randrange(0, 40) * 60_000_000, rng.choice([1, 2, 3, *range(4, 300)]),
+                         rng.randrange(1, 300)))
+
+        def build(scale):
+            edges = EdgeTable()
+            for tx_id, at, sender, receiver in rows:
+                edges.append(tx_id, at, sender * scale, receiver * scale)
+            return FlowIndex(edges)
+        dense, sparse = build(1), build(10 ** 9)
+        self.assertEqual(type(sparse.outgoing).__name__, 'defaultdict')
+        self.assertEqual(type(dense.outgoing).__name__, '_Adjacency')
+        for side in ('incoming', 'outgoing'):
+            for account in range(0, 302):
+                expected = list(getattr(sparse, side).get(account * 10 ** 9, ()))
+                self.assertEqual(list(getattr(dense, side).get(account, ())), expected)
+                low, high = 5 * 60_000_000, 30 * 60_000_000
+                _, begin, end = dense.interval(getattr(dense, side), account, low, high)
+                rows_s, begin_s, end_s = sparse.interval(getattr(sparse, side), account * 10 ** 9, low, high)
+                self.assertEqual((begin, end), (begin_s, end_s))
+        self.assertEqual(dense.edges.position(5_001_234), 1_233)
+        with self.assertRaises(ValueError):
+            dense.edges.position(4_999_999)
+
     def test_context_total_is_bounded_but_core_is_not_cut(self):
         rows = [(i, i, "H", str(i)) for i in range(1, 31)]
         result = self.build(rows, [1, 10, 20], max_context_edges=3)

@@ -116,6 +116,9 @@ def _prepare_plans(connection, execution, batch, rows, scores, seeds, days, meta
     by_id = {case.alert_id: case for case in cases}
     del raw_cases
     steps.lap('caseIndex')
+    if hasattr(scores, 'load'):
+        # One batched lookup instead of one per case seed (scores are fetched on demand).
+        scores.load({key for c in cases for key in c.evidence.seed_ids})
     reassessed = frozenset(key for c in cases for key in c.evidence.seed_ids
                            if key in scores and key not in positive)
     validity = Validity(reassessed)
