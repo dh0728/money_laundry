@@ -1153,6 +1153,26 @@ function openWorkCode(code, moveFocus = true) {
   if (moveFocus) byId('workspace').querySelector('h1')?.focus({ preventScroll: true });
 }
 
+// 앱 안의 <a> 링크는 페이지를 다시 불러오지 않고 뒤로 가기와 같은 경로(showRoute)로 화면만 바꾼다.
+document.addEventListener('click', event => {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  const link = event.target.closest('a[href]');
+  if (!link || (link.target && link.target !== '_self') || link.hasAttribute('download')) return;
+  const url = new URL(link.href, location.href);
+  if (url.origin !== location.origin) return;
+  if (url.pathname === location.pathname && url.search === location.search) return;
+  // 데이터셋과 저장 키가 로드 시점에 정해지는 경로는 전체 이동을 유지한다.
+  if (benchmarkLedgerRoute || url.pathname.replace(/\/$/, '') === benchmarkLedgerPath) return;
+  const linkData = url.searchParams.get('data');
+  if (linkData && linkData !== dataMode) return;
+  if (!signedIn) return;
+  const route = readPreviewRoute(url, { serviceMode });
+  if (route.screen === loginRoute.screen) return;
+  event.preventDefault();
+  closeTransientViews();
+  showRoute(route, url.searchParams, 'push');
+});
+
 document.addEventListener('click', event => {
   const button = event.target.closest('button');
   if (button?.matches('.group-toggle')) toggleDisclosure(button);
@@ -1998,7 +2018,9 @@ function enterWorkspace(actor, animate, user) {
   setPreviewSession(actor, user);
   void refreshPreviewSessionUser().then(() => refreshLiveInbox(0, liveWorkspaceRequests));
   const next = history.state?.previewNext;
-  const previous = typeof next === 'string' && /^\/(?!\/)/.test(next) ? new URL(next, location.origin) : undefined;
+  // 로그인 폼에서 들어오면 previewNext, 새로고침으로 세션을 복원하면 현재 주소로 돌아간다.
+  const previous = typeof next === 'string' && /^\/(?!\/)/.test(next) ? new URL(next, location.origin)
+    : location.pathname !== '/login' ? new URL(location.href) : undefined;
   const route = previous ? readPreviewRoute(previous, { serviceMode }) : dashboardRoute;
   void prepareWorkspaceRoute(route, previous?.searchParams, 'push', animate);
 }
@@ -2055,18 +2077,22 @@ window.addEventListener('popstate', restoreLocation);
 document.addEventListener('aml:model-risk', () => {
   if (signedIn && activePath) showWorkspace('', activeWorkCode, activePath, 'none', new URLSearchParams(location.search));
 });
-restoreLocation();
 if (serviceMode) {
   window.addEventListener('auth-expired', () => {
     if (!signedIn) return;
     clearWorkspaceSession();
     restoreLocation();
   });
+  // 서버 세션을 확인하기 전에는 로그인 화면 대신 준비 화면을 보여준다.
+  if (location.pathname === '/login') restoreLocation();
+  else showWorkspacePreparation();
   void restoreSession().then(user => {
     if (!signingIn && !signedIn && !loginScene.transitioning) enterWorkspace(user.username, false, user);
   }, () => {
-    // Leave the user at login when the server session is missing or unavailable.
+    // 세션이 없거나 확인하지 못했을 때만 로그인 화면으로 보낸다.
+    if (!signedIn) restoreLocation();
   });
-} else if (signedIn) {
-  void refreshPreviewSessionUser().then(() => refreshLiveInbox());
+} else {
+  restoreLocation();
+  if (signedIn) void refreshPreviewSessionUser().then(() => refreshLiveInbox());
 }
