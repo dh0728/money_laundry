@@ -24,6 +24,7 @@ import { caseOverviewEvidence, episodeAlertEvidence, relatedJudgments } from './
 import { graphRiskBand } from './case-graph-scope';
 import { modelRiskLabels } from '../settings/model-risk-settings';
 import { CaseRuleHits } from '../rules/case-rule-hits';
+import { caseAssigneeLabel } from './case-assignee';
 import './preview-case-overview.css';
 import { Box, Heading, Stack, Text } from '../../components/layout-primitives';
 import { dataSeriesColors, transactionTotalColor } from '@/components/charts/charts/chart-context';
@@ -32,7 +33,7 @@ const number = new Intl.NumberFormat('ko-KR');
 const decimal = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 });
 const kst = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul', dateStyle: 'short', timeStyle: 'short' });
 const amount = record => `${number.format(record.amount)} ${record.currency}`;
-const reviewAssignee = row => row.assigned ? '내 담당' : '다른 담당자';
+const reviewAssignee = caseAssigneeLabel;
 const caseTime = value => Number.isFinite(Date.parse(value)) ? kst.format(new Date(value)) : '';
 
 function EvidencePeriod({ records }) {

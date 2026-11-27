@@ -7,6 +7,7 @@ import { CaseActorTag, ModelScoreTag, PatternTag, ReviewStatusTag, reviewStatusL
 import { currencyColumn, SortableTableHead, tableCount,
   useTableSelection, useTableSort } from '../../components/workflow-table';
 import { Box, LineBreak, Text } from '@/components/layout-primitives';
+import { caseAssigneeLabel } from './case-assignee';
 
 const flowsFor = records => [...new Set(records.map(({ from, to }) => `${from.code} → ${to.code}`))];
 const timesFor = records => records.map(record => record.timestamp).sort();
@@ -14,7 +15,7 @@ const columns = [
   { name: 'ID', value: row => row.code },
   { name: '패턴', value: row => row.pattern },
   { name: '모델 점수·사람 판정', compactName: '점수·판정', label: '모델 점수', value: row => row.score },
-  { name: '담당자', value: row => row.assigned ? '내 담당' : '다른 담당자' },
+  { name: '담당자', value: caseAssigneeLabel },
   { name: '업무 상태', value: row => reviewStatusLabel(row.status) },
   { name: '경과일', value: row => row.open ? row.elapsed : null },
   { name: '계좌 흐름', value: row => flowsFor(row.related).join(' ') || null },
@@ -81,13 +82,13 @@ export function PreviewCaseTable({ title, rows, episode = false, totalCount = ro
       </TableRow></TableHeader>
       <TableBody>
         {visibleRows.map(row => {
-          const { code, verdict, pattern, score, assigned, status, elapsed, open, related, relatedAccounts, linkedAlerts, amountByCurrency } = row;
+          const { code, verdict, pattern, score, status, elapsed, open, related, relatedAccounts, linkedAlerts, amountByCurrency } = row;
           const totals = Object.entries(amountByCurrency);
           return <TableRow key={code} data-verdict={verdict} data-selected={selection.has(code) || undefined}>
             <RecordIdCell code={code} />
             <TableCell><PatternTag emphasis="solid">{pattern}</PatternTag></TableCell>
             <TableCell><Box className="semantic-tag-group"><VerdictTag verdict={verdict} /><ModelScoreTag score={score} /></Box></TableCell>
-            <TableCell><CaseActorTag>{assigned ? '내 담당' : '다른 담당자'}</CaseActorTag></TableCell>
+            <TableCell><CaseActorTag>{caseAssigneeLabel(row)}</CaseActorTag></TableCell>
             <TableCell><ReviewStatusTag status={status} /></TableCell>
             <TableCell>{open ? `${elapsed}일` : '—'}</TableCell>
             <TableCell stacked><AccountFlows records={related} /></TableCell>
