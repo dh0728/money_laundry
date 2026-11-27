@@ -5,7 +5,7 @@ import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/tab
 import { CaseDataTable, RecordIdCell } from './case-table-components';
 import { CaseActorTag, ModelScoreTag, PatternTag, ReviewStatusTag, reviewStatusLabel, VerdictTag } from '../../components/semantic-tags';
 import { currencyColumn, SortableTableHead, tableCount,
-  useTableSelection, useTableSort } from '../../components/workflow-table';
+  recordRowProps, useTableSelection, useTableSort } from '../../components/workflow-table';
 import { Box, LineBreak, Text } from '@/components/layout-primitives';
 import { caseAssigneeLabel } from './case-assignee';
 
@@ -84,7 +84,7 @@ export function PreviewCaseTable({ title, rows, episode = false, totalCount = ro
         {visibleRows.map(row => {
           const { code, verdict, pattern, score, status, elapsed, open, related, relatedAccounts, linkedAlerts, amountByCurrency } = row;
           const totals = Object.entries(amountByCurrency);
-          return <TableRow key={code} data-verdict={verdict} data-selected={selection.has(code) || undefined}>
+          return <TableRow key={code} data-verdict={verdict} data-selected={selection.has(code) || undefined} {...recordRowProps}>
             <RecordIdCell code={code} />
             <TableCell><PatternTag emphasis="solid">{pattern}</PatternTag></TableCell>
             <TableCell><Box className="semantic-tag-group"><VerdictTag verdict={verdict} /><ModelScoreTag score={score} /></Box></TableCell>

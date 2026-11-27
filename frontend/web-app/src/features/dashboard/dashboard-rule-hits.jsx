@@ -7,7 +7,7 @@ import { SectionDownloadHeading } from '@/components/section-download';
 import { csvDownloadEntry } from '@/components/query-controls';
 import { LinkTag } from '@/components/semantic-tags';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow, TableRowHead } from '@/components/ui/table';
-import { TableFieldLabel, WorkflowTable } from '@/components/workflow-table';
+import { recordRowProps, TableFieldLabel, WorkflowTable } from '@/components/workflow-table';
 import { codeToRuleId, liveRuleRows, refreshLiveRules } from '../rules/live-rule-store';
 
 const rankLimit = 5;
@@ -79,7 +79,7 @@ export function DashboardRuleHits({ dataSource }) {
     <Text className="dashboard-note">{dataSource === 'sample' ? '샘플 전체 운영 기록' : '전체 운영 기록'} · 조회 기간과 별도</Text>
     {rows.length ? <WorkflowTable label={title} title={null} tools={false} scrollbarGutter="auto" fill>
       <TableHeader><TableRow>{columns.map(({ key, label }) => <TableHead key={key} scope="col"><TableFieldLabel column={key}>{label}</TableFieldLabel></TableHead>)}</TableRow></TableHeader>
-      <TableBody>{rows.map(row => <TableRow key={row.code}>
+      <TableBody>{rows.map(row => <TableRow key={row.code} {...recordRowProps}>
         <TableRowHead><LinkTag href={`/rules?rule=${encodeURIComponent(row.code)}`} aria-label={`${row.code} ${row.name} 상세 열기`}>{row.name}</LinkTag></TableRowHead>
         <TableCell numeric>{formatCount.format(row.hitCount)}건</TableCell>
         <TableCell>{(row.hitCount > 0 ? row.lastHitDate : null) ?? '—'}</TableCell>
