@@ -293,6 +293,49 @@ describe('case graph analysis', () => {
     }
   });
 
+  it('hides nearby (CONTEXT) transactions until the graph setting shows them', async () => {
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback) { this.callback = callback; }
+      observe(element) {
+        if (element.hasAttribute('data-force-graph')) this.callback([{ contentRect: { width: 600, height: 360 } }]);
+      }
+      disconnect() {}
+    });
+    const rows = [
+      { ...transfer('T-261111-00000001', account('A1'), account('A2'), 90), reviewRole: 'SUBJECT' },
+      { ...transfer('T-261111-00000002', account('A2'), account('C1'), 10), reviewRole: 'CONTEXT' },
+    ].map((row, index) => ({ ...row, timestamp: `2026-11-11 13:0${index + 1}`,
+      method: '계좌이체', currency: 'KRW', amount: 100, status: '처리 전' }));
+    const active = { code: 'A-261111-000001', pattern: 'FAN-OUT 82%', related: rows };
+    const host = document.createElement('div');
+    host.innerHTML = '<div data-case-flow="analysis" data-lens="pattern"></div><div data-case-evidence="거래" data-analysis-table></div><div data-case-accounts></div>';
+    document.body.append(host);
+    const graph = within(host);
+    const checkbox = code => graph.queryByRole('checkbox', { name: `${code} 선택` });
+    const node = id => graph.queryByRole('button', { name: `계좌 노드 ${id}` });
+    let cleanup;
+    try {
+      await act(async () => { cleanup = mountCaseGraph(host.children[0], { active, cases: [active] }); });
+        // jsdom has no Element.getAnimations; the switch skips its squish animation under reduced motion.
+      document.documentElement.dataset.reducedMotion = 'true';
+      const toggle = graph.getByRole('switch', { name: '주변 거래 표시' });
+      expect(toggle).not.toBeChecked();
+      expect(node('C1')).not.toBeInTheDocument();
+      expect(checkbox(rows[1].code)).not.toBeInTheDocument();
+      expect(checkbox(rows[0].code)).toBeInTheDocument();
+      fireEvent.click(toggle);
+      expect(node('C1')).toBeInTheDocument();
+      expect(checkbox(rows[1].code)).toBeInTheDocument();
+      fireEvent.click(toggle);
+      expect(node('C1')).not.toBeInTheDocument();
+    } finally {
+      delete document.documentElement.dataset.reducedMotion;
+      await act(async () => { cleanup?.(); });
+      host.remove();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('opens the third graph lens directly for Alert and Episode, also in read-only views', () => {
     for (const [family, code] of [['alerts', 'A-261111-000001'], ['episodes', 'E-261111-000001']]) {
       for (const tab of ['analysis', 'related']) {

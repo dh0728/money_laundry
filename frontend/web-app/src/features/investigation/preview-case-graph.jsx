@@ -54,7 +54,7 @@ function riskLegend() {
 const hopSteps = [1, 2, 3, 4, 5];
 const allGraphRelations = ':all-relations:';
 
-function GraphSettings({ id, groups, showDetails, onDetailsChange, ownerView, sankeyView, anchor, hops, onHopsChange,
+function GraphSettings({ id, groups, showDetails, onDetailsChange, showContext, onContextChange, ownerView, sankeyView, anchor, hops, onHopsChange,
   network, selection, onSelect, shownCases, highlightedCase, onHighlight, hiddenCases, onVisibilityChange,
   showSankeySample, accountCount, ownerCount }) {
   const trigger = useRef(null);
@@ -112,6 +112,11 @@ function GraphSettings({ id, groups, showDetails, onDetailsChange, ownerView, sa
         <Text as="span"><SquishSwitchControl id="case-graph-details" label="그래프 거래 라벨 표시"
           checked={showDetails} onChange={onDetailsChange} /></Text>
       </Box>}
+      <Box className="preview-graph-detail-toggle">
+        <Box as="label" htmlFor="case-graph-context">주변 거래 표시</Box>
+        <Text as="span"><SquishSwitchControl id="case-graph-context" label="주변 거래 표시"
+          checked={showContext} onChange={onContextChange} /></Text>
+      </Box>
       <Box className="preview-graph-picker">
         <Box as="label" htmlFor="case-graph-selection">계좌·연결 선택</Box>
         <FormDropdown id="case-graph-selection" value={selection ?? allGraphRelations} disabled={!network.nodes.length}
@@ -413,14 +418,16 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
   const [tablePicks, setTablePicks] = useState(() => initialSelection?.tablePicks ?? new Map());
   const [hops, setHops] = useState(initialSelection?.hops ?? 3);
   const [showDetails, setShowDetails] = useState(initialSelection?.showDetails ?? true);
+  // 주변 거래(CONTEXT 멤버)는 기본으로 빼고 그린다. 큰 Alert는 수천 건이 붙는다.
+  const [showContext, setShowContext] = useState(initialSelection?.showContext ?? false);
   useLayoutEffect(() => {
     if (!scopeKey) return;
-    if (candidateIds.size || hiddenCases.size || highlightedCase || selection || tablePicks.size || hops !== 3 || !showDetails) {
-      caseGraphSelections.set(scopeKey, { candidateIds, hiddenCases, highlightedCase, selection, selectedCodes, tablePicks, hops, showDetails });
+    if (candidateIds.size || hiddenCases.size || highlightedCase || selection || tablePicks.size || hops !== 3 || !showDetails || showContext) {
+      caseGraphSelections.set(scopeKey, { candidateIds, hiddenCases, highlightedCase, selection, selectedCodes, tablePicks, hops, showDetails, showContext });
     } else {
       caseGraphSelections.delete(scopeKey);
     }
-  }, [caseGraphSelections, scopeKey, candidateIds, hiddenCases, highlightedCase, selection, selectedCodes, tablePicks, hops, showDetails]);
+  }, [caseGraphSelections, scopeKey, candidateIds, hiddenCases, highlightedCase, selection, selectedCodes, tablePicks, hops, showDetails, showContext]);
   const settingsId = useId();
   const [through, setThrough] = useState();
   const [playing, setPlaying] = useState(false);
@@ -445,8 +452,9 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
   }) : [], [active, colorSlots, comparedCases, related]);
   const shownGroups = useMemo(() => groups.filter(group => group.id === active?.code || !hiddenCases.has(group.id)),
     [active, groups, hiddenCases]);
-  const transactions = useMemo(() => mergeCaseTransactions(comparedCases.filter(record => record === active || !hiddenCases.has(record.code))),
-    [active, comparedCases, hiddenCases]);
+  const transactions = useMemo(() => mergeCaseTransactions(comparedCases.filter(record => record === active || !hiddenCases.has(record.code)))
+    .filter(row => showContext || row.reviewRole !== 'CONTEXT'),
+    [active, comparedCases, hiddenCases, showContext]);
   const cursor = casePlaybackCursor(transactions, through);
   const current = useMemo(() => transactions.slice(0, cursor), [transactions, cursor]);
   const network = useMemo(() => buildCaseNetwork(transactions), [transactions]);
@@ -650,7 +658,8 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
             onDrop={related ? dropCandidate : undefined}>
             <Box as="header" className="preview-graph-center-heading">
               <GraphSettings id={settingsId} groups={groups}
-                showDetails={showDetails} onDetailsChange={setShowDetails} ownerView={ownerView} sankeyView={sankeyView} anchor={anchor} hops={hops}
+                showDetails={showDetails} onDetailsChange={setShowDetails}
+                showContext={showContext} onContextChange={setShowContext} ownerView={ownerView} sankeyView={sankeyView} anchor={anchor} hops={hops}
                 onHopsChange={setHops} network={currentGraph} selection={selected ? selection : tableTarget?.id} onSelect={select}
                 showSankeySample={sankeyView && active?.code !== complexSankeySampleCode}
                 shownCases={shownCases} highlightedCase={shownHighlight}
