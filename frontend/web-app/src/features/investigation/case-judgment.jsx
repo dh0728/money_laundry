@@ -40,7 +40,8 @@ function JudgmentDetails({ evidence, observations, reason }) {
   </Box>;
 }
 
-export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onReport, onBundle, onTransfer, bundleBlocked, onRelationRequest }) {
+export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onReport, onBundle, onTransfer, bundleBlocked, onRelationRequest,
+  nextCase, onOpenNext, onOpenList }) {
   const dialog = useRef(null);
   const title = useRef(null);
   const [verdict, setVerdict] = useState('');
@@ -107,6 +108,15 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
     requestAnimationFrame(focusTitle);
   }
 
+  const reportLink = result && {
+    as: 'a', href: `/report?selected=${encodeURIComponent(result.id)}`,
+    onClick: event => {
+      if (event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      onReport(result.id);
+    },
+  };
+
   async function commit() {
     if (!valid || !confirm || result) return;
     const response = await save(row.code, verdict, details, reasonCategory);
@@ -132,12 +142,18 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
           onClick={begin}>조사 시작</ActionButton>}
         {onRelationRequest && !requestSent && <ActionButton shape="pill" surface="floating"
           onClick={() => onRelationRequest(rationale.trim(), () => setRequestSent(true))}>관리자에게 요청 보내기</ActionButton>}
-        {result ? <PrimaryButton as="a" tone="brand" href={`/report?selected=${encodeURIComponent(result.id)}`}
-          onClick={event => {
-            if (event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-            event.preventDefault();
-            onReport(result.id);
-          }}>보고서 보기</PrimaryButton> : eligible && <>
+        {result ? <>
+          {/* 판정을 마치면 대시보드를 거치지 않고 다음 건이나 보던 목록으로 바로 간다. */}
+          {onOpenList && <ActionButton shape="pill" surface="floating" onClick={onOpenList}>{row.kind} 목록으로</ActionButton>}
+          {nextCase && onOpenNext
+            ? <>
+              <ActionButton shape="pill" surface="floating" {...reportLink}>보고서 보기</ActionButton>
+              <PrimaryButton tone="brand" onClick={() => onOpenNext(nextCase.code)}>
+                다음 건 열기 · <Text as="code">{nextCase.code}</Text>
+              </PrimaryButton>
+            </>
+            : <PrimaryButton tone="brand" {...reportLink}>보고서 보기</PrimaryButton>}
+        </> : eligible && <>
             {confirm && <ActionButton shape="pill" surface="floating" onClick={() => {
               setConfirm(false);
               setError('');
@@ -157,6 +173,7 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
         <JudgmentTargets row={row} />
         {result ? <Box className="case-judgment-summary">
           <Text role="status"><Text as="code">{result.id}</Text>에 판정이 저장되었습니다.</Text>
+          {onOpenNext && !nextCase && <Text>남은 내 업무가 없습니다.</Text>}
           <Text><VerdictTag verdict={result.verdict} /></Text>
           <Text><Text as="strong">{reasonLabel}</Text></Text>
           <JudgmentDetails {...result} />

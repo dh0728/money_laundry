@@ -1045,6 +1045,13 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
       showWorkspace('', '', sections.report, 'push', new URLSearchParams({ selected: id }));
       workspace.querySelector('h1')?.focus({ preventScroll: true });
     },
+    onJudgmentNext: nextCode => openWorkCode(nextCode),
+    // 판정한 건의 목록(Alert·Episode)으로, 마지막에 본 보기와 조건 그대로 돌아간다.
+    onJudgmentList: () => {
+      const destination = listDestination(code[0]);
+      showWorkspace(code[0], '', destination, 'push', rememberedParams(destination));
+      workspace.querySelector('h1')?.focus({ preventScroll: true });
+    },
     registerTableTools: queryControls.registerTableTools,
     rule: isRuleId(selectedRule) ? selectedRule : undefined,
   });
