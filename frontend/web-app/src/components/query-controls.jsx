@@ -6,7 +6,7 @@ import { DayPicker } from 'react-day-picker';
 import { ko } from 'react-day-picker/locale';
 import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
 import { createCsv, downloadBlob, downloadCsv as saveCsv } from '@/lib/report-io';
-import { Icon, IconButton, bindTooltip, hideTooltip } from './components.js';
+import { Button, Icon, IconButton, bindTooltip, hideTooltip } from './components.js';
 import { ActionButton } from './primary-button';
 import { FilterTag, reviewStates, reviewStatusLabel, VerdictTag, verdictLabels } from './semantic-tags';
 import { modelRiskBand, modelRiskLabels } from '../features/settings/model-risk-settings';
@@ -14,6 +14,7 @@ import { createPageCsvZip, printWorkspace } from '../lib/page-export';
 import { downloadVisualizations, hasVisualizations } from '../lib/preview-visual-export.js';
 import JellyRadio from './react-bits/JellyRadio';
 import { QueryCheck } from './selection-check';
+import { SearchField } from './search-field';
 import { FormDropdown, FormDropdownItem } from './form-dropdown';
 import { readWorkspaceGap } from '../features/dashboard/workspace-metrics.js';
 import { sortSavedTableRows, tableSortFields } from './workflow-table';
@@ -26,7 +27,22 @@ const scopeOptions = [{ value: 'all', label: '전체' }, { value: 'assigned', la
 const elapsedOptions = [
   { value: 'under-three', label: '3일 미만' }, { value: 'three-to-six', label: '3~6일' }, { value: 'week', label: '7일 이상' },
 ];
-const defaultQuery = { sort: '', risks: [], patterns: [], elapsed: [], statuses: [], verdicts: [], assignment: 'all', range: undefined };
+const defaultQuery = { sort: '', risks: [], patterns: [], elapsed: [], statuses: [], verdicts: [], assignment: 'all', range: undefined, search: '' };
+const caseSearchPlaceholder = 'ID, 탐지 유형, 담당자 검색';
+const searchLimit = 100;
+
+/** 검색어를 띄어쓰기로 나눠 모든 낱말이 fields 어딘가에 들어 있으면 맞는 것으로 본다(대소문자 무시). */
+export function matchesSearch(fields, search = '') {
+  const terms = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return true;
+  const text = fields.filter(Boolean).join(' ').toLowerCase();
+  return terms.every(term => text.includes(term));
+}
+
+/** Alert·Episode 는 ID, 탐지 유형(패턴), 담당자(이름·아이디·'내 담당')로 찾는다. */
+export const caseMatchesSearch = (row, search) => matchesSearch([
+  row.code, row.pattern, ...(row.patterns ?? []), row.assigneeName, row.assignee, row.assigned ? '내 담당' : '',
+], search);
 const caseVerdicts = ['unjudged', 'normal', 'abnormal'].map(value => ({ value, label: verdictLabels[value] }));
 const samplePatterns = ['Fan-out 82%', 'Cycle 74%', 'Gather-scatter 71%'];
 
@@ -50,8 +66,31 @@ export function QueryToolbar({ page = false } = {}) {
   return `<div class="context-query-tools" role="group" aria-label="조회 도구" hidden>${buttons}</div>`;
 }
 
+// 화면 맨 위 줄에 두는 조회 도구. [기간 ×] [필터 (개수)] ······ [정렬] [다운로드]
+// 아이콘만 있던 버튼에 글자를 붙여 찾기 쉽게 한다. 화면을 그릴 때마다 그 화면의 .screen-query-row 로 옮겨 붙는다.
+function queryBarControl(tool, label, { extra = '', id = '' } = {}) {
+  const content = Icon(tool) +
+    (tool === 'period' ? '<span class="screen-title-accessible">기간 </span>' : '') +
+    `<span class="query-trigger-label" data-query-label>${label}</span>` +
+    (tool === 'filter' ? '<span class="query-count" data-query-count hidden></span>' : '');
+  const button = Button(content, { variant: 'query-trigger query-bar-trigger', surface: 'floating', shape: 'pill',
+    attributes: `data-query-tool="${tool}" aria-haspopup="dialog" aria-expanded="false" hidden` });
+  return `<div class="query-control query-bar-control"${id ? ` id="${id}"` : ''}>${button}${extra}</div>`;
+}
+
+export function QueryBar() {
+  const clearPeriod = IconButton(Icon('close'), '기간 지우기', 'data-query-clear="period" hidden', 'query-clear', 'floating', 'pill');
+  // 검색창 자리. 공용 SearchField 는 setupQueryControls 가 이 안에 그린다.
+  const search = '<div class="query-search" data-query-search-field hidden></div>';
+  return `<div class="context-query-tools query-bar" role="group" aria-label="조회 도구" hidden>
+    <div class="query-bar-main">${search}${queryBarControl('period', '기간', { extra: clearPeriod })}${queryBarControl('filter', '필터')}</div>
+    <div class="query-bar-side">${queryBarControl('sort', '정렬')}${queryBarControl('download', '다운로드', { id: 'page-download' })}</div>
+  </div>`;
+}
+
+// 도구 줄을 처음 만들어 두는 자리. 화면이 그려지면 그 화면 맨 위로 옮겨 가므로 여기서는 보이지 않는다.
 export function WorkspaceQueryDock() {
-  return `<div id="workspace-query-dock" class="glass floating-glass">${QueryToolbar({ page: true })}</div>`;
+  return `<div id="workspace-query-dock" hidden>${QueryBar()}</div>`;
 }
 
 const embeddedToolbar = { __html: QueryToolbar() };
@@ -127,7 +166,7 @@ function availableSorts(rows) {
   ];
 }
 
-function ActiveFilters({ value, groups, sorts, boardSortHost, onChange, onEdit, popupId, focus, extra = [] }) {
+function ActiveFilters({ value, groups, sorts, boardSortHost, onChange, onEdit, popupId, focus, extra = [], showPeriod = true }) {
   const filters = groups.filter(group => group.name).flatMap(({ key, label, options }) =>
     value[key].map(selected => {
       const optionLabel = options.find(option => option.value === selected)?.label ?? selected;
@@ -146,7 +185,7 @@ function ActiveFilters({ value, groups, sorts, boardSortHost, onChange, onEdit, 
     remove: () => onChange({ ...value, sort: '' }, 'sort'),
   };
   if (sortChip && !boardSortHost) chips.push(sortChip);
-  if (value.range) chips.push({
+  if (value.range && showPeriod) chips.push({
     tool: 'period',
     label: `${formatDate(value.range.from)} ~ ${formatDate(value.range.to)}`,
     remove: () => onChange({ ...value, range: undefined }),
@@ -205,6 +244,7 @@ function parseQuery(params, scope, rows) {
     ])),
     assignment: allowsAssignment(scope) && params.get('assignment') === 'assigned' ? 'assigned' : 'all',
     range: from && to && from <= to ? { from, to } : undefined,
+    search: (params.get('q') ?? '').slice(0, searchLimit),
   };
 }
 
@@ -231,6 +271,7 @@ export function visibleCaseRows(rows, query) {
     && (!query.elapsed?.length || query.elapsed.includes(elapsedValue(row.elapsed)))
     && (query.assignment === 'all' || row.assigned)
     && inDateRange(row.date, query.range)
+    && caseMatchesSearch(row, query.search)
   ));
   if (!query.sort) return filtered;
   if (query.sort === 'ascending' || query.sort === 'descending') {
@@ -551,7 +592,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     const extra = [];
     if (sort) extra.push({ tool: 'sort', label: `정렬 · ${sort.label} · ${sort.direction > 0 ? '오름차순' : '내림차순'}`,
       remove: () => sort.select(0), removableOnly: true });
-    if (range && !value.range) extra.push({ tool: 'period', label: `${formatDate(range.from)} ~ ${formatDate(range.to)}`,
+    if (range && !value.range && embedded) extra.push({ tool: 'period', label: `${formatDate(range.from)} ~ ${formatDate(range.to)}`,
       remove: () => tableTools.period.onChange(undefined) });
     if (filter && filter.value !== 'all') extra.push({
       tool: 'filter', label: `${filter.label}: ${filter.options.find(option => option.value === filter.value)?.label ?? filter.value}`,
@@ -562,6 +603,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     tagsRoot ??= createRoot(conditionTags);
     const boardSortHost = workspace.querySelector('[data-dashboard-sort-tags]');
     tagsRoot.render(<ActiveFilters value={value} groups={groups} sorts={availableSorts(rows)} boardSortHost={boardSortHost} extra={extra}
+      showPeriod={embedded}
       focus={focus} popupId={popover.id}
       onEdit={(tool, origin, group) => open(buttons.find(button => button.dataset.queryTool === tool), { origin, editingGroup: group })}
       onChange={(next, tool) => {
@@ -584,6 +626,66 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     for (const button of queryButtons) {
       button.toggleAttribute('data-query-applied', applied[button.dataset.queryTool]);
     }
+    // 글자 버튼(화면 도구 줄)에는 적용한 필터 수와 기간을 바로 보여 준다.
+    const filterCount = tableTools?.filter ? Number(tableTools.filter.value !== 'all')
+      : groups.reduce((sum, { key }) => sum + (key === 'assignment' ? Number(value.assignment !== 'all') : value[key].length), 0);
+    const count = controls.querySelector('[data-query-count]');
+    if (count) {
+      count.textContent = filterCount ? String(filterCount) : '';
+      count.hidden = !filterCount;
+    }
+    const range = tableTools?.period?.range ?? value.range;
+    const periodLabel = controls.querySelector('[data-query-tool="period"] [data-query-label]');
+    if (periodLabel) periodLabel.textContent = range ? `${formatDate(range.from)} → ${formatDate(range.to)}` : '기간';
+    const clearPeriod = controls.querySelector('[data-query-clear="period"]');
+    if (clearPeriod) clearPeriod.hidden = !range || periodButtonHidden();
+  }
+  const periodButtonHidden = () => queryButtons.find(button => button.dataset.queryTool === 'period')?.hidden ?? true;
+  // 검색창: Alert·Episode 목록은 조회 조건(q)으로, 보고서처럼 표가 직접 거르는 화면은 그 표의 search 로 보낸다.
+  const searchField = controls.querySelector('[data-query-search-field]');
+  const searchRoot = searchField && createRoot(searchField);
+  if (searchRoot) flushSync(() => searchRoot.render(<SearchField variant="compact" label="목록 검색"
+    placeholder={caseSearchPlaceholder} maxLength={searchLimit} data-query-search="" />));
+  const searchInput = searchField?.querySelector('[data-query-search]');
+  let searchTimer;
+  let restoreSearch;
+  const searchesCases = () => scope === 'alerts' || scope === 'episodes';
+  function syncSearch() {
+    if (!searchField) return;
+    const tableSearch = tableTools?.search;
+    const visible = Boolean(tableSearch || searchesCases() && rows.length);
+    if (searchField.hidden === visible) searchField.hidden = !visible;
+    if (!visible) return;
+    searchInput.placeholder = tableSearch?.placeholder ?? caseSearchPlaceholder;
+    searchInput.setAttribute('aria-label', tableSearch?.label ?? '목록 검색');
+    if (document.activeElement !== searchInput) searchInput.value = tableSearch?.value ?? current().search ?? '';
+  }
+  function applySearch() {
+    clearTimeout(searchTimer);
+    const text = searchInput.value.slice(0, searchLimit);
+    if (tableTools?.search) {
+      if (text !== tableTools.search.value) tableTools.search.onChange(text);
+      return;
+    }
+    if (!searchesCases() || text === (current().search ?? '')) return;
+    // 목록이 다시 그려지며 검색창이 잠시 빠지므로, 다시 붙을 때 입력 자리를 되돌린다.
+    restoreSearch = { start: searchInput.selectionStart, end: searchInput.selectionEnd };
+    const next = { ...current(), search: text };
+    queries.set(scope, localTable ? { ...next, sort: queries.get(scope)?.sort ?? '' } : next);
+    onChange('search', current());
+  }
+  const scheduleSearch = () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(applySearch, 250);
+  };
+  function clearPeriod() {
+    if (tableTools?.period?.range) {
+      tableTools.period.onChange(undefined);
+      return;
+    }
+    const next = { ...current(), range: undefined };
+    queries.set(scope, localTable ? { ...next, sort: queries.get(scope)?.sort ?? '' } : next);
+    onChange('period', current());
   }
   function visibleLocalDownloads() {
     return [...workspace.querySelectorAll('[data-local-query-tools]')]
@@ -623,6 +725,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     }
     if (trigger?.hidden && popover.matches(':popover-open')) popover.hidePopover();
     syncAppliedButtons();
+    syncSearch();
     syncConditions();
   }
   function position() {
@@ -636,7 +739,9 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     }
     popover.style.removeProperty('--query-expanded-width');
     const width = Math.min(popover.offsetWidth, viewportWidth - gap * 2);
-    const left = Math.max(gap, Math.min(rect.right - width, viewportWidth - gap - width));
+    // 도구 줄 왼쪽 묶음(기간·필터)은 버튼 왼쪽 끝에, 나머지는 오른쪽 끝에 맞춰 연다.
+    const alignStart = Boolean(triggerSlot.closest('.query-bar-main'));
+    const left = Math.max(gap, Math.min(alignStart ? rect.left : rect.right - width, viewportWidth - gap - width));
     const above = rect.top - gap;
     const below = innerHeight - rect.bottom - gap;
     popover.style.setProperty('--query-expanded-width', `${width}px`);
@@ -776,6 +881,15 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
       else open(button);
     }, eventOptions);
   }
+  // 한글 조합 중에는 거르지 않고, 조합이 끝나거나 잠깐 멈추면 거른다. Enter 는 바로 거른다.
+  searchInput?.addEventListener('input', event => { if (!event.isComposing) scheduleSearch(); }, eventOptions);
+  searchInput?.addEventListener('compositionend', scheduleSearch, eventOptions);
+  searchInput?.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && !event.isComposing) applySearch();
+  }, eventOptions);
+  const clearPeriodButton = controls.querySelector('[data-query-clear="period"]');
+  clearPeriodButton?.addEventListener('click', clearPeriod, eventOptions);
+  if (clearPeriodButton) queryTooltipDisposers.push(bindTooltip(clearPeriodButton, tooltip, { hover: true }));
   popover.tabIndex = -1;
   popover.addEventListener('keydown', event => {
     if (event.key !== 'Escape' || event.defaultPrevented) return;
@@ -808,6 +922,8 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     dispose() {
       opening++;
       events.abort();
+      clearTimeout(searchTimer);
+      searchRoot?.unmount();
       watchVisualizations.disconnect();
       cancelAnimationFrame(checkDownload);
       for (const dispose of queryTooltipDisposers) dispose();
@@ -836,7 +952,16 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
       conditionTags.remove();
     },
     renderTags() {
+      if (!embedded) {
+        const row = workspace.querySelector('.screen-query-row');
+        if (row && controls.parentElement !== row) row.prepend(controls);
+      }
       syncTools();
+      if (restoreSearch && searchInput && !searchField.hidden) {
+        searchInput.focus({ preventScroll: true });
+        searchInput.setSelectionRange(restoreSearch.start, restoreSearch.end);
+      }
+      restoreSearch = undefined;
     },
     caseRows() {
       return new Map(rows.map(row => [row.code, row]));
@@ -860,6 +985,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
         result.set('from', formatDate(value.range.from));
         result.set('to', formatDate(value.range.to));
       }
+      if (value?.search?.trim()) result.set('q', value.search);
       return result;
     },
     dismiss,
