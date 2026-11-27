@@ -408,7 +408,7 @@ board의 사건 행은 `caseId,kind,status,outcome,assigneeId,assigneeName,assig
 
 | 요청 | 계약 |
 |---|---|
-| GET /api/v1/demo/reset/preview | `{counts:{테이블명:건수},snapshot,clock}`. `snapshot`은 초기화 대상 건수·최신 jobId·업무 시각 revision의 확인값 |
+| GET /api/v1/demo/reset/preview | `{counts:{테이블명:건수},snapshot,clock}`. `counts`는 PostgreSQL 통계의 추정 행 수(통계가 없는 테이블만 정확히 셈)라 데이터 양과 무관하게 응답한다. `snapshot`은 업로드·거래·분석 작업·Alert·Episode·조사 이벤트의 최대 번호와 업무 시각 revision의 확인값 |
 | POST /api/v1/demo/reset | `{requestId:UUID,snapshot,confirmation:"시연 데이터 초기화"}`. 응답200은 **DB 초기화 접수 결과**이며 파일 정리까지 완료했다는 뜻이 아님 |
 | GET /api/v1/demo/reset/latest | 최신 접수 상태. 기록이 없으면 `{status:"NONE"}` |
 | GET /api/v1/demo/reset/{resetId} | 접수 상태 |

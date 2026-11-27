@@ -169,6 +169,47 @@ class DemoResetTests {
   }
 
   @Test
+  @SuppressWarnings("unchecked")
+  void preview_reports_planner_estimates_and_counts_unanalyzed_tables_exactly() {
+    job("COMPLETED");
+    job("FAILED");
+    jdbc.execute("analyze ingest.uploads");
+    jdbc.update(
+        "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,now(),now())",
+        admin);
+    var counts = (Map<String, Long>) service.preview(admin).get("counts");
+    assertThat(counts).containsOnlyKeys(DemoResetService.TABLES.split(","));
+    assertThat(counts.get("ingest.uploads")).isEqualTo(2L);
+    // Freshly truncated and never analyzed: no estimate, so the small table is counted exactly.
+    assertThat(
+            jdbc.queryForObject(
+                "select reltuples from pg_class where oid='review.alerts'::regclass", Double.class))
+        .isNegative();
+    assertThat(counts.get("review.alerts")).isEqualTo(1L);
+  }
+
+  @Test
+  void review_activity_after_preview_makes_it_stale() {
+    long alert =
+        jdbc.queryForObject(
+            "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,now(),now()) returning alert_id",
+            Long.class,
+            admin);
+    var stale = input();
+    jdbc.update(
+        "insert into review.events(alert_id,actor_id,action,comment,business_at,snapshot) values(?,?,'COMMENT','',now(),'{}')",
+        alert,
+        admin);
+    assertCode(() -> service.reset(admin, stale), "RESET_PREVIEW_STALE");
+    var newAlert = input();
+    jdbc.update(
+        "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,now(),now())",
+        admin);
+    assertCode(() -> service.reset(admin, newAlert), "RESET_PREVIEW_STALE");
+    assertThat(service.reset(admin, input()).get("status")).isEqualTo("COMPLETED");
+  }
+
+  @Test
   void prod_staff_and_missing_confirmation_are_rejected() {
     long staff =
         jdbc.queryForObject("select user_id from core.users where username='l1a'", Long.class);
