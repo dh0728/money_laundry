@@ -16,7 +16,7 @@ import { reviewStatusLabels } from '../lib/review-status.js';
 import { csvDownloadEntry, inDateRange, QueryRadio, setupQueryControls, WorkspaceQueryDock } from '../components/query-controls.jsx';
 import { dashboardFixtureBoardPage, dashboardFixtureResponse, dashboardFixtures, dashboardPeriodEnd, dashboardRecordCodes } from '../mocks/dashboard-fixtures.js';
 import { personalWorkHistory } from '../features/dashboard/personal-work-history.js';
-import { liveCodes, liveSource, liveSourceLoaded, loadLiveSource, rebuildLiveSource, resetLiveSource } from '../features/investigation/live-data.js';
+import { liveCodes, liveSource, liveSourceLoaded, loadLiveSource, markLiveReviewStarted, rebuildLiveSource, resetLiveSource } from '../features/investigation/live-data.js';
 import { changeLiveEpisode, editLiveTransactions, markLiveRead, saveLiveJudgment, startLiveReview } from '../features/investigation/live-actions.js';
 import { liveWorkRequests, liveWorkRequestsReady, loadLiveWorkRequests, readLiveWorkRequests, resetLiveWorkRequests, resolveLiveWorkRequest,
   sendLiveWorkRequest } from '../features/investigation/live-work-requests.js';
@@ -1005,18 +1005,22 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
       if (serviceMode) {
         const mounted = mountedWorkflows;
         if (!canStartPreviewReview(current, currentPreviewUser())) return;
-        void startLiveReview(current).then(result => {
+        const show = () => {
+          if (mountedWorkflows !== mounted) return;
+          dashboardSource = caseSource(groups);
+          mountedWorkflows.updateCase(dashboardSource.cases.find(item => item.code === target), dashboardSource);
+        };
+        // 버튼은 이 약속이 끝날 때까지 막혀 있다. board 는 오래 걸릴 수 있어 기다리지 않는다.
+        return startLiveReview(current).then(result => {
           if (!result.ok) {
-            document.dispatchEvent(new CustomEvent('aml:notice', { detail: { status: 'failed', title: '상태를 바꾸지 못했습니다.', description: result.error } }));
+            document.dispatchEvent(new CustomEvent('aml:notice', { detail: { status: 'failed', title: '조사를 시작하지 못했습니다.', description: result.error } }));
             return;
           }
-          return loadLiveSource().then(() => {
-            if (mountedWorkflows !== mounted) return;
-            dashboardSource = caseSource(groups);
-            mountedWorkflows.updateCase(dashboardSource.cases.find(item => item.code === target), dashboardSource);
-          });
+          // 받아 둔 응답에 착수를 먼저 반영해 바로 [판정]으로 바꾸고, 전체 board 는 뒤에서 다시 받아 맞춘다.
+          markLiveReviewStarted(current.caseId);
+          show();
+          void loadLiveSource().then(show, () => undefined);
         });
-        return;
       }
       if (!startPreviewReview(current, currentPreviewUser())) return;
       dashboardSource = caseSource(groups);

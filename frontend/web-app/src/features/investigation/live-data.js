@@ -14,6 +14,26 @@ const empty = { transactions: [], cases: [], mine: [], businessAt: undefined };
 let board;
 let source;
 let loading;
+// 조사 시작이 성공한 Alert. board 를 다시 받기 전이나, 시작 전에 출발한 board 응답이 늦게 와도 '처리 중'으로 보이게 한다.
+// 서버 응답에 착수 시각이 들어오면 지운다.
+const startedLocally = new Map();
+
+function applyStartedLocally() {
+  for (const [caseId, at] of startedLocally) {
+    const item = board?.cases.find(entry => entry.kind === 'ALERT' && entry.caseId === caseId);
+    if (!item) continue;
+    if (item.reviewStartedAt) startedLocally.delete(caseId);
+    else {
+      item.reviewStartedAt = at;
+      item.readAt ??= at;
+    }
+  }
+}
+
+export function markLiveReviewStarted(caseId) {
+  startedLocally.set(caseId, new Date().toISOString());
+  applyStartedLocally();
+}
 
 export const caseCode = item =>
   `${item.kind === 'EPISODE' ? 'E' : 'A'}-${stamp(item.createdAt)}-${String(item.caseId).padStart(6, '0')}`;
@@ -109,6 +129,7 @@ export const liveCodes = prefix => prefix === 'T' ? [] : liveSource().cases
 export function loadLiveSource() {
   loading ??= getJson('/api/v1/review/board').then(next => {
     board = next;
+    applyStartedLocally();
     source = build();
     return source;
   }).finally(() => { loading = undefined; });
@@ -124,4 +145,5 @@ export function rebuildLiveSource() {
 export function resetLiveSource() {
   board = undefined;
   source = undefined;
+  startedLocally.clear();
 }

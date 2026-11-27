@@ -50,9 +50,10 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [requestSent, setRequestSent] = useState(false);
+  const [starting, setStarting] = useState(false);
   const pending = row.status === '처리 전';
   const canStart = canStartPreviewReview(row, actor);
-  const actionLabel = pending && !onBundle && !bundleBlocked ? '처리 중 상태로 변환' : '판정';
+  const actionLabel = pending && !onBundle && !bundleBlocked ? '조사 시작' : '판정';
   const eligible = canJudgePreviewCase(row, actor);
   const actionEnabled = Boolean(bundleBlocked || onBundle) || (pending ? canStart : eligible && !result);
   const reasonLabel = judgmentReasonLabels[reasonCategory];
@@ -69,13 +70,20 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
     title.current?.focus();
   };
 
+  // 조사 시작 요청이 끝날 때까지 버튼을 막아 같은 요청을 여러 번 보내지 않는다.
+  function begin() {
+    if (starting) return;
+    setStarting(true);
+    Promise.resolve(startReview(row.code)).finally(() => setStarting(false));
+  }
+
   function open() {
     if (onBundle) {
       onBundle();
       return;
     }
     if (pending && !bundleBlocked) {
-      startReview(row.code);
+      begin();
       return;
     }
     dialog.current.showModal();
@@ -111,7 +119,8 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
   }
 
   return <>
-    <PrimaryButton tone="brand" className="case-judgment-trigger" disabled={!actionEnabled}
+    <PrimaryButton tone="brand" className="case-judgment-trigger" disabled={!actionEnabled || starting}
+      aria-busy={starting || undefined}
       aria-haspopup={pending && !onBundle && !bundleBlocked ? undefined : 'dialog'}
       aria-controls={onBundle ? 'case-bundle-dialog' : pending && !bundleBlocked ? undefined : 'case-judgment-dialog'}
       onHold={open}>{actionLabel}</PrimaryButton>
@@ -119,8 +128,8 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
       titleId="case-judgment-title" titleRef={title} closeLabel="판정 창 닫기"
       title={result ? '판정 완료' : confirm ? '판정 내용 확인' : `${row.kind} 판정`}
       actions={<>
-        {bundleBlocked && canStart && <ActionButton shape="pill" surface="floating"
-          onClick={() => startReview(row.code)}>처리 중으로 변경</ActionButton>}
+        {bundleBlocked && canStart && <ActionButton shape="pill" surface="floating" disabled={starting}
+          onClick={begin}>조사 시작</ActionButton>}
         {onRelationRequest && !requestSent && <ActionButton shape="pill" surface="floating"
           onClick={() => onRelationRequest(rationale.trim(), () => setRequestSent(true))}>관리자에게 요청 보내기</ActionButton>}
         {result ? <PrimaryButton as="a" tone="brand" href={`/report?selected=${encodeURIComponent(result.id)}`}
