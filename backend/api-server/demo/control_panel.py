@@ -17,9 +17,9 @@ STAGE_NAMES = {
     'ALERTS': 'Alert 구성', 'COMPLETE': 'Alert 공개',
 }
 MODEL_NAMES = {'BINARY': '이진', 'TYPE': '유형'}
-# Reset preview and reset both count every reset table on the server (dev, 16 days: about 19 s on
-# 2026-11-12), longer than the default 15 s / 30 s. Above Cloudflare's 100 s cut, which then answers 524.
-RESET_TIMEOUT = 120
+# Reset preview and reset use planner row estimates, so they no longer scale with the data. Exact
+# counts took 92 s on dev (16 days, 2026-11-28). dev nginx cuts a request at 60 s and answers 504.
+RESET_TIMEOUT = 60
 REMOTE_NAMES = {
     'ACCEPTED': '접수됨', 'QUEUED': '차례 대기', 'RUNNING': '계산 중', 'RETRY_WAIT': '서버 재시도 대기',
     'COMPLETED': '계산 완료', 'FAILED': '서버 실패', 'STOPPED': '중단됨', 'RECOVERY_REQUIRED': '서버 복구 필요',
@@ -492,7 +492,8 @@ def render_reset(replay):
         preview = st.session_state.get('reset_preview')
         if preview:
             counts = preview['counts']
-            st.write({label: counts.get(table, 0) for label, table in (
+            st.caption('건수는 DB 통계의 추정값입니다.')
+            st.write({f'{label} (약)': counts.get(table, 0) for label, table in (
                 ('거래', 'ledger.transactions'), ('업로드', 'ingest.uploads'), ('분석 작업', 'analysis.jobs'),
                 ('Alert', 'review.alerts'), ('Episode', 'review.episodes'))})
             confirmation = st.text_input('확인 문구: 시연 데이터 초기화', key='reset_confirmation')
