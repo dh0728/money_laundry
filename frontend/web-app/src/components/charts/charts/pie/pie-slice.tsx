@@ -1,35 +1,18 @@
 "use client";
 
-import { m, useSpring, useTransform } from "motion/react";
-import { memo, useEffect, type CSSProperties } from "react";
+import { m, useTransform } from "motion/react";
+import { memo, type CSSProperties } from "react";
 import { arcPath } from "./arc-path";
 import { usePieHover, usePieStable } from "./pie-context";
 import { useEnterComplete } from "./use-enter-complete";
 import { useMountProgress } from "../use-mount-progress";
 import "./pie-slice.css";
 
-// Calculate the translation offset for a slice to "pop out" along its radial axis
-function getSliceOffset(
-  startAngle: number,
-  endAngle: number,
-  distance: number
-): { x: number; y: number } {
-  // Calculate the midpoint angle of the slice
-  const midAngle = (startAngle + endAngle) / 2;
-  // In d3-shape, 0 radians is at 12 o'clock, angles increase clockwise
-  // So the outward direction is: x = sin(angle), y = -cos(angle)
-  return {
-    x: Math.sin(midAngle) * distance,
-    y: -Math.cos(midAngle) * distance,
-  };
-}
+// 마우스를 올려도 조각 모양·위치·투명도는 바뀌지 않는다. 튀어나오기·커지기·다른 조각 흐리기 효과는
+// 대시보드·Alert 개요의 원형 차트가 움찔거리고 색이 바뀌어 보이던 원인이라 없앴다. 처음 그릴 때 차오르는 효과만 남긴다.
 
-// Every `m.path` below uses `initial={false}`: Motion can't read `opacity`
-// or `d` back from an SVG path, so without it the first frame animates from
-// `undefined` (console warning + an invalid `d="undefined"` attribute).
-
-/** Hover effect types */
-export type PieSliceHoverEffect = "translate" | "grow" | "none";
+// `m.path` uses `initial={false}`: Motion can't read `d` back from an SVG path,
+// so without it the first frame animates from `undefined` (console warning + an invalid `d="undefined"` attribute).
 
 export interface PieSliceProps {
   /** Index of the slice in the data array */
@@ -42,20 +25,11 @@ export interface PieSliceProps {
   animate?: boolean;
   /** Show glow effect on hover. Default: false */
   showGlow?: boolean;
-  /**
-   * Hover effect type. Default: "none"
-   * - "translate": Slice moves outward along its radial axis
-   * - "grow": Slice extends its outer radius (gets longer)
-   * - "none": No hover animation
-   */
-  hoverEffect?: PieSliceHoverEffect;
-  /** Distance in pixels for hover effect (translate distance or grow amount). Defaults to PieChart's hoverOffset */
-  hoverOffset?: number;
   /** Additional CSS class */
   className?: string;
 }
 
-interface AnimatedSliceTranslateProps {
+interface AnimatedSliceProps {
   index: number;
   innerRadius: number;
   outerRadius: number;
@@ -64,12 +38,11 @@ interface AnimatedSliceTranslateProps {
   cornerRadius: number;
   padAngle: number;
   fill: string;
-  isHovered: boolean;
   animationKey: number;
-  hoverOffset: number;
 }
 
-function AnimatedSliceTranslate({
+// 처음 그릴 때 12시 방향에서 끝 각도까지 차오른다. 다 그린 뒤에는 고정된 모양이다.
+function AnimatedSlice({
   index,
   innerRadius,
   outerRadius,
@@ -78,10 +51,8 @@ function AnimatedSliceTranslate({
   cornerRadius,
   padAngle,
   fill,
-  isHovered,
   animationKey,
-  hoverOffset,
-}: AnimatedSliceTranslateProps) {
+}: AnimatedSliceProps) {
   const {
     enterTransition,
     enterStaggerScale,
@@ -110,165 +81,25 @@ function AnimatedSliceTranslate({
     );
   });
 
-  const offset = getSliceOffset(startAngle, endAngle, hoverOffset);
-  const hitboxPath = arcPath(
-    innerRadius,
-    outerRadius,
-    startAngle,
-    endAngle,
-    cornerRadius,
-    padAngle
-  );
-
   if (enterComplete) {
-    const shouldTranslate = isHovered;
     return (
-      <m.path
-        animate={{
-          x: shouldTranslate ? offset.x : 0,
-          y: shouldTranslate ? offset.y : 0,
-        }}
-        d={hitboxPath}
+      <path
+        d={arcPath(innerRadius, outerRadius, startAngle, endAngle, cornerRadius, padAngle)}
         fill={fill}
-        initial={false}
         pointerEvents="none"
         className="pie-slice-visual"
-        transition={{
-          x: { type: "spring", stiffness: 400, damping: 25 },
-          y: { type: "spring", stiffness: 400, damping: 25 },
-        }}
       />
     );
   }
 
   return (
     <m.path
-      animate={{
-        x: isHovered ? offset.x : 0,
-        y: isHovered ? offset.y : 0,
-      }}
       d={animatedPath}
       fill={fill}
       initial={false}
       key={`slice-${animationKey}-${index}`}
       pointerEvents="none"
       className="pie-slice-visual"
-      transition={{
-        x: { type: "spring", stiffness: 400, damping: 25 },
-        y: { type: "spring", stiffness: 400, damping: 25 },
-      }}
-    />
-  );
-}
-
-interface AnimatedSliceGrowProps {
-  index: number;
-  innerRadius: number;
-  outerRadius: number;
-  startAngle: number;
-  endAngle: number;
-  cornerRadius: number;
-  padAngle: number;
-  fill: string;
-  isHovered: boolean;
-  animationKey: number;
-  hoverOffset: number;
-}
-
-function AnimatedSliceGrow({
-  index,
-  innerRadius,
-  outerRadius,
-  startAngle,
-  endAngle,
-  cornerRadius,
-  padAngle,
-  fill,
-  isHovered,
-  animationKey,
-  hoverOffset,
-}: AnimatedSliceGrowProps) {
-  const {
-    enterTransition,
-    enterStaggerScale,
-    animationKey: pieAnimationKey,
-  } = usePieStable();
-  const animationDelay = (0.1 + index * 0.08) * enterStaggerScale;
-  const mountProgress = useMountProgress(
-    enterTransition,
-    animationDelay,
-    pieAnimationKey
-  );
-  const enterComplete = useEnterComplete(mountProgress);
-
-  const growSpring = useSpring(outerRadius, {
-    stiffness: 400,
-    damping: 25,
-  });
-
-  useEffect(() => {
-    growSpring.set(isHovered ? outerRadius + hoverOffset : outerRadius);
-  }, [isHovered, hoverOffset, outerRadius, growSpring]);
-
-  const animatedPath = useTransform(
-    [mountProgress, growSpring],
-    ([mount, currentOuterRadius]) => {
-      const currentEndAngle =
-        startAngle + (endAngle - startAngle) * (mount as number);
-      if (currentEndAngle <= startAngle + 0.01) {
-        return "";
-      }
-      return arcPath(
-        innerRadius,
-        currentOuterRadius as number,
-        startAngle,
-        currentEndAngle,
-        cornerRadius,
-        padAngle
-      );
-    }
-  );
-
-  const grownOuterRadius = isHovered ? outerRadius + hoverOffset : outerRadius;
-  const grownPath = arcPath(
-    innerRadius,
-    grownOuterRadius,
-    startAngle,
-    endAngle,
-    cornerRadius,
-    padAngle
-  );
-
-  if (enterComplete) {
-    return (
-      <m.path
-        animate={{
-          d: grownPath,
-        }}
-        d={grownPath}
-        fill={fill}
-        initial={false}
-        pointerEvents="none"
-        className="pie-slice-visual"
-        transition={{
-          d: { type: "spring", stiffness: 400, damping: 25 },
-        }}
-      />
-    );
-  }
-
-  return (
-    <m.path
-      animate={{
-      }}
-      d={animatedPath}
-      fill={fill}
-      initial={false}
-      key={`slice-${animationKey}-${index}`}
-      pointerEvents="none"
-      className="pie-slice-visual"
-      transition={{
-      }}
     />
   );
 }
@@ -279,16 +110,12 @@ export const PieSlice = memo(function PieSlice({
   fill: fillProp,
   animate = true,
   showGlow = false,
-  // 마우스를 올려도 조각을 밀어내지 않는다(대시보드·Alert 개요의 원형 차트가 움찔거리던 원인). 필요한 곳만 "translate"·"grow"를 넘긴다.
-  hoverEffect = "none",
-  hoverOffset: hoverOffsetProp,
 }: PieSliceProps) {
   const {
     arcs,
     innerRadius,
     outerRadius,
     cornerRadius,
-    hoverOffset: contextHoverOffset,
     animationKey,
     geometryScrubbing,
     scrubSlicePaths,
@@ -296,9 +123,6 @@ export const PieSlice = memo(function PieSlice({
     getFill,
   } = usePieStable();
   const { hoveredIndex, setHoveredIndex } = usePieHover();
-
-  // Use prop if provided, otherwise use context value
-  const hoverOffset = hoverOffsetProp ?? contextHoverOffset;
 
   const arcData = arcs[index];
   if (!arcData) {
@@ -317,17 +141,7 @@ export const PieSlice = memo(function PieSlice({
   }
 
   const isHovered = hoveredIndex === index;
-  // 마우스를 올려도 다른 조각을 흐리게 하지 않는다(색이 바뀌어 보이던 원인).
-
-  // Calculate values for non-animated/static paths
-  const offset = getSliceOffset(
-    arcData.startAngle,
-    arcData.endAngle,
-    hoverOffset
-  );
-
-  // Generate the static hitbox path (always uses base outer radius)
-  const hitboxPath = arcPath(
+  const slicePath = arcPath(
     innerRadius,
     outerRadius,
     arcData.startAngle,
@@ -336,113 +150,33 @@ export const PieSlice = memo(function PieSlice({
     arcData.padAngle
   );
 
-  // Generate the visible path for grow effect
-  const grownOuterRadius = isHovered ? outerRadius + hoverOffset : outerRadius;
-  const grownPath = arcPath(
-    innerRadius,
-    grownOuterRadius,
-    arcData.startAngle,
-    arcData.endAngle,
-    cornerRadius,
-    arcData.padAngle
-  );
-
-  // Render animated slice based on effect type
-  const renderAnimatedSlice = () => {
-    if (hoverEffect === "grow") {
-      return (
-        <AnimatedSliceGrow
-          animationKey={animationKey}
-          cornerRadius={cornerRadius}
-          endAngle={arcData.endAngle}
-          fill={fill}
-          hoverOffset={hoverOffset}
-          index={index}
-          innerRadius={innerRadius}
-          isHovered={isHovered}
-          outerRadius={outerRadius}
-          padAngle={arcData.padAngle}
-          startAngle={arcData.startAngle}
-        />
-      );
-    }
-
-    // Default: translate effect (also covers "none" with hoverOffset=0)
-    return (
-      <AnimatedSliceTranslate
-        animationKey={animationKey}
-        cornerRadius={cornerRadius}
-        endAngle={arcData.endAngle}
-        fill={fill}
-        hoverOffset={hoverEffect === "none" ? 0 : hoverOffset}
-        index={index}
-        innerRadius={innerRadius}
-        isHovered={isHovered}
-        outerRadius={outerRadius}
-        padAngle={arcData.padAngle}
-        startAngle={arcData.startAngle}
-      />
-    );
-  };
-
-  // Render static (non-animated) slice
-  const renderStaticSlice = () => {
-    if (hoverEffect === "grow") {
-      return (
-        <m.path
-          animate={{
-            d: grownPath,
-          }}
-          d={hitboxPath}
-          fill={fill}
-          initial={false}
-          pointerEvents="none"
-          className="pie-slice-visual"
-          transition={{
-            d: { type: "spring", stiffness: 400, damping: 25 },
-          }}
-        />
-      );
-    }
-
-    // Default: translate effect
-    const shouldTranslate = hoverEffect !== "none" && isHovered;
-    const translateX = shouldTranslate ? offset.x : 0;
-    const translateY = shouldTranslate ? offset.y : 0;
-
-    return (
-      <m.path
-        animate={{
-          x: translateX,
-          y: translateY,
-        }}
-        d={hitboxPath}
-        fill={fill}
-        initial={false}
-        pointerEvents="none"
-        className="pie-slice-visual"
-        transition={{
-          x: { type: "spring", stiffness: 400, damping: 25 },
-          y: { type: "spring", stiffness: 400, damping: 25 },
-        }}
-      />
-    );
-  };
-
   return (
     <g className="pie-slice" data-pie-slice-glow={showGlow && isHovered ? "" : undefined}
       style={{ "--pie-slice-glow-color": showGlow ? color : undefined } as CSSProperties}>
-      {/* Invisible hitbox - stays in place, handles hover events */}
+      {/* Invisible hitbox - reports which slice is under the pointer (tooltips, glow) */}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: SVG path used as hover hitbox for visualization */}
       <path
-        d={hitboxPath}
+        d={slicePath}
         fill="transparent"
         onMouseEnter={() => setHoveredIndex(index)}
         onMouseLeave={() => setHoveredIndex(null)}
       />
 
-      {/* Visible slice - animates based on hover effect, no pointer events */}
-      {animate ? renderAnimatedSlice() : renderStaticSlice()}
+      {animate ? (
+        <AnimatedSlice
+          animationKey={animationKey}
+          cornerRadius={cornerRadius}
+          endAngle={arcData.endAngle}
+          fill={fill}
+          index={index}
+          innerRadius={innerRadius}
+          outerRadius={outerRadius}
+          padAngle={arcData.padAngle}
+          startAngle={arcData.startAngle}
+        />
+      ) : (
+        <path d={slicePath} fill={fill} pointerEvents="none" className="pie-slice-visual" />
+      )}
     </g>
   );
 });
