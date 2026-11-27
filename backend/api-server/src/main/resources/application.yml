@@ -81,3 +81,4 @@ app:
   ai:
     anthropic-api-key: ${ANTHROPIC_API_KEY:}
     model: ${AI_MODEL:claude-haiku-5-5}
+    report-model: ${AI_REPORT_MODEL:claude-sonnet-5-5}

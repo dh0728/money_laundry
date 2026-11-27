@@ -573,6 +573,7 @@ TRANSFER는 Episode 측 이벤트 하나만 알림으로 제공한다. 같은 �
 
 | API | 내용 |
 |---|---|
+| POST /api/v1/ai-reports/judgments/{judgmentId}?regenerate= | 법정 STR 작성을 위한 분석 보고서. 대상 Alert·Episode 담당자와 ADMIN만(아니면 403). '의심' 판정만(아니면 409 `AI_REPORT_NOT_SUSPICIOUS`), 없는 판정 404. 저장된 성공 보고서가 있고 regenerate가 아니면 그것을 돌려주고, 아니면 Claude로 만들어 `review.ai_reports`에 쌓는다. `{reportId,judgmentId,caseId,kind,status,facts[{id,text}],narrative{overview,subject,dates,places,instruments,method,grounds,opinion: [{text,sources[]}]},needsBankCheck[],model,createdAt}`. 실패·검사 탈락은 FAILED 줄을 남기고 503 `AI_REPORT_UNAVAILABLE`. '의심' 판정이 커밋되면 서버가 뒤에서(한 번에 하나씩) 미리 만들어 두고, 그 사이 들어온 요청은 끝날 때까지(최대 150초) 기다려 같은 보고서를 받는다. 키가 없으면 미리 만들지 않는다 |
 | GET /api/v1/ai-summary/dashboard | 전체 대시보드의 종합 위험지수와 설명. 로그인 STAFF/ADMIN. `{index:{latestTxDate,businessDate,score,level,indicators[{key,label,weight,current,baseline,ratio,score}]},headline,points[{text,sources[]}],facts[{id,text}],model,generatedAt}`. Claude 실패·키 없음이면 200에 headline null·points 빈 배열(지수는 그대로) |
 | GET /api/v1/ai-summary/cases/{caseId} | Alert·Episode 개요의 AI 요약. 로그인 STAFF/ADMIN. `{caseId,kind,headline,points[{text,sources[]}],facts[{id,text}],model,generatedAt}`. kind는 ALERT/EPISODE. 없는 사건 404, 키 미설정·Claude 실패·거절·검사 탈락은 503 `AI_SUMMARY_UNAVAILABLE` |
 
@@ -580,4 +581,4 @@ TRANSFER는 Episode 측 이벤트 하나만 알림으로 제공한다. 같은 �
 - 서버는 근거 번호가 없는 사실을 가리키거나 사실 목록에 없는 숫자를 쓴 문장을 버린다. 결론 줄이 걸리거나 남는 문장이 없으면 503이다.
 - 결과는 DB에 저장하지 않는다. 모델·프롬프트 버전과 사실 목록이 같으면 서버 메모리(최근 500건)의 결과를 다시 쓴다. 서버를 다시 띄우면 다시 만든다.
 - 종합 위험지수: 지표 4개를 0~100점으로 바꿔 가중 평균한다. 의심 거래 비율(30, 최근 거래일 ÷ 앞 30일 평균), 고위험(점수 90 이상) 비중(25, 같은 방식), 오늘 생성 Alert(25, ÷ 앞 7일 하루 평균), 배정 후 3일 넘은 처리 전 Alert 비율(20). 배수는 0.5배 이하 0점·1배 20점·2배 60점·3배 이상 100점(구간별 직선), 적체 비율은 0% 0점·50% 이상 100점. 기준선이 없는 지표는 빼고 남은 가중치로 나눈다. 단계는 0~19 낮음, 20~39 보통, 40~59 경계, 60~79 높음, 80~100 심각. 대시보드 집계 표(ops.dashboard_*)만 읽는다.
-- 설정: `ANTHROPIC_API_KEY`(비면 503), `AI_MODEL`(기본 `claude-haiku-5-5`). 화면은 503이면 기존 규칙 문장을 그대로 보여 준다.
+- 설정: `ANTHROPIC_API_KEY`(비면 503), `AI_MODEL`(요약, 기본 `claude-haiku-5-5`), `AI_REPORT_MODEL`(보고서, 기본 `claude-sonnet-5-5`). 화면은 503이면 기존 규칙 문장을 그대로 보여 준다.
