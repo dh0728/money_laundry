@@ -8,7 +8,7 @@ import { ApiError } from '@/api/common';
 import { alternatePreviewStaff, currentPreviewUser, previewAdmin, previewStaff, setPreviewUser, subscribePreviewUser } from '../features/auth/preview-session-user.js';
 import { fetchNotificationCases, fetchNotifications, setNotificationsRead } from '@/api/notifications';
 import { bindCardGlow } from '../components/card-glow.js';
-import { ConfirmHoldButton, PrimaryButton } from '../components/primary-button.jsx';
+import { PrimaryButton } from '../components/primary-button.jsx';
 import { DialogClose, DialogFooter, DialogHeader } from '../components/dialog-parts.jsx';
 import { FooterPagination } from '../components/footer-pagination.jsx';
 import { SearchField } from '../components/search-field.jsx';
@@ -2144,7 +2144,8 @@ for (const host of document.querySelectorAll('[data-dialog-heading]')) {
   }));
 }
 createRoot(byId('preview-sign-out')).render(createElement(DialogFooter, null,
-  createElement(ConfirmHoldButton, { tone: 'negative', onHold: signOut, doneLabel: '로그아웃' }, '길게 눌러 로그아웃')));
+  // 계정 창을 열어야 보이는 버튼이고 다시 로그인하면 되므로 한 번 누르면 로그아웃한다.
+  createElement(PrimaryButton, { tone: 'negative', onClick: signOut }, '로그아웃')));
 window.addEventListener('popstate', restoreLocation);
 document.addEventListener('aml:model-risk', () => {
   if (signedIn && activePath) showWorkspace('', activeWorkCode, activePath, 'none', new URLSearchParams(location.search));
