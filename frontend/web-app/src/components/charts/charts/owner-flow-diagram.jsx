@@ -6,9 +6,9 @@ export function readOwnerFlowDesign() {
   return {
     periodStroke: readChartNumber('--owner-flow-period-stroke', 4),
     periodMarkerRadius: readChartNumber('--owner-flow-period-marker-radius', 3),
-    membershipOpacity: readChartNumber('--owner-flow-membership-opacity', .24),
-    membershipBaseWidth: readChartNumber('--owner-flow-membership-base-width', 8),
+    membershipBaseWidth: readChartNumber('--owner-flow-membership-base-width', 22),
     membershipStepWidth: readChartNumber('--owner-flow-membership-step-width', 5),
+    membershipMinWidth: readChartNumber('--owner-flow-membership-min-width', 8),
     edgeStroke: readChartNumber('--owner-flow-edge-stroke', 2.5),
     edgeSelectedStroke: readChartNumber('--owner-flow-edge-selected-stroke', 4),
     edgeTargetWidth: readChartNumber('--owner-flow-edge-target-width', 18),
@@ -54,15 +54,20 @@ export function OwnerFlowPeriods({ periods, design }) {
   </g>;
 }
 
+// Alert마다 소속 선을 한 덩어리 영역으로 칠한다. 그룹 전체에 투명도를 주므로 같은 Alert 안에서 겹친 곳이 진해지지 않는다.
+export function OwnerFlowRegions({ regions }) {
+  return <g className="owner-case-regions" aria-hidden="true">
+    {regions.map(({ id, color, emphasis, width, paths }) => <g key={id} className="owner-case-region" data-emphasis={emphasis}>
+      {paths.map(({ key, path }) => <path key={key} d={path} fill="none" stroke={color} strokeWidth={width}
+        strokeLinecap="round" strokeLinejoin="round" />)}
+    </g>)}
+  </g>;
+}
+
 export function OwnerFlowEdge({ path, label, pressed, muted, onSelect, memberships, color, reveal, design,
   pulse, pulseColor, width, height, ambientDelay, detail }) {
-  const line = <>
-    {memberships.map(({ id, color: stroke }, index) => <path key={id} d={path} stroke={stroke}
-      strokeWidth={design.membershipBaseWidth + design.membershipStepWidth * (memberships.length - index)}
-      strokeOpacity={design.membershipOpacity} />)}
-    <path className="owner-edge-visible" d={path} stroke={color}
-      strokeWidth={pressed ? design.edgeSelectedStroke : design.edgeStroke} />
-  </>;
+  const line = <path className="owner-edge-visible" d={path} stroke={color}
+    strokeWidth={pressed ? design.edgeSelectedStroke : design.edgeStroke} />;
   return <g className="owner-time-edge" role="button" tabIndex={0} aria-label={label} aria-pressed={pressed}
     data-muted={muted || undefined} onClick={onSelect} onKeyDown={event => selectWithKeyboard(event, onSelect)}>
     <title>{[label, ...memberships.map(({ id }) => id)].join(' · ')}</title>

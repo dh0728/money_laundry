@@ -8,7 +8,8 @@ import {
 import { copySVG, registerGraphSnapshot } from '../../lib/preview-visual-export';
 import { useSpringNodeDrag } from './graph-node-drag';
 import { Box } from '../../components/layout-primitives';
-import { OwnerFlowAccount, OwnerFlowDiagram, OwnerFlowEdge, OwnerFlowLane, OwnerFlowPeriods, readOwnerFlowDesign } from '../../components/charts/charts/owner-flow-diagram';
+import { OwnerFlowAccount, OwnerFlowDiagram, OwnerFlowEdge, OwnerFlowLane, OwnerFlowPeriods, OwnerFlowRegions, readOwnerFlowDesign } from '../../components/charts/charts/owner-flow-diagram';
+import { caseRegionOpacity, caseRegionWidth } from './graph-case-groups';
 
 const dragThreshold = 5;
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -157,6 +158,15 @@ export function OwnerGraphTimeline({
     }
     return [{ ...link, rows }];
   });
+  const edgePaths = edges.map(edge => ({ ...edge, ...ownerTransferPath(edge.from, edge.to, accountOffset(edge.from), accountOffset(edge.to)) }));
+  // 투명도는 CSS(.owner-case-region)가 밝은/어두운 화면 토큰으로 정한다.
+  const regions = groups.length < 2 ? [] : groups.map((group, index) => ({
+    id: group.id, color: group.color,
+    emphasis: caseRegionOpacity(group.id, highlightedCase, { base: undefined, strong: 'strong', faint: 'faint' }),
+    // 확대 배율과 관계없이 화면에서 같은 폭으로 보이게 한다.
+    width: caseRegionWidth(index, design.membershipBaseWidth, design.membershipStepWidth, design.membershipMinWidth) / camera.scale,
+    paths: edgePaths.filter(edge => edge.rows.some(row => group.transactionIds.has(row.code))).map(edge => ({ key: edge.key, path: edge.path })),
+  }));
   const highlightedCodes = groups.find(group => group.id === highlightedCase)?.transactionIds;
   const isHighlighted = rows => !highlightedCodes || rows.some(row => highlightedCodes.has(row.code));
   const dragHandlers = id => ({
@@ -173,8 +183,8 @@ export function OwnerGraphTimeline({
       plotHeight={plotHeight} camera={camera} periods={showPeriods ? <OwnerFlowPeriods design={design} periods={ownerComparisonPeriods({
         groups, timeByCode, times, formatTime, width: viewWidth, highlightedCase,
       })} /> : undefined}>
-      {edges.map(({ key, from, to, rows }, index) => {
-        const { path, midpoint } = ownerTransferPath(from, to, accountOffset(from), accountOffset(to));
+      <OwnerFlowRegions regions={regions} />
+      {edgePaths.map(({ key, from, to, rows, path, midpoint }, index) => {
         const codes = new Set(rows.map(row => row.code));
         const memberships = groups.filter(group => rows.some(row => group.transactionIds.has(row.code)));
         const relationship = `${from.id}>${to.id}`;

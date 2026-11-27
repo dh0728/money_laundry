@@ -351,6 +351,10 @@
   --case-graph-settings-share: 58%;
   --case-graph-playback-slider-min-width: 60px;
   --case-graph-dimmed-ink-share: 52%;
+  --case-graph-chip-fill-share: 45%;
+  --case-graph-region-opacity: .2;
+  --case-graph-region-strong-opacity: .38;
+  --case-graph-region-faint-opacity: .07;
   --case-graph-owner-boundary-stroke: 1.5px;
   --case-graph-owner-port-stroke: 1.25px;
   --case-graph-owner-muted-opacity: .25;
@@ -370,9 +374,9 @@
   --graph-flow-canvas-fade-share: .12;
   --owner-flow-period-stroke: var(--aml-space-4);
   --owner-flow-period-marker-radius: 3px;
-  --owner-flow-membership-opacity: .24;
-  --owner-flow-membership-base-width: var(--aml-space-8);
+  --owner-flow-membership-base-width: 22px;
   --owner-flow-membership-step-width: 5px;
+  --owner-flow-membership-min-width: var(--aml-space-8);
   --owner-flow-edge-stroke: 2.5px;
   --owner-flow-edge-selected-stroke: var(--aml-space-4);
   --owner-flow-edge-target-width: 18px;
@@ -528,6 +532,9 @@
 }
 
 :root[data-theme="dark"] {
+  --case-graph-region-opacity: .36;
+  --case-graph-region-strong-opacity: .58;
+  --case-graph-region-faint-opacity: .1;
   --login-scene-particle-colors: #77ddf4, #a5a6fa, #61e1d1;
   --login-scene-network-ink: #75cde4;
   --login-scene-network-highlight: #bdeaff;

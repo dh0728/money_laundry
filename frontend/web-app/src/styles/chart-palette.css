@@ -8,4 +8,13 @@
     color-mix(in srgb, var(--palette-teal-500) 70%, var(--aml-white-100)));
   --case-comparison-sky: light-dark(var(--aml-sky-040), var(--aml-sky-070));
   --case-comparison-lime: light-dark(var(--aml-lime-050), var(--aml-lime-070));
+  /* 관련 탭 합친 그래프의 Alert 구분 색. 위험도 색(빨강·주황·초록·회색)과 겹치지 않는 색만 쓴다. 1번은 기준 Alert. */
+  --case-group-1: light-dark(var(--aml-sky-050), var(--aml-sky-060));
+  --case-group-2: light-dark(var(--aml-violet-050), var(--aml-violet-060));
+  --case-group-3: light-dark(var(--aml-pink-050), var(--aml-pink-060));
+  --case-group-4: light-dark(oklch(.56 .11 212), oklch(.78 .1 212));
+  --case-group-5: light-dark(oklch(.38 .12 262), oklch(.86 .06 262));
+  --case-group-6: light-dark(oklch(.42 .14 330), oklch(.84 .08 330));
+  --case-group-7: light-dark(var(--aml-violet-070), var(--aml-violet-040));
+  --case-group-8: light-dark(oklch(.5 .06 240), oklch(.68 .05 240));
 }
