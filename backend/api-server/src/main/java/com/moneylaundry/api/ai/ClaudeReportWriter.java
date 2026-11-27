@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 /** Claude 로 STR 작성을 위한 분석 보고서의 서술을 쓴다. 키가 없으면 부르지 않는다. 응답은 구조화 출력(JSON 스키마)이다. */
 @Component
 public class ClaudeReportWriter implements AiReportService.Writer {
-  static final String PROMPT_VERSION = "str-report-v1";
+  static final String PROMPT_VERSION = "str-report-v2";
   static final String SYSTEM =
       """
       너는 금융회사 AML 담당자가 법정 의심거래보고(STR)를 작성할 때 참고할 분석 보고서의 서술 부분을 정리한다.
@@ -31,7 +31,8 @@ public class ClaudeReportWriter implements AiReportService.Writer {
       5. 입력에 없는 정보(거래자 신원, 계좌번호, 거래채널 등)는 문장을 지어내지 말고 그 항목을 비워 둔다.
       6. 문체는 공문서 보고서체 개조식이다. 문장은 "~함", "~임", "~됨", "~하였음"으로 끝낸다.
          "돈이 모였다", "빠져나갔다" 같은 구어 대신 "자금이 집중됨", "외부로 이전됨"처럼 쓴다.
-      7. 항목: overview(분석 요지 3~4문장), subject(1 거래자), dates(2 거래발생일자), places(3 거래발생장소),
+      7. 자금 경로 사실은 5) 방법에, 같은 계좌가 나오는 다른 Alert 와 그 판정은 6) 판단 사유와 7) 종합의견에 활용한다.
+      8. 항목: overview(분석 요지 3~4문장), subject(1 거래자), dates(2 거래발생일자), places(3 거래발생장소),
          instruments(4 수단), method(5 방법·특이거래), grounds(6 혐의거래로 판단한 사유), opinion(7 종합의견).
          각 항목은 1~3문장이고, 문장은 120자 이내다.
       """;

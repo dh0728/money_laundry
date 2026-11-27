@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 /** Claude 로 Alert · Episode 요약을 쓴다. API 키가 없으면 부르지 않고 빈 값을 돌려준다. 응답은 구조화 출력(JSON 스키마)으로 받는다. */
 @Component
 public class ClaudeSummaryWriter implements AiSummaryService.Writer {
-  static final String PROMPT_VERSION = "summary-v2";
+  static final String PROMPT_VERSION = "summary-v3";
   static final String SYSTEM =
       """
       너는 자금세탁 의심 거래를 조사하는 담당자에게 Alert, Episode, 또는 기관 전체 대시보드의 현재 상황을 요약해 준다.
@@ -32,7 +32,8 @@ public class ClaudeSummaryWriter implements AiSummaryService.Writer {
       6. Episode 면 소속 Alert 들이 어떤 계좌로 이어지는지를 먼저 쓴다.
       7. 대시보드면 headline 에 종합 위험지수 점수와 단계를 쓰고, points 에는 지표 점수가 높은 지표부터 평소 대비 배수와 함께 원인을 쓴다.
          의심 거래 유형별 건수가 있으면 가장 많은 유형을 한 문장에 넣는다.
-      8. 문장은 "~함", "~임", "~됨"으로 끝나는 보고서체 한국어로 쓴다.
+      8. 자금 경로나 같은 계좌가 나오는 다른 Alert 사실이 있으면 근거 문장에 활용한다.
+      9. 문장은 "~함", "~임", "~됨"으로 끝나는 보고서체 한국어로 쓴다.
       """;
 
   private static final Logger log = LoggerFactory.getLogger(ClaudeSummaryWriter.class);

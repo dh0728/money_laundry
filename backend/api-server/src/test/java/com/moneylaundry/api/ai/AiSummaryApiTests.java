@@ -186,6 +186,18 @@ class AiSummaryApiTests {
   }
 
   @Test
+  void alert_summary_names_other_alerts_that_share_its_accounts() throws Exception {
+    long shared = sharedAccount();
+    long a = alert(1, shared), b = alert(11, shared);
+    when(writer.write(any()))
+        .thenReturn(Optional.of(written("씨앗 거래 2건이 근거임", "근거 거래가 한 계좌로 모임", "F2")));
+    login();
+    var facts =
+        rows(summary(a, 200).get("facts")).stream().map(f -> f.get("text").toString()).toList();
+    assertThat(facts).contains("같은 계좌가 나오는 다른 Alert 1건: Alert " + b + "(공유 계좌 1개, 처리 중)");
+  }
+
+  @Test
   void episode_summary_lists_member_alerts_and_shared_accounts() throws Exception {
     long shared = sharedAccount();
     long a = alert(1, shared), b = alert(11, shared);
@@ -218,6 +230,8 @@ class AiSummaryApiTests {
             String.class,
             shared);
     assertThat(facts).contains("계좌 " + code + "가 Alert " + a + ", " + b + "에 함께 나옴");
+    // 소속 Alert 는 이미 함께 보는 건이라 이웃으로 다시 쓰지 않는다
+    assertThat(facts).noneMatch(f -> f.startsWith("같은 계좌가 나오는 다른 Alert"));
   }
 
   @Test

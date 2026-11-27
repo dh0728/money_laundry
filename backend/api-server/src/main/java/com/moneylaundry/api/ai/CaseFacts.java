@@ -6,6 +6,7 @@ import com.moneylaundry.api.review.ReviewJson;
 import com.moneylaundry.api.rules.RuleHitQuery;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -58,6 +59,8 @@ public class CaseFacts {
             + ("OPEN".equals(row.get("status")) ? "처리 중" : "종결"));
     flow(summary, out);
     if ("EPISODE".equals(kind)) episode(caseId, out);
+    paths(caseId, out);
+    neighbors(caseId, kind, out);
     rules(caseId, out);
     var facts = new ArrayList<Fact>();
     for (int i = 0; i < out.size(); i++) facts.add(new Fact("F" + (i + 1), out.get(i)));
@@ -160,6 +163,164 @@ public class CaseFacts {
             episodeId,
             episodeId))
       out.add("계좌 " + shared.get("account") + "가 Alert " + shared.get("alerts") + "에 함께 나옴");
+  }
+
+  record Move(long from, long to, BigDecimal usd, Instant at) {}
+
+  /**
+   * 자금 경로: 들어오고 나간 돈이 모두 있는 계좌(경유 계좌) 가운데 오간 금액이 큰 두 곳을 골라, 그 계좌로 돈을 가장 많이 보낸 계좌 두 곳과 받은 계좌 두 곳, 첫
+   * 유입에서 첫 유출까지 걸린 시간을 쓴다. 현재 범위의 거래(원장)만 쓴다.
+   */
+  private void paths(long caseId, List<String> out) {
+    var moves =
+        jdbc.query(
+            """
+            select l.from_account_id, l.to_account_id, l.amount_usd, l.occurred_at
+            from review.current_members m join ledger.transactions l on l.tx_id = m.tx_id
+            where m.case_id = ? and m.state in ('PENDING','DECIDED')
+            """,
+            (r, i) ->
+                new Move(
+                    r.getLong(1), r.getLong(2), r.getBigDecimal(3), r.getTimestamp(4).toInstant()),
+            caseId);
+    for (String line : pathLines(moves, accountCodes(moves))) out.add(line);
+  }
+
+  static List<String> pathLines(List<Move> moves, Map<Long, String> code) {
+    var in = new java.util.HashMap<Long, BigDecimal>();
+    var outgoing = new java.util.HashMap<Long, BigDecimal>();
+    var firstIn = new java.util.HashMap<Long, Instant>();
+    var firstOut = new java.util.HashMap<Long, Instant>();
+    for (var m : moves) {
+      if (m.from() == m.to()) continue;
+      in.merge(m.to(), m.usd(), BigDecimal::add);
+      outgoing.merge(m.from(), m.usd(), BigDecimal::add);
+      firstIn.merge(m.to(), m.at(), (a, b) -> a.isBefore(b) ? a : b);
+      firstOut.merge(m.from(), m.at(), (a, b) -> a.isBefore(b) ? a : b);
+    }
+    var hubs =
+        in.keySet().stream()
+            .filter(outgoing::containsKey)
+            .sorted(
+                Comparator.comparing((Long a) -> in.get(a).min(outgoing.get(a)))
+                    .reversed()
+                    .thenComparing(a -> code.getOrDefault(a, "")))
+            .limit(2)
+            .toList();
+    var lines = new ArrayList<String>();
+    for (long hub : hubs) {
+      var sources = top(moves, m -> m.to() == hub && m.from() != hub, Move::from, code);
+      var targets = top(moves, m -> m.from() == hub && m.to() != hub, Move::to, code);
+      long hours = Duration.between(firstIn.get(hub), firstOut.get(hub)).toHours();
+      lines.add(
+          "자금 경로: "
+              + String.join(", ", sources)
+              + " → "
+              + code.get(hub)
+              + " → "
+              + String.join(", ", targets)
+              + ". 경유 계좌 "
+              + code.get(hub)
+              + " 유입 "
+              + usd(in.get(hub))
+              + " USD, 유출 "
+              + usd(outgoing.get(hub))
+              + " USD"
+              + (hours >= 0 ? ", 첫 유입 후 " + hours + "시간 뒤 첫 유출" : ", 유출이 유입보다 먼저 시작"));
+    }
+    return lines;
+  }
+
+  /** 조건에 맞는 거래를 상대 계좌별로 합쳐 금액이 큰 두 곳을 "계좌 금액 USD" 로 돌려준다. */
+  private static List<String> top(
+      List<Move> moves,
+      java.util.function.Predicate<Move> keep,
+      java.util.function.Function<Move, Long> side,
+      Map<Long, String> code) {
+    var sums = new java.util.HashMap<Long, BigDecimal>();
+    for (var m : moves) if (keep.test(m)) sums.merge(side.apply(m), m.usd(), BigDecimal::add);
+    return sums.entrySet().stream()
+        .sorted(
+            Map.Entry.<Long, BigDecimal>comparingByValue()
+                .reversed()
+                .thenComparing(e -> code.getOrDefault(e.getKey(), "")))
+        .limit(2)
+        .map(e -> code.get(e.getKey()) + " " + usd(e.getValue()) + " USD")
+        .toList();
+  }
+
+  private Map<Long, String> accountCodes(List<Move> moves) {
+    var ids = new java.util.TreeSet<Long>();
+    for (var m : moves) {
+      ids.add(m.from());
+      ids.add(m.to());
+    }
+    var codes = new java.util.HashMap<Long, String>();
+    if (ids.isEmpty()) return codes;
+    jdbc.query(
+        "select account_id, service_account_id from core.accounts where account_id = any(?)",
+        (org.springframework.jdbc.core.RowCallbackHandler)
+            r -> codes.put(r.getLong(1), r.getString(2)),
+        (Object) ids.toArray(Long[]::new));
+    return codes;
+  }
+
+  /**
+   * 이웃 Alert: 이 건의 계좌가 나오는 다른 공개 Alert(최대 5건)와 그 판정. Episode 는 소속 Alert 를, Alert 는 자기가 속한 Episode 의
+   * 다른 Alert 를 이웃에서 뺀다(이미 함께 보는 건이다).
+   */
+  private void neighbors(long caseId, String kind, List<String> out) {
+    var rows =
+        jdbc.queryForList(
+            """
+            with mine as (
+              select l.from_account_id as account_id from review.current_members m
+              join ledger.transactions l on l.tx_id = m.tx_id
+              where m.case_id = ? and m.state in ('PENDING','DECIDED')
+              union
+              select l.to_account_id from review.current_members m
+              join ledger.transactions l on l.tx_id = m.tx_id
+              where m.case_id = ? and m.state in ('PENDING','DECIDED')),
+            together as (
+              select ea.alert_id from review.episode_alerts ea
+              where ea.episode_id = ? or ea.episode_id in (select episode_id from review.episode_alerts where alert_id = ?)),
+            hits as (
+              select a.alert_id, count(distinct x.account_id) as shared
+              from review.alerts a
+              join review.alert_transactions t on t.alert_id = a.alert_id and t.version = a.published_version
+              join ledger.transactions l on l.tx_id = t.tx_id
+              join mine x on x.account_id in (l.from_account_id, l.to_account_id)
+              where a.merged_into_alert_id is null and a.alert_id <> ?
+                and a.alert_id not in (select alert_id from together)
+              group by a.alert_id)
+            select h.alert_id, h.shared, a.status,
+                   (select verdict from review.judgments j where j.alert_id = h.alert_id and j.superseded_at is null) as verdict,
+                   (select j.verdict from review.episode_alerts ea join review.judgments j
+                      on j.episode_id = ea.episode_id and j.superseded_at is null where ea.alert_id = h.alert_id) as episode_verdict
+            from hits h join review.alerts a on a.alert_id = h.alert_id
+            order by h.shared desc, h.alert_id limit 5
+            """,
+            caseId,
+            caseId,
+            caseId,
+            caseId,
+            caseId);
+    if (rows.isEmpty()) return;
+    var parts = new ArrayList<String>();
+    for (var r : rows) {
+      Object verdict = r.get("verdict") != null ? r.get("verdict") : r.get("episode_verdict");
+      parts.add(
+          "Alert "
+              + r.get("alert_id")
+              + "(공유 계좌 "
+              + r.get("shared")
+              + "개, "
+              + (verdict == null
+                  ? ("OPEN".equals(r.get("status")) ? "처리 중" : "판정 없음")
+                  : "SUSPICIOUS".equals(verdict) ? "이상 판정" : "정상 판정")
+              + ")");
+    }
+    out.add("같은 계좌가 나오는 다른 Alert " + rows.size() + "건: " + String.join(", ", parts));
   }
 
   private void rules(long caseId, List<String> out) {
