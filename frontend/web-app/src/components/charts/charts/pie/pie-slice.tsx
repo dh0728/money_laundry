@@ -43,7 +43,7 @@ export interface PieSliceProps {
   /** Show glow effect on hover. Default: false */
   showGlow?: boolean;
   /**
-   * Hover effect type. Default: "translate"
+   * Hover effect type. Default: "none"
    * - "translate": Slice moves outward along its radial axis
    * - "grow": Slice extends its outer radius (gets longer)
    * - "none": No hover animation
@@ -65,7 +65,6 @@ interface AnimatedSliceTranslateProps {
   padAngle: number;
   fill: string;
   isHovered: boolean;
-  isFaded: boolean;
   animationKey: number;
   hoverOffset: number;
 }
@@ -80,7 +79,6 @@ function AnimatedSliceTranslate({
   padAngle,
   fill,
   isHovered,
-  isFaded,
   animationKey,
   hoverOffset,
 }: AnimatedSliceTranslateProps) {
@@ -127,7 +125,6 @@ function AnimatedSliceTranslate({
     return (
       <m.path
         animate={{
-          opacity: isFaded ? 0.4 : 1,
           x: shouldTranslate ? offset.x : 0,
           y: shouldTranslate ? offset.y : 0,
         }}
@@ -137,7 +134,6 @@ function AnimatedSliceTranslate({
         pointerEvents="none"
         className="pie-slice-visual"
         transition={{
-          opacity: { duration: 0.15 },
           x: { type: "spring", stiffness: 400, damping: 25 },
           y: { type: "spring", stiffness: 400, damping: 25 },
         }}
@@ -148,7 +144,6 @@ function AnimatedSliceTranslate({
   return (
     <m.path
       animate={{
-        opacity: isFaded ? 0.4 : 1,
         x: isHovered ? offset.x : 0,
         y: isHovered ? offset.y : 0,
       }}
@@ -159,7 +154,6 @@ function AnimatedSliceTranslate({
       pointerEvents="none"
       className="pie-slice-visual"
       transition={{
-        opacity: { duration: 0.15 },
         x: { type: "spring", stiffness: 400, damping: 25 },
         y: { type: "spring", stiffness: 400, damping: 25 },
       }}
@@ -177,7 +171,6 @@ interface AnimatedSliceGrowProps {
   padAngle: number;
   fill: string;
   isHovered: boolean;
-  isFaded: boolean;
   animationKey: number;
   hoverOffset: number;
 }
@@ -192,7 +185,6 @@ function AnimatedSliceGrow({
   padAngle,
   fill,
   isHovered,
-  isFaded,
   animationKey,
   hoverOffset,
 }: AnimatedSliceGrowProps) {
@@ -251,7 +243,6 @@ function AnimatedSliceGrow({
     return (
       <m.path
         animate={{
-          opacity: isFaded ? 0.4 : 1,
           d: grownPath,
         }}
         d={grownPath}
@@ -260,7 +251,6 @@ function AnimatedSliceGrow({
         pointerEvents="none"
         className="pie-slice-visual"
         transition={{
-          opacity: { duration: 0.15 },
           d: { type: "spring", stiffness: 400, damping: 25 },
         }}
       />
@@ -270,7 +260,6 @@ function AnimatedSliceGrow({
   return (
     <m.path
       animate={{
-        opacity: isFaded ? 0.4 : 1,
       }}
       d={animatedPath}
       fill={fill}
@@ -279,7 +268,6 @@ function AnimatedSliceGrow({
       pointerEvents="none"
       className="pie-slice-visual"
       transition={{
-        opacity: { duration: 0.15 },
       }}
     />
   );
@@ -291,7 +279,8 @@ export const PieSlice = memo(function PieSlice({
   fill: fillProp,
   animate = true,
   showGlow = false,
-  hoverEffect = "translate",
+  // 마우스를 올려도 조각을 밀어내지 않는다(대시보드·Alert 개요의 원형 차트가 움찔거리던 원인). 필요한 곳만 "translate"·"grow"를 넘긴다.
+  hoverEffect = "none",
   hoverOffset: hoverOffsetProp,
 }: PieSliceProps) {
   const {
@@ -328,7 +317,7 @@ export const PieSlice = memo(function PieSlice({
   }
 
   const isHovered = hoveredIndex === index;
-  const isFaded = hoveredIndex !== null && hoveredIndex !== index;
+  // 마우스를 올려도 다른 조각을 흐리게 하지 않는다(색이 바뀌어 보이던 원인).
 
   // Calculate values for non-animated/static paths
   const offset = getSliceOffset(
@@ -370,7 +359,6 @@ export const PieSlice = memo(function PieSlice({
           hoverOffset={hoverOffset}
           index={index}
           innerRadius={innerRadius}
-          isFaded={isFaded}
           isHovered={isHovered}
           outerRadius={outerRadius}
           padAngle={arcData.padAngle}
@@ -389,7 +377,6 @@ export const PieSlice = memo(function PieSlice({
         hoverOffset={hoverEffect === "none" ? 0 : hoverOffset}
         index={index}
         innerRadius={innerRadius}
-        isFaded={isFaded}
         isHovered={isHovered}
         outerRadius={outerRadius}
         padAngle={arcData.padAngle}
@@ -404,7 +391,6 @@ export const PieSlice = memo(function PieSlice({
       return (
         <m.path
           animate={{
-            opacity: isFaded ? 0.4 : 1,
             d: grownPath,
           }}
           d={hitboxPath}
@@ -413,7 +399,6 @@ export const PieSlice = memo(function PieSlice({
           pointerEvents="none"
           className="pie-slice-visual"
           transition={{
-            opacity: { duration: 0.15 },
             d: { type: "spring", stiffness: 400, damping: 25 },
           }}
         />
@@ -428,7 +413,6 @@ export const PieSlice = memo(function PieSlice({
     return (
       <m.path
         animate={{
-          opacity: isFaded ? 0.4 : 1,
           x: translateX,
           y: translateY,
         }}
@@ -438,7 +422,6 @@ export const PieSlice = memo(function PieSlice({
         pointerEvents="none"
         className="pie-slice-visual"
         transition={{
-          opacity: { duration: 0.15 },
           x: { type: "spring", stiffness: 400, damping: 25 },
           y: { type: "spring", stiffness: 400, damping: 25 },
         }}
