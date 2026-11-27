@@ -330,6 +330,16 @@ body:has(#sidebar:not([hidden])) .sidebar-chrome .drawer-chrome__primary > .butt
   gap: var(--header-inset);
 }
 .button[data-button-surface="floating"]:is(:disabled, [aria-disabled="true"]) { color: var(--disabled-text) }
+.live-refresh {
+  padding-inline: var(--aml-space-12);
+  font-size: var(--aml-type-caption-size);
+  color: var(--muted-text);
+  white-space: nowrap;
+}
+.live-refresh[data-changes] {
+  color: var(--status-info-accent);
+  font-weight: var(--aml-type-body-strong-weight);
+}
 .inbox-header { --drawer-chrome-width: var(--inbox-width) }
 .inbox-header:has(#inbox-toggle[aria-expanded="false"]) { padding-inline-start: 0 }
 .inbox-pill { position: relative }
