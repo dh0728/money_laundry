@@ -92,7 +92,8 @@ public class DemoResetService {
             actor))) throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "관리자 전용 기능입니다.");
   }
 
-  // Index-backed maxima: new uploads, transactions, jobs, Alerts/Episodes or review events change it.
+  // Index-backed maxima: new uploads, transactions, jobs, Alerts/Episodes or review events change
+  // it.
   private static final String MARKERS =
       """
       select concat_ws(':',
@@ -125,8 +126,7 @@ public class DemoResetService {
 
   private String fingerprint() {
     try {
-      String value =
-          jdbc.queryForObject(MARKERS, String.class) + ":" + time.view().get("revision");
+      String value = jdbc.queryForObject(MARKERS, String.class) + ":" + time.view().get("revision");
       return HexFormat.of()
           .formatHex(
               MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
