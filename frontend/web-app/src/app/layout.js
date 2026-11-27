@@ -82,9 +82,10 @@ const defaultTabs = tabGroups.flatMap(group => tabCodes(group).slice(0, 2));
 const initialWorkTabs = restoreWorkTabCodes(storedWorkTabs, defaultTabs, tabGroups.flatMap(tabCodes))
   .filter(code => serviceMode || benchmarkLedgerRoute || !isBenchmarkTransactionCode(code));
 
-// 거래·Alert·Episode 메뉴마다 마지막에 본 목록(표·카드와 조건)을 기억해 메뉴로 돌아올 때 그대로 연다.
+// 대시보드·거래·Alert·Episode 메뉴마다 마지막에 본 화면(전체·개인, 표·카드와 조건)을 기억해 메뉴로 돌아올 때 그대로 연다.
 const lastListsStorageKey = benchmarkLedgerRoute ? 'aml-live-layout-ibm-last-lists' : 'aml-live-layout-last-lists';
 const listScreens = {
+  D: path => /^dashboard\/(?:all|mine)$/.test(path),
   T: path => isLedgerScreen(path),
   A: path => /^add-tab\/alerts-(?:cards|table)(?:\/no-filter)?$/.test(path),
   E: path => /^add-tab\/episodes(?:-table)?(?:\/no-filter)?$/.test(path),
@@ -111,7 +112,7 @@ function rememberList(path, params) {
   try { sessionStorage.setItem(lastListsStorageKey, JSON.stringify(lastLists)); } catch { /* 이번 페이지에서만 기억한다. */ }
 }
 
-const listDestination = prefix => lastLists[prefix]?.path ?? sections[prefix];
+const listDestination = prefix => lastLists[prefix]?.path ?? (prefix === 'D' ? sections.dashboard : sections[prefix]);
 // 기억한 목록으로 갈 때만 그때의 조건을 함께 넘긴다.
 const rememberedParams = path => {
   const entry = lastLists[listPrefix(path)];
@@ -625,7 +626,7 @@ function showWorkspaceNavigation(path, code) {
     navigation.global = navigation.global.map(item => item.value === sections.T
       ? { ...item, label: '은행·계좌·거래' } : item);
   }
-  // 거래·Alert·Episode 메뉴는 지금 보는 목록, 아니면 마지막에 본 목록으로 보낸다.
+  // 대시보드·거래·Alert·Episode 메뉴는 지금 보는 화면, 아니면 마지막에 본 화면으로 보낸다.
   navigation.global = navigation.global?.map(item => {
     const prefix = listPrefix(item.value);
     if (!prefix) return item;

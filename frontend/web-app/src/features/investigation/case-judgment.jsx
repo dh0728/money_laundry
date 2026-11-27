@@ -148,9 +148,7 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
           {nextCase && onOpenNext
             ? <>
               <ActionButton shape="pill" surface="floating" {...reportLink}>보고서 보기</ActionButton>
-              <PrimaryButton tone="brand" onClick={() => onOpenNext(nextCase.code)}>
-                다음 건 열기 · <Text as="code">{nextCase.code}</Text>
-              </PrimaryButton>
+              <PrimaryButton tone="brand" onClick={() => onOpenNext(nextCase.code)}>다음 건 열기</PrimaryButton>
             </>
             : <PrimaryButton tone="brand" {...reportLink}>보고서 보기</PrimaryButton>}
         </> : eligible && <>
@@ -173,7 +171,9 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
         <JudgmentTargets row={row} />
         {result ? <Box className="case-judgment-summary">
           <Text role="status"><Text as="code">{result.id}</Text>에 판정이 저장되었습니다.</Text>
-          {onOpenNext && !nextCase && <Text>남은 내 업무가 없습니다.</Text>}
+          {/* 버튼에는 이름만 두고, 어느 건으로 가는지는 본문에 다른 코드와 같은 모양으로 보여 준다. */}
+          {onOpenNext && (nextCase ? <Text>다음 건 · <Text as="code">{nextCase.code}</Text></Text>
+            : <Text>남은 내 업무가 없습니다.</Text>)}
           <Text><VerdictTag verdict={result.verdict} /></Text>
           <Text><Text as="strong">{reasonLabel}</Text></Text>
           <JudgmentDetails {...result} />
