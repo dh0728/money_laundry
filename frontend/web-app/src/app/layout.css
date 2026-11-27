@@ -13,7 +13,8 @@
   --workspace-inset: var(--aml-density-gap);
   --app-inline-gutter: max(0px, (100% - var(--aml-layout-max-width)) / 2);
   --workspace-gap: var(--aml-density-gap);
-  --workspace-panel-gap: max(var(--aml-space-8), var(--workspace-gap));
+  /* 패널과 패널 사이. 테두리 없이 틈으로만 나누므로 패널 안 요소 간격(workspace-gap)의 두 배로 둔다. */
+  --workspace-panel-gap: calc(2 * var(--workspace-gap));
   --layer-workspace: var(--aml-layer-base);
   --layer-drawers: var(--aml-layer-popover);
   --layer-shell: var(--aml-layer-dialog);
@@ -999,21 +1000,10 @@ body:has(:is(#footer-pagination, #footer-actions) > *) #workspace {
 :is(.screen-panel, .screen-overlay, .panel-material) {
   box-shadow: var(--panel-edge-depth), var(--panel-material-depth, var(--panel-glass-depth));
 }
-/* 누르지 않는 패널(Panel·대시보드 지표 칸·판정 이력처럼 누르지 않는 기록 카드)은 화면 안으로 들어간 면(inner glow)이다. 바깥 유리·기울기는 누르는 카드(RecordCard)만 쓴다. */
+/* 누르지 않는 패널(Panel·대시보드 지표 칸·판정 이력처럼 누르지 않는 기록 카드)은 테두리·안쪽 그림자 없는 평평한 면이다. 바깥 유리·기울기는 누르는 카드(RecordCard)만 쓴다. */
 :where(.screen-panel, .panel-inset, .dashboard-metrics .magic-bento__card) {
-  --panel-material-solid: var(--information-panel-surface);
+  --panel-material-solid: var(--panel-flat-surface);
   --panel-material-depth: 0 0 0 transparent;
-}
-:root:not([data-glassmorphism="false"]) :is(.screen-panel, .panel-inset, .dashboard-metrics .magic-bento__card, [data-glow-surface]:not([data-card-interactive])) {
-  --panel-sunken-shadow: color-mix(in srgb, var(--panel-light-source, var(--information-panel-surface)) var(--panel-sunken-shadow-tint), var(--panel-sunken-shadow-base));
-  /* 안쪽 그림자와 반사광을 중앙에 맞춰 둘레 전체에 고르게 보이게 한다. */
-  --panel-material-depth:
-    inset 0 0 var(--aml-space-4)
-      light-dark(color-mix(in srgb, var(--panel-sunken-shadow) var(--panel-sunken-edge-opacity), transparent), var(--panel-sunken-dark-edge)),
-    inset 0 0 var(--aml-space-12)
-      light-dark(color-mix(in srgb, var(--panel-sunken-shadow) var(--panel-sunken-falloff-opacity), transparent), var(--panel-sunken-dark-falloff)),
-    inset 0 0 var(--aml-space-2)
-      light-dark(transparent, var(--glass-shell-highlight));
 }
 .dashboard-metrics .magic-bento__card { box-shadow: var(--panel-edge-depth), var(--panel-material-depth) }
 /* 그래프처럼 내용이 면을 덮는 패널은 안쪽 빛을 내용 위에 한 번 더 그린다. */

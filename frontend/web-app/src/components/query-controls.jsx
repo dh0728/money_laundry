@@ -535,6 +535,15 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
   const downloadButton = toolbarButtons.find(button => button.dataset.queryTool === 'download');
   if (downloadButton) downloadButton.dataset.buttonSurface = downloadSurface;
   const sortButton = queryButtons.find(button => button.dataset.queryTool === 'sort');
+  // 대시보드의 정렬은 보드 섹션에만 적용된다. 그 섹션 제목 옆에 자리([data-dashboard-sort-host])가 있으면 정렬 버튼을 그리로 옮기고,
+  // 자리가 없는 화면에서는 맨 위 줄의 원래 자리로 되돌린다.
+  const sortControl = embedded ? undefined : sortButton?.closest('.query-control');
+  const sortHome = sortControl?.parentElement;
+  function placeSortControl() {
+    if (!sortControl) return;
+    const target = workspace.querySelector('[data-dashboard-sort-host]') ?? sortHome;
+    if (sortControl.parentElement !== target) target.prepend(sortControl);
+  }
   const popover = document.createElement('div');
   popover.id = `query-tool-popover-${++nextPopoverId}`;
   popover.popover = 'auto';
@@ -698,6 +707,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
       .filter(Boolean);
   }
   function syncTools(workspaceReady = true) {
+    placeSortControl();
     const hasRows = Boolean(scope && rows.length);
     const hasDownloadEntries = tableTools?.entries?.some(entry => !entry.disabled);
     const available = {

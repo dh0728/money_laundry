@@ -20,7 +20,7 @@ export function ChartSectionDownload({ label, entries = [], readRoot, surface })
   return <SectionDownload label={label} entries={[...entries, ...visuals]} host={host} surface={surface} />;
 }
 
-export function SectionDownloadHeading({ as: Heading = 'h2', id, className = '', headingClassName, downloadLabel, printLabel, entries = [], readRoot, disclosure, children }) {
+export function SectionDownloadHeading({ as: Heading = 'h2', id, className = '', headingClassName, downloadLabel, printLabel, entries = [], readRoot, disclosure, tools, children }) {
   const host = useRef(null);
   const Chevron = disclosure?.expanded ? ChevronDown : ChevronRight;
   const printEntries = printLabel ? [...entries, { label: printLabel, format: 'PDF로 저장',
@@ -30,6 +30,7 @@ export function SectionDownloadHeading({ as: Heading = 'h2', id, className = '',
       shape="pill" surface="ghost" aria-controls={disclosure.controls} aria-expanded={disclosure.expanded} onClick={disclosure.onToggle}>
       <Chevron className="icon" aria-hidden="true" /><span>{children}</span>
     </ActionButton> : children}</Heading>
+    {tools}
     {downloadLabel ? <ChartSectionDownload label={downloadLabel} entries={printEntries} readRoot={readRoot} />
       : printEntries.length > 0 && <SectionDownload label={printLabel ?? printEntries[0].label} entries={printEntries} />}
   </div>;

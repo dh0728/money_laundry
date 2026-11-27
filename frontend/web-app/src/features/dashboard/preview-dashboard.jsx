@@ -63,33 +63,39 @@ function DashboardTodaySummary({ snapshot, dataSource }) {
     createdCases, completedCreatedCases } = snapshot;
   const openWork = openAlerts + openEpisodes;
   const detectionLabel = detection?.basis === 'transaction-day' ? '거래일 기준' : '오늘 분석 완료 거래 기준';
+  // 값이 0이면 색을 빼고, 집계가 없으면 숫자 대신 이유를 적는다. 카드 바탕색은 tone을 옅게 깐 것이다.
+  const handledRate = compactShare(completedCreatedCases, createdCases);
+  const suspiciousRate = detection ? compactShare(detection.suspicious, detection.analyzed) : '—';
   const items = [
-    { title: '개별 미처리 Alert', value: count(openAlerts), detail: `오늘 생성 ${count(createdAlerts)}`, tone: 'in-progress',
-      chartValue: openAlerts, chartTotal: openWork },
-    { title: '장기 미처리', value: count(overdue3Days), detail: `3일 초과 · 7일 이상 ${count(overdue7Days)}`, tone: overdue3Days > 0 ? 'suspect' : undefined,
-      chartValue: overdue3Days, chartTotal: openWork },
-    { title: '진행 Episode', value: count(openEpisodes), tone: 'in-progress', chartValue: openEpisodes, chartTotal: openWork },
-    { title: '오늘 처리율', value: compactShare(completedCreatedCases, createdCases),
+    { title: '개별 미처리 Alert', value: count(openAlerts), detail: `오늘 생성 ${count(createdAlerts)}`,
+      tone: openAlerts > 0 ? 'in-progress' : undefined, quiet: !openAlerts, chartValue: openAlerts, chartTotal: openWork },
+    { title: '장기 미처리', value: count(overdue3Days), detail: `3일 초과 · 7일 이상 ${count(overdue7Days)}`,
+      tone: overdue3Days > 0 ? 'suspect' : undefined, quiet: !overdue3Days, chartValue: overdue3Days, chartTotal: openWork },
+    { title: '진행 Episode', value: count(openEpisodes), tone: openEpisodes > 0 ? 'in-progress' : undefined, quiet: !openEpisodes,
+      chartValue: openEpisodes, chartTotal: openWork },
+    { title: '오늘 처리율', value: handledRate, emptyReason: handledRate === '—' ? '오늘 생성된 업무가 없습니다.' : undefined,
       tone: 'done', chartValue: completedCreatedCases, chartTotal: createdCases },
-    { title: '오늘 의심 비율', value: detection ? compactShare(detection.suspicious, detection.analyzed) : '—',
+    { title: '오늘 의심 비율', value: suspiciousRate,
+      emptyReason: suspiciousRate === '—' ? (detection ? '오늘 분석된 거래가 없습니다.' : '오늘 분석 집계가 없습니다.') : undefined,
       tone: 'suspect', chartValue: detection?.suspicious, chartTotal: detection?.analyzed, basis: detectionLabel },
   ];
 
-  return <Panel as="article" className="dashboard-today-summary">
-    <SectionDownloadHeading as="h3" printLabel="오늘의 업무">
-      오늘의 업무
-      {dataSource === 'sample' && <Text as="span" className="dashboard-note dashboard-today-date">샘플 · {date}</Text>}
-    </SectionDownloadHeading>
+  // 지표마다 패널 한 장으로 나눈다. 묶음 제목은 섹션 제목 "오늘 할 일"이 맡아서 패널 제목은 두지 않는다.
+  return <Stack as="section" className="dashboard-today-summary" aria-label="오늘의 업무">
+    {dataSource === 'sample' && <Text className="dashboard-note">샘플 · {date}</Text>}
     <Grid columns={5} className="dashboard-today-metrics">
-      {items.map(({ title, value, detail, tone, chartValue, chartTotal, basis }) => <Stack key={title} data-kpi-tone={value === '—' ? undefined : tone}>
-        <Text as="span">{title}</Text>
-        <Text as="strong">{value}</Text>
-        {chartTotal > 0 && <Meter min={0} max={chartTotal} value={chartValue}
-          aria-label={basis ? `${title} · ${basis}` : title} aria-valuetext={`${count(chartTotal)} 중 ${count(chartValue)}`} />}
-        {detail && <Text className="dashboard-note">{detail}</Text>}
-      </Stack>)}
+      {items.map(({ title, value, detail, tone, quiet, emptyReason, chartValue, chartTotal, basis }) => <Panel as="article" key={title}
+        data-kpi-tone={emptyReason ? undefined : tone} data-kpi-quiet={quiet || undefined}>
+        <Stack>
+          <Text as="span">{title}</Text>
+          {emptyReason ? <Text as="span" className="dashboard-today-empty">집계 없음</Text> : <Text as="strong">{value}</Text>}
+          {!emptyReason && chartTotal > 0 && <Meter min={0} max={chartTotal} value={chartValue}
+            aria-label={basis ? `${title} · ${basis}` : title} aria-valuetext={`${count(chartTotal)} 중 ${count(chartValue)}`} />}
+          {(emptyReason ?? detail) && <Text className="dashboard-note">{emptyReason ?? detail}</Text>}
+        </Stack>
+      </Panel>)}
     </Grid>
-  </Panel>;
+  </Stack>;
 }
 
 const personalStages = ['배정된 업무', '현재 상태', '완료 판정'];
@@ -217,6 +223,7 @@ function WorkBoard({ rows, mine, sort, appearance }) {
       <Heading id="dashboard-work-title" tabIndex={-1}>내 업무 현황</Heading>
       <Box data-dashboard-sort-tags></Box>
       <Box className="dashboard-board-actions">
+        <Box className="query-bar" data-dashboard-sort-host></Box>
         <BoardSectionDownload records={rows} label="내 업무 현황" file="work-board" />
       </Box>
     </Box>}

@@ -3,7 +3,7 @@
   --chart-suspect: var(--risk-high);
   --chart-pattern: var(--chart-suspect);
   --chart-risk-high: var(--risk-high);
-  --chart-background: var(--information-panel-surface);
+  --chart-background: var(--panel-flat-surface);
   --chart-foreground: var(--text);
   --chart-foreground-muted: var(--muted-text);
   --chart-label: var(--muted-text);
@@ -110,7 +110,7 @@
 }
 .dashboard-institution-relations,
 .preview-dashboard[data-mine="false"]:not(.preview-benchmark-dashboard) {
-  gap: max(var(--aml-space-24), var(--workspace-panel-gap));
+  gap: max(var(--aml-space-32), var(--workspace-panel-gap));
 }
 .dashboard-section-header {
   grid-column: 1 / -1;
@@ -201,7 +201,8 @@
   --dashboard-score-middle: color-mix(in srgb, var(--chart-suspect), var(--information-panel-surface));
   --dashboard-score-lower: color-mix(in srgb, var(--dashboard-score-middle), var(--information-panel-surface));
 }
-.dashboard-flow-family, .dashboard-work-details { gap: var(--workspace-panel-gap) }
+.dashboard-focus-grid, .dashboard-flow-family, .dashboard-work-details, .dashboard-board-section,
+.dashboard-personal-overview, .dashboard-personal-work { gap: var(--workspace-panel-gap) }
 .dashboard-flow-family > [data-dashboard-section-content] > .dashboard-transaction-flow { grid-column: 1 / -1 }
 .dashboard-transaction-scope, .dashboard-board-section > [data-dashboard-section-content] > .dashboard-board { grid-column: 1 / -1 }
 .dashboard-flow-volume { grid-column: span 8 }
@@ -400,7 +401,6 @@
   min-inline-size: 0;
 }
 .dashboard-chart {
-  --panel-material-solid: color-mix(in srgb, var(--information-panel-surface), var(--canvas-surface) 50%);
   display: grid;
   gap: var(--workspace-gap);
   align-content: start;
@@ -534,7 +534,7 @@
   min-block-size: var(--header-control-size);
   margin-block-end: var(--workspace-gap);
 }
-.dashboard-board-heading [data-dashboard-sort-tags]:empty { display: none }
+:is([data-dashboard-sort-tags], [data-dashboard-sort-host]):empty { display: none }
 .dashboard-board-actions { display: flex; align-items: center; gap: var(--workspace-gap); margin-inline-start: auto }
 .dashboard-board-scroll {
   min-inline-size: 0;
