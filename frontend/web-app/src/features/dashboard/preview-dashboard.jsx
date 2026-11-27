@@ -22,6 +22,7 @@ import { workRequestUserName } from '../investigation/preview-work-requests';
 import { personalInvestigationFlow, share as compactShare, statusLabels } from './dashboard-flows';
 import { DashboardRuleHits } from './dashboard-rule-hits';
 import { Meter } from '../../components/meter';
+import { DashboardAiSummary, useDashboardAiSummary } from './dashboard-ai-summary';
 import './dashboard-today-summary.css';
 
 const formatter = new Intl.NumberFormat('ko-KR');
@@ -232,7 +233,11 @@ export function PreviewDashboard({ mine, data, appearance }) {
     const status = data.investigation.statusByCode?.[row.code] ?? row.status;
     return status === row.status ? row : { ...row, status };
   });
-  const summary = <DashboardSummary trail={data.accountRecommendation} reduced={appearance.reduced} showContext={!mine} />;
+  // 전체 대시보드는 서비스 모드에서 AI 요약(종합 위험지수)을 쓰고, 없거나 실패하면 기존 "분석 추천"을 쓴다
+  const ai = useDashboardAiSummary(!mine && import.meta.env.VITE_API_MODE === 'live');
+  const summary = ai.status === 'ready' && ai.summary.index.score != null
+    ? <DashboardAiSummary summary={ai.summary} reduced={appearance.reduced} />
+    : <DashboardSummary trail={data.accountRecommendation} reduced={appearance.reduced} showContext={!mine} />;
   const board = rows ? <WorkBoard rows={rows} mine={mine} sort={data.sort} appearance={appearance} />
     : <DashboardBoardSkeleton showTitle={mine} />;
   const boardEntries = rows?.length ? [caseCsvDownloadEntry('업무 상태 보드', 'work-board', rows)] : [];
