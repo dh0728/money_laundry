@@ -6,7 +6,7 @@ import { caseAccountLayout } from './case-pattern-layout';
 import { caseSankeyGraph, layoutCaseSankey } from './case-sankey-data';
 import { sankeyLinkPath } from '@/components/charts/charts/sankey/sankey-path';
 import { ownerGraphLayout, ownerTransferPath } from '../graph/owner-graph-layout';
-import { assignCaseColorSlots, caseGroupColor, caseRegionOpacity, caseRegionWidth, caseShortLabel } from '../graph/graph-case-groups';
+import { assignCaseColorSlots, caseGroupColor, caseGroupShape, caseShapeClip, caseShapePath, caseShortLabel, flowMarkers } from '../graph/graph-case-groups';
 import { mountCaseGraph } from './preview-case-graph';
 import { previewUrl, readPreviewRoute } from '../../app/preview-route';
 import { ScreenLayout, ScreenNavigation } from '../../app/screen-layouts';
@@ -42,13 +42,38 @@ describe('case graph analysis', () => {
     expect(slots.get('A-3')).toBe(3);
   });
 
-  it('labels shared nodes and edges with short Alert numbers and fades the other Alerts on highlight', () => {
+  it('labels shared nodes and edges with short Alert numbers', () => {
     expect(caseShortLabel('A-230908-000117')).toBe('117');
     expect(caseShortLabel('A-230915-001880')).toBe('1880');
-    expect(caseRegionOpacity('A-1')).toBeCloseTo(.2);
-    expect(caseRegionOpacity('A-1', 'A-1')).toBeGreaterThan(caseRegionOpacity('A-1'));
-    expect(caseRegionOpacity('A-2', 'A-1')).toBeLessThan(caseRegionOpacity('A-2'));
-    expect([0, 1, 2, 3, 4].map(index => caseRegionWidth(index, 26, 5, 12))).toEqual([26, 21, 16, 12, 12]);
+  });
+
+  it('gives every color slot its own marker shape for the legend, canvas and image export', () => {
+    const shapes = Array.from({ length: 8 }, (_, slot) => caseGroupShape(slot));
+    expect(new Set(shapes).size).toBe(8);
+    expect(caseGroupShape(8)).toBe(caseGroupShape(0));
+    expect(caseShapeClip('circle')).toBe('circle(42%)');
+    expect(caseShapeClip('square')).toMatch(/^polygon\(/);
+    expect(caseShapePath('triangle', 10, 10, 2)).toMatch(/^M 10 7\.7 L /);
+    expect(caseShapePath('circle', 10, 10, 2)).toContain(' a 2 2 ');
+  });
+
+  it('spaces flow markers per Alert and alternates shapes where transactions are shared', () => {
+    expect(flowMarkers([], 130, 64).map(marker => marker.caseId)).toEqual([undefined, undefined]);
+    const shared = flowMarkers(['A', 'B', 'C'], 130, 64);
+    expect(shared.map(marker => marker.caseId)).toEqual(['A', 'B', 'C', 'A', 'B', 'C']);
+    expect(shared.map(marker => marker.t)).toEqual(shared.map((_, index) => (index + .5) / 6));
+    expect(flowMarkers(['A'], 10, 64)).toHaveLength(1);
+  });
+
+  it('keeps each moving marker on its Alert as it passes into the next slot', () => {
+    const before = flowMarkers(['A', 'B'], 128, 64, 2.99);
+    const after = flowMarkers(['A', 'B'], 128, 64, 3.01);
+    // 한 칸을 넘어가면 index가 하나 밀린다. 같은 자리 근처의 표식은 같은 Alert다.
+    for (const marker of after.slice(1)) {
+      const previous = before.find(entry => Math.abs(entry.t - marker.t) < .01);
+      expect(previous.caseId).toBe(marker.caseId);
+    }
+    expect(after[0].t).toBeLessThan(.01);
   });
 
   it('shows a chip for every compared Alert and highlights one on press', async () => {
@@ -262,6 +287,49 @@ describe('case graph analysis', () => {
       expect(checkbox(rows[0].code)).not.toBeChecked();
       expect(checkbox(rows[1].code)).not.toBeChecked();
     } finally {
+      await act(async () => { cleanup?.(); });
+      host.remove();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('hides nearby (CONTEXT) transactions until the graph setting shows them', async () => {
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback) { this.callback = callback; }
+      observe(element) {
+        if (element.hasAttribute('data-force-graph')) this.callback([{ contentRect: { width: 600, height: 360 } }]);
+      }
+      disconnect() {}
+    });
+    const rows = [
+      { ...transfer('T-261111-00000001', account('A1'), account('A2'), 90), reviewRole: 'SUBJECT' },
+      { ...transfer('T-261111-00000002', account('A2'), account('C1'), 10), reviewRole: 'CONTEXT' },
+    ].map((row, index) => ({ ...row, timestamp: `2026-11-11 13:0${index + 1}`,
+      method: '계좌이체', currency: 'KRW', amount: 100, status: '처리 전' }));
+    const active = { code: 'A-261111-000001', pattern: 'FAN-OUT 82%', related: rows };
+    const host = document.createElement('div');
+    host.innerHTML = '<div data-case-flow="analysis" data-lens="pattern"></div><div data-case-evidence="거래" data-analysis-table></div><div data-case-accounts></div>';
+    document.body.append(host);
+    const graph = within(host);
+    const checkbox = code => graph.queryByRole('checkbox', { name: `${code} 선택` });
+    const node = id => graph.queryByRole('button', { name: `계좌 노드 ${id}` });
+    let cleanup;
+    try {
+      await act(async () => { cleanup = mountCaseGraph(host.children[0], { active, cases: [active] }); });
+        // jsdom has no Element.getAnimations; the switch skips its squish animation under reduced motion.
+      document.documentElement.dataset.reducedMotion = 'true';
+      const toggle = graph.getByRole('switch', { name: '주변 거래 표시' });
+      expect(toggle).not.toBeChecked();
+      expect(node('C1')).not.toBeInTheDocument();
+      expect(checkbox(rows[1].code)).not.toBeInTheDocument();
+      expect(checkbox(rows[0].code)).toBeInTheDocument();
+      fireEvent.click(toggle);
+      expect(node('C1')).toBeInTheDocument();
+      expect(checkbox(rows[1].code)).toBeInTheDocument();
+      fireEvent.click(toggle);
+      expect(node('C1')).not.toBeInTheDocument();
+    } finally {
+      delete document.documentElement.dataset.reducedMotion;
       await act(async () => { cleanup?.(); });
       host.remove();
       vi.unstubAllGlobals();

@@ -60,10 +60,11 @@ class _EdgeInput:
                           *codes, None if usd is None else int((Decimal(usd) * USD_MICROS).to_integral_value()))
 
 
-def _build_graphs(rows, seeds, seed_groups=()):
+def _build_graphs(rows, seeds, seed_groups=(), context_eligible=None):
     """Translate public UUIDs to snapshot-local codes, preserving transaction IDs.
 
     ``rows`` is the streamed _EdgeInput, or a mapping tx_id -> row for small inputs.
+    ``context_eligible``: tx_id -> score of the transactions that may become CONTEXT members (None = all).
     """
     source = rows
     if not isinstance(rows, _EdgeInput):
@@ -72,7 +73,8 @@ def _build_graphs(rows, seeds, seed_groups=()):
             source.add(tx_id, row['occurred_at'], row['from_bank_id'], row['from_account_id'],
                        row['to_bank_id'], row['to_account_id'], row.get('amount_usd'))
     try:
-        batch = build_block_graphs(FlowIndex(source.edges), seeds, POLICY, seed_groups=seed_groups)
+        batch = build_block_graphs(FlowIndex(source.edges), seeds, POLICY, seed_groups=seed_groups,
+                                   context_eligible=context_eligible)
     except GraphBudgetExceeded as error:
         raise ProtocolError('Alert graph budget exceeded: ' + str(error)) from error
     return GraphBatch(batch.graphs, batch.unassigned, batch.rejected_relations, batch.policy_digest,
@@ -157,10 +159,11 @@ def _coverage(seeds, days):
 
 
 def _context_query(members, focal):
-    """Context is a query condition, not stored members (block-pin-1).
+    """Focal-account query condition kept beside the stored CONTEXT members.
 
     The window is the core's time span padded by the policy; focal accounts are
-    the block's own fan centres whose other transactions a viewer may fetch.
+    the block's own fan centres. The CONTEXT members themselves are the scored
+    transactions of every core account in the same window (block_graph _Build.context).
     """
     times = [datetime.fromisoformat(m['occurredAt']) for m in members]
     pad = timedelta(microseconds=POLICY.context_pad_us)
@@ -331,7 +334,9 @@ def _promote_seeds(connection, execution, edges, decisions, positive, times):
     low, floor = _promotion_values(connection, execution)
     if low is None or floor is None or not positive:
         return 0
-    probability = {key: decision[0] for key, decision in decisions.items()}
+    # decisions may reach below the promotion floor (context_score_min); promotion sees only its own range.
+    bottom = float(min(low, floor))
+    probability = {key: decision[0] for key, decision in decisions.items() if decision[0] >= bottom}
     positions = promote(edges, probability, positive, low, floor)
     for i in positions:
         key = edges.tx_ids[i]
@@ -367,10 +372,13 @@ def save_alerts(connection, execution):
     if threshold is None:
         raise ProtocolError('Frozen threshold is required')
     scope = Scope(connection, execution.run_id)
-    # Only the decisions a seed or seed promotion can use are held: scores at or above their own
-    # threshold, or at or above the promotion floor. Lower scores (99%+ of the window) decide
-    # nothing here and are fetched on demand through _Scores when evidence shows them.
+    # Only the decisions a seed, seed promotion or CONTEXT member can use are held: scores at or
+    # above their own threshold, or at or above the lower of the promotion floor and
+    # context_score_min. Lower scores decide nothing here and are fetched on demand through
+    # _Scores when evidence shows them.
+    # CONTEXT members need every score at or above context_score_min as well.
     cut = _promotion_floor(connection, execution)
+    cut = POLICY.context_score_min if cut is None else min(cut, POLICY.context_score_min)
     decisions = {}
     with connection.transaction(), connection.cursor(name='alert_scores') as cursor:
         cursor.execute(WINDOW_SCORES, dict(scope.arguments(), floor=cut))
@@ -418,6 +426,8 @@ def save_alerts(connection, execution):
     timings['inputRead'] = (perf_counter() - started) * 1000
     promotion_started = perf_counter()
     promoted = _promote_seeds(connection, execution, edges.edges, decisions, positive, times)
+    context_eligible = {key: float(probability) for key, (probability, _) in decisions.items()
+                        if probability >= POLICY.context_score_min}
     del decisions
     timings['seedPromotion'] = (perf_counter() - promotion_started) * 1000
     candidate_started = perf_counter()
@@ -443,8 +453,8 @@ def save_alerts(connection, execution):
     candidates = {key for key, at in times.items() if at >= scope.seed_start}
     candidates -= scope.owned_elsewhere(connection, candidates, pinned_ids)
     seeds = {key: positive[key] for key in candidates | owned_seen}
-    batch = _build_graphs(edges, seeds, seed_groups)
-    del edges
+    batch = _build_graphs(edges, seeds, seed_groups, context_eligible)
+    del edges, context_eligible
     timings['candidateBuild'] = (perf_counter() - candidate_started) * 1000
     member_started = perf_counter()
     # Evidence renders only this run's graph members: read their full rows and scores.

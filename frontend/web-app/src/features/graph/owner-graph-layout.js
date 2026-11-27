@@ -83,7 +83,12 @@ export function ownerTransferPath(from, to, fromOffset, toOffset) {
   const below = Math.max(from.owner.y + from.owner.height + fromOffset.y, to.owner.y + to.owner.height + toOffset.y) + 44;
   const first = [start[0] + bend, forward ? start[1] : start[1] + (below - start[1]) * 4 / 3];
   const second = [end[0] - bend, forward ? end[1] : end[1] + (below - end[1]) * 4 / 3];
-  return { path: `M ${start.join(' ')} C ${first.join(' ')}, ${second.join(' ')}, ${end.join(' ')}`,
+  const points = Array.from({ length: 13 }, (_, step) => {
+    const t = step / 12, u = 1 - t;
+    return start.map((value, index) => u * u * u * value + 3 * u * u * t * first[index] + 3 * u * t * t * second[index] + t * t * t * end[index]);
+  });
+  const length = points.slice(1).reduce((sum, point, index) => sum + Math.hypot(point[0] - points[index][0], point[1] - points[index][1]), 0);
+  return { path: `M ${start.join(' ')} C ${first.join(' ')}, ${second.join(' ')}, ${end.join(' ')}`, length,
     midpoint: start.map((value, index) => (value + 3 * first[index] + 3 * second[index] + end[index]) / 8) };
 }
 

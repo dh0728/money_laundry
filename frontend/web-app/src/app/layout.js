@@ -16,7 +16,8 @@ import { reviewStatusLabels } from '../lib/review-status.js';
 import { csvDownloadEntry, inDateRange, QueryRadio, setupQueryControls, WorkspaceQueryDock } from '../components/query-controls.jsx';
 import { dashboardFixtureBoardPage, dashboardFixtureResponse, dashboardFixtures, dashboardPeriodEnd, dashboardRecordCodes } from '../mocks/dashboard-fixtures.js';
 import { personalWorkHistory } from '../features/dashboard/personal-work-history.js';
-import { liveCodes, liveSource, liveSourceLoaded, loadLiveSource, markLiveJudged, markLiveReviewStarted, rebuildLiveSource, resetLiveSource } from '../features/investigation/live-data.js';
+import { liveCaseSignatures, liveCodes, liveLoadedAt, liveSource, liveSourceLoaded, loadLiveSource, markLiveJudged, markLiveReviewStarted, rebuildLiveSource,
+  resetLiveSource } from '../features/investigation/live-data.js';
 import { changeLiveEpisode, editLiveTransactions, markLiveRead, saveLiveJudgment, startLiveReview } from '../features/investigation/live-actions.js';
 import { liveWorkRequests, liveWorkRequestsReady, loadLiveWorkRequests, readLiveWorkRequests, resetLiveWorkRequests, resolveLiveWorkRequest,
   sendLiveWorkRequest } from '../features/investigation/live-work-requests.js';
@@ -48,6 +49,7 @@ import { notificationRowTitle, ruleNotificationLink, RuleNotificationLink } from
 import { getModelRiskThresholds, loadLiveModelRiskThresholds } from '../features/settings/model-risk-settings.js';
 import { restoreWorkTabCodes, setWorkTabCodes } from './work-tab-state.js';
 import { startSessionKeepalive } from './session-keepalive.js';
+import { changedCaseCount, liveRefreshIntervalMs, startLiveRefresh } from './live-refresh.js';
 import { benchmarkLedgerPath, dashboardRoute, initialDetail, isBenchmarkTransactionCode, isLedgerScreen, ledgerTableScreen, loginRoute, previewUrl, readPreviewRoute, validWorkCode } from './preview-route.js';
 import { appMotionPreference, appReducedMotion, systemReducedMotion } from '@/hooks/use-reduced-motion';
 
@@ -175,7 +177,10 @@ function Header() {
     BoxHTML('', 'id="screen-navigation" class="header-frame screen-navigation" hidden'),
     'class="contextual-header"',
   ), 'class="header-frame header-frame--center"');
-  const viewControls = BoxHTML(
+  // 서비스 모드: 화면 데이터 기준 시각과 다른 사람의 변경 건수. 누르면 새로 받아 지금 화면을 다시 그린다.
+  const liveStatus = serviceMode ? Button(TextHTML('', 'id="live-refresh-label"'),
+    { variant: 'live-refresh', attributes: 'id="live-refresh" hidden aria-live="polite"', shape: 'pill', surface: 'floating' }) : '';
+  const viewControls = BoxHTML(liveStatus +
     IconButton(Icon('fullscreen'), '전체화면 보기', 'id="fullscreen-toggle" aria-pressed="false"') +
     IconButton(Icon('wide'), '넓게 보기', 'id="workspace-width-toggle" aria-pressed="false"'),
     'class="header-view-controls" role="group" aria-label="화면 보기"',
@@ -202,6 +207,42 @@ function WorkTab(code) {
 // 서비스 모드는 서버에서 받은 사건을, 프리뷰는 샘플을 화면 데이터로 쓴다.
 function caseSource(groups) {
   return serviceMode ? rebuildLiveSource() : dashboardFixtures(groups);
+}
+
+// 주기적으로 다시 받은 board 에서 아직 화면에 그리지 않은 변경 건수. 화면을 새로 그리면 0으로 돌린다.
+let unshownLiveChanges = 0;
+let refreshLiveNow = () => undefined;
+const minuteMs = 60_000;
+
+async function refreshLiveBoard() {
+  const before = liveCaseSignatures();
+  await loadLiveSource();
+  unshownLiveChanges += changedCaseCount(before, liveCaseSignatures());
+  // 지금 화면은 그대로 두고, 버튼 동작이 찾는 행만 새 데이터로 바꾼다. 다음에 그리는 화면은 새 데이터로 그린다.
+  if (dashboardSource) dashboardSource = rebuildLiveSource();
+  renderLiveRefreshStatus();
+}
+
+function renderLiveRefreshStatus() {
+  const button = document.getElementById('live-refresh');
+  const loadedAt = liveLoadedAt();
+  if (!button) return;
+  button.hidden = !signedIn || !loadedAt;
+  if (button.hidden) return;
+  const minutes = Math.floor((Date.now() - loadedAt) / minuteMs);
+  const age = minutes < 1 ? '방금 기준' : `${minutes}분 전 기준`;
+  button.toggleAttribute('data-changes', unshownLiveChanges > 0);
+  button.querySelector('#live-refresh-label').textContent = unshownLiveChanges ? `변경 ${unshownLiveChanges}건 · 반영` : age;
+  button.title = unshownLiveChanges ? `다른 사람이 바꾼 ${unshownLiveChanges}건이 있습니다. 누르면 지금 화면에 반영합니다. (${age})`
+    : `화면 데이터 ${age}. 누르면 새로 받습니다.`;
+}
+
+// 버튼: 묵은 데이터면 새로 받고, 지금 화면을 새 데이터로 다시 그린다.
+function applyLiveRefresh() {
+  const stale = Date.now() - (liveLoadedAt() ?? 0) >= liveRefreshIntervalMs;
+  void Promise.resolve(stale ? refreshLiveNow() : undefined).then(() => {
+    if (signedIn && activePath) showWorkspace('', activeWorkCode, activePath, 'none', new URLSearchParams(location.search));
+  });
 }
 
 function tabCodes(group) {
@@ -862,6 +903,10 @@ function loadPreviewDashboard(mounted, source, query) {
 
 function showWorkspace(prefix, code = '', override = '', navigationMode = 'push', params, benchmarkFailed = false) {
   cancelAnimationFrame(navigationFrame);
+  if (serviceMode) {
+    unshownLiveChanges = 0;
+    renderLiveRefreshStatus();
+  }
   for (const tab of document.querySelectorAll('#sidebar [aria-current="page"]')) {
     tab.removeAttribute('aria-current');
   }
@@ -1018,10 +1063,10 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
             document.dispatchEvent(new CustomEvent('aml:notice', { detail: { status: 'failed', title: '조사를 시작하지 못했습니다.', description: result.error } }));
             return;
           }
-          // 받아 둔 응답에 착수를 먼저 반영해 바로 [판정]으로 바꾸고, 전체 board 는 뒤에서 다시 받아 맞춘다.
+          // 받아 둔 응답에 착수를 반영해 바로 [판정]으로 바꾼다. 착수는 그 사건의 상태만 바꾸므로 board 를 다시 받지 않는다.
+          // 서버 쪽 최신 값은 주기적인 다시 받기(live-refresh.js)가 맞춘다.
           markLiveReviewStarted(current.caseId);
           show();
-          void loadLiveSource().then(show, () => undefined);
         });
       }
       if (!startPreviewReview(current, currentPreviewUser())) return;
@@ -1033,10 +1078,10 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
       if (serviceMode) {
         return saveLiveJudgment(row, verdict, details, reasonCategory).then(result => {
           if (!result.ok) return result;
-          // 판정 응답만으로 완료 창을 띄운다. 받아 둔 board 에 판정을 먼저 반영하고, 전체 board 는 뒤에서 다시 받아 맞춘다.
+          // 판정 응답만으로 완료 창을 띄운다. 판정은 그 사건만 닫으므로(ReviewService.judge) board 를 다시 받지 않고
+          // 받아 둔 board 에 판정을 반영한다. 서버 쪽 최신 값은 주기적인 다시 받기(live-refresh.js)가 맞춘다.
           markLiveJudged(row, result.judgment);
           dashboardSource = caseSource(groups);
-          void loadLiveSource().then(() => { dashboardSource = caseSource(groups); }, () => undefined);
           return result;
         });
       }
@@ -2164,6 +2209,11 @@ if (serviceMode) {
       throw error;
     }),
   });
+  // 다른 사람이 처리한 결과·새 Alert가 보이게 board 를 주기적으로 다시 받는다(live-refresh.js).
+  const liveRefresh = startLiveRefresh({ isActive: () => signedIn && liveSourceLoaded(), refresh: refreshLiveBoard });
+  refreshLiveNow = liveRefresh.refreshNow;
+  byId('live-refresh')?.addEventListener('click', applyLiveRefresh);
+  setInterval(renderLiveRefreshStatus, minuteMs / 4);
   // 서버 세션을 확인하기 전에는 로그인 화면 대신 준비 화면을 보여준다.
   if (location.pathname === '/login') restoreLocation();
   else showWorkspacePreparation();
