@@ -297,7 +297,14 @@
   .preview-graph-playback > span[aria-hidden="true"] { display: none }
   .preview-graph-playback input { min-inline-size: 0 }
 }
-.preview-flow-swatch { display: block; width: var(--aml-space-16); border-block-start: var(--aml-stroke-focus) solid var(--case-graph-swatch-ink, var(--muted-text)) }
+.preview-graph-case-chips { display: flex; flex-wrap: wrap; flex-basis: 100%; gap: var(--aml-space-4); margin: 0; padding: 0; list-style: none }
+.preview-graph-case-chip { display: inline-flex; align-items: center; gap: var(--aml-space-4); font-size: var(--aml-type-caption-size) }
+.preview-graph-case-chip[aria-pressed="true"] { box-shadow: inset 0 0 0 var(--aml-stroke-focus) var(--case-graph-swatch-ink) }
+.preview-graph-chip-swatch {
+  display: block; flex: none; inline-size: var(--aml-space-12); block-size: var(--aml-space-12); border-radius: 50%;
+  background: color-mix(in srgb, var(--case-graph-swatch-ink, var(--muted-text)) var(--case-graph-chip-fill-share), transparent);
+  box-shadow: inset 0 0 0 var(--aml-stroke-focus) var(--case-graph-swatch-ink, var(--muted-text));
+}
 .preview-case-network {
   --case-graph-risk-high: var(--risk-high);
   --case-graph-risk-medium: var(--risk-medium);
@@ -355,6 +362,9 @@
 .owner-account-divider { fill: none; stroke: var(--divider); }
 .owner-account-port { stroke: var(--information-panel-surface); stroke-width: var(--case-graph-owner-port-stroke) }
 .owner-time-edge path { fill: none }
+.owner-case-region { opacity: var(--case-graph-region-opacity) }
+.owner-case-region[data-emphasis="strong"] { opacity: var(--case-graph-region-strong-opacity) }
+.owner-case-region[data-emphasis="faint"] { opacity: var(--case-graph-region-faint-opacity) }
 .owner-edge-visible { stroke-linecap: round }
 .owner-time-edge text {
   paint-order: stroke;

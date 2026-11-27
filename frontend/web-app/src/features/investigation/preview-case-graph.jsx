@@ -22,9 +22,8 @@ import { caseSankeyGraph, caseSankeyLayers, layoutCaseSankey } from './case-sank
 import { complexSankeySampleCode } from '../../mocks/dashboard-fixtures';
 import { buildCaseNetwork, casePlaybackCursor, graphRiskBand, graphTableSelection, graphVerdict, graphVerdictLabels,
   mergeCaseTransactions, sharedCaseEvidence, transactionsWithinHops } from './case-graph-scope';
-import { caseAccountLayout } from './case-pattern-layout';
 import { CountTag, LinkTag, ModelScoreTag } from '../../components/semantic-tags';
-import { caseGroupColor, caseMembership } from '../graph/graph-case-groups';
+import { assignCaseColorSlots, caseGroupColor, caseMembership } from '../graph/graph-case-groups';
 import { ForceCaseCanvas } from '../graph/force-case-canvas';
 import { GraphIconButton, GraphPlayback, GraphZoomControls } from '../graph/preview-graph-controls';
 import { GraphFlowStroke, readGraphFlowDuration } from '../../components/charts/charts/graph-flow-pulse';
@@ -57,7 +56,7 @@ const allGraphRelations = ':all-relations:';
 
 function GraphSettings({ id, groups, showDetails, onDetailsChange, ownerView, sankeyView, anchor, hops, onHopsChange,
   network, selection, onSelect, shownCases, highlightedCase, onHighlight, hiddenCases, onVisibilityChange,
-  showSankeySample, accountCount, ownerCount, patternLayout }) {
+  showSankeySample, accountCount, ownerCount }) {
   const trigger = useRef(null);
   const [expanded, setExpanded] = useState(() => window.innerWidth > 768);
   function closeOnEscape(event) {
@@ -71,7 +70,7 @@ function GraphSettings({ id, groups, showDetails, onDetailsChange, ownerView, sa
     const hidden = !isBase && hiddenCases.has(id);
     const interactive = shownCases.has(id);
     const membership = <>
-      <Text as="i" className="preview-flow-swatch" style={{ '--case-graph-swatch-ink': color }} aria-hidden="true" />
+      <Text as="i" className="preview-graph-chip-swatch" style={{ '--case-graph-swatch-ink': color }} aria-hidden="true" />
       <Text as="code">{id}</Text>{isBase && <Text as="span">기준</Text>}
       {hidden ? <Text as="span">숨김</Text> : !interactive && <Text as="span">범위 밖</Text>}
     </>;
@@ -106,7 +105,7 @@ function GraphSettings({ id, groups, showDetails, onDetailsChange, ownerView, sa
         ? '띠의 굵기는 거래 건수를 나타냅니다.'
         : ownerView
         ? '소유주 블록에 계좌를 모아 표시합니다. 왼쪽은 수취, 오른쪽은 송금입니다.'
-        : `가로 · 계좌의 첫 거래 시각(KST) / 세로 · ${patternLayout === 'pattern' ? '거래 패턴' : '송금·수취 연결'}`}</Text>
+        : '가로 · 돈이 처음 출발한 계좌에서 송금 방향으로 건너간 횟수(홉) / 세로 · 같은 홉 안에서 위가 이른 시각'}</Text>
       {!sankeyView && <Box className="preview-graph-detail-toggle">
         <Box as="label" htmlFor="case-graph-details">그래프 거래 라벨 표시</Box>
         <Text as="span"><SquishSwitchControl id="case-graph-details" label="그래프 거래 라벨 표시"
@@ -400,6 +399,12 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
   const scopeKey = active?.code ? `${active.code}:${related ? 'related' : 'analysis'}` : undefined;
   const initialSelection = caseGraphSelections.get(scopeKey);
   const [candidateIds, setCandidateIds] = useState(() => initialSelection?.candidateIds ?? new Set());
+  // 비교에 넣은 순서대로 색 칸을 준다. 빠진 Alert의 칸은 다음에 넣는 Alert가 쓰고, 남은 Alert의 색은 그대로다.
+  const colorSlotMemory = useRef(new Map());
+  const colorSlots = useMemo(() => {
+    colorSlotMemory.current = assignCaseColorSlots(colorSlotMemory.current, [...candidateIds]);
+    return colorSlotMemory.current;
+  }, [candidateIds]);
   const [hiddenCases, setHiddenCases] = useState(() => initialSelection?.hiddenCases ?? new Set());
   const [highlightedCase, setHighlightedCase] = useState(initialSelection?.highlightedCase);
   const [selection, setSelection] = useState(initialSelection?.selection);
@@ -434,8 +439,8 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
   const comparedCases = useMemo(() => [active, ...compared].filter(Boolean), [active, compared]);
   const groups = useMemo(() => related ? comparedCases.map(record => ({
     id: record.code, transactionIds: new Set(record.related.map(row => row.code)),
-    color: caseGroupColor(record === active ? 0 : candidates.findIndex(item => item.record.code === record.code) + 1),
-  })) : [], [active, candidates, comparedCases, related]);
+    color: caseGroupColor(record === active ? 0 : colorSlots.get(record.code) ?? 1),
+  })) : [], [active, colorSlots, comparedCases, related]);
   const shownGroups = useMemo(() => groups.filter(group => group.id === active?.code || !hiddenCases.has(group.id)),
     [active, groups, hiddenCases]);
   const transactions = useMemo(() => mergeCaseTransactions(comparedCases.filter(record => record === active || !hiddenCases.has(record.code))),
@@ -443,8 +448,6 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
   const cursor = casePlaybackCursor(transactions, through);
   const current = useMemo(() => transactions.slice(0, cursor), [transactions, cursor]);
   const network = useMemo(() => buildCaseNetwork(transactions), [transactions]);
-  const accountLayout = useMemo(() => lens === 'pattern' ? caseAccountLayout(network, active?.pattern) : undefined,
-    [lens, network, active?.pattern]);
   const currentGraph = useMemo(() => buildCaseNetwork(current), [current]);
   const hasOwnerScope = selection?.startsWith('owner:') ?? false;
   const ownerNodes = useMemo(() => hasOwnerScope ? buildCaseNetwork(current, true).nodes.filter(node => node.owner) : [],
@@ -652,7 +655,6 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
                 hiddenCases={hiddenCases} onVisibilityChange={setCaseVisible}
                 accountCount={visible.nodes.length}
                 ownerCount={ownerView ? new Set(visible.nodes.map(node => node.owner).filter(Boolean)).size : undefined}
-                patternLayout={accountLayout?.kind}
                 onHighlight={id => setHighlightedCase(previous => previous === id ? undefined : id)} />
               <Box className="preview-graph-metadata">
                 {hasSelection && <Box className="semantic-tag-group">
@@ -677,9 +679,27 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
                 groups={shownGroups} showDetails={showDetails} highlightedCase={shownHighlight} flowPulse={scopedFlowPulse} playing={playing} />
               : <ForceCaseCanvas network={network} visible={visible} records={transactions}
                 selection={selectedIds} onNodeSelect={activateNode} onSelect={select} controlsHost={controlsHost} groups={shownGroups}
-                positions={accountLayout?.positions}
                 showDetails={showDetails} highlightedCase={shownHighlight} flowPulse={scopedFlowPulse} playing={playing} />}
             {network.nodes.length > 0 && <Box className="preview-graph-actions">
+              {groups.length > 1 && <Box as="ul" className="preview-graph-case-chips" aria-label="그래프의 Alert 구분">
+                {groups.map(group => {
+                  const isBase = group.id === active?.code;
+                  const hidden = !isBase && hiddenCases.has(group.id);
+                  const shown = !hidden && shownCases.has(group.id);
+                  return <Box as="li" key={group.id}>
+                    <ActionButton shape="pill" surface="floating" className="preview-graph-case-chip"
+                      aria-pressed={shownHighlight === group.id} disabled={!shown || sankeyView}
+                      title={sankeyView ? '생키 보기에서는 Alert별 강조를 하지 않습니다' : hidden ? '그래프 설정에서 숨긴 Alert'
+                        : !shown ? '현재 표시 범위에 거래가 없습니다' : undefined}
+                      style={{ '--case-graph-swatch-ink': group.color }}
+                      onClick={() => setHighlightedCase(previous => previous === group.id ? undefined : group.id)}>
+                      <Text as="i" className="preview-graph-chip-swatch" aria-hidden="true" />
+                      <Text as="code">{group.id}</Text>{isBase && <Text as="span">기준</Text>}
+                      <Text as="span">{group.transactionIds.size}건</Text>
+                    </ActionButton>
+                  </Box>;
+                })}
+              </Box>}
               <GraphPlayback records={transactions} cursor={cursor} playing={playing && cursor < transactions.length} onPlay={play} onSeek={seek} />
               <Box className="preview-graph-controls" ref={setControlsHost} />
             </Box>}

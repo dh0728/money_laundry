@@ -1,6 +1,6 @@
 import { readChartFontFamily, readChartNumber } from '@/components/charts/chart-design-values';
 
-export const graphTimeStep = 120;
+export const hopStep = 160;
 const sameTimeGap = 42;
 const clockFormat = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/;
 
@@ -58,39 +58,76 @@ export function graphTimeFormatter(times) {
   return time => format.format(time).replace(',', '');
 }
 
-export function buildPatternTime(records, nodes, patternPositions) {
+// 계좌마다 홉(돈이 처음 출발한 계좌에서 송금 방향으로 몇 번 건너왔는지)을 센다.
+// 출발 계좌 = 받은 적 없이 보내기만 한 계좌(여러 개일 수 있다). 출발 계좌가 없는 순환은
+// 아직 정하지 않은 계좌 중 가장 이른 거래를 보낸 계좌에서 다시 시작한다. 여러 경로로 닿으면 가장 짧은 홉.
+export function accountHops(records, accountIds) {
+  const accounts = new Set(accountIds);
+  const outgoing = new Map();
+  const received = new Set();
+  for (const row of records) {
+    const from = row.from.code, to = row.to.code;
+    if (!accounts.has(from) || !accounts.has(to)) continue;
+    if (!outgoing.has(from)) outgoing.set(from, []);
+    outgoing.get(from).push(to);
+    if (from !== to) received.add(to);
+  }
+  const hops = new Map();
+  const spread = starts => {
+    let frontier = starts.filter(id => !hops.has(id));
+    for (const id of frontier) hops.set(id, 0);
+    for (let hop = 1; frontier.length; hop++) {
+      const next = [];
+      for (const id of frontier) for (const target of outgoing.get(id) ?? []) {
+        if (hops.has(target)) continue;
+        hops.set(target, hop);
+        next.push(target);
+      }
+      frontier = next;
+    }
+  };
+  spread([...accounts].filter(id => !received.has(id)));
+  const byTime = records.map(row => ({ row, time: transactionTime(row.timestamp) }))
+    .sort((left, right) => (Number.isFinite(left.time) ? left.time : Infinity) - (Number.isFinite(right.time) ? right.time : Infinity)
+      || String(left.row.code).localeCompare(String(right.row.code)));
+  for (const { row } of byTime) {
+    if (hops.size === accounts.size) break;
+    if (!hops.has(row.from.code) && accounts.has(row.from.code)) spread([row.from.code]);
+  }
+  for (const id of accounts) if (!hops.has(id)) hops.set(id, 0);
+  return hops;
+}
+
+// 홉-시간순 그래프: 가로 = 홉, 같은 홉 안의 세로 = 시간순(위가 이른 시각).
+// 출발 계좌는 첫 송금 시각, 나머지는 돈이 처음 들어온 시각으로 줄을 세운다.
+export function buildHopTimePlan(records, nodes) {
   const byCode = new Map();
   const first = new Map();
+  const arrived = new Map();
+  const sent = new Map();
+  const earliest = (map, key, time) => map.set(key, Math.min(map.get(key) ?? time, time));
   for (const row of records) {
     const time = transactionTime(row.timestamp);
     if (!Number.isFinite(time)) continue;
     byCode.set(row.code, time);
-    for (const account of [row.from.code, row.to.code]) {
-      first.set(account, Math.min(first.get(account) ?? time, time));
-    }
+    for (const account of [row.from.code, row.to.code]) earliest(first, account, time);
+    earliest(sent, row.from.code, time);
+    if (row.from.code !== row.to.code) earliest(arrived, row.to.code, time);
   }
+  if (!nodes.length) return undefined;
   const times = [...new Set(byCode.values())].sort((left, right) => left - right);
-  if (!times.length) return undefined;
-
-  const formatTime = graphTimeFormatter(times);
-  const ticks = times.map((time, index) => ({ x: index * graphTimeStep, label: formatTime(time) }));
-  const columns = new Map(times.map((time, index) => [time, index * graphTimeStep]));
+  const formatTime = graphTimeFormatter(times.length ? times : [0]);
+  const hops = accountHops(records, nodes.map(node => node.id));
+  const lastHop = Math.max(...hops.values());
+  const ticks = Array.from({ length: lastHop + 1 }, (_, hop) => ({ x: hop * hopStep, label: `홉 ${hop}` }));
   const homes = new Map();
-  const buckets = Map.groupBy(nodes, ({ id }) => first.get(id));
-  for (const [time, accounts] of buckets) {
-    const x = columns.get(time) ?? ticks.length * graphTimeStep;
-    const preferredY = id => (patternPositions?.[id]?.y ?? 0) * .44;
-    const ordered = accounts.sort((left, right) => preferredY(left.id) - preferredY(right.id) || left.id.localeCompare(right.id));
-    const ys = [];
-    for (const { id } of ordered) {
-      const preferred = preferredY(id);
-      ys.push(ys.length ? Math.max(ys.at(-1) + sameTimeGap, preferred) : preferred);
-    }
-    const offset = ordered.reduce((sum, { id }, index) => sum + ys[index] - preferredY(id), 0) / ordered.length;
-    ordered.forEach(({ id }, index) => homes.set(id, { x, y: ys[index] - offset }));
+  const order = id => (hops.get(id) === 0 ? sent.get(id) : arrived.get(id)) ?? first.get(id) ?? Infinity;
+  for (const [hop, accounts] of Map.groupBy(nodes, ({ id }) => hops.get(id))) {
+    const ordered = accounts.toSorted((left, right) => order(left.id) - order(right.id) || left.id.localeCompare(right.id));
+    const top = -((ordered.length - 1) * sameTimeGap) / 2;
+    ordered.forEach(({ id }, index) => homes.set(id, { x: hop * hopStep, y: top + index * sameTimeGap }));
   }
-  if (buckets.has(undefined)) ticks.push({ x: ticks.length * graphTimeStep, label: '시각 없음' });
-  return { byCode, first, ticks, homes, formatTime };
+  return { byCode, first, hops, ticks, homes, formatTime };
 }
 
 // D3 integrates velocity after each force iteration. This pair crosses the

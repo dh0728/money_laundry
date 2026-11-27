@@ -34,7 +34,7 @@ function svg(tag, attributes = {}) {
   return element;
 }
 
-export function makeGraphSnapshot({ width, height, nodes, edges, wraps = [] }) {
+export function makeGraphSnapshot({ width, height, nodes, edges, regions = [] }) {
   const drawing = svg('svg', { width, height, viewBox: `0 0 ${width} ${height}` });
   const textStyle = { 'font-family': 'Pretendard', 'font-size': 11, 'text-anchor': 'middle' };
   const label = (text, attributes) => {
@@ -42,11 +42,14 @@ export function makeGraphSnapshot({ width, height, nodes, edges, wraps = [] }) {
     element.textContent = text;
     return element;
   };
-  for (const { path, stroke, width: thickness, opacity = 1 } of wraps) {
-    drawing.append(svg('path', {
-      d: path, fill: 'none', stroke, 'stroke-width': thickness, 'stroke-opacity': opacity,
-      'stroke-linecap': 'round',
-    }));
+  for (const { color, opacity, shapes } of regions) {
+    const layer = svg('g', { opacity });
+    for (const { path, width: thickness } of shapes) {
+      layer.append(svg('path', {
+        d: path, fill: 'none', stroke: color, 'stroke-width': thickness, 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+      }));
+    }
+    drawing.append(layer);
   }
   for (const { path, stroke, width: thickness, text, x, y, textColor = stroke } of edges) {
     drawing.append(svg('path', { d: path, fill: 'none', stroke, 'stroke-width': thickness, 'stroke-linecap': 'round' }));
