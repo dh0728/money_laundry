@@ -8,7 +8,7 @@ import { GraphZoomControls } from './preview-graph-controls';
 import { readGraphCanvasPulse } from '../../components/charts/charts/graph-flow-pulse';
 import { readCanvasColors, readChartNumber } from '../../components/charts/chart-design-values';
 import { makeGraphSnapshot, registerGraphSnapshot } from '../../lib/preview-visual-export';
-import { buildPatternTime, readGraphTimeAxisDesign, projectGraphTimeTicks,
+import { buildHopTimePlan, readGraphTimeAxisDesign, projectGraphTimeTicks,
   patternHomeForce, patternVelocityDecay } from './pattern-graph-time';
 import { useAppReducedMotion } from '@/hooks/use-reduced-motion';
 import { Box, Text } from '../../components/layout-primitives';
@@ -288,7 +288,7 @@ export function ForceCaseCanvas({
   const [idleFlow, setIdleFlow] = useState();
   const [pulseDesign] = useState(readGraphCanvasPulse);
   const [axisDesign] = useState(readGraphTimeAxisDesign);
-  const timePlan = useMemo(() => buildPatternTime(records ?? [], network.nodes, positions), [records, network, positions]);
+  const timePlan = useMemo(() => buildHopTimePlan(records ?? [], network.nodes), [records, network]);
   const [data, setData] = useState(() => simulationData(network, positions, timePlan));
   const currentLayout = useRef({ network, positions, timePlan });
   const reducedMotion = useAppReducedMotion();
@@ -388,8 +388,8 @@ export function ForceCaseCanvas({
   }));
 
   return <Box ref={host} className="preview-evidence-canvas" data-force-graph=""
-    data-graph-layout={positions ? 'account' : 'gravity'} data-time-axis={timePlan ? 'first-appearance' : undefined} role="group"
-    aria-label={timePlan ? '패턴별 관계 그래프 · 계좌 첫 등장 시각 순서 · KST'
+    data-graph-layout={positions ? 'account' : 'gravity'} data-time-axis={timePlan ? 'hop' : undefined} role="group"
+    aria-label={timePlan ? '홉-시간순 관계 그래프 · 가로는 돈이 출발한 계좌에서 건너간 횟수 · 같은 홉 안에서는 위가 이른 시각'
       : ownerView ? '소유주 관계 그래프' : '계좌 관계 그래프'}>
     {ready && <ForceGraph2D ref={graph} width={size.width} height={size.height} graphData={data}
       autoPauseRedraw={!activeFlow && !ambientFlow}
@@ -398,7 +398,8 @@ export function ForceCaseCanvas({
       nodeVisibility={node => visibleNodes.has(node.id)} linkVisibility={link => visibleEdges.has(link.id)}
       nodeRelSize={1} nodeLabel={node => {
         const time = timePlan?.first.get(node.id);
-        return <Text as="span">{node.id}{time === undefined ? '' : ` · 첫 거래 ${timePlan.formatTime(time)} KST`}</Text>;
+        const hop = timePlan?.hops.get(node.id);
+        return <Text as="span">{node.id}{hop === undefined ? '' : ` · 홉 ${hop}`}{time === undefined ? '' : ` · 첫 거래 ${timePlan.formatTime(time)} KST`}</Text>;
       }}
       linkLabel={link => {
         const edge = visibleEdges.get(link.id);

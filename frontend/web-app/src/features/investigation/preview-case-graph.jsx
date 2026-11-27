@@ -22,7 +22,6 @@ import { caseSankeyGraph, caseSankeyLayers, layoutCaseSankey } from './case-sank
 import { complexSankeySampleCode } from '../../mocks/dashboard-fixtures';
 import { buildCaseNetwork, casePlaybackCursor, graphRiskBand, graphTableSelection, graphVerdict, graphVerdictLabels,
   mergeCaseTransactions, sharedCaseEvidence, transactionsWithinHops } from './case-graph-scope';
-import { caseAccountLayout } from './case-pattern-layout';
 import { CountTag, LinkTag, ModelScoreTag } from '../../components/semantic-tags';
 import { assignCaseColorSlots, caseGroupColor, caseMembership } from '../graph/graph-case-groups';
 import { ForceCaseCanvas } from '../graph/force-case-canvas';
@@ -57,7 +56,7 @@ const allGraphRelations = ':all-relations:';
 
 function GraphSettings({ id, groups, showDetails, onDetailsChange, ownerView, sankeyView, anchor, hops, onHopsChange,
   network, selection, onSelect, shownCases, highlightedCase, onHighlight, hiddenCases, onVisibilityChange,
-  showSankeySample, accountCount, ownerCount, patternLayout }) {
+  showSankeySample, accountCount, ownerCount }) {
   const trigger = useRef(null);
   const [expanded, setExpanded] = useState(() => window.innerWidth > 768);
   function closeOnEscape(event) {
@@ -106,7 +105,7 @@ function GraphSettings({ id, groups, showDetails, onDetailsChange, ownerView, sa
         ? '띠의 굵기는 거래 건수를 나타냅니다.'
         : ownerView
         ? '소유주 블록에 계좌를 모아 표시합니다. 왼쪽은 수취, 오른쪽은 송금입니다.'
-        : `가로 · 계좌의 첫 거래 시각(KST) / 세로 · ${patternLayout === 'pattern' ? '거래 패턴' : '송금·수취 연결'}`}</Text>
+        : '가로 · 돈이 처음 출발한 계좌에서 송금 방향으로 건너간 횟수(홉) / 세로 · 같은 홉 안에서 위가 이른 시각'}</Text>
       {!sankeyView && <Box className="preview-graph-detail-toggle">
         <Box as="label" htmlFor="case-graph-details">그래프 거래 라벨 표시</Box>
         <Text as="span"><SquishSwitchControl id="case-graph-details" label="그래프 거래 라벨 표시"
@@ -449,8 +448,6 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
   const cursor = casePlaybackCursor(transactions, through);
   const current = useMemo(() => transactions.slice(0, cursor), [transactions, cursor]);
   const network = useMemo(() => buildCaseNetwork(transactions), [transactions]);
-  const accountLayout = useMemo(() => lens === 'pattern' ? caseAccountLayout(network, active?.pattern) : undefined,
-    [lens, network, active?.pattern]);
   const currentGraph = useMemo(() => buildCaseNetwork(current), [current]);
   const hasOwnerScope = selection?.startsWith('owner:') ?? false;
   const ownerNodes = useMemo(() => hasOwnerScope ? buildCaseNetwork(current, true).nodes.filter(node => node.owner) : [],
@@ -658,7 +655,6 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
                 hiddenCases={hiddenCases} onVisibilityChange={setCaseVisible}
                 accountCount={visible.nodes.length}
                 ownerCount={ownerView ? new Set(visible.nodes.map(node => node.owner).filter(Boolean)).size : undefined}
-                patternLayout={accountLayout?.kind}
                 onHighlight={id => setHighlightedCase(previous => previous === id ? undefined : id)} />
               <Box className="preview-graph-metadata">
                 {hasSelection && <Box className="semantic-tag-group">
@@ -683,7 +679,6 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
                 groups={shownGroups} showDetails={showDetails} highlightedCase={shownHighlight} flowPulse={scopedFlowPulse} playing={playing} />
               : <ForceCaseCanvas network={network} visible={visible} records={transactions}
                 selection={selectedIds} onNodeSelect={activateNode} onSelect={select} controlsHost={controlsHost} groups={shownGroups}
-                positions={accountLayout?.positions}
                 showDetails={showDetails} highlightedCase={shownHighlight} flowPulse={scopedFlowPulse} playing={playing} />}
             {network.nodes.length > 0 && <Box className="preview-graph-actions">
               {groups.length > 1 && <Box as="ul" className="preview-graph-case-chips" aria-label="그래프의 Alert 구분">
