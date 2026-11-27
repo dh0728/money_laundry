@@ -65,8 +65,14 @@
   align-items: start;
   gap: var(--aml-space-32);
 }
-/* 원은 패널 남은 세로 길이를 꽉 채우고(가로는 같은 길이), 단계 막대는 제목 줄 위부터 원 바닥까지 옆에 둔다 */
-.dashboard-risk-layout { align-items: stretch; min-block-size: 0; padding-inline-start: var(--risk-panel-inset) }
+/* 원은 패널 남은 세로 길이를 꽉 채우고(가로는 같은 길이), 단계 막대는 제목 줄 위부터 원 바닥까지 옆에 둔다.
+   원 아래 여백은 왼쪽 여백과 같게 둔다 */
+.dashboard-risk-layout {
+  align-items: stretch;
+  min-block-size: 0;
+  padding-inline-start: var(--risk-panel-inset);
+  padding-block-end: var(--risk-panel-inset);
+}
 .dashboard-risk-explain { gap: var(--aml-space-8) }
 .dashboard-risk-index {
   --risk-gauge-ink: var(--risk-level-moderate);
