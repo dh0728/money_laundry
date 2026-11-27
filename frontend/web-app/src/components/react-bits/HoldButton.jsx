@@ -47,6 +47,17 @@ export default function HoldButton({
   const timers = useRef({ complete: 0, reset: 0 });
   const hintId = useId();
 
+  // 이름은 aria-labelledby 로 안쪽 글자를 가리킨다. 이를 읽지 않는 점검 도구에서도 이름이 비지 않게
+  // 지금 보이는 글자(평소·완료)를 aria-label 로도 둔다. 호출하는 쪽이 aria-label 을 주면 그대로 쓴다.
+  useLayoutEffect(() => {
+    const button = buttonRef.current;
+    if (!button || buttonProps['aria-label'] !== undefined) return;
+    const shown = button.querySelector(`:scope > .hold-button__label > ${phase === 'done' ? '.hold-button__done' : '.hold-button__idle'}`);
+    const text = shown?.textContent.replace(/\s+/g, ' ').trim();
+    if (text) button.setAttribute('aria-label', text);
+    else button.removeAttribute('aria-label');
+  });
+
   const go = (next, kind = null) => {
     phaseRef.current = next;
     inputRef.current = kind;
