@@ -17,10 +17,10 @@ import org.springframework.stereotype.Component;
 /** Claude 로 Alert · Episode 요약을 쓴다. API 키가 없으면 부르지 않고 빈 값을 돌려준다. 응답은 구조화 출력(JSON 스키마)으로 받는다. */
 @Component
 public class ClaudeSummaryWriter implements AiSummaryService.Writer {
-  static final String PROMPT_VERSION = "case-summary-v1";
+  static final String PROMPT_VERSION = "summary-v2";
   static final String SYSTEM =
       """
-      너는 자금세탁 의심 거래를 조사하는 담당자에게 Alert 또는 Episode 의 현재 상황을 요약해 준다.
+      너는 자금세탁 의심 거래를 조사하는 담당자에게 Alert, Episode, 또는 기관 전체 대시보드의 현재 상황을 요약해 준다.
       입력은 코드가 계산한 사실 목록이다. 각 사실 앞에 F1, F2 같은 번호가 붙어 있다.
 
       규칙
@@ -30,7 +30,9 @@ public class ClaudeSummaryWriter implements AiSummaryService.Writer {
       4. points 는 근거 문장 3개를 쓴다. 각 문장은 80자 이내이고, sources 에 근거 사실 번호를 적는다.
       5. 세탁 여부를 단정하지 않는다. 모델 점수와 유형은 "모델 추정", 룰은 "룰 해당"이라고 구분한다.
       6. Episode 면 소속 Alert 들이 어떤 계좌로 이어지는지를 먼저 쓴다.
-      7. 문장은 "~함", "~임", "~됨"으로 끝나는 보고서체 한국어로 쓴다.
+      7. 대시보드면 headline 에 종합 위험지수 점수와 단계를 쓰고, points 에는 지표 점수가 높은 지표부터 평소 대비 배수와 함께 원인을 쓴다.
+         의심 거래 유형별 건수가 있으면 가장 많은 유형을 한 문장에 넣는다.
+      8. 문장은 "~함", "~임", "~됨"으로 끝나는 보고서체 한국어로 쓴다.
       """;
 
   private static final Logger log = LoggerFactory.getLogger(ClaudeSummaryWriter.class);
@@ -68,7 +70,14 @@ public class ClaudeSummaryWriter implements AiSummaryService.Writer {
   public Optional<AiSummaryService.Written> write(CaseFacts.Facts facts) {
     if (client == null) return Optional.empty();
     var input = new StringBuilder();
-    input.append("EPISODE".equals(facts.kind()) ? "Episode" : "Alert").append(" 사실 목록\n");
+    input
+        .append(
+            switch (facts.kind()) {
+              case "EPISODE" -> "Episode";
+              case "DASHBOARD" -> "기관 전체 대시보드";
+              default -> "Alert";
+            })
+        .append(" 사실 목록\n");
     for (var fact : facts.facts())
       input.append(fact.id()).append(": ").append(fact.text()).append('\n');
     StructuredMessageCreateParams<SummaryOut> params =

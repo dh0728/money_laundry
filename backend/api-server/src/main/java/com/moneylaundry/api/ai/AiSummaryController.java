@@ -19,6 +19,12 @@ public class AiSummaryController {
     this.reviews = reviews;
   }
 
+  @GetMapping("/dashboard")
+  public AiSummaryService.Dashboard dashboard(Principal principal) {
+    reviews.actor(reviews.userId(principal));
+    return summaries.forDashboard();
+  }
+
   @GetMapping("/cases/{caseId}")
   public AiSummaryService.Summary forCase(@PathVariable long caseId, Principal principal) {
     reviews.actor(reviews.userId(principal));
