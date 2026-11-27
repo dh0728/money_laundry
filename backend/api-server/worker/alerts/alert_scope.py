@@ -29,13 +29,16 @@ INPUT_ROWS = """WITH """ + _WINDOW_IDS + """, own AS (
       AND l.occurred_at>=%(start)s AND NOT EXISTS(SELECT 1 FROM own o WHERE o.tx_id=l.tx_id)
     ORDER BY tx_id"""
 
-# Frozen score decisions of the window (p_laundering as stored jsonb, threshold of the scoring job).
+# Frozen score decisions of the window (p_laundering as stored jsonb, threshold of the scoring job),
+# only those a seed or seed promotion can use: at or above the job's threshold or the promotion
+# floor (%(floor)s, NULL = no promotion, which least() ignores).
 WINDOW_SCORES = """WITH """ + _WINDOW_IDS + """
     SELECT l.tx_id,to_jsonb(s.p_laundering),b.threshold_value
     FROM ids JOIN analysis.score_ledger l USING(tx_id)
     JOIN analysis.scores s ON s.run_id=l.score_run_id AND s.tx_id=l.tx_id
     JOIN analysis.runs r ON r.run_id=l.score_run_id JOIN analysis.jobs b ON b.job_id=r.job_id
-    WHERE l.valid_from_seq<=%(seq)s AND (l.valid_to_seq IS NULL OR l.valid_to_seq>%(seq)s)"""
+    WHERE l.valid_from_seq<=%(seq)s AND (l.valid_to_seq IS NULL OR l.valid_to_seq>%(seq)s)
+      AND s.p_laundering>=least(b.threshold_value,%(floor)s::float8)"""
 
 
 class Scope:

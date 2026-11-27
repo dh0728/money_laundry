@@ -101,36 +101,45 @@ def _member_rows(connection, run_id, keys):
 
 
 class _Scores:
-    """Model scores of the frozen input, without holding every score document.
+    """Model scores of the frozen input, without holding every score or every scored ID.
 
-    Membership covers every scored input transaction; documents are loaded for the
-    evidence members up front and on demand for anything else (e.g. reassessment).
+    Membership is a scored transaction of the window (occurred at or after ``start``), as the
+    window's score read defines it. It is looked up in the database on first use and kept, so
+    the run never holds the window's scored IDs (2026-11-27: 17M of them reached the memory
+    limit). Documents are loaded for the evidence members up front and on demand otherwise.
     The current run's score wins over a copied earlier one, as in the input itself.
     """
 
-    def __init__(self, connection, run_id, scored):
-        self.connection, self.run_id, self.scored, self.loaded = connection, run_id, scored, {}
+    def __init__(self, connection, run_id, start):
+        self.connection, self.run_id, self.start = connection, run_id, start
+        self.loaded, self.missing = {}, set()
 
     def __contains__(self, key):
-        return key in self.scored
+        self.load((key,))
+        return key in self.loaded
 
     def __getitem__(self, key):
-        if key not in self.scored:
+        if key not in self:
             raise KeyError(key)
-        if key not in self.loaded:
-            self.load((key,))
         return self.loaded[key]
 
     def get(self, key, default=None):
-        return self[key] if key in self.scored else default
+        return self.loaded[key] if key in self else default
 
     def load(self, keys):
-        for chunk in _chunks({key for key in keys if key in self.scored and key not in self.loaded}):
-            for sql in ('SELECT tx_id,scores FROM analysis.run_scores WHERE run_id=%s AND tx_id=ANY(%s)',
-                        "SELECT tx_id,to_jsonb(s)-'run_id'-'tx_id'-'job_id' FROM analysis.scores s"
-                        " WHERE run_id=%s AND tx_id=ANY(%s)"):
-                for key, score in self.connection.execute(sql, (self.run_id, chunk)):
-                    self.loaded[key] = score
+        for chunk in _chunks({key for key in keys if key not in self.loaded and key not in self.missing}):
+            found = {}
+            window = [key for key, in self.connection.execute(
+                'SELECT tx_id FROM ledger.transactions WHERE tx_id=ANY(%s) AND occurred_at>=%s',
+                (chunk, self.start))]
+            if window:
+                for sql in ('SELECT tx_id,scores FROM analysis.run_scores WHERE run_id=%s AND tx_id=ANY(%s)',
+                            "SELECT tx_id,to_jsonb(s)-'run_id'-'tx_id'-'job_id' FROM analysis.scores s"
+                            " WHERE run_id=%s AND tx_id=ANY(%s)"):
+                    for key, score in self.connection.execute(sql, (self.run_id, window)):
+                        found[key] = score
+            self.loaded.update(found)
+            self.missing.update(key for key in chunk if key not in found)
 
 
 def _json(value):
@@ -303,12 +312,23 @@ def _member_digest(evidence):
     return _digest_of(body)
 
 
-def _promote_seeds(connection, execution, edges, decisions, positive, times):
-    """Add the seeds alerts/seed_promotion.py promotes (when the bound binary model defines its values)."""
+def _promotion_values(connection, execution):
+    """(low, floor) of seed promotion from the bound binary model's spec; (None, None) without them."""
     from features.prepare_features import versions_for_run
     from models import registry
     spec = registry.require(*versions_for_run(connection, execution)['BINARY']).spec
-    low, floor = getattr(spec, 'ALERT_SEED_LOW', None), getattr(spec, 'ALERT_CHAIN_FLOOR', None)
+    return getattr(spec, 'ALERT_SEED_LOW', None), getattr(spec, 'ALERT_CHAIN_FLOOR', None)
+
+
+def _promotion_floor(connection, execution):
+    """Lowest score seed promotion reads (promote() visits nothing below min(low, floor)); None = none."""
+    low, floor = _promotion_values(connection, execution)
+    return None if low is None or floor is None else float(min(low, floor))
+
+
+def _promote_seeds(connection, execution, edges, decisions, positive, times):
+    """Add the seeds alerts/seed_promotion.py promotes (when the bound binary model defines its values)."""
+    low, floor = _promotion_values(connection, execution)
     if low is None or floor is None or not positive:
         return 0
     probability = {key: decision[0] for key, decision in decisions.items()}
@@ -347,41 +367,49 @@ def save_alerts(connection, execution):
     if threshold is None:
         raise ProtocolError('Frozen threshold is required')
     scope = Scope(connection, execution.run_id)
-    # Only the seed decision is held per scored transaction of the window: the stored
-    # probability value (jsonb, so 1 stays 1) and its original threshold. Documents load later.
+    # Only the decisions a seed or seed promotion can use are held: scores at or above their own
+    # threshold, or at or above the promotion floor. Lower scores (99%+ of the window) decide
+    # nothing here and are fetched on demand through _Scores when evidence shows them.
+    cut = _promotion_floor(connection, execution)
     decisions = {}
     with connection.transaction(), connection.cursor(name='alert_scores') as cursor:
-        cursor.execute(WINDOW_SCORES, scope.arguments())
+        cursor.execute(WINDOW_SCORES, dict(scope.arguments(), floor=cut))
         for key, probability, value in cursor:
             decisions[key] = (probability, value)
-    current = set()
     with connection.transaction(), connection.cursor(name='alert_current') as cursor:
-        cursor.execute("SELECT tx_id,to_jsonb(s)->'p_laundering' FROM analysis.scores s WHERE run_id=%s",
-                       (execution.run_id,))
+        cursor.execute("SELECT tx_id,to_jsonb(s)->'p_laundering' FROM analysis.scores s"
+                       " WHERE run_id=%s AND s.p_laundering>=least(%s::float8,%s::float8)",
+                       (execution.run_id, threshold, cut))
         for key, probability in cursor:
-            current.add(key)
             decisions[key] = (probability, threshold)
     if any(value is None for _, value in decisions.values()):
         raise ProtocolError('Every frozen score requires its original threshold')
+    # Every TARGET has a current-run score and every current-run score is a TARGET; checked in
+    # the database rather than by holding both ID sets.
+    unscored, stray = connection.execute('''SELECT
+          (SELECT count(*) FROM analysis.input_transactions i WHERE i.run_id=%(run)s AND i.input_role='TARGET'
+             AND i.occurred_at>=%(start)s
+             AND NOT EXISTS(SELECT 1 FROM analysis.scores s WHERE s.run_id=i.run_id AND s.tx_id=i.tx_id)),
+          (SELECT count(*) FROM analysis.scores s WHERE s.run_id=%(run)s
+             AND NOT EXISTS(SELECT 1 FROM analysis.input_transactions i WHERE i.run_id=s.run_id
+                            AND i.tx_id=s.tx_id AND i.input_role='TARGET' AND i.occurred_at>=%(start)s))''',
+        scope.arguments()).fetchone()
+    if unscored or stray:
+        raise ProtocolError('Every frozen TARGET requires current-run scores')
     # Only immutable input is read during computation, without holding row locks.
     # Generator columns are streamed into arrays; no row dictionary is kept.
-    edges, targets, positive, times = _EdgeInput(), set(), {}, {}
+    edges, positive, times = _EdgeInput(), {}, {}
     with connection.transaction(), connection.cursor(name='alert_input') as cursor:
         cursor.itersize = 2048
         cursor.execute(INPUT_ROWS, scope.arguments())
         for key, role, occurred, from_bank, from_account, to_bank, to_account, usd in cursor:
             edges.add(key, occurred, from_bank, from_account, to_bank, to_account, usd)
-            if role == 'TARGET':
-                targets.add(key)
             decision = decisions.get(key)
             if decision is not None and decision[0] >= decision[1]:
                 positive[key] = dict(txId=key, occurredAt=occurred.astimezone(timezone.utc).isoformat(),
                                      score=decision[0], threshold=float(decision[1]))
                 times[key] = occurred
-    if targets != current:
-        raise ProtocolError('Every frozen TARGET requires current-run scores')
-    scores = _Scores(connection, execution.run_id, frozenset(decisions))
-    del current, targets
+    scores = _Scores(connection, execution.run_id, scope.start)
     days = {day.isoformat(): dict(complete=complete, rowCount=rows)
             for day, complete, rows in connection.execute(
                 "SELECT business_date,complete,row_count FROM analysis.input_coverage"

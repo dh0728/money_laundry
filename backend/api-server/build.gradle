@@ -21,6 +21,7 @@ repositories {
 dependencies {
 	implementation platform('software.amazon.awssdk:bom:2.54.14')
 	implementation 'software.amazon.awssdk:s3'
+	implementation 'com.anthropic:anthropic-java:3.3.0' // AI 요약·보고서의 Claude 호출
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'

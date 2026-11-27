@@ -25,11 +25,20 @@ public class ReviewService {
   private final JdbcTemplate jdbc;
   private final TransactionTemplate tx;
   private final BusinessTime time;
+  private final org.springframework.context.ApplicationEventPublisher events;
 
-  public ReviewService(JdbcTemplate jdbc, TransactionTemplate tx, BusinessTime time) {
+  /** 판정이 저장되어 커밋된 뒤 알리는 이벤트. AI 분석 보고서가 '의심' 판정을 받아 뒤에서 보고서를 만든다. */
+  public record JudgmentRecorded(long judgmentId, String verdict, long reviewerId) {}
+
+  public ReviewService(
+      JdbcTemplate jdbc,
+      TransactionTemplate tx,
+      BusinessTime time,
+      org.springframework.context.ApplicationEventPublisher events) {
     this.jdbc = jdbc;
     this.tx = tx;
     this.time = time;
+    this.events = events;
   }
 
   public long userId(java.security.Principal principal) {
@@ -393,6 +402,8 @@ public class ReviewService {
               rationale,
               Map.of("judgmentId", judgment, "verdict", in.verdict()));
           touch(episode, id);
+          // 커밋된 뒤에만 듣는 쪽(@TransactionalEventListener AFTER_COMMIT)이 받는다
+          events.publishEvent(new JudgmentRecorded(judgment, in.verdict(), user));
           return judgment(
               jdbc.queryForMap(
                   "select j.*,u.name as reviewer from review.judgments j join core.users u on u.user_id=j.reviewer_id where j.judgment_id=?",

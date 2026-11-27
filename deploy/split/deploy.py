@@ -196,6 +196,8 @@ class Deployment:
                 self.parameters = {f"{prefix}_{key}": self.parameter(path) for key, path in mapping.items()}
                 if self.environment == "dev":
                     self.parameters["DEV_LOCAL_INFERENCE_TOKEN"] = self.parameter("inference/token")
+                    # Claude key for AI summaries (SecureString /aml/dev/ai/anthropic-api-key).
+                    self.parameters["DEV_ANTHROPIC_API_KEY"] = self.parameter("ai/anthropic-api-key")
                     bucket = self.parameters["DEV_S3_BUCKET"]
                     key = self.parameters["DEV_S3_PREFIX"].rstrip("/")
                     self.parameters["DEV_INFERENCE_OBJECT_BASE_URL"] = f"https://{bucket}.s3.{self.region}.amazonaws.com/{key}/"

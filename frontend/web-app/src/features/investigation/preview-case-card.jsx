@@ -11,6 +11,7 @@ import './preview-case-card.css';
 import { Box, Heading, Text } from '../../components/layout-primitives';
 import { caseCsvDownloadEntry } from '../../components/query-controls';
 import { SectionDownloadHeading } from '../../components/section-download';
+import { caseAssigneeLabel } from './case-assignee';
 
 const amount = new Intl.NumberFormat('ko-KR');
 const formatDate = new Intl.DateTimeFormat('sv-SE', { year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -96,7 +97,7 @@ export function EpisodeAlertSummary({ codes, complete = Boolean(codes) }) {
 
 export function PreviewCaseCard({ row, selectedTransaction, className = '', selection, showAdd = true, sharedEvidence, drag,
   showReviewStatus = true, showAssignee = true, onAction }) {
-  const { code, kind, score, status, pattern, assigned, elapsed, open, related } = row;
+  const { code, kind, score, status, pattern, elapsed, open, related } = row;
   const isEpisode = kind === 'Episode';
   const transaction = selectedTransaction ?? related[0];
   const source = transaction?.from?.code ?? transaction?.account;
@@ -117,7 +118,7 @@ export function PreviewCaseCard({ row, selectedTransaction, className = '', sele
         {open && <CaseAgeTag days={elapsed} />}
         {showReviewStatus && <ReviewStatusTag status={status} />}
         <ModelScoreTag score={score} />
-        {showAssignee && <CaseActorTag>{assigned ? '내 담당' : '다른 담당자'}</CaseActorTag>}
+        {showAssignee && <CaseActorTag>{caseAssigneeLabel(row)}</CaseActorTag>}
         {status === '처리 완료' && <CaseCompletionTag completedAt={row.completedAt} />}
       </Box>
       <Box as="dl">
