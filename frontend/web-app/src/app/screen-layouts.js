@@ -1,4 +1,4 @@
-import { FilePenLine, LayoutDashboard, Scale, ScanSearch } from 'lucide-react';
+import { ArrowLeftRight, FilePenLine, FolderSearch, LayoutDashboard, Scale, Siren } from 'lucide-react';
 import { BoxHTML, HeadingHTML, PanelHTML, TextHTML } from '../components/components.js';
 import { frames } from './screen-frames.js';
 import { dashboardRoute, isLedgerScreen, ledgerTableScreen } from './preview-route.js';
@@ -43,21 +43,24 @@ export const sections = {
   E: 'add-tab/episodes',
 };
 
+// '조사' 한 메뉴 아래 있던 거래·Alert·Episode를 주 메뉴로 꺼낸다. 목록과 상세가 같은 메뉴에 속해서 한 번에 오간다.
 export const workspaceDestinations = [
-  { icon: LayoutDashboard, label: '대시보드', value: sections.dashboard, routes: ['dashboard'] },
-  { icon: Scale, label: '룰엔진', value: sections.rules, routes: ['rule-engine'] },
-  { icon: ScanSearch, label: '조사', value: sections.T, routes: ['add-tab', 'alert', 'episode'] },
-  { icon: FilePenLine, label: '보고서 작성', value: sections.report, routes: ['report'] },
+  { icon: LayoutDashboard, label: '대시보드', value: sections.dashboard, matches: path => path.startsWith('dashboard/') },
+  { icon: Scale, label: '룰엔진', value: sections.rules, matches: path => path.startsWith('rule-engine/') },
+  { icon: ArrowLeftRight, label: '거래', value: sections.T, matches: isLedgerScreen },
+  { icon: Siren, label: 'Alert', value: sections.A, matches: path => /^(?:add-tab\/alerts|alert\/)/.test(path) },
+  { icon: FolderSearch, label: 'Episode', value: sections.E, matches: path => /^(?:add-tab\/episodes|episode\/)/.test(path) },
+  { icon: FilePenLine, label: '보고서 작성', value: sections.report, matches: path => path.startsWith('report/') },
 ];
 
 export function currentWorkspace(path) {
-  return workspaceDestinations.find(({ routes }) => routes.includes(path?.split('/')[0]));
+  return path ? workspaceDestinations.find(item => item.matches(path)) : undefined;
 }
 
 const rows = Object.fromEntries(frames.map(([id, path]) => [path, id]));
 const category = path => path.includes('/') ? path.split('/')[0] : 'utility';
 const workspaceLabels = {
-  dashboard: '대시보드', 'rule-engine': '룰엔진', 'add-tab': '조사', report: '보고서 작성',
+  dashboard: '대시보드', 'rule-engine': '룰엔진', report: '보고서 작성',
   alert: 'Alert', episode: 'Episode',
 };
 const navigatorLabels = {
@@ -124,16 +127,20 @@ function caseNavigation(path, route) {
 export function ScreenNavigation(path, code = '') {
   const family = category(path);
   const area = currentWorkspace(path);
+  const listMode = viewMode(path);
+  // 표·카드 어느 쪽으로 보든 그 메뉴의 목록 화면이면 현재 페이지로 표시한다.
+  const isMenuPage = item => !code && (path === item.value || [listMode?.card, listMode?.table].includes(item.value));
   const global = workspaceDestinations.map(item => ({ ...item,
-    current: item === area ? (path === item.value && !code ? 'page' : 'location') : undefined }));
+    current: item === area ? (isMenuPage(item) ? 'page' : 'location') : undefined }));
   const location = code ? { text: code, record: true }
-    : { text: workspaceLabels[family] ?? titles[path] };
+    : { text: workspaceLabels[family] ?? area?.label ?? titles[path] };
   const route = caseRoute(path);
   if (route) return { global, location, ...caseNavigation(path, route) };
   if (family === 'utility') return { global, location, primary: [], secondary: [] };
   const basePath = path === 'rule-engine/draft-list/reason' ? sections.rules : path;
   const activeMode = viewMode(path);
-  const primary = frames.filter(([, candidate]) => {
+  // 거래·Alert·Episode는 주 메뉴에서 고르므로 목록 화면에는 세부 화면 줄을 두지 않고 표·카드만 남긴다.
+  const primary = family === 'add-tab' ? [] : frames.filter(([, candidate]) => {
     if (category(candidate) !== family || candidate === 'rule-engine/draft-list/reason') return false;
     const mode = viewMode(candidate);
     return !mode || candidate === (candidate.startsWith('report/') ? mode.table : mode.card);
