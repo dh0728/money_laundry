@@ -16,7 +16,7 @@ import { reviewStatusLabels } from '../lib/review-status.js';
 import { csvDownloadEntry, inDateRange, QueryRadio, setupQueryControls, WorkspaceQueryDock } from '../components/query-controls.jsx';
 import { dashboardFixtureBoardPage, dashboardFixtureResponse, dashboardFixtures, dashboardPeriodEnd, dashboardRecordCodes } from '../mocks/dashboard-fixtures.js';
 import { personalWorkHistory } from '../features/dashboard/personal-work-history.js';
-import { liveCodes, liveSource, liveSourceLoaded, loadLiveSource, markLiveReviewStarted, rebuildLiveSource, resetLiveSource } from '../features/investigation/live-data.js';
+import { liveCodes, liveSource, liveSourceLoaded, loadLiveSource, markLiveJudged, markLiveReviewStarted, rebuildLiveSource, resetLiveSource } from '../features/investigation/live-data.js';
 import { changeLiveEpisode, editLiveTransactions, markLiveRead, saveLiveJudgment, startLiveReview } from '../features/investigation/live-actions.js';
 import { liveWorkRequests, liveWorkRequestsReady, loadLiveWorkRequests, readLiveWorkRequests, resetLiveWorkRequests, resolveLiveWorkRequest,
   sendLiveWorkRequest } from '../features/investigation/live-work-requests.js';
@@ -1029,8 +1029,14 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     saveJudgment: (target, verdict, details, reasonCategory) => {
       const row = !readOnly && activeWorkCode === target ? dashboardSource.cases.find(item => item.code === target) : undefined;
       if (serviceMode) {
-        return saveLiveJudgment(row, verdict, details, reasonCategory).then(result => result.ok
-          ? loadLiveSource().then(() => { dashboardSource = caseSource(groups); return result; }) : result);
+        return saveLiveJudgment(row, verdict, details, reasonCategory).then(result => {
+          if (!result.ok) return result;
+          // 판정 응답만으로 완료 창을 띄운다. 받아 둔 board 에 판정을 먼저 반영하고, 전체 board 는 뒤에서 다시 받아 맞춘다.
+          markLiveJudged(row, result.judgment);
+          dashboardSource = caseSource(groups);
+          void loadLiveSource().then(() => { dashboardSource = caseSource(groups); }, () => undefined);
+          return result;
+        });
       }
       const actor = currentPreviewUser();
       const result = savePreviewJudgment(row, verdict, details, reasonCategory, actor?.username ?? '', actor);

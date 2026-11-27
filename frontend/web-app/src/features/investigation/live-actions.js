@@ -25,7 +25,7 @@ export async function saveLiveJudgment(row, verdict, details, reasonCategory) {
       verdict: verdict === 'normal' ? 'NORMAL' : 'SUSPICIOUS', reasonCategory,
       evidence: details.evidence, observations: details.observations, rationale: details.rationale,
     });
-    return { ok: true, value: { ...saved, code: row.code, verdict } };
+    return { ok: true, value: { ...saved, code: row.code, verdict }, judgment: saved };
   } catch (error) {
     return failure(error, '판정을 저장하지 못했습니다.');
   }
