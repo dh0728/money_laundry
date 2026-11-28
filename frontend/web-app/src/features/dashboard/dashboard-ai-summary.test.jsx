@@ -19,14 +19,16 @@ const index = {
 it('지수와 Claude 의 결론·근거를 보여 준다', () => {
   render(<DashboardAiSummary reduced summary={{ index, headline: '종합 위험지수 58점으로 경계 단계임',
     points: [{ text: '의심 거래 비율이 평소의 2.00배임', sources: ['F2'] }], facts: [], model: 'm', generatedAt: '2026-11-26T00:00:00Z' }} />);
-  expect(screen.getByLabelText('종합 위험지수 58점, 경계')).toHaveTextContent('58 / 100 · 경계');
+  expect(screen.getByLabelText('종합 위험지수 58점, 경계')).toBeInTheDocument();
+  expect(screen.getByRole('meter', { name: '종합 위험지수' })).toHaveAttribute('aria-valuenow', '58');
+  expect(within(screen.getByRole('list', { name: '위험 단계' })).getByText('경계').closest('li')).toHaveAttribute('aria-current', 'step');
   expect(screen.getByText('종합 위험지수 58점으로 경계 단계임')).toHaveAttribute('data-ai-summary', 'claude');
   expect(screen.getByText('의심 거래 비율이 평소의 2.00배임')).toBeInTheDocument();
 });
 
 it('Claude 문장이 없으면 지표를 그대로 읽어 준다', () => {
   render(<DashboardAiSummary reduced summary={{ index, headline: null, points: [], facts: [], model: 'm', generatedAt: '2026-11-26T00:00:00Z' }} />);
-  const items = within(screen.getByRole('list')).getAllByRole('listitem').map(item => item.textContent);
+  const items = within(document.querySelector('.overview-summary-facts')).getAllByRole('listitem').map(item => item.textContent);
   expect(items).toEqual(['의심 거래 비율 4.00% (40 / 1000건) · 평소의 2배 · 지표 60점', '오늘 생성 Alert 6건 · 기준선 없음']);
 });
 

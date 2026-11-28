@@ -665,6 +665,8 @@ const queryControls = setupQueryControls({
   },
   workspace: byId('workspace'),
   controls: byId('workspace-query-dock').firstElementChild,
+  // 분석가는 Alert·Episode 목록을 내 담당 업무로 연다. 관리자는 전체 업무를 본다. 필터에서 '전체'로 바꿀 수 있다.
+  defaultAssignment: scope => ['alerts', 'episodes'].includes(scope) && currentPreviewUser()?.role === 'STAFF' ? 'assigned' : 'all',
 });
 mountWorkflowNotifications(byId('workflow-notifications'));
 mountNotificationPreference(byId('notification-preference'));

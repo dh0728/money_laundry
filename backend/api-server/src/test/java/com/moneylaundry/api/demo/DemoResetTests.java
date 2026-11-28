@@ -135,7 +135,7 @@ class DemoResetTests {
   @Test
   void cleanup_failure_is_retryable_and_same_request_never_deletes_new_data() {
     long id = job("FAILED");
-    String key = "uploads/12/" + id + "/file.csv";
+    String key = "uploads/ledger/" + id + "/file.csv";
     jdbc.update("update ingest.uploads set s3_key=? where upload_id=?", key, id);
     var request = input();
     assertThat(service.reset(admin, request).get("status")).isEqualTo("FILES_PENDING");
@@ -166,6 +166,47 @@ class DemoResetTests {
         .isEqualTo(1);
     assertThat(jdbc.queryForObject("select count(*) from ops.resets", Integer.class)).isZero();
     verify(store, never()).removeDemoFiles(anyString(), anyBoolean());
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void preview_reports_planner_estimates_and_counts_unanalyzed_tables_exactly() {
+    job("COMPLETED");
+    job("FAILED");
+    jdbc.execute("analyze ingest.uploads");
+    jdbc.update(
+        "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,now(),now())",
+        admin);
+    var counts = (Map<String, Long>) service.preview(admin).get("counts");
+    assertThat(counts).containsOnlyKeys(DemoResetService.TABLES.split(","));
+    assertThat(counts.get("ingest.uploads")).isEqualTo(2L);
+    // Freshly truncated and never analyzed: no estimate, so the small table is counted exactly.
+    assertThat(
+            jdbc.queryForObject(
+                "select reltuples from pg_class where oid='review.alerts'::regclass", Double.class))
+        .isNegative();
+    assertThat(counts.get("review.alerts")).isEqualTo(1L);
+  }
+
+  @Test
+  void review_activity_after_preview_makes_it_stale() {
+    long alert =
+        jdbc.queryForObject(
+            "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,now(),now()) returning alert_id",
+            Long.class,
+            admin);
+    var stale = input();
+    jdbc.update(
+        "insert into review.events(alert_id,actor_id,action,comment,business_at,snapshot) values(?,?,'COMMENT','',now(),'{}')",
+        alert,
+        admin);
+    assertCode(() -> service.reset(admin, stale), "RESET_PREVIEW_STALE");
+    var newAlert = input();
+    jdbc.update(
+        "insert into review.alerts(assignee_id,created_at,assigned_at) values(?,now(),now())",
+        admin);
+    assertCode(() -> service.reset(admin, newAlert), "RESET_PREVIEW_STALE");
+    assertThat(service.reset(admin, input()).get("status")).isEqualTo("COMPLETED");
   }
 
   @Test
