@@ -20,7 +20,7 @@ function open(container) {
   return within(screen.getByRole('dialog', { name: '선택 항목 편집' }));
 }
 
-it('shows the exact IDs and requires an operation, reason and held confirmation before applying', () => {
+it('shows the exact IDs and requires an operation and reason before applying with one press', () => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'requestAnimationFrame', 'cancelAnimationFrame', 'performance'] });
   const apply = vi.fn().mockReturnValueOnce({ ok: false, error: '선택을 다시 확인해 주세요.' }).mockReturnValue({ ok: true });
   const { container } = render(<CaseTransactionEdit row={row} selected={selected} destinations={destinations}
@@ -44,9 +44,8 @@ it('shows the exact IDs and requires an operation, reason and held confirmation 
   expect(reason).toHaveValue('  동일 거래 묶음에 포함  ');
   act(() => vi.advanceTimersByTime(300));
   fireEvent.click(modal.getByRole('radio', { name: '이 Alert에서 제외' }));
-  const hold = modal.getByRole('button', { name: '길게 눌러 적용' });
-  fireEvent.keyDown(hold, { key: 'Enter' });
-  act(() => vi.advanceTimersByTime(2100));
+  // 제외는 길게 누르지 않고 한 번 누르면 적용한다. 버튼에 몇 건을 빼는지 보인다.
+  fireEvent.click(modal.getByRole('button', { name: '2건 제외' }));
   expect(apply).toHaveBeenLastCalledWith({ codes: selected, targetCode: null, reason: '동일 거래 묶음에 포함' });
   expect(screen.queryByRole('dialog', { name: '선택 항목 편집' })).not.toBeInTheDocument();
 });
@@ -59,7 +58,7 @@ it('keeps selection inspectable and clearable in read-only mode', () => {
   const modal = open(container);
   expect(modal.getByText('현재 연결은 조회 전용입니다.')).toBeInTheDocument();
   expect(modal.queryByRole('radio')).not.toBeInTheDocument();
-  expect(modal.queryByRole('button', { name: '길게 눌러 적용' })).not.toBeInTheDocument();
+  expect(modal.queryByRole('button', { name: '2건 제외' })).not.toBeInTheDocument();
   fireEvent.click(modal.getByRole('button', { name: '선택 해제' }));
   expect(clear).toHaveBeenCalledOnce();
   expect(apply).not.toHaveBeenCalled();

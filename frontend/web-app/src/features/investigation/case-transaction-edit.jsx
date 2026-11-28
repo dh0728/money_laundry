@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { ActionButton, ConfirmHoldButton } from '../../components/primary-button';
+import { ActionButton, PrimaryButton } from '../../components/primary-button';
 import { DialogFrame } from '../../components/dialog-parts';
 import GlideSelect from '../../components/react-bits/GlideSelect';
 import { NativeRadio } from '../../components/ui/radio-group';
@@ -86,9 +86,9 @@ export function CaseTransactionEdit({ row, selected = [], destinations = [], can
       onClose={() => trigger.current?.focus({ preventScroll: true })}
       actions={<>
         <ActionButton shape="pill" surface="ghost" onClick={clear}>선택 해제</ActionButton>
-        {canEdit && <ConfirmHoldButton tone={operation === 'exclude' ? 'negative' : 'brand'}
-          disabled={!valid} doneLabel="적용 완료" resetAfter={250}
-          onHold={apply}>{operation === 'exclude' ? '길게 눌러 적용' : '적용'}</ConfirmHoldButton>}
+        {/* 동작(제외·이동)을 고르고 사유를 적어야 켜지므로 길게 누르지 않고 한 번 누르면 적용한다. */}
+        {canEdit && <PrimaryButton tone={operation === 'exclude' ? 'negative' : 'brand'}
+          disabled={!valid} onClick={apply}>{operation === 'exclude' ? `${countLabel} 제외` : '적용'}</PrimaryButton>}
       </>}>
       <Box className="case-judgment-body">
         <Box className="case-judgment-target-group">

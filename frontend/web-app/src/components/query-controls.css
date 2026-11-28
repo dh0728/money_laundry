@@ -13,7 +13,7 @@
   max-inline-size: 100%;
 }
 .contextual-header > .screen-navigation { position: relative; z-index: var(--layer-local-overlay); flex: none }
-.screen-query-area { display: grid; min-inline-size: 0 }
+.screen-query-area { display: grid; min-inline-size: 0; container: screen-query / inline-size }
 .screen-query-row {
   display: flex;
   align-items: flex-start;
@@ -37,31 +37,123 @@
   block-size: var(--query-control-size, var(--header-control-size));
 }
 .query-control:has(.query-trigger[hidden]) { display: none }
-#workspace-query-dock {
-  --query-dock-padding: var(--aml-space-4);
-  --query-dock-width: calc(var(--header-control-size) + 2 * var(--query-dock-padding));
-  --query-dock-inline-end: max(var(--workspace-inset), calc(var(--app-inline-gutter) - var(--query-dock-width) - var(--workspace-panel-gap)));
-  position: fixed;
-  inset-block-end: var(--workspace-footer-inset);
-  inset-inline-end: var(--query-dock-inline-end);
-  z-index: var(--layer-shell);
+/* 조회 도구는 화면 맨 위 줄(.screen-query-row)에 붙는다. 처음 만들어 두는 자리(#workspace-query-dock)는 보이지 않는다. */
+#workspace-query-dock { display: none }
+.screen-query-row > .query-bar {
+  flex: 1 1 100%;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  row-gap: var(--aml-space-6);
+}
+/* 검색·기간·필터는 한 줄로 두고(검색창이 줄어든다), 정렬·다운로드는 남는 자리 오른쪽 끝에 둔다. 좁으면 오른쪽 묶음만 다음 줄로 간다. */
+:is(.query-bar-main, .query-bar-side) {
+  display: flex;
+  align-items: center;
+  gap: var(--aml-space-6);
+  min-inline-size: 0;
+}
+.query-bar-main { flex: 1 1 auto }
+.query-bar-side { flex: none; margin-inline-start: auto }
+.query-bar .query-control { flex: none; inline-size: auto; align-items: center }
+.query-bar .query-control > .query-bar-trigger {
+  display: inline-flex;
+  align-items: center;
+  inline-size: auto;
+  gap: var(--aml-space-6);
+  padding-inline: var(--aml-space-12);
+  white-space: nowrap;
+}
+/* 기간과 지우기(×)는 구분선이 있는 한 칩으로 붙인다. */
+.query-bar .query-control:has(> .query-clear:not([hidden])) > .query-bar-trigger {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+.query-bar .query-control > .query-clear {
+  inline-size: var(--header-control-size);
+  block-size: var(--header-control-size);
+  border-inline-start: var(--aml-stroke-control) solid var(--divider);
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+}
+.query-count {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: var(--aml-space-20);
+  block-size: var(--aml-space-20);
+  padding-inline: var(--aml-space-4);
   border-radius: var(--aml-radius-full);
-  transition: inset-inline-end var(--aml-duration-fast) ease-out;
+  background-color: var(--status-info-accent);
+  color: var(--inverse-text);
+  font-size: var(--aml-type-caption-size);
+  font-variant-numeric: tabular-nums;
 }
-#workspace-query-dock:not(:has(> .context-query-tools:not([hidden]))) { display: none }
-body:has(#inbox:not([hidden])) #workspace-query-dock {
-  inset-inline-end: max(var(--query-dock-inline-end), calc(var(--inbox-width) + var(--aml-space-8)));
+.query-count[hidden] { display: none }
+/* 검색창은 헤더 검색과 같은 공용 SearchField(compact)이고 높이만 도구 버튼에 맞춘다. */
+.query-bar .query-search {
+  flex: 0 1 calc(var(--header-control-size) * 8);
+  min-inline-size: calc(var(--header-control-size) * 4);
 }
-:root[data-reduced-motion="true"] #workspace-query-dock { transition: none }
-@media (prefers-reduced-motion: reduce) {
-  #workspace-query-dock { transition: none }
+.query-bar .query-search[hidden] { display: none }
+/* 대시보드 기준일: [‹ 날짜 · 받은 시각 ›] 한 칩. 높이는 옆의 도구 버튼과 같다. */
+.query-date {
+  display: flex;
+  align-items: center;
+  gap: var(--aml-space-6);
+  min-inline-size: 0;
 }
-#workspace-query-dock > .context-query-tools {
-  flex-direction: column;
-  gap: var(--aml-space-4);
-  padding: var(--query-dock-padding);
+.query-date[hidden] { display: none }
+.query-date-stepper {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-inline-size: 0;
+  block-size: var(--header-control-size);
+  border-radius: var(--aml-radius-full);
+  white-space: nowrap;
 }
-:root[data-workspace-width="wide"] #workspace-query-dock { --query-dock-inline-end: var(--workspace-inset) }
+.query-date-step {
+  inline-size: var(--header-control-size);
+  block-size: var(--header-control-size);
+}
+.query-date .query-date-step:disabled { color: var(--disabled-text) }
+.query-date-reading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--aml-space-6);
+  min-inline-size: 0;
+  font-variant-numeric: tabular-nums;
+}
+.query-date-reading > time { font-weight: var(--aml-type-body-strong-weight) }
+.query-date-note {
+  overflow: hidden;
+  color: var(--muted-text);
+  font-size: var(--aml-type-caption-size);
+  text-overflow: ellipsis;
+}
+.query-date-note:empty { display: none }
+.query-date > [data-query-date-today] {
+  flex: none;
+  inline-size: max-content;
+  block-size: var(--header-control-size);
+  padding-inline: var(--aml-space-12);
+  white-space: nowrap;
+}
+/* 기준일은 줄 한가운데에 둔다. [오늘로 이동]은 칩 오른쪽에 띄워 붙여서 나타나도 칩이 밀리지 않는다. 줄이 좁으면 왼쪽 정렬로 돌아간다. */
+@container screen-query (width >= 44rem) {
+  .screen-query-row > .query-bar:not([hidden]):has(.query-date:not([hidden])) {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+  }
+  .query-bar:has(.query-date:not([hidden])) > .query-bar-main { grid-column: 2 }
+  .query-bar:has(.query-date:not([hidden])) > .query-bar-side { grid-column: 3; justify-self: end }
+  .query-date { position: relative }
+  .query-date > [data-query-date-today] {
+    position: absolute;
+    inset-inline-start: calc(100% + var(--aml-space-6));
+  }
+}
+.query-bar .query-search > .search-field { --search-field-size: var(--header-control-size) }
 .screen-layout:has(.dashboard-work-details > [data-dashboard-section-content][inert]) {
   padding-block-end: calc(var(--workspace-footer-inset) + 4 * var(--header-control-size) + 5 * var(--aml-space-4));
 }
@@ -73,12 +165,26 @@ body:has(#inbox:not([hidden])) #workspace-query-dock {
   block-size: 100%;
   padding-inline: 0;
 }
-.query-trigger[data-button-surface][data-query-applied]:not([aria-expanded="true"]) {
-  --button-hover-bg: var(--selection-surface);
-  --button-active-bg: var(--selection-surface);
-  background-color: var(--selection-surface);
-  color: var(--selection-ink);
+/* 조건을 적용한 버튼은 검게 칠하지 않고 옅은 파란 면과 파란 아이콘으로 알린다. 붙어 있는 ×도 같은 면이다. */
+.query-control:has(> .query-trigger[data-query-applied]) {
+  --query-applied-face: color-mix(in srgb, var(--status-info-accent) var(--query-applied-tint), var(--glass-control-solid));
+  --query-applied-hover: color-mix(in srgb, var(--status-info-accent) var(--query-applied-hover-tint), var(--glass-control-solid));
 }
+.query-trigger[data-button-surface][data-query-applied]:not([aria-expanded="true"]),
+.query-control:has(> .query-trigger[data-query-applied]:not([aria-expanded="true"])) > .query-clear {
+  --button-hover-bg: var(--query-applied-hover);
+  --button-active-bg: var(--query-applied-hover);
+  background-color: var(--query-applied-face);
+  /* 떠 있는 버튼의 흰 광택과 안쪽 테두리 그림자는 색이 있는 면 위에서 얼룩처럼 보여서 뺀다. 면은 고르게 칠한다. */
+  background-image: none;
+  box-shadow: var(--button-depth, var(--floating-shadow));
+}
+.query-trigger[data-button-surface][data-query-applied]:not([aria-expanded="true"], :disabled):hover,
+.query-control:has(> .query-trigger[data-query-applied]:not([aria-expanded="true"])) > .query-clear:hover {
+  background-color: var(--query-applied-hover);
+}
+.query-trigger[data-query-applied] { font-weight: var(--aml-type-body-strong-weight) }
+.query-trigger[data-query-applied] > .icon { color: var(--status-info-accent) }
 .query-trigger-row {
   display: flex;
   flex: none;
@@ -87,24 +193,20 @@ body:has(#inbox:not([hidden])) #workspace-query-dock {
   justify-content: space-between;
 }
 .query-popover-label { padding-inline: var(--aml-panel-text-inset) }
+/* 적용 버튼은 팝업 맨 아래 줄에 글자 버튼으로 둔다. 얇은 선으로 내용과 나눈다. */
 .query-actions:empty { display: none }
 .query-actions {
+  display: flex;
   flex: none;
-  padding-inline-end: var(--query-action-inset);
+  justify-content: flex-end;
+  padding: var(--aml-space-8);
+  border-block-start: var(--aml-stroke-divider) solid var(--divider);
 }
-.query-actions .query-apply[data-button-surface] {
-  --glass-surface-face: var(--query-apply-face);
-  --glass-elevated: color-mix(in srgb, var(--query-apply-face), var(--selection-ink) var(--query-apply-hover-ink-weight));
-  --glass-strong: color-mix(in srgb, var(--query-apply-face), var(--selection-ink) var(--query-apply-pressed-ink-weight));
-  --query-apply-face: color-mix(in srgb, var(--selection-surface) var(--query-apply-face-weight), var(--glass-material-frost));
-  inline-size: var(--aml-size-control-compact);
-  block-size: var(--aml-size-control-compact);
-  border-radius: var(--aml-radius-full);
-  padding: 0;
-  color: var(--selection-ink);
+.query-actions .query-apply {
+  min-inline-size: calc(var(--aml-space-64) + var(--aml-space-8));
+  min-block-size: var(--aml-size-control-compact);
+  padding-inline: var(--aml-space-16);
 }
-.query-actions .query-apply:disabled { opacity: var(--aml-opacity-disabled) }
-.query-actions .query-apply:focus-visible { outline-color: var(--selection-ink) }
 
 .query-tool-popover.glass {
   --query-action-inset: calc(var(--aml-panel-inset) - var(--aml-stroke-control));
@@ -199,6 +301,13 @@ body:has(#inbox:not([hidden])) #workspace-query-dock {
   padding: 0;
 }
 .query-filter-values-group > .spring-check { min-block-size: var(--aml-size-control-compact) }
+/* 정렬 방향은 기준 아래에 얇은 선으로 나눠 둔다. */
+.query-choice-group.query-sort-direction {
+  margin-block-start: var(--aml-space-4);
+  padding-block-start: var(--aml-space-8);
+  border-block-start: var(--aml-stroke-divider) solid var(--divider);
+}
+.query-choice:has(input:checked) > .query-menu-detail { color: inherit }
 .query-choice {
   border-radius: var(--aml-radius-control);
   cursor: pointer;

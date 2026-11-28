@@ -12,7 +12,7 @@ import { Panel } from '../components/panel';
 import { ScreenActions } from '../components/screen-actions';
 import { SectionDownloadHeading } from '../components/section-download';
 import { CountTag, LinkTag, PatternTag, StatusTag, VerdictTag, verdictLabels } from '../components/semantic-tags';
-import { csvDownloadEntry, inDateRange, LocalQueryTools } from '../components/query-controls';
+import { csvDownloadEntry, inDateRange, LocalQueryTools, matchesSearch } from '../components/query-controls';
 import { LiveRuleBacktest } from '../features/rules/live-rule-backtest';
 import { LiveRuleList } from '../features/rules/live-rule-list';
 import { liveActiveRules, liveRules, refreshLiveRules } from '../features/rules/live-rule-store';
@@ -39,7 +39,7 @@ import { Box, Heading, Text } from '@/components/layout-primitives';
 const PreviewDashboard = lazy(() => import('../features/dashboard/preview-dashboard').then(module => ({ default: module.PreviewDashboard })));
 const BenchmarkDashboard = lazy(() => import('../features/dashboard/preview-dashboard').then(module => ({ default: module.BenchmarkDashboard })));
 const PreviewCaseOverview = lazy(() => import('../features/investigation/preview-case-overview').then(module => ({ default: module.PreviewCaseOverview })));
-const reportSelection = { ids: [], verdict: 'all', order: 'recent' };
+const reportSelection = { ids: [], verdict: 'all', order: 'recent', search: '' };
 const verdictChoices = [
   { label: '전체', value: 'all' }, { label: '정상', value: 'normal' }, { label: '이상', value: 'abnormal' },
 ];
@@ -205,11 +205,14 @@ function Report({ view, data, registerTableTools, documentId, actionsHost }) {
   const [filter, setFilter] = useState(() => target ? 'all' : reportSelection.verdict);
   const [range, setRange] = useState(() => target ? undefined : reportSelection.range);
   const [order, setOrder] = useState(reportSelection.order);
+  const [search, setSearch] = useState(() => target ? '' : reportSelection.search);
   const [status, setStatus] = useState('pending');
   const [preview, setPreview] = useState(null);
   const tableView = view !== 'card';
   const records = history.filter(row => (!tableView || filter === 'all' || row.verdict === filter)
-    && (!range || row.at && inDateRange(reportDate(row.at), range)));
+    && (!range || row.at && inDateRange(reportDate(row.at), range))
+    // 보고서는 판정 ID(보고서 ID), 대상 사건 코드, 판정자로 찾는다.
+    && matchesSearch([row.id, ...row.targets.map(({ code }) => code), row.reviewer], search));
   const sorting = useTableSort(records);
   const shown = tableView ? sorting.rows : records.toSorted((left, right) => compareJudgments(left, right, order));
   const selectedRows = (tableView ? records : shown).filter(row => selected.includes(row.id));
@@ -220,6 +223,10 @@ function Report({ view, data, registerTableTools, documentId, actionsHost }) {
   function changeRange(value) {
     reportSelection.range = value;
     setRange(value);
+  }
+  function changeSearch(value) {
+    reportSelection.search = value;
+    setSearch(value);
   }
   function changeOrder(value) {
     reportSelection.order = value;
@@ -257,6 +264,7 @@ function Report({ view, data, registerTableTools, documentId, actionsHost }) {
     filter: tableView ? { label: '판정 결과', options: verdictChoices, value: filter, onChange: changeFilter } : undefined,
     sort: tableView ? undefined : { options: reportSortOptions, value: order, defaultValue: 'recent', onChange: changeOrder },
     period: { asOf: reportDate(new Date()), range, onChange: changeRange },
+    search: { value: search, onChange: changeSearch, label: '판정 이력 검색', placeholder: '보고서 ID, 사건 코드, 판정자 검색' },
     panelDownload: !registerTableTools,
     entries: [
       ...(records.length ? [csvEntry('표시 중인 판정 이력', 'judgment-history', shown)] : []),

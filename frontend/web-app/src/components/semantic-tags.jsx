@@ -55,7 +55,7 @@ export function StatusTag({ preset, className = '', emphasis = 'solid', children
 export function CaseAgeTag({ days, showRecent = false, overdueFromDays }) {
   if (days == null || !(days >= (showRecent ? 0 : cautionAgeDays))) return null;
   const overdue = overdueFromDays == null ? isOverdueCaseAge(days) : days >= overdueFromDays;
-  return <StatusTag preset={overdue ? 'elapsedOverdue' : 'elapsed'}>{days}일 경과</StatusTag>;
+  return <StatusTag preset={overdue ? 'elapsedOverdue' : 'elapsed'} emphasis="tint">{days}일 경과</StatusTag>;
 }
 
 const countFormat = new Intl.NumberFormat('ko-KR');
@@ -95,7 +95,7 @@ export function PatternTag({ emphasis = 'solid', children }) {
 }
 
 export function ModelScoreTag({ score, band = modelRiskBand(score) }) {
-  return <span className="semantic-tag" data-tag="model-score" data-tone={statusTones[band]} data-emphasis="solid">
+  return <span className="semantic-tag" data-tag="model-score" data-tone={statusTones[band]} data-emphasis="tint">
     <TriangleAlert className="semantic-tag-icon" aria-hidden="true" /><span>모델</span><span>{score}점</span>
   </span>;
 }

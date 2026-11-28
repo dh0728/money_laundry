@@ -465,7 +465,7 @@ export function Analytics({ data, reduced, summary, today, board, boardEntries, 
     ? ` · Episode 편입 ${integer.format(episodeAlerts)}/${integer.format(totalAlerts)}` : '';
   return <Box as="section" className="dashboard-analytics dashboard-workflow-charts dashboard-institution-relations"
     aria-label="기관 탐지 현황">
-    <DashboardFocusGrid>
+    <DashboardFocusGrid {...(data.asOfDate && { title: `${data.asOfDate} 기준 업무` })}>
       {today}
       <DashboardPriorityQueue rows={data.priorityCases} />
       {summary}

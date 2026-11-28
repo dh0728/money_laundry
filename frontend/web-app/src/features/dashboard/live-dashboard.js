@@ -47,13 +47,19 @@ export async function liveDashboardResponse(source, { mine, rows, population, ra
   const members = source.transactions.filter(row => includesDate(row) && evidence.has(row.code));
   const flagged = members.filter(row => row.suspicious);
   const coveredEvidence = partial ? alertEvidenceCodes(population ?? rows ?? scopeCases) : undefined;
-  const [ledger, roster, todayDetection] = await Promise.all([
+  // 지난 기준일(source.asOfDate)을 볼 때는 오늘의 분석 집계를 읽지 않고, 그날 거래의 서버 집계로 의심 비율을 낸다.
+  const [ledger, roster, liveDetection] = await Promise.all([
     partial ? undefined : getJson(`/api/v1/dashboard/transaction-days?from=${from}&to=${to}`),
     mine ? undefined : fetchReviewUsers().then(users => Array.isArray(users)
       ? users.filter(user => user.role === 'STAFF') : undefined).catch(() => undefined),
-    mine ? null : loadTodayDetection(dashboardBusinessDate(source.businessAt)),
+    mine || source.asOfDate ? null : loadTodayDetection(dashboardBusinessDate(source.businessAt)),
   ]);
   const ledgerDays = new Map(ledger?.days.map(day => [day.date, day]));
+  const referenceDay = ledgerDays.get(source.asOfDate);
+  const todayDetection = referenceDay && Number.isSafeInteger(referenceDay.total) && Number.isSafeInteger(referenceDay.suspicious)
+    && referenceDay.suspicious >= 0 && referenceDay.suspicious <= referenceDay.total
+    ? { received: referenceDay.total, analyzed: referenceDay.total, suspicious: referenceDay.suspicious, basis: 'transaction-day' }
+    : liveDetection;
   const ledgerHours = new Map(ledger?.hours.map(hour => [hour.hour, hour]));
 
   const alertCases = cases.filter(row => row.kind === 'Alert');
@@ -117,6 +123,7 @@ export async function liveDashboardResponse(source, { mine, rows, population, ra
     scope: mine ? 'mine' : 'all',
     dataSource: 'live',
     businessAt: source.businessAt,
+    asOfDate: source.asOfDate,
     period: { from, to },
     cases, mine: owned, alertCases,
     // 화면은 두 목록의 건수만 읽는다. 전체 거래는 서버 건수로 채운다.

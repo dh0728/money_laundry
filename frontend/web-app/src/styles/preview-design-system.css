@@ -50,9 +50,6 @@
   --aml-shell-compact-max-width: 680px;
   --aml-workspace-laptop-max-width: 1919px;
   --layer-local-overlay: 1;
-  --query-apply-hover-ink-weight: 8%;
-  --query-apply-pressed-ink-weight: 14%;
-  --query-apply-face-weight: 94%;
   --query-section-open-rotation: .25turn;
   --query-radio-center-stop: 32%;
   --query-radio-edge-stop: 37%;
@@ -420,6 +417,9 @@
   --loading-pulse-duration: 1.4s;
   --loading-pulse-opacity: .5;
   --canvas-surface: var(--aml-figma-surface-neutral-background-primary);
+  /* 패널은 테두리 없이 면으로 구분한다. 밝은 화면은 흰 바탕 위에 패널을 아주 옅은 푸른 회색 면으로 둔다. */
+  --panel-flat-surface: light-dark(color-mix(in srgb, var(--aml-slate-095), var(--aml-sky-090) 30%),
+    var(--aml-figma-dark-surface-neutral-background-secondary));
   --workspace-surface: var(--canvas-surface);
   --information-panel-surface: var(--aml-figma-surface-neutral-background-secondary);
   --information-panel-edge: light-dark(var(--aml-black-010), var(--aml-white-010));
@@ -443,7 +443,9 @@
   --selected: color-mix(in srgb, var(--text) 14%, transparent);
   --hover: color-mix(in srgb, var(--text) 9%, transparent);
   --pressed: color-mix(in srgb, var(--text) 15%, transparent);
-  --inner-surface: var(--aml-figma-surface-neutral-subtle-hover);
+  /* 입력 칸·막대 바탕 같은 들어간 면. 회색 바탕 위에서도 보이도록 바탕보다 한 단계 어둡다. */
+  --inner-surface: light-dark(color-mix(in srgb, var(--aml-slate-090), var(--aml-slate-080) 40%),
+    var(--aml-figma-dark-surface-neutral-subtle-hover));
   --glass-edge: color-mix(in srgb, var(--text) 17%, transparent);
   --glass-border-strength: 0%;
   --glass-surface-edge: color-mix(in srgb, var(--glass-edge) var(--glass-border-strength), transparent);
@@ -476,12 +478,6 @@
     inset 0 calc(-1 * var(--aml-stroke-control)) var(--aml-space-4) light-dark(var(--aml-black-010), var(--aml-black-040));
   --floating-color-transition-duration: 120ms;
   --floating-press-transition-duration: 70ms;
-  --panel-sunken-shadow-base: var(--aml-black-100);
-  --panel-sunken-shadow-tint: 28%;
-  --panel-sunken-edge-opacity: 22%;
-  --panel-sunken-falloff-opacity: 16%;
-  --panel-sunken-dark-edge: var(--aml-black-080);
-  --panel-sunken-dark-falloff: var(--aml-black-060);
   --panel-sunken-overlay-layer: 2;
   --panel-surface-glass-opacity: 78%;
   --backdrop: light-dark(var(--aml-black-020), var(--aml-black-040));
@@ -526,8 +522,13 @@
   --review-tag-base: light-dark(var(--canvas-surface), var(--aml-gray-060));
   --review-tag-strength: 22%;
   --tag-selected-pattern-ink-strength: 18%;
+  --tag-neutral-fill-strength: 8%;
+  --tag-tint-strength: 14%;
+  --kpi-card-info-tint: 15%;
+  --tag-neutral-hover-strength: 20%;
   --tag-status-dot-ink-strength: 70%;
-  --tag-filter-border-ink-strength: 26%;
+  --query-applied-tint: 14%;
+  --query-applied-hover-tint: 22%;
   --tag-filter-hover-ink-strength: 7%;
   --tag-filter-press-ink-strength: 12%;
   --status-surface-secondary-ink: color-mix(in srgb, var(--text) 36%, var(--muted-text));
@@ -569,25 +570,17 @@
 :root,
 :where(.screen-panel, .screen-overlay, .panel-material) {
   --panel-light-source: var(--panel-material-light, var(--panel-material-solid, var(--information-panel-surface)));
-  --panel-edge-light: color-mix(in srgb,
-    color-mix(in srgb, var(--panel-material-solid, var(--information-panel-surface)) 92%, var(--panel-light-source)),
-    var(--aml-black-100) 10%);
   --panel-light-color: light-dark(
     color-mix(in srgb, var(--panel-light-source) 21%, var(--aml-white-100)),
     color-mix(in srgb, var(--panel-light-source) 72%, var(--aml-white-100)));
-  --panel-edge-depth: inset 0 0 var(--aml-space-8)
-    light-dark(color-mix(in srgb, var(--panel-edge-light) 72%, transparent), color-mix(in srgb, var(--panel-light-color), transparent));
+  /* 밝은 화면의 패널은 가장자리 선·안쪽 그림자가 없다. 어두운 화면은 바탕과 면이 가까워 실선 한 줄을 둔다. */
+  --panel-edge-depth: inset 0 0 0 var(--aml-stroke-divider)
+    light-dark(transparent,
+      color-mix(in srgb, var(--panel-material-solid, var(--information-panel-surface)) 76%, var(--panel-light-color)));
   --information-panel-shadow:
     inset 0 var(--aml-stroke-divider) var(--aml-space-2) color-mix(in srgb, var(--panel-light-color) 46%, transparent),
     inset 0 var(--aml-space-4) var(--aml-space-12) color-mix(in srgb, var(--panel-light-color) 24%, transparent);
   --panel-glass-depth: var(--information-panel-shadow);
-}
-
-:root[data-glassmorphism="false"]
-  :where(.screen-panel, .screen-overlay, .panel-material) {
-  --panel-edge-depth: inset 0 0 0 var(--aml-stroke-divider)
-    light-dark(var(--panel-edge-light),
-      color-mix(in srgb, var(--panel-material-solid, var(--information-panel-surface)) 76%, var(--panel-light-color)));
 }
 
 /* Standalone density changes component dimensions without altering the shared size primitives. */

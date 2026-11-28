@@ -68,7 +68,7 @@ export const ProfileAvatarHTML = (src, alt) =>
 
 export const DecorativeCanvasHTML = attributes => `<canvas ${attributes} aria-hidden="true"></canvas>`;
 
-// 문자열 화면용 Panel(components/panel.jsx와 같은 면: 화면 안으로 들어간 inner glow).
+// 문자열 화면용 Panel(components/panel.jsx와 같은 면: 테두리·안쪽 그림자 없는 평평한 면).
 export const PanelHTML = (content, variant = '') =>
   `<section class="screen-panel ${variant}">${content}</section>`;
 

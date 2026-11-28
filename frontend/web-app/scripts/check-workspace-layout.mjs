@@ -25,23 +25,22 @@ function layoutFailures({ pathname, table, selected, list, pageButtons }) {
 
   const pageControl = document.getElementById('page-download');
   const button = pageControl?.querySelector(download);
-  const dock = document.getElementById('workspace-query-dock');
+  // 조회 도구는 화면 맨 위 줄에 한 줄로 놓이고, 다운로드가 맨 끝에 온다.
+  const bar = document.querySelector('.screen-query-row > .query-bar');
   if (pathname !== '/rules/new' && !visible(button)) failures.push('The page download is missing.');
   if (visible(button)) {
-    const tools = findVisible('[data-query-tool]', dock);
-    if (!dock.contains(pageControl) || getComputedStyle(dock).position !== 'fixed' ||
-        tools.at(-1) !== button ||
-        tools.some((tool, index) => index > 0 && tool.getBoundingClientRect().top <= tools[index - 1].getBoundingClientRect().bottom)) {
-      failures.push('Workspace tools must share a fixed vertical dock, with page download last.');
+    const tools = findVisible('[data-query-tool]', bar ?? document.createElement('div'));
+    if (!bar?.contains(pageControl) || tools.at(-1) !== button ||
+        tools.some((tool, index) => index > 0 && Math.abs(tool.getBoundingClientRect().top - tools[0].getBoundingClientRect().top) > 1)) {
+      failures.push('Workspace tools must share one row at the top of the screen, with page download last.');
     }
-    if (pathname.startsWith('/dashboard/') && tools.map(tool => tool.dataset.queryTool).join() !== 'filter,sort,period,download') {
-      failures.push('The dashboard dock must include filter, sort, period, and download.');
+    if (pathname.startsWith('/dashboard/') && tools.map(tool => tool.dataset.queryTool).join() !== 'period,filter,download') {
+      failures.push('The dashboard tools must include period, filter, and download.');
     }
-    const bounds = dock.getBoundingClientRect();
-    const footerTop = document.querySelector('.app-footer').getBoundingClientRect().top;
-    if (Math.abs(footerTop - bounds.bottom) > 1 || bounds.left < -1 || bounds.right > document.documentElement.clientWidth + 1 ||
-        parseFloat(getComputedStyle(workspace).paddingInlineEnd) > 0) {
-      failures.push('The workspace dock must float within the viewport above the footer and reserve no content width.');
+    // 대시보드의 정렬은 적용 대상인 보드 섹션 제목 옆에 둔다.
+    if (pathname.startsWith('/dashboard/') && document.querySelector('[data-dashboard-sort-host]') &&
+        !findVisible('[data-dashboard-sort-host] [data-query-tool="sort"]', document).length) {
+      failures.push('The dashboard sort must sit beside the board section it applies to.');
     }
   }
 

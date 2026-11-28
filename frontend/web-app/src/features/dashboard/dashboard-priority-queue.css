@@ -1,1 +1,5 @@
 .dashboard-priority-queue { grid-template-columns: minmax(0, 1fr) }
+/* 큐의 업무 ID는 면 없이 글자만 둔다. 행 전체가 누르는 대상이라 마우스를 올려도 ID에 따로 표시하지 않는다. 키보드 초점일 때만 공용 태그의 면이 나타난다. */
+.dashboard-priority-queue .button.semantic-tag[data-tag="link"]:not(:focus-visible) { background-color: transparent }
+/* 면이 없을 때 글자가 열 머리글과 같은 줄에 서도록 안쪽 여백만큼 당긴다. */
+.dashboard-priority-queue .semantic-tag[data-tag="link"] { margin-inline-start: calc(-1 * var(--aml-space-8)) }
