@@ -20,7 +20,7 @@ import { useCaseRuleHits } from '../features/rules/case-rule-hits';
 import { useCaseAiSummary } from '../features/investigation/case-ai-summary';
 import { liveSource } from '../features/investigation/live-data.js';
 import { readWorkspaceDuration } from '../features/dashboard/workspace-metrics';
-import { SortableTableHead, tableCount, useTableSort, WorkflowQueryHeading, WorkflowTable } from '../components/workflow-table';
+import { savedTableSelection, SortableTableHead, tableCount, useTableSort, WorkflowQueryHeading, WorkflowTable } from '../components/workflow-table';
 import { DashboardSkeleton } from '../features/dashboard/dashboard-layout';
 import { CaseOverviewSkeleton } from '../features/investigation/investigation-skeletons';
 import { PreviewEpisodeDialog } from '../features/investigation/preview-episode-dialog';
@@ -342,13 +342,14 @@ function Report({ view, data, registerTableTools, documentId, actionsHost }) {
 }
 
 function AlertEpisodeActions({ overview }) {
-  const [open, setOpen] = useState(false);
+  const [initialCodes, setInitialCodes] = useState(null);
   const user = useSyncExternalStore(subscribePreviewUser, currentPreviewUser);
   if (!canManagePreviewEpisodes(user)) return null;
+  // Alert 표에서 체크해 둔 행을 미리 고른 채로 연다.
   return <ScreenActions host={overview.actionsHost}>
-    <PrimaryButton tone="brand" aria-haspopup="dialog" onClick={() => setOpen(true)}>Episode로 묶기</PrimaryButton>
-    {open && <PreviewEpisodeDialog cases={overview.reportData.cases} save={overview.saveEpisode}
-      onClose={saved => saved ? overview.refreshEpisode() : setOpen(false)} />}
+    <PrimaryButton tone="brand" aria-haspopup="dialog" onClick={() => setInitialCodes(savedTableSelection('alerts'))}>Episode로 묶기</PrimaryButton>
+    {initialCodes && <PreviewEpisodeDialog cases={overview.reportData.cases} save={overview.saveEpisode} initialCodes={initialCodes}
+      onClose={saved => saved ? overview.refreshEpisode() : setInitialCodes(null)} />}
   </ScreenActions>;
 }
 
@@ -360,35 +361,23 @@ function CaseReviewActions({ overview }) {
   const selected = row.related.filter(record => selection.has(record.code)).map(record => record.code);
   const blockedReason = previewAlertEditUnavailable(row, user);
   const canManageEpisodes = canManagePreviewEpisodes(user);
+  // 관련 탭 그래프에 넣은 업무. 'Episode로 묶기' 창이 그대로 받아 미리 고른다.
   const compared = overview.comparedCases ?? [];
   const comparedAlerts = compared.filter(item => item.kind === 'Alert');
   const comparedEpisodes = compared.filter(item => item.kind === 'Episode');
+  const initialTarget = row.kind === 'Alert' && comparedEpisodes.length === 1 && comparedEpisodes[0].open ? comparedEpisodes[0].code : '';
   const transferAlerts = row.kind === 'Alert' ? [row, ...comparedAlerts] : comparedAlerts;
-  const target = row.kind === 'Episode' ? row : comparedEpisodes[0];
-  let bundle;
-  let bundleBlocked;
-  if (compared.length) {
-    if (comparedEpisodes.length > 1) {
-      bundleBlocked = '편입할 Episode를 한 건 선택해 주세요.';
-    } else {
-      const blockers = transferAlerts.filter(item => !canTransferAlert(item)).map(item =>
-        `${item.code} · ${item.episodeCode ? '기존 Episode 소속' : !item.open || item.verdict !== 'unjudged' ? '판정 완료' : '다른 담당자'}`);
-      if (target && !target.open) blockers.push(`${target.code} · 판정 완료`);
-      if (blockers.length) {
-        bundleBlocked = blockers.join('\n');
-      } else if (transferAlerts.length < (target ? 1 : 2)) {
-        bundleBlocked = '기존 Episode 또는 함께 묶을 Alert를 선택해 주세요.';
-      } else if (canManageEpisodes) {
-        bundle = { alerts: transferAlerts.map(item => item.code), target: target?.code };
-      }
-    }
-  }
-  const onRelationRequest = (bundleBlocked || target && !target.assigned) && user?.role === 'STAFF' && overview.openRelationRequest
+  const bundleReady = comparedEpisodes.length <= 1 && transferAlerts.every(canTransferAlert)
+    && transferAlerts.length >= (initialTarget || row.kind === 'Episode' ? 1 : 2);
+  const canBundle = canManageEpisodes && row.open && (row.kind === 'Alert' ? canTransferAlert(row) || compared.length > 0 : row.assigned);
+  const bundleLabel = `${row.kind === 'Episode' ? 'Alert 편입' : 'Episode로 묶기'}${compared.length ? ` ${compared.length}건` : ''}`;
+  const onRelationRequest = user?.role === 'STAFF' && overview.openRelationRequest && compared.length
     ? (reason, onSent) => overview.openRelationRequest({ codes: compared.map(item => item.code), reason, onSent })
     : undefined;
   return <>
     {overview.bundleNoticeHost && createPortal(
-      bundle ? <ResultStatus status="pending">Alert {bundle.alerts.length}건 → {bundle.target ?? '새 Episode'}</ResultStatus> : null,
+      canBundle && compared.length && bundleReady
+        ? <ResultStatus status="pending">Alert {transferAlerts.length}건 → {row.kind === 'Episode' ? row.code : initialTarget || '새 Episode'}</ResultStatus> : null,
       overview.bundleNoticeHost,
     )}
     <ScreenActions host={overview.actionsHost} stackOnNarrow={selected.length > 0}>
@@ -398,13 +387,13 @@ function CaseReviewActions({ overview }) {
       {row.episodeCode && <PrimaryButton tone="inverse" as="a" href={`/episodes/${row.episodeCode}?tab=related`}>연결 Episode 열기</PrimaryButton>}
       {canManageEpisodes && row.kind === 'Episode' && row.open && row.assigned && Boolean(row.linkedAlertCodes?.length)
         && <PrimaryButton tone="inverse" aria-haspopup="dialog" onClick={() => setEpisodeAction('unlink')}>Alert 연결 해제</PrimaryButton>}
+      {canBundle && <PrimaryButton tone="inverse" aria-haspopup="dialog" onClick={() => setEpisodeAction('bundle')}>{bundleLabel}</PrimaryButton>}
       {episodeAction && <PreviewEpisodeDialog cases={reportData.cases} save={overview.saveEpisode} row={row}
-        bundle={episodeAction === 'bundle' ? bundle : undefined} unlink={episodeAction === 'unlink'} startNew={episodeAction === 'create'}
+        unlink={episodeAction === 'unlink'} initialCodes={episodeAction === 'bundle' ? comparedAlerts.map(item => item.code) : []}
+        initialTarget={episodeAction === 'bundle' ? initialTarget : ''}
         onRelationRequest={episodeAction === 'bundle' ? onRelationRequest : undefined}
         onClose={saved => saved ? overview.refreshEpisode() : setEpisodeAction(null)} />}
-      <CaseJudgment actor={user} bundleBlocked={bundleBlocked} onBundle={bundle ? () => setEpisodeAction('bundle') : undefined}
-        onRelationRequest={onRelationRequest}
-        onTransfer={!bundleBlocked && canManageEpisodes && canTransferAlert(row) ? create => setEpisodeAction(create ? 'create' : 'transfer') : undefined} row={row} startReview={overview.startReview} save={overview.saveJudgment}
+      <CaseJudgment actor={user} row={row} startReview={overview.startReview} save={overview.saveJudgment}
         onSavedClose={overview.onJudgmentClose} onReport={overview.onJudgmentReport}
         nextCase={nextReviewCase(reportData?.cases, row.code)} onOpenNext={overview.onJudgmentNext} onOpenList={overview.onJudgmentList} />
     </ScreenActions>

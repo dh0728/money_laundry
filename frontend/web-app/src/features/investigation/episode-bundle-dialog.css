@@ -1,0 +1,76 @@
+/* Episode로 묶기 창: 표·사유(왼쪽)와 연결 요약·합친 그래프(오른쪽)를 한 화면에 둔다. 확인·완료 단계는 판정 창 크기로 돌아간다. */
+.case-judgment-dialog.episode-bundle-dialog {
+  inline-size: min(calc(6 * var(--aml-size-sidebar)), calc(100% - var(--aml-space-32)));
+  block-size: calc(100dvh - var(--aml-space-32));
+}
+.episode-bundle-dialog .dialog-frame { block-size: 100% }
+.episode-bundle-body {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: var(--aml-panel-inset);
+  min-block-size: 0;
+  padding: var(--aml-panel-text-inset);
+  overflow: auto;
+}
+.episode-bundle-body p { margin: 0 }
+.episode-bundle-picker, .episode-bundle-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--aml-space-8);
+  min-inline-size: 0;
+  min-block-size: 0;
+}
+.episode-bundle-picker > * { flex: none }
+.episode-bundle-picker > .episode-bundle-candidates {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-block-size: var(--case-graph-min-height);
+}
+.episode-bundle-candidates { gap: var(--aml-space-8) }
+.episode-bundle-candidates > :last-child { flex: 1 }
+.episode-bundle-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--aml-space-4) var(--aml-space-8);
+}
+.episode-bundle-target { display: flex; flex-wrap: wrap; align-items: center; gap: var(--aml-space-4) }
+.episode-bundle-chip { display: inline-flex; align-items: center; gap: var(--aml-space-4) }
+.episode-bundle-chip > span { color: var(--muted-text) }
+.episode-bundle-swatch {
+  display: inline-block;
+  flex: none;
+  inline-size: var(--aml-space-12);
+  block-size: var(--aml-space-12);
+  background: var(--case-graph-swatch-ink, var(--muted-text));
+  clip-path: var(--case-graph-swatch-clip);
+}
+.episode-bundle-connection {
+  display: grid;
+  gap: var(--aml-space-4);
+  padding: var(--aml-space-8) var(--aml-space-12);
+  border-radius: var(--aml-radius-control);
+  background: var(--inner-surface);
+}
+.episode-bundle-connection p { margin: 0 }
+.episode-bundle-warning { display: flex; flex-wrap: wrap; align-items: center; gap: var(--aml-space-4) }
+.episode-bundle-preview > .episode-bundle-graph {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--aml-space-8);
+  min-block-size: var(--case-graph-min-height);
+}
+.episode-bundle-graph > .preview-evidence-canvas {
+  flex: 1;
+  height: auto;
+  min-block-size: 0;
+  border-radius: var(--aml-radius-control);
+  background: var(--inner-surface);
+}
+.episode-bundle-graph > .preview-graph-actions { flex: none }
+@media (max-width: 768px) {
+  .episode-bundle-body { grid-template-columns: minmax(0, 1fr) }
+}
