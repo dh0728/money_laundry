@@ -50,9 +50,6 @@
   --aml-shell-compact-max-width: 680px;
   --aml-workspace-laptop-max-width: 1919px;
   --layer-local-overlay: 1;
-  --query-apply-hover-ink-weight: 8%;
-  --query-apply-pressed-ink-weight: 14%;
-  --query-apply-face-weight: 94%;
   --query-section-open-rotation: .25turn;
   --query-radio-center-stop: 32%;
   --query-radio-edge-stop: 37%;
@@ -515,7 +512,8 @@
   --kpi-card-info-tint: 15%;
   --tag-neutral-hover-strength: 20%;
   --tag-status-dot-ink-strength: 70%;
-  --tag-filter-border-ink-strength: 26%;
+  --query-applied-tint: 14%;
+  --query-applied-hover-tint: 22%;
   --tag-filter-hover-ink-strength: 7%;
   --tag-filter-press-ink-strength: 12%;
   --status-surface-secondary-ink: color-mix(in srgb, var(--text) 36%, var(--muted-text));

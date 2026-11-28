@@ -64,7 +64,7 @@ export function CaseProgressBoard({ rows, reduced, theme, orderRows, showAssigne
     notice={isEmpty && <EmptyState announce>조회 조건에 해당하는 업무가 없습니다.</EmptyState>}
     renderLane={({ label, preset, value }) => {
         const matching = rows.filter(row => (statusByCode?.[row.code] ?? row.status) === value);
-        const cards = orderRows ? orderRows(matching) : matching;
+        const cards = orderRows ? orderRows(matching, value) : matching;
         const limit = limits[preset] ?? pageSize ?? cards.length;
         const downloads = cards.length ? [caseCsvDownloadEntry(label + ' 업무', 'work-board-' + preset, cards)] : [];
         return <Panel className="case-progress-lane" data-review={preset} key={preset} aria-label={label}>

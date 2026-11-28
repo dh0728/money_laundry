@@ -534,7 +534,7 @@
   min-block-size: var(--header-control-size);
   margin-block-end: var(--workspace-gap);
 }
-:is([data-dashboard-sort-tags], [data-dashboard-sort-host]):empty { display: none }
+[data-dashboard-sort-host]:empty { display: none }
 .dashboard-board-actions { display: flex; align-items: center; gap: var(--workspace-gap); margin-inline-start: auto }
 .dashboard-board-scroll {
   min-inline-size: 0;

@@ -82,8 +82,8 @@
   block-size: var(--aml-space-20);
   padding-inline: var(--aml-space-4);
   border-radius: var(--aml-radius-full);
-  background-color: var(--selection-ink);
-  color: var(--selection-surface);
+  background-color: var(--status-info-accent);
+  color: var(--inverse-text);
   font-size: var(--aml-type-caption-size);
   font-variant-numeric: tabular-nums;
 }
@@ -165,12 +165,26 @@
   block-size: 100%;
   padding-inline: 0;
 }
-.query-trigger[data-button-surface][data-query-applied]:not([aria-expanded="true"]) {
-  --button-hover-bg: var(--selection-surface);
-  --button-active-bg: var(--selection-surface);
-  background-color: var(--selection-surface);
-  color: var(--selection-ink);
+/* 조건을 적용한 버튼은 검게 칠하지 않고 옅은 파란 면과 파란 아이콘으로 알린다. 붙어 있는 ×도 같은 면이다. */
+.query-control:has(> .query-trigger[data-query-applied]) {
+  --query-applied-face: color-mix(in srgb, var(--status-info-accent) var(--query-applied-tint), var(--glass-control-solid));
+  --query-applied-hover: color-mix(in srgb, var(--status-info-accent) var(--query-applied-hover-tint), var(--glass-control-solid));
 }
+.query-trigger[data-button-surface][data-query-applied]:not([aria-expanded="true"]),
+.query-control:has(> .query-trigger[data-query-applied]:not([aria-expanded="true"])) > .query-clear {
+  --button-hover-bg: var(--query-applied-hover);
+  --button-active-bg: var(--query-applied-hover);
+  background-color: var(--query-applied-face);
+  /* 떠 있는 버튼의 흰 광택과 안쪽 테두리 그림자는 색이 있는 면 위에서 얼룩처럼 보여서 뺀다. 면은 고르게 칠한다. */
+  background-image: none;
+  box-shadow: var(--button-depth, var(--floating-shadow));
+}
+.query-trigger[data-button-surface][data-query-applied]:not([aria-expanded="true"], :disabled):hover,
+.query-control:has(> .query-trigger[data-query-applied]:not([aria-expanded="true"])) > .query-clear:hover {
+  background-color: var(--query-applied-hover);
+}
+.query-trigger[data-query-applied] { font-weight: var(--aml-type-body-strong-weight) }
+.query-trigger[data-query-applied] > .icon { color: var(--status-info-accent) }
 .query-trigger-row {
   display: flex;
   flex: none;
@@ -179,24 +193,20 @@
   justify-content: space-between;
 }
 .query-popover-label { padding-inline: var(--aml-panel-text-inset) }
+/* 적용 버튼은 팝업 맨 아래 줄에 글자 버튼으로 둔다. 얇은 선으로 내용과 나눈다. */
 .query-actions:empty { display: none }
 .query-actions {
+  display: flex;
   flex: none;
-  padding-inline-end: var(--query-action-inset);
+  justify-content: flex-end;
+  padding: var(--aml-space-8);
+  border-block-start: var(--aml-stroke-divider) solid var(--divider);
 }
-.query-actions .query-apply[data-button-surface] {
-  --glass-surface-face: var(--query-apply-face);
-  --glass-elevated: color-mix(in srgb, var(--query-apply-face), var(--selection-ink) var(--query-apply-hover-ink-weight));
-  --glass-strong: color-mix(in srgb, var(--query-apply-face), var(--selection-ink) var(--query-apply-pressed-ink-weight));
-  --query-apply-face: color-mix(in srgb, var(--selection-surface) var(--query-apply-face-weight), var(--glass-material-frost));
-  inline-size: var(--aml-size-control-compact);
-  block-size: var(--aml-size-control-compact);
-  border-radius: var(--aml-radius-full);
-  padding: 0;
-  color: var(--selection-ink);
+.query-actions .query-apply {
+  min-inline-size: calc(var(--aml-space-64) + var(--aml-space-8));
+  min-block-size: var(--aml-size-control-compact);
+  padding-inline: var(--aml-space-16);
 }
-.query-actions .query-apply:disabled { opacity: var(--aml-opacity-disabled) }
-.query-actions .query-apply:focus-visible { outline-color: var(--selection-ink) }
 
 .query-tool-popover.glass {
   --query-action-inset: calc(var(--aml-panel-inset) - var(--aml-stroke-control));
@@ -291,6 +301,13 @@
   padding: 0;
 }
 .query-filter-values-group > .spring-check { min-block-size: var(--aml-size-control-compact) }
+/* 정렬 방향은 기준 아래에 얇은 선으로 나눠 둔다. */
+.query-choice-group.query-sort-direction {
+  margin-block-start: var(--aml-space-4);
+  padding-block-start: var(--aml-space-8);
+  border-block-start: var(--aml-stroke-divider) solid var(--divider);
+}
+.query-choice:has(input:checked) > .query-menu-detail { color: inherit }
 .query-choice {
   border-radius: var(--aml-radius-control);
   cursor: pointer;

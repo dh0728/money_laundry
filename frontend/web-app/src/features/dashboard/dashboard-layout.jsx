@@ -21,11 +21,8 @@ export function DashboardMetricGrid({ items, appearance, loading = false }) {
   </Box>;
 }
 
-// 정렬은 보드에만 적용된다. 조회 도구(query-controls)가 적용된 정렬 표시와 정렬 버튼을 이 자리로 옮겨 온다.
-const boardSortSlot = <>
-  <Box data-dashboard-sort-tags />
-  <Box className="query-bar" data-dashboard-sort-host />
-</>;
+// 정렬은 보드에만 적용된다. 조회 도구(query-controls)가 정렬 버튼을 이 자리로 옮겨 온다. 적용한 정렬은 버튼 글자로 보인다.
+const boardSortSlot = <Box className="query-bar" data-dashboard-sort-host />;
 
 function DashboardSectionGrid({ title, children, loading = false, downloadEntries = [], tools, ...props }) {
   const [expanded, setExpanded] = useState(true);

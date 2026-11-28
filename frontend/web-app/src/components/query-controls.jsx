@@ -4,7 +4,7 @@ import { createPortal, flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { DayPicker } from 'react-day-picker';
 import { ko } from 'react-day-picker/locale';
-import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react';
 import { createCsv, downloadBlob, downloadCsv as saveCsv } from '@/lib/report-io';
 import { Button, Icon, IconButton, bindTooltip, hideTooltip } from './components.js';
 import { ActionButton } from './primary-button';
@@ -66,7 +66,8 @@ export function QueryToolbar({ page = false } = {}) {
   return `<div class="context-query-tools" role="group" aria-label="조회 도구" hidden>${buttons}</div>`;
 }
 
-// 화면 맨 위 줄에 두는 조회 도구. [기간 ×] [필터 (개수)] ······ [정렬] [다운로드]
+// 화면 맨 위 줄에 두는 조회 도구. [기간 ×] [필터 (개수)] ······ [정렬 ×] [다운로드]
+// 기간과 정렬은 적용한 값을 버튼 글자로 보이고, 옆의 ×로 지운다.
 // 아이콘만 있던 버튼에 글자를 붙여 찾기 쉽게 한다. 화면을 그릴 때마다 그 화면의 .screen-query-row 로 옮겨 붙는다.
 function queryBarControl(tool, label, { extra = '', id = '' } = {}) {
   const content = Icon(tool) +
@@ -95,11 +96,12 @@ function QueryDate() {
 
 export function QueryBar() {
   const clearPeriod = IconButton(Icon('close'), '기간 지우기', 'data-query-clear="period" hidden', 'query-clear', 'floating', 'pill');
+  const clearSort = IconButton(Icon('close'), '정렬 지우기', 'data-query-clear="sort" hidden', 'query-clear', 'floating', 'pill');
   // 검색창 자리. 공용 SearchField 는 setupQueryControls 가 이 안에 그린다.
   const search = '<div class="query-search" data-query-search-field hidden></div>';
   return `<div class="context-query-tools query-bar" role="group" aria-label="조회 도구" hidden>
     <div class="query-bar-main">${QueryDate()}${search}${queryBarControl('period', '기간', { extra: clearPeriod })}${queryBarControl('filter', '필터')}</div>
-    <div class="query-bar-side">${queryBarControl('sort', '정렬')}${queryBarControl('download', '다운로드', { id: 'page-download' })}</div>
+    <div class="query-bar-side">${queryBarControl('sort', '정렬', { extra: clearSort })}${queryBarControl('download', '다운로드', { id: 'page-download' })}</div>
   </div>`;
 }
 
@@ -169,19 +171,40 @@ function filterGroups(rows, scope) {
   ].filter(group => group.options.length);
 }
 
-function availableSorts(rows) {
-  const currencies = [...new Set(rows.flatMap(row => Object.keys(row.amountByCurrency ?? {})))].sort();
-  return [
-    ...(rows.some(row => Number.isFinite(row.score)) ? [{ value: 'risk', label: '위험도순' }] : []),
-    ...(rows.some(row => Number.isFinite(row.elapsed)) ? [{ value: 'elapsed', label: '경과일순' }] : []),
-    ...currencies.map(currency => ({ value: `amount:${currency}`, label: `금액순 (${currency})` })),
-    { value: 'ascending', label: '코드 오름차순' },
-    { value: 'descending', label: '코드 내림차순' },
-    { value: '', label: '기본 순서' },
-  ];
+// 금액순의 기준. 카드에 적힌 금액을 통화 구분 없이 숫자 그대로 더한다(환산하지 않는다).
+// 서버의 totalAmountUsd 는 조사 대상이 아닌 주변 거래까지 더한 값이라 카드의 금액과 순서가 어긋나서 쓰지 않는다.
+function caseAmount(row) {
+  const amounts = Object.values(row.amountByCurrency ?? {}).filter(Number.isFinite);
+  return amounts.length ? amounts.reduce((sum, value) => sum + value, 0) : undefined;
 }
 
-function ActiveFilters({ value, groups, sorts, boardSortHost, onChange, onEdit, popupId, focus, extra = [], showPeriod = true }) {
+// 정렬 기준은 네 가지고, 기준마다 내림차순(기본)과 오름차순을 고른다.
+// 조건 값은 내림차순이면 기준 이름('risk'), 오름차순이면 '-asc'를 붙인 이름('risk-asc')이다.
+// 생성일 내림차순은 값이 없는 기본 순서로, 받은 순서(서버는 새로 생긴 업무부터 준다) 그대로다.
+const sortFields = [
+  { key: '', label: '생성일순', descending: '최신부터', ascending: '오래된 것부터' },
+  { key: 'risk', label: '위험도순', descending: '높은 점수부터', ascending: '낮은 점수부터', read: row => row.score },
+  { key: 'elapsed', label: '경과일순', descending: '오래된 업무부터', ascending: '새 업무부터', read: row => row.elapsed },
+  { key: 'amount', label: '금액순', descending: '큰 금액부터', ascending: '작은 금액부터', read: caseAmount },
+];
+const ascendingSuffix = '-asc';
+const sortName = field => field.key || 'created';
+const sortValue = (field, ascending) => ascending ? `${sortName(field)}${ascendingSuffix}` : field.key;
+function readSort(sort = '') {
+  const ascending = sort.endsWith(ascendingSuffix);
+  const name = ascending ? sort.slice(0, -ascendingSuffix.length) : sort || 'created';
+  return { field: sortFields.find(field => sortName(field) === name), ascending };
+}
+const availableSortFields = rows => sortFields.filter(field => !field.read || rows.some(row => Number.isFinite(field.read(row))));
+function availableSorts(rows) {
+  return availableSortFields(rows).flatMap(field => [
+    { value: sortValue(field, false), label: field.label },
+    { value: sortValue(field, true), label: `${field.label} · 오름차순` },
+  ]);
+}
+
+// 화면 도구 줄은 기간과 정렬을 버튼 글자로 보이므로 칩을 따로 그리지 않는다(showPeriod·showSort). 표에 붙은 도구는 칩으로 보인다.
+function ActiveFilters({ value, groups, sorts, onChange, onEdit, popupId, focus, extra = [], showPeriod = true, showSort = true }) {
   const filters = groups.filter(group => group.name).flatMap(({ key, label, options }) =>
     value[key].map(selected => {
       const optionLabel = options.find(option => option.value === selected)?.label ?? selected;
@@ -195,11 +218,10 @@ function ActiveFilters({ value, groups, sorts, boardSortHost, onChange, onEdit, 
     tool: 'filter', group: 'assignment', label: '내 담당', remove: () => onChange({ ...value, assignment: 'all' }),
   });
   const chips = [];
-  const sortChip = value.sort && {
+  if (value.sort && showSort) chips.push({
     tool: 'sort', label: `정렬 · ${sorts.find(option => option.value === value.sort)?.label ?? value.sort}`,
     remove: () => onChange({ ...value, sort: '' }, 'sort'),
-  };
-  if (sortChip && !boardSortHost) chips.push(sortChip);
+  });
   if (value.range && showPeriod) chips.push({
     tool: 'period',
     label: `${formatDate(value.range.from)} ~ ${formatDate(value.range.to)}`,
@@ -210,12 +232,9 @@ function ActiveFilters({ value, groups, sorts, boardSortHost, onChange, onEdit, 
   const tag = ({ tool, group, label, remove, removableOnly }, autoFocus) => <FilterTag key={`${tool}:${label}`} onRemove={remove}
     onEdit={removableOnly ? undefined : event => onEdit(tool, event.currentTarget, group)} popupId={removableOnly ? undefined : popupId}
     autoFocus={autoFocus}>{label}</FilterTag>;
-  return <>
-    {chips.length > 0 && <div className="active-query-tags" role="group" aria-label="적용된 조회 조건">
-      {chips.map((chip, index) => tag(chip, Boolean(focus) && !(boardSortHost && focus === 'sort') && index === focused))}
-    </div>}
-    {sortChip && boardSortHost && createPortal(tag(sortChip, focus === 'sort'), boardSortHost)}
-  </>;
+  return chips.length > 0 && <div className="active-query-tags" role="group" aria-label="적용된 조회 조건">
+    {chips.map((chip, index) => tag(chip, Boolean(focus) && index === focused))}
+  </div>;
 }
 
 export function dateFromCode(code) {
@@ -288,17 +307,17 @@ export function visibleCaseRows(rows, query) {
     && inDateRange(row.date, query.range)
     && caseMatchesSearch(row, query.search)
   ));
-  if (!query.sort) return filtered;
-  if (query.sort === 'ascending' || query.sort === 'descending') {
-    const sign = query.sort === 'ascending' ? 1 : -1;
-    return filtered.sort((left, right) => sign * left.code.localeCompare(right.code));
-  }
-  const sortValue = row => query.sort === 'risk' ? row.score : query.sort === 'elapsed' ? row.elapsed
-    : row.amountByCurrency?.[query.sort.slice('amount:'.length)];
+  const { field, ascending } = readSort(query.sort);
+  // 생성일순은 받은 순서(최신부터)를 그대로 쓰거나 뒤집는다.
+  if (!field?.read) return field && ascending ? filtered.reverse() : filtered;
+  // 값이 없는 업무는 방향과 상관없이 맨 뒤로 간다.
   return filtered.sort((left, right) => {
-    const l = sortValue(left) ?? -Infinity;
-    const r = sortValue(right) ?? -Infinity;
-    return (l === r ? 0 : r - l) || left.code.localeCompare(right.code);
+    const l = field.read(left);
+    const r = field.read(right);
+    const hasLeft = Number.isFinite(l);
+    const hasRight = Number.isFinite(r);
+    if (hasLeft !== hasRight) return hasLeft ? -1 : 1;
+    return (hasLeft ? (ascending ? l - r : r - l) : 0) || left.code.localeCompare(right.code);
   });
 }
 
@@ -340,6 +359,7 @@ function QueryChoices({ options, value, onChange, label, className = '' }) {
       <input type="radio" name={name} value={option.value} checked={value === option.value}
         onChange={() => onChange(option.value)} />
       <span>{option.label}</span>
+      {option.detail && <span className="query-menu-detail">{option.detail}</span>}
     </label>)}
   </fieldset>;
 }
@@ -349,13 +369,10 @@ const QueryActions = createContext(null);
 function QueryPanel({ title, onSubmit, children, invalid = false }) {
   const formId = useId();
   const actions = useContext(QueryActions);
-  const apply = useRef(null);
-  useEffect(() => bindTooltip(apply.current, actions.tooltip), [actions]);
+  // 적용 버튼은 팝업 맨 아래 줄(actions.host)에 글자 버튼으로 둔다.
   return <>
-    {createPortal(<ActionButton ref={apply} className="query-apply icon-button" surface="floating"
-      type="submit" form={formId} aria-label="적용" disabled={invalid}>
-      <Check className="icon" aria-hidden="true" />
-    </ActionButton>, actions.host)}
+    {createPortal(<ActionButton className="query-apply" surface="primary" shape="pill"
+      type="submit" form={formId} disabled={invalid}>적용</ActionButton>, actions.host)}
     <form id={formId} aria-label={title} onSubmit={event => { event.preventDefault(); if (!invalid) onSubmit(); }}>
       {children}
     </form>
@@ -406,12 +423,33 @@ function FilterPane({ value, groups, onApply, onResize, editingGroup }) {
   </QueryPanel>;
 }
 
-function SortPane({ value, sorts, onApply, sortScope }) {
+// 표가 직접 정렬하는 화면(보고서 등)의 정렬. 그 표가 준 선택지를 그대로 보인다.
+function SortPane({ value, sorts, onApply }) {
   const [sort, setSort] = useState(value.sort);
   return <QueryPanel title="정렬 기준" onSubmit={() => onApply({ ...value, sort })}>
     <div className="query-popover-body">
-      {sortScope && <p className="query-popover-note">대시보드에서는 ‘{sortScope}’ 섹션에만 적용됩니다.</p>}
       <QueryChoices label="정렬 기준" options={sorts} value={sort} onChange={setSort} />
+    </div>
+  </QueryPanel>;
+}
+
+// Alert·Episode의 정렬. 위에서 기준을, 선 아래에서 방향을 고른다. 방향 옆에는 그 기준에서 무엇이 먼저 오는지 적는다.
+function CaseSortPane({ value, fields, onApply, sortScope }) {
+  const initial = readSort(value.sort);
+  const [key, setKey] = useState(initial.field?.key ?? '');
+  const [ascending, setAscending] = useState(initial.ascending);
+  const field = fields.find(item => item.key === key) ?? fields[0];
+  const directions = [
+    { value: 'descending', label: '내림차순', detail: field.descending },
+    { value: 'ascending', label: '오름차순', detail: field.ascending },
+  ];
+  return <QueryPanel title="정렬 기준" onSubmit={() => onApply({ ...value, sort: sortValue(field, ascending) })}>
+    <div className="query-popover-body">
+      {sortScope && <p className="query-popover-note">대시보드에서는 ‘{sortScope}’의 처리 전·처리 중 칸에만 적용됩니다. 처리 완료 칸은 최근 완료순입니다.</p>}
+      <QueryChoices label="정렬 기준" options={fields.map(item => ({ value: item.key, label: item.label }))}
+        value={field.key} onChange={setKey} />
+      <QueryChoices label="정렬 방향" className="query-sort-direction" options={directions}
+        value={ascending ? 'ascending' : 'descending'} onChange={next => setAscending(next === 'ascending')} />
     </div>
   </QueryPanel>;
 }
@@ -472,7 +510,7 @@ function PeriodPane({ value, asOf, onApply, onResize }) {
   </QueryPanel>;
 }
 
-const queryPanels = { filter: FilterPane, sort: SortPane, period: PeriodPane };
+const queryPanels = { filter: FilterPane, sort: CaseSortPane, period: PeriodPane };
 const firstQueryControl = {
   filter: '.query-filter-group',
   sort: '.query-choice input:checked',
@@ -570,11 +608,12 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
   actionHost.className = 'query-actions';
   const popoverLabel = document.createElement('span');
   popoverLabel.className = 'query-popover-label';
-  triggerRow.append(popoverLabel, actionHost);
+  triggerRow.append(popoverLabel);
   const actions = { host: actionHost, tooltip };
   const queryContent = document.createElement('div');
   queryContent.className = 'query-content';
-  popover.append(triggerRow, queryContent);
+  // 제목 줄 · 내용(길면 스크롤) · 적용 버튼 줄. 적용 버튼 줄은 내용이 스크롤돼도 항상 보인다.
+  popover.append(triggerRow, queryContent, actionHost);
   const conditionTags = document.createElement('div');
   conditionTags.className = 'query-condition-tags';
 
@@ -651,16 +690,13 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     const focus = focusTags;
     focusTags = false;
     tagsRoot ??= createRoot(conditionTags);
-    const boardSortHost = workspace.querySelector('[data-dashboard-sort-tags]');
-    tagsRoot.render(<ActiveFilters value={value} groups={groups} sorts={availableSorts(rows)} boardSortHost={boardSortHost} extra={extra}
-      showPeriod={embedded}
+    tagsRoot.render(<ActiveFilters value={value} groups={groups} sorts={availableSorts(rows)} extra={extra}
+      showPeriod={embedded} showSort={embedded}
       focus={focus} popupId={popover.id}
       onEdit={(tool, origin, group) => open(buttons.find(button => button.dataset.queryTool === tool), { origin, editingGroup: group })}
       onChange={(next, tool) => {
         queries.set(scope, localTable ? { ...next, sort: queries.get(scope)?.sort ?? '' } : next);
-        if (tool === 'sort' && boardSortHost) {
-          sortButton?.focus({ preventScroll: true });
-        } else focusTags = true;
+        focusTags = true;
         onChange(tool, current());
       }} />);
   }
@@ -689,6 +725,14 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     if (periodLabel) periodLabel.textContent = range ? `${formatDate(range.from)} → ${formatDate(range.to)}` : '기간';
     const clearPeriod = controls.querySelector('[data-query-clear="period"]');
     if (clearPeriod) clearPeriod.hidden = !range || periodButtonHidden();
+    // 정렬도 적용한 기준을 버튼 글자로 보인다. 내림차순은 기준 이름만, 오름차순은 방향까지 적는다.
+    const sortOptions = tableTools?.sort?.options ?? availableSorts(rows);
+    // 정렬 버튼은 대시보드에서 보드 섹션으로 옮겨 가므로 controls 안에서 찾지 않고 버튼에서 찾는다.
+    const sortLabel = sortButton?.querySelector('[data-query-label]');
+    if (sortLabel) sortLabel.textContent = applied.sort
+      ? sortOptions.find(option => option.value === (tableTools?.sort?.value ?? value.sort))?.label ?? queryTools.sort : queryTools.sort;
+    const clearSort = sortButton?.parentElement.querySelector('[data-query-clear="sort"]');
+    if (clearSort) clearSort.hidden = !applied.sort || sortButton.hidden;
   }
   const periodButtonHidden = () => queryButtons.find(button => button.dataset.queryTool === 'period')?.hidden ?? true;
   // 검색창: Alert·Episode 목록은 조회 조건(q)으로, 보고서처럼 표가 직접 거르는 화면은 그 표의 search 로 보낸다.
@@ -736,6 +780,15 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     const next = { ...current(), range: undefined };
     queries.set(scope, localTable ? { ...next, sort: queries.get(scope)?.sort ?? '' } : next);
     onChange('period', current());
+  }
+  function clearSort() {
+    if (tableTools?.sort) tableTools.sort.onChange(tableTools.sort.defaultValue);
+    else {
+      queries.set(scope, { ...(queries.get(scope) ?? defaultQuery), sort: '' });
+      onChange('sort', current());
+    }
+    // ×가 사라지므로 초점을 정렬 버튼으로 옮긴다.
+    sortButton?.focus({ preventScroll: true });
   }
   function visibleLocalDownloads() {
     return [...workspace.querySelectorAll('[data-local-query-tools]')]
@@ -796,7 +849,8 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     const above = rect.top - gap;
     const below = innerHeight - rect.bottom - gap;
     popover.style.setProperty('--query-expanded-width', `${width}px`);
-    const panelHeight = queryContent.scrollHeight + triggerRow.offsetHeight + popover.offsetHeight - popover.clientHeight;
+    const panelHeight = queryContent.scrollHeight + triggerRow.offsetHeight + actionHost.offsetHeight
+      + popover.offsetHeight - popover.clientHeight;
     const openAbove = below < panelHeight && above > below;
     const fitsBeneathOrAbove = panelHeight <= Math.max(above, below);
     const fitViewport = popover.dataset.tool === 'period' && !fitsBeneathOrAbove;
@@ -877,7 +931,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
         onApply={({ sort }) => { close(); tableSort.onChange(sort); }} />
       : tablePeriod ? <PeriodPane value={{ range: tablePeriod.range }} asOf={tablePeriod.asOf}
         onApply={next => { close(); tablePeriod.onChange(next.range); }} onResize={position} />
-      : <Panel value={value} groups={filterGroups(rows, scope)} sorts={availableSorts(rows)} asOf={asOf}
+      : <Panel value={value} groups={filterGroups(rows, scope)} fields={availableSortFields(rows)} asOf={asOf}
           onApply={apply} onResize={position} editingGroup={editingGroup} sortScope={sortScope} />;
     flushSync(() => root.render(<QueryActions.Provider value={actions} key={version}>{content}</QueryActions.Provider>));
     if (!popover.matches(':popover-open')) popover.showPopover();
@@ -941,6 +995,9 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
   const clearPeriodButton = controls.querySelector('[data-query-clear="period"]');
   clearPeriodButton?.addEventListener('click', clearPeriod, eventOptions);
   if (clearPeriodButton) queryTooltipDisposers.push(bindTooltip(clearPeriodButton, tooltip, { hover: true }));
+  const clearSortButton = controls.querySelector('[data-query-clear="sort"]');
+  clearSortButton?.addEventListener('click', clearSort, eventOptions);
+  if (clearSortButton) queryTooltipDisposers.push(bindTooltip(clearSortButton, tooltip, { hover: true }));
   popover.tabIndex = -1;
   popover.addEventListener('keydown', event => {
     if (event.key !== 'Escape' || event.defaultPrevented) return;

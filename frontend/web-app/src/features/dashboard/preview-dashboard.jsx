@@ -220,11 +220,16 @@ function interleaveCaseKinds(records) {
     [alerts[index], episodes[index]].filter(Boolean)).flat();
 }
 
+// 고른 정렬은 처리 전·처리 중 칸에 적용된다. 처리 완료 칸은 정렬과 상관없이 방금 끝난 업무부터 보인다.
+const completionTime = row => Date.parse(row.completedAt ?? row.judgment?.at) || 0;
+const recentlyCompleted = rows => rows.toSorted((left, right) => completionTime(right) - completionTime(left));
+
 function WorkBoard({ rows, mine, sort, appearance }) {
+  const orderLane = (lane, status) => status === '처리 완료' ? recentlyCompleted(lane)
+    : mine && !sort ? interleaveCaseKinds(lane) : lane;
   return <Box as="section" className="dashboard-board" aria-label={mine ? '내 담당 업무' : '업무 상태 보드'}>
     {mine && <Box as="header" className="dashboard-board-heading">
       <Heading id="dashboard-work-title" tabIndex={-1}>내 업무 현황</Heading>
-      <Box data-dashboard-sort-tags></Box>
       <Box className="dashboard-board-actions">
         <Box className="query-bar" data-dashboard-sort-host></Box>
         <BoardSectionDownload records={rows} label="내 업무 현황" file="work-board" />
@@ -233,7 +238,7 @@ function WorkBoard({ rows, mine, sort, appearance }) {
     <Box className="dashboard-board-scroll">
       <CaseProgressBoard rows={rows} reduced={appearance.reduced} theme={appearance.theme} showAssignee={!mine}
         plainCount pageSize={8}
-        orderRows={mine && !sort ? interleaveCaseKinds : undefined} />
+        orderRows={orderLane} />
     </Box>
   </Box>;
 }
