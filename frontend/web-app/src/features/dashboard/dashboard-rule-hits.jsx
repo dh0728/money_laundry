@@ -57,7 +57,8 @@ export function rankOperatingRuleHits(rows) {
   }).slice(0, rankLimit).map(({ row }) => row);
 }
 
-export function DashboardRuleHits({ dataSource }) {
+// 적중 수는 지금까지의 누적만 있다. 지난 기준일(asOfDate)을 볼 때도 같은 값을 보이고 그 사실을 적는다.
+export function DashboardRuleHits({ dataSource, asOfDate }) {
   const [result, setResult] = useState(null);
   const [retry, setRetry] = useState(0);
   useEffect(() => {
@@ -76,7 +77,7 @@ export function DashboardRuleHits({ dataSource }) {
 
   return <Panel as="article" fillContent className="dashboard-chart dashboard-rule-hits">
     <SectionDownloadHeading entries={entries} printLabel={title}>{title}</SectionDownloadHeading>
-    <Text className="dashboard-note">{dataSource === 'sample' ? '샘플 전체 운영 기록' : '전체 운영 기록'} · 조회 기간과 별도</Text>
+    <Text className="dashboard-note">{dataSource === 'sample' ? '샘플 전체 운영 기록' : '전체 운영 기록'} · {asOfDate ? '지금까지 누적 · 기준일과 별도' : '조회 기간과 별도'}</Text>
     {rows.length ? <WorkflowTable label={title} title={null} tools={false} scrollbarGutter="auto" fill>
       <TableHeader><TableRow>{columns.map(({ key, label }) => <TableHead key={key} scope="col"><TableFieldLabel column={key}>{label}</TableFieldLabel></TableHead>)}</TableRow></TableHeader>
       <TableBody>{rows.map(row => <TableRow key={row.code} {...recordRowProps}>

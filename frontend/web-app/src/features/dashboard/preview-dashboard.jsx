@@ -57,31 +57,34 @@ function Metrics({ items, appearance }) {
   }))} appearance={appearance} />;
 }
 
-function DashboardTodaySummary({ snapshot, dataSource }) {
+// asOfDate 가 있으면 지난 기준일의 요약이다. 그날을 "당일"이라 부른다.
+function DashboardTodaySummary({ snapshot, dataSource, asOfDate }) {
   if (!snapshot?.date) return null;
+  const day = asOfDate ? '당일' : '오늘';
   const { detection, date, openAlerts, openEpisodes, createdAlerts, overdue3Days, overdue7Days,
     createdCases, completedCreatedCases } = snapshot;
   const openWork = openAlerts + openEpisodes;
   const detectionLabel = detection?.basis === 'transaction-day' ? '거래일 기준' : '오늘 분석 완료 거래 기준';
+  const noDetection = detection?.basis === 'transaction-day' ? `${day} 거래가 없습니다.` : `${day} 분석된 거래가 없습니다.`;
   // 값이 0이면 색을 빼고, 집계가 없으면 숫자 대신 이유를 적는다. 카드 바탕색은 tone을 옅게 깐 것이다.
   const handledRate = compactShare(completedCreatedCases, createdCases);
   const suspiciousRate = detection ? compactShare(detection.suspicious, detection.analyzed) : '—';
   const items = [
-    { title: '개별 미처리 Alert', value: count(openAlerts), detail: `오늘 생성 ${count(createdAlerts)}`,
+    { title: '개별 미처리 Alert', value: count(openAlerts), detail: `${day} 생성 ${count(createdAlerts)}`,
       tone: openAlerts > 0 ? 'in-progress' : undefined, quiet: !openAlerts, chartValue: openAlerts, chartTotal: openWork },
     { title: '장기 미처리', value: count(overdue3Days), detail: `3일 초과 · 7일 이상 ${count(overdue7Days)}`,
       tone: overdue3Days > 0 ? 'suspect' : undefined, quiet: !overdue3Days, chartValue: overdue3Days, chartTotal: openWork },
     { title: '진행 Episode', value: count(openEpisodes), tone: openEpisodes > 0 ? 'in-progress' : undefined, quiet: !openEpisodes,
       chartValue: openEpisodes, chartTotal: openWork },
-    { title: '오늘 처리율', value: handledRate, emptyReason: handledRate === '—' ? '오늘 생성된 업무가 없습니다.' : undefined,
+    { title: `${day} 처리율`, value: handledRate, emptyReason: handledRate === '—' ? `${day} 생성된 업무가 없습니다.` : undefined,
       tone: 'done', chartValue: completedCreatedCases, chartTotal: createdCases },
-    { title: '오늘 의심 비율', value: suspiciousRate,
-      emptyReason: suspiciousRate === '—' ? (detection ? '오늘 분석된 거래가 없습니다.' : '오늘 분석 집계가 없습니다.') : undefined,
+    { title: `${day} 의심 비율`, value: suspiciousRate,
+      emptyReason: suspiciousRate === '—' ? (detection ? noDetection : `${day} 분석 집계가 없습니다.`) : undefined,
       tone: 'suspect', chartValue: detection?.suspicious, chartTotal: detection?.analyzed, basis: detectionLabel },
   ];
 
   // 지표마다 패널 한 장으로 나눈다. 묶음 제목은 섹션 제목 "오늘 할 일"이 맡아서 패널 제목은 두지 않는다.
-  return <Stack as="section" className="dashboard-today-summary" aria-label="오늘의 업무">
+  return <Stack as="section" className="dashboard-today-summary" aria-label={asOfDate ? `${asOfDate} 업무` : '오늘의 업무'}>
     {dataSource === 'sample' && <Text className="dashboard-note">샘플 · {date}</Text>}
     <Grid columns={5} className="dashboard-today-metrics">
       {items.map(({ title, value, detail, tone, quiet, emptyReason, chartValue, chartTotal, basis }) => <Panel as="article" key={title}
@@ -240,8 +243,9 @@ export function PreviewDashboard({ mine, data, appearance }) {
     const status = data.investigation.statusByCode?.[row.code] ?? row.status;
     return status === row.status ? row : { ...row, status };
   });
-  // 전체 대시보드는 서비스 모드에서 AI 요약(종합 위험지수)을 쓰고, 없거나 실패하면 기존 "분석 추천"을 쓴다
-  const ai = useDashboardAiSummary(!mine && import.meta.env.VITE_API_MODE === 'live');
+  // 전체 대시보드는 서비스 모드에서 AI 요약(종합 위험지수)을 쓰고, 없거나 실패하면 기존 "분석 추천"을 쓴다.
+  // AI 요약은 지금 시점 것만 있어서, 지난 기준일(data.asOfDate)을 볼 때는 읽지 않고 "분석 추천"을 쓴다.
+  const ai = useDashboardAiSummary(!mine && !data.asOfDate && import.meta.env.VITE_API_MODE === 'live');
   const summary = ai.status === 'ready' && ai.summary.index.score != null
     ? <DashboardAiSummary summary={ai.summary} reduced={appearance.reduced} />
     : <DashboardSummary trail={data.accountRecommendation} reduced={appearance.reduced} showContext={!mine} />;
@@ -262,8 +266,9 @@ export function PreviewDashboard({ mine, data, appearance }) {
     </PersonalDashboardOverview> : (
       <React.Suspense fallback={<DashboardAnalyticsSkeleton reduced={appearance.reduced} />}>
         <Analytics data={data} reduced={appearance.reduced} summary={summary}
-          today={<DashboardTodaySummary snapshot={data.todaySnapshot} dataSource={data.dataSource} />}
-          detectionSources={<DashboardRuleHits dataSource={data.dataSource} />} board={board} boardEntries={boardEntries} />
+          today={<DashboardTodaySummary snapshot={data.todaySnapshot} dataSource={data.dataSource} asOfDate={data.asOfDate} />}
+          detectionSources={<DashboardRuleHits dataSource={data.dataSource} asOfDate={data.asOfDate} />}
+          board={board} boardEntries={boardEntries} />
       </React.Suspense>
     )}
     {mine && board}

@@ -102,6 +102,7 @@ function caseRow(item, transactions, userId, codes) {
     // 열람 여부는 서버가 기억한다. 방금 연 사건은 다시 받아 오기 전에도 읽은 것으로 보인다.
     unread: assigned && status === '처리 전' && !item.readAt && !wasPreviewCaseRead(code),
     date: dateFromCode(code), createdAt, assignedAt: item.assignedAt, completedAt: item.closedAt ?? undefined,
+    reviewStartedAt: item.reviewStartedAt ?? undefined,
     hour: Number(kstTimestamp(createdAt).slice(11, 13)) - 9, elapsed: item.ageDays,
     score: Math.round((item.summary.riskScore ?? 0) * 100),
     pattern: `${item.summary.primaryType}${share == null ? '' : ` ${Math.round(share * 100)}%`}`,

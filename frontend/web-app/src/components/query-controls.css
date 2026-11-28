@@ -13,7 +13,7 @@
   max-inline-size: 100%;
 }
 .contextual-header > .screen-navigation { position: relative; z-index: var(--layer-local-overlay); flex: none }
-.screen-query-area { display: grid; min-inline-size: 0 }
+.screen-query-area { display: grid; min-inline-size: 0; container: screen-query / inline-size }
 .screen-query-row {
   display: flex;
   align-items: flex-start;
@@ -94,6 +94,65 @@
   min-inline-size: calc(var(--header-control-size) * 4);
 }
 .query-bar .query-search[hidden] { display: none }
+/* 대시보드 기준일: [‹ 날짜 · 받은 시각 ›] 한 칩. 높이는 옆의 도구 버튼과 같다. */
+.query-date {
+  display: flex;
+  align-items: center;
+  gap: var(--aml-space-6);
+  min-inline-size: 0;
+}
+.query-date[hidden] { display: none }
+.query-date-stepper {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-inline-size: 0;
+  block-size: var(--header-control-size);
+  border-radius: var(--aml-radius-full);
+  white-space: nowrap;
+}
+.query-date-step {
+  inline-size: var(--header-control-size);
+  block-size: var(--header-control-size);
+}
+.query-date .query-date-step:disabled { color: var(--disabled-text) }
+.query-date-reading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--aml-space-6);
+  min-inline-size: 0;
+  font-variant-numeric: tabular-nums;
+}
+.query-date-reading > time { font-weight: var(--aml-type-body-strong-weight) }
+.query-date-note {
+  overflow: hidden;
+  color: var(--muted-text);
+  font-size: var(--aml-type-caption-size);
+  text-overflow: ellipsis;
+}
+.query-date-note:empty { display: none }
+.query-date > [data-query-date-today] {
+  flex: none;
+  inline-size: max-content;
+  block-size: var(--header-control-size);
+  padding-inline: var(--aml-space-12);
+  white-space: nowrap;
+}
+/* 기준일은 줄 한가운데에 둔다. [오늘로 이동]은 칩 오른쪽에 띄워 붙여서 나타나도 칩이 밀리지 않는다. 줄이 좁으면 왼쪽 정렬로 돌아간다. */
+@container screen-query (width >= 44rem) {
+  .screen-query-row > .query-bar:not([hidden]):has(.query-date:not([hidden])) {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+  }
+  .query-bar:has(.query-date:not([hidden])) > .query-bar-main { grid-column: 2 }
+  .query-bar:has(.query-date:not([hidden])) > .query-bar-side { grid-column: 3; justify-self: end }
+  .query-date { position: relative }
+  .query-date > [data-query-date-today] {
+    position: absolute;
+    inset-inline-start: calc(100% + var(--aml-space-6));
+  }
+}
 .query-bar .query-search > .search-field { --search-field-size: var(--header-control-size) }
 .screen-layout:has(.dashboard-work-details > [data-dashboard-section-content][inert]) {
   padding-block-end: calc(var(--workspace-footer-inset) + 4 * var(--header-control-size) + 5 * var(--aml-space-4));

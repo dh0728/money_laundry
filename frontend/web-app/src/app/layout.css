@@ -331,15 +331,12 @@ body:has(#sidebar:not([hidden])) .sidebar-chrome .drawer-chrome__primary > .butt
   gap: var(--header-inset);
 }
 .button[data-button-surface="floating"]:is(:disabled, [aria-disabled="true"]) { color: var(--disabled-text) }
-.live-refresh {
-  padding-inline: var(--aml-space-12);
-  font-size: var(--aml-type-caption-size);
-  color: var(--muted-text);
-  white-space: nowrap;
-}
-.live-refresh[data-changes] {
-  color: var(--status-info-accent);
-  font-weight: var(--aml-type-body-strong-weight);
+/* 새로고침: 다른 사람이 바꾼 건이 있으면 점이 붙고, 받는 동안에는 아이콘이 돈다. */
+.app-header .live-refresh[data-changes] { color: var(--status-info-accent) }
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-reduced-motion="true"]) .live-refresh[data-loading] > .icon {
+    animation: aml-radar-symbol-sweep calc(var(--aml-radar-symbol-sweep-duration) / 4) linear infinite;
+  }
 }
 .inbox-header { --drawer-chrome-width: var(--inbox-width) }
 .inbox-header:has(#inbox-toggle[aria-expanded="false"]) { padding-inline-start: 0 }
@@ -352,7 +349,7 @@ body:has(#sidebar:not([hidden])) .sidebar-chrome .drawer-chrome__primary > .butt
   background: var(--status-info-accent);
   pointer-events: none;
 }
-.inbox-count {
+.inbox-count, .live-refresh-dot {
   position: absolute;
   top: var(--header-button-padding);
   right: var(--header-button-padding);

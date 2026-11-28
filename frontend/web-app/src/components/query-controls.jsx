@@ -78,12 +78,27 @@ function queryBarControl(tool, label, { extra = '', id = '' } = {}) {
   return `<div class="query-control query-bar-control"${id ? ` id="${id}"` : ''}>${button}${extra}</div>`;
 }
 
+// 대시보드 기준일. [‹ 날짜 · 받은 시각 ›]을 한 칩으로 두고, 지난 날짜를 볼 때만 [오늘로 이동]을 옆에 보인다.
+// "오늘"만 적으면 보고 있는 날짜가 오늘이라는 표시로 읽혀서 동작을 적는다.
+// 값과 동작은 화면이 setupQueryControls 의 setDate 로 넘긴다.
+function QueryDate() {
+  const step = (direction, label) => IconButton(Icon(direction), label, `data-query-date-step="${direction}"`, 'query-date-step', 'ghost');
+  const today = Button('오늘로 이동', { variant: 'query-bar-trigger', surface: 'floating', shape: 'pill', attributes: 'data-query-date-today hidden' });
+  return `<div class="query-date" data-query-date hidden>
+    <div class="glass floating-glass query-date-stepper" role="group" aria-label="대시보드 기준일">
+      ${step('previous', '이전 날짜')}
+      <span class="query-date-reading" aria-live="polite"><time data-query-date-value></time><span class="query-date-note" data-query-date-note></span></span>
+      ${step('next', '다음 날짜')}
+    </div>${today}
+  </div>`;
+}
+
 export function QueryBar() {
   const clearPeriod = IconButton(Icon('close'), '기간 지우기', 'data-query-clear="period" hidden', 'query-clear', 'floating', 'pill');
   // 검색창 자리. 공용 SearchField 는 setupQueryControls 가 이 안에 그린다.
   const search = '<div class="query-search" data-query-search-field hidden></div>';
   return `<div class="context-query-tools query-bar" role="group" aria-label="조회 도구" hidden>
-    <div class="query-bar-main">${search}${queryBarControl('period', '기간', { extra: clearPeriod })}${queryBarControl('filter', '필터')}</div>
+    <div class="query-bar-main">${QueryDate()}${search}${queryBarControl('period', '기간', { extra: clearPeriod })}${queryBarControl('filter', '필터')}</div>
     <div class="query-bar-side">${queryBarControl('sort', '정렬')}${queryBarControl('download', '다운로드', { id: 'page-download' })}</div>
   </div>`;
 }
@@ -577,6 +592,32 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
   let localTable = embedded;
   let rows = [];
   let periodAnchor;
+  // 기준일로 보는 화면(서비스 모드 대시보드). 기간·필터 대신 날짜 이동을 쓴다.
+  let dated = false;
+  let dateState;
+  const dateHost = controls.querySelector('[data-query-date]');
+  dateHost?.addEventListener('click', event => {
+    const step = event.target.closest('[data-query-date-step]');
+    const today = event.target.closest('[data-query-date-today]');
+    if (!dateState || !step && !today) return;
+    dateState.onChange(step ? dateState[step.dataset.queryDateStep] : undefined);
+    // 화면을 다시 그리며 도구 줄이 옮겨 붙으므로 누르던 자리로 초점을 되돌린다. 끝 날짜에 닿아 꺼진 버튼이면 반대쪽으로 보낸다.
+    const focusTarget = [step, ...dateHost.querySelectorAll('[data-query-date-step]')].find(button => button && !button.disabled);
+    focusTarget?.focus({ preventScroll: true });
+  }, eventOptions);
+  function setDate(next) {
+    if (!dateHost) return;
+    dateState = next;
+    if (dateHost.hidden !== !next) dateHost.hidden = !next;
+    if (!next) return;
+    const value = dateHost.querySelector('[data-query-date-value]');
+    value.dateTime = next.value;
+    value.textContent = next.value;
+    dateHost.querySelector('[data-query-date-note]').textContent = next.note ? `· ${next.note}` : '';
+    dateHost.querySelector('[data-query-date-step="previous"]').disabled = !next.previous;
+    dateHost.querySelector('[data-query-date-step="next"]').disabled = !next.next;
+    dateHost.querySelector('[data-query-date-today]').hidden = !next.past;
+  }
   let closingOnClick;
   let resumeTableFocus;
   const queries = new Map();
@@ -711,9 +752,9 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     const hasRows = Boolean(scope && rows.length);
     const hasDownloadEntries = tableTools?.entries?.some(entry => !entry.disabled);
     const available = {
-      filter: hasRows || Boolean(tableTools?.filter),
+      filter: hasRows && !dated || Boolean(tableTools?.filter),
       sort: hasRows && !localTable || Boolean(tableTools?.sort),
-      period: Boolean(tableTools?.period || scope && (hasRows || periodAnchor)),
+      period: Boolean(tableTools?.period || scope && !dated && (hasRows || periodAnchor)),
       download: tableTools?.panelDownload !== false && (hasRows || hasDownloadEntries),
     };
     for (const button of toolbarButtons) {
@@ -999,6 +1040,8 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
       return result;
     },
     dismiss,
+    /** 기준일 표시를 그린다. next 가 없으면 숨긴다. { value, note, previous, next, past, onChange(date | undefined) } */
+    setDate,
     setScreen(path, codes, data, params) {
       const next = queryScope(path);
       if (path !== screen) {
@@ -1015,6 +1058,9 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
         const value = parseQuery(params, scope, rows);
         queries.set(scope, localTable ? { ...value, sort: queries.get(scope)?.sort ?? '' } : value);
       }
+      // 기준일로 보는 화면은 기간·필터를 쓰지 않는다. 주소나 이전 화면에서 온 조건 가운데 정렬만 남긴다.
+      dated = Boolean(scope && data?.dated);
+      if (dated) queries.set(scope, { ...defaultQuery, sort: queries.get(scope)?.sort ?? '' });
       periodAnchor = data?.asOf;
       for (const button of queryButtons) button.removeAttribute('data-query-applied');
       syncTools(false);

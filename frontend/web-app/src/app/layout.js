@@ -23,6 +23,7 @@ import { liveWorkRequests, liveWorkRequestsReady, loadLiveWorkRequests, readLive
   sendLiveWorkRequest } from '../features/investigation/live-work-requests.js';
 import { changePreviewEpisode } from '../features/investigation/preview-episode-transfer.js';
 import { liveDashboardAsOf, liveDashboardResponse } from '../features/dashboard/live-dashboard.js';
+import { clampDashboardDate, dashboardDateRange, shiftDateKey, sourceAsOf } from '../features/dashboard/dashboard-as-of.js';
 import { refreshLiveRules } from '../features/rules/live-rule-store';
 import { canStartPreviewReview, savePreviewJudgment, startPreviewReview } from '../features/investigation/case-judgment-data.js';
 import { requestStateLabels, WorkRequestDetail, WorkRequestForm } from '../features/investigation/preview-work-request-dialog.jsx';
@@ -49,7 +50,7 @@ import { notificationRowTitle, ruleNotificationLink, RuleNotificationLink } from
 import { getModelRiskThresholds, loadLiveModelRiskThresholds } from '../features/settings/model-risk-settings.js';
 import { restoreWorkTabCodes, setWorkTabCodes } from './work-tab-state.js';
 import { startSessionKeepalive } from './session-keepalive.js';
-import { changedCaseCount, liveRefreshIntervalMs, startLiveRefresh } from './live-refresh.js';
+import { changedCaseCount, startLiveRefresh } from './live-refresh.js';
 import { benchmarkLedgerPath, dashboardRoute, initialDetail, isBenchmarkTransactionCode, isLedgerScreen, ledgerTableScreen, loginRoute, previewUrl, readPreviewRoute, validWorkCode } from './preview-route.js';
 import { appMotionPreference, appReducedMotion, systemReducedMotion } from '@/hooks/use-reduced-motion';
 
@@ -177,9 +178,10 @@ function Header() {
     BoxHTML('', 'id="screen-navigation" class="header-frame screen-navigation" hidden'),
     'class="contextual-header"',
   ), 'class="header-frame header-frame--center"');
-  // 서비스 모드: 화면 데이터 기준 시각과 다른 사람의 변경 건수. 누르면 새로 받아 지금 화면을 다시 그린다.
-  const liveStatus = serviceMode ? Button(TextHTML('', 'id="live-refresh-label"'),
-    { variant: 'live-refresh', attributes: 'id="live-refresh" hidden aria-live="polite"', shape: 'pill', surface: 'floating' }) : '';
+  // 서비스 모드: 누르면 화면 데이터를 새로 받아 지금 화면을 다시 그린다. 다른 사람이 바꾼 건이 있으면 점으로 알린다.
+  // 받은 시각은 대시보드의 기준일 옆과 이 버튼의 설명에 보인다.
+  const liveStatus = serviceMode ? IconButton(Icon('refresh') + TextHTML('', 'class="live-refresh-dot unread-dot" hidden'),
+    '새로고침', 'id="live-refresh" hidden', 'live-refresh') : '';
   const viewControls = BoxHTML(liveStatus +
     IconButton(Icon('fullscreen'), '전체화면 보기', 'id="fullscreen-toggle" aria-pressed="false"') +
     IconButton(Icon('wide'), '넓게 보기', 'id="workspace-width-toggle" aria-pressed="false"'),
@@ -212,7 +214,10 @@ function caseSource(groups) {
 // 주기적으로 다시 받은 board 에서 아직 화면에 그리지 않은 변경 건수. 화면을 새로 그리면 0으로 돌린다.
 let unshownLiveChanges = 0;
 let refreshLiveNow = () => undefined;
-const minuteMs = 60_000;
+// 지금 화면을 그릴 때 쓴 board 를 받은 시각(ms). 뒤에서 다시 받아도 화면을 새로 그리기 전에는 바뀌지 않는다.
+let shownLoadedAt;
+const kstClock = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false });
+const receivedClock = time => `${kstClock.format(time)} KST`;
 
 async function refreshLiveBoard() {
   const before = liveCaseSignatures();
@@ -229,18 +234,21 @@ function renderLiveRefreshStatus() {
   if (!button) return;
   button.hidden = !signedIn || !loadedAt;
   if (button.hidden) return;
-  const minutes = Math.floor((Date.now() - loadedAt) / minuteMs);
-  const age = minutes < 1 ? '방금 기준' : `${minutes}분 전 기준`;
   button.toggleAttribute('data-changes', unshownLiveChanges > 0);
-  button.querySelector('#live-refresh-label').textContent = unshownLiveChanges ? `변경 ${unshownLiveChanges}건 · 반영` : age;
-  button.title = unshownLiveChanges ? `다른 사람이 바꾼 ${unshownLiveChanges}건이 있습니다. 누르면 지금 화면에 반영합니다. (${age})`
-    : `화면 데이터 ${age}. 누르면 새로 받습니다.`;
+  button.querySelector('.live-refresh-dot').hidden = !unshownLiveChanges;
+  // 설명(툴팁)은 aria-label 을 읽는다.
+  button.setAttribute('aria-label', unshownLiveChanges
+    ? `새로고침 · 다른 사람이 바꾼 ${unshownLiveChanges}건 반영`
+    : `새로고침 · 화면 데이터 ${receivedClock(shownLoadedAt ?? loadedAt)}에 받음`);
 }
 
-// 버튼: 묵은 데이터면 새로 받고, 지금 화면을 새 데이터로 다시 그린다.
+// 버튼: 화면 데이터를 새로 받고, 지금 화면을 새 데이터로 다시 그린다. 받는 동안에는 다시 눌러도 한 번만 받는다.
 function applyLiveRefresh() {
-  const stale = Date.now() - (liveLoadedAt() ?? 0) >= liveRefreshIntervalMs;
-  void Promise.resolve(stale ? refreshLiveNow() : undefined).then(() => {
+  const button = document.getElementById('live-refresh');
+  if (button.hasAttribute('data-loading')) return;
+  button.setAttribute('data-loading', '');
+  void Promise.resolve(refreshLiveNow()).finally(() => {
+    button.removeAttribute('data-loading');
     if (signedIn && activePath) showWorkspace('', activeWorkCode, activePath, 'none', new URLSearchParams(location.search));
   });
 }
@@ -635,6 +643,8 @@ let unmountCaseEvidence;
 let activeEvidence;
 let benchmarkLedgerView;
 let dashboardSource;
+// 서비스 모드 대시보드의 기준일('YYYY-MM-DD'). undefined 는 오늘(업무일)이다. 전체·개인 대시보드가 같은 날짜를 본다.
+let dashboardDate;
 const institutionDashboardCache = new WeakMap();
 const institutionDashboardFreshMs = 60_000;
 let caseListPage = { key: '', page: 0 };
@@ -646,7 +656,7 @@ const queryControls = setupQueryControls({
     if (tool === 'sort' && activePath?.startsWith('dashboard/')) {
       const { rows, sort } = queryControls.selection();
       if (mountedWorkflows?.updateDashboardSort(rows, sort)) {
-        updateWorkspaceAddress(activePath, activeWorkCode, 'replace', queryControls.params(activePath), { scroll: false });
+        updateWorkspaceAddress(activePath, activeWorkCode, 'replace', screenParams(activePath), { scroll: false });
         queryControls.refresh();
         return;
       }
@@ -658,6 +668,35 @@ const queryControls = setupQueryControls({
 });
 mountWorkflowNotifications(byId('workflow-notifications'));
 mountNotificationPreference(byId('notification-preference'));
+
+// 조회 조건으로 만든 주소에 대시보드 기준일을 덧붙인다. 오늘을 볼 때는 붙이지 않는다.
+function screenParams(path) {
+  const result = queryControls.params(path);
+  if (serviceMode && dashboardDate && path?.startsWith('dashboard/')) result.set('date', dashboardDate);
+  return result;
+}
+
+// 대시보드 기준일을 정하고 날짜 이동 표시를 그린다. 그 날짜를 마감한 시점의 업무 목록을 돌려준다(오늘이면 받은 목록 그대로).
+function datedDashboardSource(source, params) {
+  const range = dashboardDateRange(source);
+  // 주소에 날짜가 있으면 그 날짜를, 주소 없이 다시 그릴 때(전체·개인 전환, 정렬)는 보던 날짜를 쓴다.
+  dashboardDate = clampDashboardDate(params ? params.get('date') : dashboardDate, range);
+  const shown = dashboardDate ?? range.last;
+  queryControls.setDate(shown ? {
+    value: shown,
+    note: shownLoadedAt ? `${receivedClock(shownLoadedAt)}까지 업데이트` : '',
+    previous: shown > range.first ? shiftDateKey(shown, -1) : undefined,
+    next: dashboardDate ? shiftDateKey(shown, 1) : undefined,
+    past: Boolean(dashboardDate),
+    onChange: date => {
+      const next = screenParams(activePath);
+      if (date) next.set('date', date);
+      else next.delete('date');
+      showWorkspace('', '', activePath, 'replace', next);
+    },
+  } : undefined);
+  return dashboardDate ? sourceAsOf(source, dashboardDate) : source;
+}
 
 function showWorkspaceNavigation(path, code) {
   if (headerPath === path && headerCode === code) return;
@@ -832,7 +871,7 @@ function afterWorkspacePaint(callback) {
 
 function loadPreviewDashboard(mounted, source, query) {
   if (!query.mine) {
-    const key = `${getModelRiskThresholds().join(',')}:${queryControls.params('dashboard/all')}`;
+    const key = `${getModelRiskThresholds().join(',')}:${screenParams('dashboard/all')}`;
     const previous = institutionDashboardCache.get(source);
     const entry = previous?.key === key ? previous : { key };
     const render = data => { if (mountedWorkflows === mounted) mounted.updateDashboard(data); };
@@ -864,7 +903,9 @@ function loadPreviewDashboard(mounted, source, query) {
     const requests = serviceMode
       ? (liveWorkRequestsReady() ? liveWorkRequests() : undefined)
       : [...source.assignmentChanges, ...previewWorkRequests({ source: 'fixture', username })];
-    return { ...summary, workHistory: personalWorkHistory(source.cases, requests, username, query.range) };
+    // 지난 기준일을 볼 때는 그날까지의 기록만 보인다.
+    const range = query.range ?? (source.asOfDate ? { to: new Date(`${source.asOfDate}T00:00:00`) } : undefined);
+    return { ...summary, workHistory: personalWorkHistory(source.cases, requests, username, range) };
   };
   const load = () => {
     mounted.updateDashboard(undefined);
@@ -905,6 +946,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
   cancelAnimationFrame(navigationFrame);
   if (serviceMode) {
     unshownLiveChanges = 0;
+    shownLoadedAt = liveLoadedAt();
     renderLiveRefreshStatus();
   }
   for (const tab of document.querySelectorAll('#sidebar [aria-current="page"]')) {
@@ -964,10 +1006,15 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     if (serviceMode) void markLiveRead(opened);
     dashboardSource = caseSource(groups);
   }
+  // 서비스 모드 대시보드는 기간·필터 대신 기준일로 본다. 다른 화면은 받은 목록(지금 상태)을 그대로 쓴다.
+  const datedDashboard = isDashboard && serviceMode;
+  const dashboardView = datedDashboard ? datedDashboardSource(dashboardSource, params) : dashboardSource;
+  if (!datedDashboard) queryControls.setDate(undefined);
   const queryData = isDashboard ? {
-    rows: isPersonalDashboard ? dashboardSource.mine : dashboardSource.cases,
-    asOf: serviceMode ? liveDashboardAsOf(dashboardSource) : dashboardPeriodEnd,
+    rows: isPersonalDashboard ? dashboardView.mine : dashboardView.cases,
+    asOf: serviceMode ? liveDashboardAsOf(dashboardView) : dashboardPeriodEnd,
     dashboard: true,
+    dated: datedDashboard,
     sortScope: isPersonalDashboard ? '내 업무 현황' : '처리 상태',
   } : isCaseList ? { rows: dashboardSource.cases.filter(row => row.code.startsWith(groupPrefix)) } : undefined;
   activePath = path;
@@ -1108,7 +1155,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     registerTableTools: queryControls.registerTableTools,
     rule: isRuleId(selectedRule) ? selectedRule : undefined,
   });
-  if (isDashboard) loadPreviewDashboard(mountedWorkflows, dashboardSource,
+  if (isDashboard) loadPreviewDashboard(mountedWorkflows, dashboardView,
     { ...queryControls.selection(), mine: isPersonalDashboard });
   const caseGraphHost = byId('workspace').querySelector('[data-case-flow]');
   const evidenceHost = workspace.querySelector('[data-case-evidence]');
@@ -1158,7 +1205,7 @@ function showWorkspace(prefix, code = '', override = '', navigationMode = 'push'
     });
   }
   if (path) {
-    const urlParams = queryControls.params(path);
+    const urlParams = screenParams(path);
     if (initialPanel) urlParams.set('panel', initialPanel);
     if (reportDocument) urlParams.set('selected', reportDocument);
     if (isRuleId(selectedRule)) urlParams.set('rule', selectedRule);
@@ -2181,6 +2228,7 @@ function clearWorkspaceSession() {
   resetLiveWorkRequests();
   liveWorkspaceRequests = undefined;
   dashboardSource = undefined;
+  dashboardDate = undefined;
 }
 for (const host of document.querySelectorAll('[data-dialog-heading]')) {
   const { dialogHeading: id, dialogTitle: title } = host.dataset;
@@ -2213,7 +2261,6 @@ if (serviceMode) {
   const liveRefresh = startLiveRefresh({ isActive: () => signedIn && liveSourceLoaded(), refresh: refreshLiveBoard });
   refreshLiveNow = liveRefresh.refreshNow;
   byId('live-refresh')?.addEventListener('click', applyLiveRefresh);
-  setInterval(renderLiveRefreshStatus, minuteMs / 4);
   // 서버 세션을 확인하기 전에는 로그인 화면 대신 준비 화면을 보여준다.
   if (location.pathname === '/login') restoreLocation();
   else showWorkspacePreparation();
