@@ -101,7 +101,7 @@ export function QueryBar() {
   const search = '<div class="query-search" data-query-search-field hidden></div>';
   return `<div class="context-query-tools query-bar" role="group" aria-label="조회 도구" hidden>
     <div class="query-bar-main">${QueryDate()}${search}${queryBarControl('period', '기간', { extra: clearPeriod })}${queryBarControl('filter', '필터')}</div>
-    <div class="query-bar-side">${queryBarControl('sort', '정렬', { extra: clearSort })}${queryBarControl('download', '다운로드', { id: 'page-download' })}</div>
+    <div class="query-bar-side">${queryBarControl('sort', '정렬', { extra: clearSort })}${queryBarControl('download', '페이지 다운로드', { id: 'page-download' })}</div>
   </div>`;
 }
 
@@ -635,6 +635,8 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
   let periodAnchor;
   // 기준일로 보는 화면(서비스 모드 대시보드). 기간·필터 대신 날짜 이동을 쓴다.
   let dated = false;
+  // 대시보드 화면인지. 대시보드의 정렬 버튼은 보드 섹션 제목 옆 자리에만 둔다.
+  let dashboardScreen = false;
   let dateState;
   const dateHost = controls.querySelector('[data-query-date]');
   dateHost?.addEventListener('click', event => {
@@ -808,7 +810,9 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
     const hasDownloadEntries = tableTools?.entries?.some(entry => !entry.disabled);
     const available = {
       filter: hasRows && !dated || Boolean(tableTools?.filter),
-      sort: hasRows && !localTable || Boolean(tableTools?.sort),
+      // 대시보드는 보드 섹션이 그려져 자리가 생긴 뒤에 정렬 버튼을 보인다. 불러오는 동안 맨 위 줄에 잠깐 떴다가 내려가지 않게 한다.
+      sort: hasRows && !localTable && (!dashboardScreen || Boolean(workspace.querySelector('[data-dashboard-sort-host]')))
+        || Boolean(tableTools?.sort),
       period: Boolean(tableTools?.period || scope && !dated && (hasRows || periodAnchor)),
       download: tableTools?.panelDownload !== false && (hasRows || hasDownloadEntries),
     };
@@ -1120,6 +1124,7 @@ export function setupQueryControls({ onChange, workspace, controls, embedded = f
       }
       // 기준일로 보는 화면은 기간·필터를 쓰지 않는다. 주소나 이전 화면에서 온 조건 가운데 정렬만 남긴다.
       dated = Boolean(scope && data?.dated);
+      dashboardScreen = Boolean(data?.dashboard);
       if (dated) queries.set(scope, { ...defaultQuery, sort: queries.get(scope)?.sort ?? '' });
       periodAnchor = data?.asOf;
       for (const button of queryButtons) button.removeAttribute('data-query-applied');
