@@ -1,7 +1,8 @@
 import React, { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { GraphZoomControls } from './preview-graph-controls';
-import { graphVerdict, graphVerdictLabels } from '../investigation/case-graph-scope';
+import { graphVerdict, graphVerdictLabels, isContextTransaction, transactionRoleLabels,
+  transactionRoleSummary } from '../investigation/case-graph-scope';
 import {
   ownerAccountY, ownerGraphLayout, ownerHeaderHeight, ownerRowHeight, ownerTransferPath, ownerTransferRisk, ownerWidth,
 } from './owner-graph-layout';
@@ -206,17 +207,22 @@ export function OwnerGraphTimeline({
         const earliest = Math.min(...range), latest = Math.max(...range);
         const when = range.length ? earliest === latest ? `${formatTime(earliest)} KST` :
           `${formatTime(earliest)} ~ ${formatTime(latest)} KST` : '시각 없음';
-        const label = `${from.id} → ${to.id} · ${rows.length}건 · ${verdict} · ${when}`;
+        const contextRows = rows.filter(isContextTransaction).length;
+        const context = contextRows === rows.length;
+        const roles = transactionRoleSummary(rows);
+        const label = `${from.id} → ${to.id} · ${rows.length}건 · ${verdict} · ${when}${roles ? ` · ${roles}` : ''}`;
         const select = () => selection === relationship ? onSelect() : onSelect(relationship, codes);
         const activePulse = flowPulse && codes.has(flowPulse.code) ? flowPulse : undefined;
         const highlighted = isHighlighted(rows);
-        return <OwnerFlowEdge key={key} design={design} path={path} label={label} pressed={active} muted={!highlighted}
+        return <OwnerFlowEdge key={key} design={design} path={path} label={label} pressed={active} muted={!highlighted} context={context}
           onSelect={select} memberships={memberships} color={riskColor(ownerTransferRisk(rows))}
           width={width} height={height} pulse={activePulse} pulseColor={activePulse && riskColor(activePulse.risk)}
           reveal={activePulse && codes.size === 1}
           markers={edgeMarkers(length, memberships)}
           detail={showDetails && (active || edges.length <= 12)
-            ? { x: midpoint[0], y: midpoint[1], count: rows.length } : undefined} />;
+            ? { x: midpoint[0], y: midpoint[1], count: rows.length,
+              text: context ? `${transactionRoleLabels.context} ${rows.length}건`
+                : contextRows ? `${rows.length}건 · ${transactionRoleLabels.context} ${contextRows}건` : undefined } : undefined} />;
       })}
       {owners.map(owner => {
         const accounts = owner.accounts.filter(account => shownAccounts.has(account.id));
@@ -232,7 +238,7 @@ export function OwnerGraphTimeline({
             const pressed = selection === id || selection === owner.selection || selectedAccounts?.has(id) === true;
             return <OwnerFlowAccount key={id} design={design} id={id} owner={owner.name} x={owner.x} y={ownerAccountY(account)}
               width={ownerWidth} height={ownerRowHeight} offset={offsetFor(id)} pressed={pressed}
-              muted={!isHighlighted(rows)} dragging={activeId === id} incoming={incoming} outgoing={outgoing}
+              muted={!isHighlighted(rows)} context={rows.every(isContextTransaction)} dragging={activeId === id} incoming={incoming} outgoing={outgoing}
               color={riskColor(ownerTransferRisk(rows))} shared={sharedBy > 1 ? sharedBy : undefined}
               badge={{ width: markerDesign.badgeWidth, height: markerDesign.badgeHeight }}
               onSelect={() => onNodeSelect(id)} dragHandlers={dragHandlers(id)} />;

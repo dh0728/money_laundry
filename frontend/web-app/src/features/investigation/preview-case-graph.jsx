@@ -20,8 +20,8 @@ import { SankeyChart, SankeyLink, SankeyNode, SankeyTooltip } from '../../compon
 import { TooltipContent } from '../../components/charts/charts/tooltip/tooltip-content';
 import { caseSankeyGraph, caseSankeyLayers, layoutCaseSankey } from './case-sankey-data';
 import { complexSankeySampleCode } from '../../mocks/dashboard-fixtures';
-import { buildCaseNetwork, casePlaybackCursor, graphRiskBand, graphTableSelection, graphVerdict, graphVerdictLabels,
-  mergeCaseTransactions, sharedCaseEvidence, transactionsWithinHops } from './case-graph-scope';
+import { buildCaseNetwork, casePlaybackCursor, contextOnly, graphRiskBand, graphTableSelection, graphVerdict, graphVerdictLabels,
+  isContextTransaction, mergeCaseTransactions, sharedCaseEvidence, transactionRoleLabels, transactionsWithinHops } from './case-graph-scope';
 import { CountTag, LinkTag, ModelScoreTag } from '../../components/semantic-tags';
 import { assignCaseColorSlots, caseGroupColor, caseGroupShape, caseMembership, caseShapeClip } from '../graph/graph-case-groups';
 import { ForceCaseCanvas } from '../graph/force-case-canvas';
@@ -54,7 +54,7 @@ function riskLegend() {
 const hopSteps = [1, 2, 3, 4, 5];
 const allGraphRelations = ':all-relations:';
 
-function GraphSettings({ id, groups, showDetails, onDetailsChange, showContext, onContextChange, ownerView, sankeyView, anchor, hops, onHopsChange,
+function GraphSettings({ id, groups, showDetails, onDetailsChange, showContext, onContextChange, hasContext, ownerView, sankeyView, anchor, hops, onHopsChange,
   network, selection, onSelect, shownCases, highlightedCase, onHighlight, hiddenCases, onVisibilityChange,
   showSankeySample, accountCount, ownerCount }) {
   const trigger = useRef(null);
@@ -117,6 +117,15 @@ function GraphSettings({ id, groups, showDetails, onDetailsChange, showContext, 
         <Text as="span"><SquishSwitchControl id="case-graph-context" label="주변 거래 표시"
           checked={showContext} onChange={onContextChange} /></Text>
       </Box>
+      {showContext && hasContext && <Box as="ul" className="preview-graph-role-legend" aria-label="거래 구분">
+        <Box as="li"><Text as="i" className="preview-graph-role-mark" data-graph-role="subject" data-graph-lens={sankeyView ? 'sankey' : 'line'}
+          aria-hidden="true" />{transactionRoleLabels.subject} · 이 Alert에서 판정하는 거래</Box>
+        <Box as="li"><Text as="i" className="preview-graph-role-mark" data-graph-role="context" data-graph-lens={sankeyView ? 'sankey' : 'line'}
+          aria-hidden="true" />{transactionRoleLabels.context} · {sankeyView ? '흐린 띠' : '흐린 점선'}</Box>
+        {!sankeyView && <Box as="li"><Text as="i" className="preview-graph-role-mark" data-graph-role="context-account"
+          data-graph-lens={ownerView ? 'owner' : 'line'} aria-hidden="true" />
+          {ownerView ? '점선 테두리 계좌' : '속이 빈 원'} · {transactionRoleLabels.context}에만 나오는 계좌</Box>}
+      </Box>}
       <Box className="preview-graph-picker">
         <Box as="label" htmlFor="case-graph-selection">계좌·연결 선택</Box>
         <FormDropdown id="case-graph-selection" value={selection ?? allGraphRelations} disabled={!network.nodes.length}
@@ -183,6 +192,12 @@ function DirectTransferChart({ flow, layers, returnLinks, linkAction, flowPulse,
   const scoreRow = entry => ({ label: '최고 모델 점수', value: flowRiskLabel(entry), color: flowRiskColor(entry) });
   const { offsetFor, nodeHandlers, activeId } = useSpringNodeDrag(zoom);
   const nodeOffset = index => offsetFor(nodes[index]?.name);
+  const contextOpacity = readChartNumber('--case-graph-sankey-link-opacity', 0.68)
+    * readChartNumber('--case-graph-context-opacity', .4);
+  const roleRows = link => link.contextCodes?.size ? [
+    { label: transactionRoleLabels.subject, value: `${link.codes.size - link.contextCodes.size}건`, color: flowRiskColor(link) },
+    { label: transactionRoleLabels.context, value: `${link.contextCodes.size}건`, color: flowRiskColor(link) },
+  ] : [];
   return <Box as="figure" className="preview-graph-sankey" data-export-visualization style={{ '--sankey-lanes': lanes }}
     aria-label={`송금에서 수취로 · 계좌 ${nodes.length}개 · 경로 ${links.length}개`}>
     <Box as="figcaption">띠 두께 · 거래 건수</Box>
@@ -193,6 +208,7 @@ function DirectTransferChart({ flow, layers, returnLinks, linkAction, flowPulse,
       animationDuration={0} enterTransition={instantChartTransition}>
       <SankeyLink reveal={false} getLinkColor={flowRiskColor} getNodeOffset={nodeOffset}
         strokeOpacity={readChartNumber('--case-graph-sankey-link-opacity', 0.68)}
+        getLinkOpacity={link => contextOnly(link) ? contextOpacity : undefined}
         linkAction={linkAction}
         renderLinkOverlay={(link, path, width) => {
           const pulseWidth = Math.max(2, Math.min(8, width * 0.28));
@@ -200,7 +216,7 @@ function DirectTransferChart({ flow, layers, returnLinks, linkAction, flowPulse,
             return <GraphFlowStroke key={flowPulse.startedAt} path={path} pulse={flowPulse}
               color={`var(--case-graph-risk-${flowPulse.risk})`} width={pulseWidth} />;
           }
-          return playing || flowPulse ? null : <GraphFlowStroke path={path} color={flowRiskColor(link)}
+          return playing || flowPulse || contextOnly(link) ? null : <GraphFlowStroke path={path} color={flowRiskColor(link)}
             width={pulseWidth} ambientDelay={(link.index % 8) * .22} />;
         }} />
       <SankeyNode getNodeColor={flowRiskColor} lineCap={space(4)} showValueLabels={false}
@@ -218,7 +234,7 @@ function DirectTransferChart({ flow, layers, returnLinks, linkAction, flowPulse,
         nodeContent={({ node }) => <TooltipContent title={node.name}
           rows={[...amountRows('송금 합계', node.outgoing), ...amountRows('수취 합계', node.incoming), scoreRow(node)]} />}
         linkContent={({ link }) => <TooltipContent title={`${link.source.name} → ${link.target.name}`}
-          rows={[{ label: '거래 건수', value: `${link.value}건`, color: flowRiskColor(link) },
+          rows={[{ label: '거래 건수', value: `${link.value}건`, color: flowRiskColor(link) }, ...roleRows(link),
             ...amountRows('송금액', link.amounts), scoreRow(link)]} />} />
     </SankeyChart>
   </Box>;
@@ -659,7 +675,8 @@ function CaseGraph({ active, candidates, lens, related, evidenceHost, accountsHo
             <Box as="header" className="preview-graph-center-heading">
               <GraphSettings id={settingsId} groups={groups}
                 showDetails={showDetails} onDetailsChange={setShowDetails}
-                showContext={showContext} onContextChange={setShowContext} ownerView={ownerView} sankeyView={sankeyView} anchor={anchor} hops={hops}
+                showContext={showContext} onContextChange={setShowContext}
+                hasContext={transactions.some(isContextTransaction)} ownerView={ownerView} sankeyView={sankeyView} anchor={anchor} hops={hops}
                 onHopsChange={setHops} network={currentGraph} selection={selected ? selection : tableTarget?.id} onSelect={select}
                 showSankeySample={sankeyView && active?.code !== complexSankeySampleCode}
                 shownCases={shownCases} highlightedCase={shownHighlight}

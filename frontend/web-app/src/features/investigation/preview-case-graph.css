@@ -333,6 +333,34 @@
   font-size: var(--aml-type-caption-size);
 }
 .preview-graph-settings .preview-graph-legend li { gap: var(--aml-space-4) }
+.preview-graph-role-legend {
+  display: grid;
+  row-gap: var(--aml-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--aml-type-caption-size);
+}
+.preview-graph-settings .preview-graph-role-legend li { display: flex; align-items: center; gap: var(--aml-space-6) }
+.preview-graph-role-mark { flex: none; display: inline-block; inline-size: var(--aml-space-16); block-size: 0 }
+.preview-graph-role-mark[data-graph-role="subject"][data-graph-lens="line"] { border-block-start: var(--case-graph-role-mark-stroke) solid var(--text) }
+.preview-graph-role-mark[data-graph-role="context"][data-graph-lens="line"] {
+  border-block-start: var(--case-graph-role-mark-stroke) dashed var(--text);
+  opacity: var(--case-graph-context-opacity);
+}
+.preview-graph-role-mark[data-graph-lens="sankey"] { block-size: var(--aml-space-6); background: var(--text) }
+.preview-graph-role-mark[data-graph-role="context"][data-graph-lens="sankey"] { opacity: var(--case-graph-context-opacity) }
+.preview-graph-role-mark[data-graph-role="context-account"] {
+  inline-size: var(--aml-space-8);
+  block-size: var(--aml-space-8);
+  border: var(--aml-stroke-focus) solid var(--text);
+  border-radius: var(--aml-radius-full);
+}
+.preview-graph-role-mark[data-graph-role="context-account"][data-graph-lens="owner"] {
+  inline-size: var(--aml-space-16);
+  border-style: dashed;
+  border-radius: var(--aml-radius-small);
+}
 .preview-graph-settings .preview-graph-lens-note { font-size: var(--aml-type-caption-size); overflow-wrap: normal }
 .preview-evidence-canvas {
   width: 100%;
@@ -375,6 +403,17 @@
   pointer-events: none;
 }
 .preview-owner-timeline [data-muted] { opacity: var(--case-graph-owner-muted-opacity) }
+/* 주변 거래로만 이루어진 선은 흐린 점선, 계좌는 점선 테두리와 속이 빈 연결점으로 그린다. */
+.owner-time-edge[data-context]:not([aria-pressed="true"]) .owner-edge-visible { opacity: var(--case-graph-context-opacity) }
+.owner-time-edge[data-context] .owner-edge-visible {
+  stroke-linecap: butt;
+  stroke-dasharray: var(--case-graph-context-dash) var(--case-graph-context-gap);
+}
+.owner-time-node[data-context] > rect {
+  stroke: var(--owner-account-ink);
+  stroke-dasharray: var(--case-graph-context-dash) var(--case-graph-context-gap);
+}
+.owner-time-node[data-context] .owner-account-port { fill: var(--information-panel-surface); stroke: var(--owner-account-ink) }
 .owner-time-edge:focus-visible .owner-edge-hit { stroke: var(--brand-accent-tint) }
 .preview-owner-timeline :is(.owner-lane-control, .owner-time-node) text {
   dominant-baseline: central;

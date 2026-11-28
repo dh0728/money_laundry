@@ -43,16 +43,18 @@ export function makeGraphSnapshot({ width, height, nodes, edges, markers = [] })
     element.textContent = text;
     return element;
   };
-  for (const { path, stroke, width: thickness, text, x, y, textColor = stroke } of edges) {
-    drawing.append(svg('path', { d: path, fill: 'none', stroke, 'stroke-width': thickness, 'stroke-linecap': 'round' }));
+  for (const { path, stroke, width: thickness, text, x, y, textColor = stroke, dash, opacity = 1 } of edges) {
+    drawing.append(svg('path', { d: path, fill: 'none', stroke, 'stroke-width': thickness, opacity,
+      'stroke-linecap': dash ? 'butt' : 'round', ...(dash ? { 'stroke-dasharray': dash.join(' ') } : {}) }));
     if (text) drawing.append(label(text, { x, y: y - 4, fill: textColor }));
   }
   for (const { x, y, r, shape, fill, stroke, strokeWidth, opacity } of markers) {
     drawing.append(svg('path', { d: caseShapePath(shape, x, y, r), fill, opacity,
       ...(stroke ? { stroke, 'stroke-width': strokeWidth, 'stroke-linejoin': 'round' } : {}) }));
   }
-  for (const { x, y, r, fill, stroke, text, textColor, ring, badge, badgeFill, badgeInk, badgeHeight } of nodes) {
-    drawing.append(svg('circle', { cx: x, cy: y, r, fill, ...(stroke ? { stroke, 'stroke-width': 2 } : {}) }));
+  for (const { x, y, r, fill, stroke, outline, outlineWidth, text, textColor, ring, badge, badgeFill, badgeInk, badgeHeight } of nodes) {
+    drawing.append(svg('circle', { cx: x, cy: y, r, fill,
+      ...(outline ? { stroke: outline, 'stroke-width': outlineWidth } : {}), ...(stroke ? { stroke, 'stroke-width': 2 } : {}) }));
     if (ring) {
       const reach = r + 3;
       const circumference = 2 * Math.PI * reach;

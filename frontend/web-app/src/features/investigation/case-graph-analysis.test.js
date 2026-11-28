@@ -1,7 +1,8 @@
 import { createElement } from 'react';
 import { act, fireEvent, renderHook, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { buildCaseNetwork, graphRiskBand, graphTableSelection, graphVerdict, transactionsWithinHops } from './case-graph-scope';
+import { buildCaseNetwork, contextOnly, graphRiskBand, graphTableSelection, graphVerdict, transactionRoleLabel,
+  transactionRoleSummary, transactionsWithinHops } from './case-graph-scope';
 import { caseAccountLayout } from './case-pattern-layout';
 import { caseSankeyGraph, layoutCaseSankey } from './case-sankey-data';
 import { sankeyLinkPath } from '@/components/charts/charts/sankey/sankey-path';
@@ -124,6 +125,34 @@ describe('case graph analysis', () => {
     expect(ownerGraph.edges[0].codes.size).toBe(3);
     expect(graphVerdict(ownerGraph.edges[0].verdicts)).toBe('mixed');
     expect(ownerGraph.edges[0].peakScore).toBe(90);
+  });
+
+  it('marks accounts and connections made only of nearby (CONTEXT) transactions', () => {
+    const subject = row => ({ ...row, reviewRole: 'SUBJECT' });
+    const context = row => ({ ...row, reviewRole: 'CONTEXT' });
+    const rows = [
+      subject(transfer('T1', account('A'), account('B'), 90)),
+      context(transfer('T2', account('A'), account('B'), 99)),
+      context(transfer('T3', account('B'), account('C'), 98)),
+      transfer('T4', account('C'), account('D'), 50),
+    ];
+    const network = buildCaseNetwork(rows);
+    const edge = id => network.edges.find(entry => entry.id === id);
+    const node = id => network.nodes.find(entry => entry.id === id);
+    expect([...edge('A>B').contextCodes]).toEqual(['T2']);
+    expect(contextOnly(edge('A>B'))).toBe(false);
+    expect(contextOnly(edge('B>C'))).toBe(true);
+    // 역할이 없는 거래는 판정 거래로 본다.
+    expect(contextOnly(edge('C>D'))).toBe(false);
+    expect(contextOnly(node('B'))).toBe(false);
+    expect(contextOnly(node('C'))).toBe(false);
+    expect(contextOnly(buildCaseNetwork(rows.slice(0, 3)).nodes.find(entry => entry.id === 'C'))).toBe(true);
+    expect(rows.map(transactionRoleLabel)).toEqual(['판정 거래', '주변 거래', '주변 거래', '판정 거래']);
+    expect(transactionRoleSummary(rows)).toBe('판정 거래 2건 · 주변 거래 2건');
+    expect(transactionRoleSummary(rows.slice(0, 1))).toBeUndefined();
+    const sankey = caseSankeyGraph(rows);
+    expect(sankey.links.map(link => [link.codes.size, link.contextCodes.size, contextOnly(link)]))
+      .toEqual([[2, 1, false], [1, 1, true], [1, 0, false]]);
   });
 
   it('selects direct node evidence, owner accounts, and the chosen timed edge', () => {
@@ -323,11 +352,25 @@ describe('case graph analysis', () => {
       expect(node('C1')).not.toBeInTheDocument();
       expect(checkbox(rows[1].code)).not.toBeInTheDocument();
       expect(checkbox(rows[0].code)).toBeInTheDocument();
+      expect(graph.queryByRole('columnheader', { name: /구분/ })).not.toBeInTheDocument();
+      expect(graph.queryByRole('list', { name: '거래 구분' })).not.toBeInTheDocument();
       fireEvent.click(toggle);
       expect(node('C1')).toBeInTheDocument();
       expect(checkbox(rows[1].code)).toBeInTheDocument();
+      // 켜면 표의 '구분' 칸과 그래프 범례로 판정 거래와 주변 거래를 나눈다.
+      expect(graph.getByRole('columnheader', { name: /구분/ })).toBeInTheDocument();
+      const rowOf = code => checkbox(code).closest('tr');
+      expect(rowOf(rows[0].code)).toHaveAttribute('data-review-role', 'subject');
+      expect(within(rowOf(rows[0].code)).getByText('판정 거래')).toBeInTheDocument();
+      expect(rowOf(rows[1].code)).toHaveAttribute('data-review-role', 'context');
+      expect(within(rowOf(rows[1].code)).getByText('주변 거래')).toBeInTheDocument();
+      const legend = graph.getByRole('list', { name: '거래 구분' });
+      expect(legend).toHaveTextContent('판정 거래 · 이 Alert에서 판정하는 거래');
+      expect(legend).toHaveTextContent('주변 거래 · 흐린 점선');
+      expect(legend).toHaveTextContent('속이 빈 원 · 주변 거래에만 나오는 계좌');
       fireEvent.click(toggle);
       expect(node('C1')).not.toBeInTheDocument();
+      expect(graph.queryByRole('columnheader', { name: /구분/ })).not.toBeInTheDocument();
     } finally {
       delete document.documentElement.dataset.reducedMotion;
       await act(async () => { cleanup?.(); });

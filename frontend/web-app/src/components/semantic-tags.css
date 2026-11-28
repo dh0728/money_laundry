@@ -70,6 +70,14 @@
   --tag-fill: var(--information-panel-surface);
   --tag-ink: var(--text);
 }
+/* Alert 구성원 구분: 판정 거래는 기본 태그, 주변 거래는 흐린 회색 점선 태그. */
+.semantic-tag[data-tag="transaction-role"] { font: bold var(--aml-type-caption-size)/var(--aml-type-label-lineHeight) var(--aml-font-family) }
+.semantic-tag[data-tag="transaction-role"][data-role="context"] {
+  --tag-fill: var(--information-panel-surface);
+  --tag-ink: var(--muted-text);
+  outline: var(--aml-stroke-control) dashed var(--muted-text);
+  outline-offset: calc(-1 * var(--aml-stroke-control));
+}
 .semantic-tag-icon {
   flex: 0 0 var(--compact-icon-size);
   inline-size: var(--compact-icon-size);

@@ -354,6 +354,10 @@
   --case-graph-owner-boundary-stroke: 1.5px;
   --case-graph-owner-port-stroke: 1.25px;
   --case-graph-owner-muted-opacity: .25;
+  --case-graph-context-opacity: .4;
+  --case-graph-context-dash: 6;
+  --case-graph-context-gap: 5;
+  --case-graph-role-mark-stroke: 3px;
   --graph-flow-travel-duration: 560ms;
   --graph-flow-reveal-duration: 480ms;
   --graph-flow-ambient-duration: 8s;
