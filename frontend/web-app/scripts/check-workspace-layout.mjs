@@ -34,8 +34,13 @@ function layoutFailures({ pathname, table, selected, list, pageButtons }) {
         tools.some((tool, index) => index > 0 && Math.abs(tool.getBoundingClientRect().top - tools[0].getBoundingClientRect().top) > 1)) {
       failures.push('Workspace tools must share one row at the top of the screen, with page download last.');
     }
-    if (pathname.startsWith('/dashboard/') && tools.map(tool => tool.dataset.queryTool).join() !== 'period,filter,sort,download') {
-      failures.push('The dashboard tools must include period, filter, sort, and download.');
+    if (pathname.startsWith('/dashboard/') && tools.map(tool => tool.dataset.queryTool).join() !== 'period,filter,download') {
+      failures.push('The dashboard tools must include period, filter, and download.');
+    }
+    // 대시보드의 정렬은 적용 대상인 보드 섹션 제목 옆에 둔다.
+    if (pathname.startsWith('/dashboard/') && document.querySelector('[data-dashboard-sort-host]') &&
+        !findVisible('[data-dashboard-sort-host] [data-query-tool="sort"]', document).length) {
+      failures.push('The dashboard sort must sit beside the board section it applies to.');
     }
   }
 

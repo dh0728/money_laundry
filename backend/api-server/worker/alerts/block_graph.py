@@ -3,8 +3,9 @@
 Implements P0-P7 of worktable/alert_motif_design.md §7: pinning, hubs, faces/stars/
 RELAY, PASS/PATH/BRIDGE flow relations, capped Kruskal assembly, CLOSURE walks,
 single-seed shapes (policy, default on) and the output contract. Non-seed hops of
-PATH, BRIDGE, CLOSURE and shapes become CONNECTION members; context is never a
-member. No labels, persistence or review state.
+PATH, BRIDGE, CLOSURE and shapes become CONNECTION members. CONTEXT members are the
+core accounts' scored neighbours in the padded span (_Build.context); they never shape
+a block. No labels, persistence or review state.
 
 block-pin-2 keeps every decision within the policy's time limits (BRIDGE time clusters,
 
@@ -81,6 +82,12 @@ class BlockPolicy:
     hub_max_seed_share_percent: int = 20
     hub_window_us: int = 72 * HOUR_US
     context_pad_us: int = 24 * HOUR_US
+    # CONTEXT (user decision 2026-11-27): transactions of any core account within
+    # [first core - pad, last core + pad] whose model score (p_laundering) is at least
+    # context_score_min (the caller supplies them: build_block_graphs context_eligible),
+    # at most context_max per block, highest score first.
+    context_score_min: float = 0.01
+    context_max: int = 200
     link_max: int = 32
     single_seed_shapes: bool = True
     max_edge_visits: int = 20_000_000
@@ -91,7 +98,7 @@ class BlockPolicy:
                     self.ratio_den, self.pass_margin, self.pass_margin_floor_num,
                     self.pass_margin_floor_den, self.star_gap_us, self.star_width_us,
                     self.star_max, self.star_strong, self.star_min_counterparties, self.relay_window_us,
-                    self.hub_min_activity, self.hub_window_us, self.link_max,
+                    self.hub_min_activity, self.hub_window_us, self.context_max, self.link_max,
                     self.max_edge_visits, self.max_relations, self.walk_scan, self.ear_max,
                     self.bridge_min_mids, self.shape_min_mids, self.shape_min_hops)
         non_negative = (self.relay_lead_us, self.context_pad_us, self.hub_max_seed_share_percent,
@@ -105,6 +112,7 @@ class BlockPolicy:
                 or self.bridge_min_mids < 2 or self.shape_min_mids < 2 or self.shape_min_hops < 2
                 or self.ratio_num >= self.ratio_den
                 or self.hub_max_seed_share_percent > 100
+                or type(self.context_score_min) is not float or not 0 <= self.context_score_min <= 1
                 or self.relay_mode not in ("WEAK", "LINK_ONLY", "STRONG")
                 or self.star_width_us < self.star_gap_us
                 or self.star_max < 2 or self.star_strong < 2 or self.core_max < 2):
@@ -148,7 +156,7 @@ class BlockBatch:
         return tuple(item.tx_id for item in self.unassigned)
 
     def flow_batch(self) -> FlowBatch:
-        """The current publication contract; context is never a member here."""
+        """The current publication contract; context members ride along with each graph."""
         return FlowBatch(tuple(graph.flow_graph() for graph in self.graphs), self.unassigned,
                          self.rejected_relations, 0, self.edge_visits, self.policy_digest)
 
@@ -172,8 +180,12 @@ class _Relation:
 
 
 def build_block_graphs(index: FlowIndex, seed_ids: Iterable[int], policy: BlockPolicy, *,
-                       seed_groups=()) -> BlockBatch:
+                       seed_groups=(), context_eligible=None) -> BlockBatch:
     """Build blocks from already-classified valid seeds.
+
+    ``context_eligible`` maps the transaction IDs that may become CONTEXT members (those
+    scoring at least ``policy.context_score_min``) to their score; None admits every
+    transaction (score unknown, ID order).
 
     ``seed_groups`` items are ``(seed_ids, historical_core_ids, historical_member_ids)``,
     optionally followed by the adopted witnesses of that OPEN Alert (``Witness`` objects
@@ -182,11 +194,11 @@ def build_block_graphs(index: FlowIndex, seed_ids: Iterable[int], policy: BlockP
     never joined (I4); a frozen group neither grows nor lends its seeds.
     """
     policy.validate()
-    return _Build(index, seed_ids, policy, seed_groups).run()
+    return _Build(index, seed_ids, policy, seed_groups, context_eligible).run()
 
 
 class _Build:
-    def __init__(self, index, seed_ids, policy, seed_groups):
+    def __init__(self, index, seed_ids, policy, seed_groups, context_eligible=None):
         edges = index.edges
         if not hasattr(edges, "amount_usd_micros"):
             raise BlockInputError("EdgeTable without amount column")
@@ -199,6 +211,8 @@ class _Build:
         self.ordered_seeds = sorted(self.seeds, key=self.ids.__getitem__)
         self.selfie = {s for s in self.seeds if self.sources[s] == self.targets[s]}
         self.seed_groups = seed_groups
+        self.context_eligible = context_eligible
+        self._scored = None
         self.visits = 0
         self.limits = defaultdict(set)
         self.parent = {s: s for s in self.seeds}
@@ -1157,8 +1171,14 @@ class _Build:
             focal = sorted({account for (account, side), count in degree.items() if count >= 2
                             and not self.is_hub(account, side, first - policy.hub_window_us,
                                                 last + policy.hub_window_us)})
+            context = self.context(core, first - policy.context_pad_us, last + policy.context_pad_us,
+                                   self.reserved_ids[root])
+            if len(context) > policy.context_max:
+                context = context[:policy.context_max]
+                limits.add("CONTEXT_SELECTION")
+            context = tuple(sorted(context))
             graphs.append(BlockGraph(
-                self.tx_tuple(seeds), self.tx_tuple(core - seeds), (), witnesses, tuple(sorted(limits)),
+                self.tx_tuple(seeds), self.tx_tuple(core - seeds), context, witnesses, tuple(sorted(limits)),
                 tuple(sorted((Witness(kind, tx_ids) for (_, kind), tx_ids in links),
                              key=lambda w: (w.kind, w.tx_ids))),
                 tuple(focal), first - policy.context_pad_us, last + policy.context_pad_us,
@@ -1180,6 +1200,54 @@ class _Build:
         self.stats["unassigned"] = len(unassigned)
         return BlockBatch(tuple(graphs), tuple(unassigned), tuple(self.rejected), self.visits, digest,
                           dict(sorted(self.stats.items())))
+
+    def scored_index(self):
+        """account -> (times, positions) of the eligible (scored) transactions, time-sorted.
+
+        Built once from context_eligible (E rows), so a busy account's unscored rows are never
+        scanned: a lookup is O(log E + hits).
+        """
+        if self._scored is None:
+            lists = defaultdict(list)
+            for key in self.context_eligible:
+                try:
+                    pos = self.edges.position(key)
+                except ValueError:  # a score outside the frozen input window
+                    continue
+                entry = (self.times[pos], pos)
+                lists[self.sources[pos]].append(entry)
+                if self.targets[pos] != self.sources[pos]:
+                    lists[self.targets[pos]].append(entry)
+            self._scored = {}
+            for account, entries in lists.items():
+                entries.sort()
+                self._scored[account] = ([at for at, _ in entries], [pos for _, pos in entries])
+        return self._scored
+
+    def context(self, core, low, high, reserved):
+        """Transactions of any core account within [low, high], outside the core and the
+        reserved (historical) members, best first: score descending, then transaction ID.
+
+        Only context_eligible transactions qualify (None: every input row, unscored). These
+        are the block's CONTEXT members: shown with the Alert, never seeds, witnesses or the
+        block's identity.
+        """
+        accounts = {self.sources[pos] for pos in core} | {self.targets[pos] for pos in core}
+        positions = set()
+        if self.context_eligible is None:
+            for account in accounts:
+                for adjacency in (self.index.outgoing, self.index.incoming):
+                    found, begin, end = self.index.interval(adjacency, account, low, high)
+                    positions.update(found[begin:end])
+            score = lambda key: 0.0
+        else:
+            scored = self.scored_index()
+            for account in accounts:
+                times, found = scored.get(account, ((), ()))
+                positions.update(found[bisect_left(times, low):bisect_right(times, high)])
+            score = self.context_eligible.__getitem__
+        keys = [key for key in (self.ids[pos] for pos in positions - core) if key not in reserved]
+        return sorted(keys, key=lambda key: (-score(key), key))
 
     def self_check(self, root, witnesses, core, seeds):
         """Invariants of every published block: I3 (seeds, witnesses), I5 (core_max), I6 (span_max)."""

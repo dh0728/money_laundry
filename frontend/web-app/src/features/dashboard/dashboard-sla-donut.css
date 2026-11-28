@@ -13,18 +13,29 @@
   place-items: center;
   inline-size: min(100%, calc(var(--aml-space-64) * 3 + var(--aml-space-32)));
   aspect-ratio: 1;
+  container-type: size;
 }
 .dashboard-sla-plot > * { grid-area: 1 / 1 }
+/* 원 중앙에는 건수 줄만 맞추고, '미처리' 글자는 그 줄 바로 위에 붙인다 */
 .dashboard-sla-total {
+  position: relative;
   display: grid;
   justify-items: center;
   color: var(--muted-text);
   font-size: var(--aml-type-caption-size);
   pointer-events: none;
 }
+.dashboard-sla-total > span {
+  position: absolute;
+  inset-block-end: 100%;
+  inset-inline-start: 50%;
+  translate: -50% 0;
+  white-space: nowrap;
+}
 .dashboard-sla-total > strong {
   color: var(--text);
-  font-size: var(--workspace-kpi-value-size);
+  /* 원 안쪽 구멍에 들어가게 원 크기에 맞춰 줄인다(큰 화면에서는 기존 크기까지만) */
+  font-size: min(var(--workspace-kpi-value-size), var(--overview-donut-value-size));
   font-weight: var(--aml-type-metric-weight);
   line-height: var(--metric-value-line-height);
   font-variant-numeric: tabular-nums;

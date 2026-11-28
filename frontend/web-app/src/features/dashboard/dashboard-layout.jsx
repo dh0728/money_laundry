@@ -9,6 +9,7 @@ import { AISummaryPanel } from '../../components/ai-summary-panel';
 import { CaseProgressLanes } from '../investigation/preview-case-card';
 import { readWorkspaceGap } from './workspace-metrics';
 import './preview-dashboard.css';
+import './dashboard-today-summary.css';
 import { Box, Grid, Heading, Stack, Text } from '@/components/layout-primitives';
 
 export function DashboardMetricGrid({ items, appearance, loading = false }) {
@@ -20,7 +21,10 @@ export function DashboardMetricGrid({ items, appearance, loading = false }) {
   </Box>;
 }
 
-function DashboardSectionGrid({ title, children, loading = false, downloadEntries = [], ...props }) {
+// 정렬은 보드에만 적용된다. 조회 도구(query-controls)가 정렬 버튼을 이 자리로 옮겨 온다. 적용한 정렬은 버튼 글자로 보인다.
+const boardSortSlot = <Box className="query-bar" data-dashboard-sort-host />;
+
+function DashboardSectionGrid({ title, children, loading = false, downloadEntries = [], tools, ...props }) {
   const [expanded, setExpanded] = useState(true);
   const ref = useRef(null);
   const contentId = useId();
@@ -28,6 +32,7 @@ function DashboardSectionGrid({ title, children, loading = false, downloadEntrie
     download: () => printWorkspace(ref.current.closest('#workspace'), ref.current) }, ...downloadEntries];
   return <Grid as="section" columns={12} aria-label={title} ref={ref} {...props}>
     <SectionDownloadHeading className="dashboard-section-header" headingClassName="dashboard-section-heading" entries={entries}
+      tools={loading ? undefined : tools}
       disclosure={loading ? undefined : { controls: contentId, expanded, onToggle: () => setExpanded(open => !open) }}>
       {title}
     </SectionDownloadHeading>
@@ -48,7 +53,7 @@ export function DashboardWorkGrid(props) {
 }
 
 export function DashboardBoardGrid(props) {
-  return <DashboardSectionGrid title="처리 상태" className="dashboard-board-section" {...props} />;
+  return <DashboardSectionGrid title="처리 상태" className="dashboard-board-section" tools={boardSortSlot} {...props} />;
 }
 
 export function DashboardFocusGrid(props) {
@@ -79,6 +84,21 @@ function LoadingChart({ className = '', chartClass = 'dashboard-proportion-band'
     {showNote && <Skeleton className="dashboard-loading-note" />}
     {children ?? <Skeleton className={chartClass} />}
   </Panel>;
+}
+
+const todayMetricSlots = ['open-alerts', 'overdue', 'episodes', 'handled', 'suspicious'];
+
+function LoadingTodayMetrics() {
+  return <Box as="section" className="dashboard-today-summary">
+    <Grid columns={5} className="dashboard-today-metrics">
+      {todayMetricSlots.map(slot => <Panel as="article" key={slot}>
+        <Stack>
+          <Skeleton className="dashboard-loading-note" />
+          <Skeleton className="dashboard-loading-value" />
+        </Stack>
+      </Panel>)}
+    </Grid>
+  </Box>;
 }
 
 function LoadingSeries({ className, showTools }) {
@@ -122,7 +142,7 @@ export function DashboardAnalyticsSkeleton({ reduced }) {
     <Text as="span" className="visually-hidden" role="status">대시보드 차트 불러오는 중</Text>
     <Box aria-hidden="true" className="dashboard-analytics dashboard-institution-relations">
       <DashboardFocusGrid loading>
-        <LoadingChart className="dashboard-today-summary" chartClass="dashboard-loading-value" />
+        <LoadingTodayMetrics />
         <LoadingChart className="dashboard-priority-queue" chartClass="dashboard-series-plot" />
         <LoadingRecommendation reduced={reduced} />
       </DashboardFocusGrid>

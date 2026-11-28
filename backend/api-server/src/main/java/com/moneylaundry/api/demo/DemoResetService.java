@@ -92,22 +92,41 @@ public class DemoResetService {
             actor))) throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "관리자 전용 기능입니다.");
   }
 
+  // Index-backed maxima: new uploads, transactions, jobs, Alerts/Episodes or review events change
+  // it.
+  private static final String MARKERS =
+      """
+      select concat_ws(':',
+        (select max(upload_id) from ingest.uploads),
+        (select max(tx_id) from ledger.transactions),
+        (select max(job_id) from analysis.jobs),
+        (select max(alert_id) from review.alerts),
+        (select max(episode_id) from review.episodes),
+        (select max(event_id) from review.events))
+      """;
+
+  /**
+   * Planner row estimates, not exact counts: an exact count(*) reads every target table and grew
+   * past the proxy timeout (dev 16 days: 92 s). A table never analyzed (-1) is counted exactly.
+   */
   private Map<String, Long> counts() {
     var counts = new LinkedHashMap<String, Long>();
-    for (String table : TABLES.split(","))
-      counts.put(table, jdbc.queryForObject("select count(*) from " + table, Long.class));
+    for (String table : TABLES.split(",")) {
+      long estimate =
+          jdbc.queryForObject(
+              "select reltuples::bigint from pg_class where oid=?::regclass", Long.class, table);
+      counts.put(
+          table,
+          estimate >= 0
+              ? estimate
+              : jdbc.queryForObject("select count(*) from " + table, Long.class));
+    }
     return counts;
   }
 
-  private String fingerprint(Map<String, Long> counts) {
+  private String fingerprint() {
     try {
-      String value =
-          json.writeValueAsString(counts)
-              + ":"
-              + time.view().get("revision")
-              + ":"
-              + jdbc.queryForObject(
-                  "select coalesce(max(job_id),0) from ops.work_items", Long.class);
+      String value = jdbc.queryForObject(MARKERS, String.class) + ":" + time.view().get("revision");
       return HexFormat.of()
           .formatHex(
               MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
@@ -118,8 +137,7 @@ public class DemoResetService {
 
   public Map<String, Object> preview(long actor) {
     admin(actor);
-    var counts = counts();
-    return Map.of("counts", counts, "snapshot", fingerprint(counts), "clock", time.view());
+    return Map.of("counts", counts(), "snapshot", fingerprint(), "clock", time.view());
   }
 
   public record ResetInput(UUID requestId, String snapshot, String confirmation) {}
@@ -158,8 +176,7 @@ public class DemoResetService {
                     "select exists(select 1 from ops.resets where status<>'COMPLETED')",
                     Boolean.class)))
               throw conflict("RESET_CLEANUP_PENDING", "이전 초기화의 파일 정리를 먼저 완료하세요.");
-            var counts = counts();
-            if (!fingerprint(counts).equals(input.snapshot()))
+            if (!fingerprint().equals(input.snapshot()))
               throw conflict("RESET_PREVIEW_STALE", "데이터가 변경됐습니다. 삭제 대상을 다시 확인하세요.");
             if (Boolean.TRUE.equals(
                 jdbc.queryForObject(
@@ -217,7 +234,7 @@ public class DemoResetService {
                 input.requestId(),
                 actor,
                 scope,
-                json.writeValueAsString(counts));
+                json.writeValueAsString(counts()));
             objects.forEach(
                 (key, prefix) ->
                     jdbc.update(

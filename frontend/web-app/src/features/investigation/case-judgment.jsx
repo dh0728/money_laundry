@@ -188,12 +188,13 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
               options={[
                 { value: 'normal', label: row.kind === 'Alert' ? '정상 종결' : '정상' },
                 { value: 'abnormal', label: row.kind === 'Alert' ? '단독 의심 종결' : '이상' },
-                ...(onTransfer ? [{ value: 'transfer', label: '기존 Episode에 편입' }] : []),
+                ...(onTransfer ? [{ value: 'transfer', label: '기존 Episode에 편입' },
+                  ...(row.kind === 'Alert' ? [{ value: 'create', label: '새 Episode 만들기' }] : [])] : []),
               ]}
               onChange={value => {
-                if (value === 'transfer') {
+                if (value === 'transfer' || value === 'create') {
                   dialog.current.close();
-                  onTransfer();
+                  onTransfer(value === 'create');
                 } else {
                   setVerdict(value);
                 }

@@ -2,6 +2,7 @@ import { validWorkCode } from '../../app/preview-route.js';
 
 import { applyPreviewJudgment } from './case-judgment-data.js';
 import { liveNextEpisodeCode } from './live-data.js';
+import { sharedCaseEvidence } from './case-graph-scope.js';
 
 const storageKey = 'aml-radar-preview-episode-transfers';
 const isAlert = code => validWorkCode(code) && code.startsWith('A-');
@@ -34,6 +35,15 @@ export function canManagePreviewEpisodes(user) {
 
 export function canTransferAlert(row) {
   return row.kind === 'Alert' && row.assigned && row.open && row.verdict === 'unjudged' && !row.episodeCode;
+}
+
+// Alert와 계좌·거래를 공유하면서 함께 묶을 수 있는(내 담당·열림·미판정·미편입) Alert. 공유 거래가 많은 순, 그다음 공유 계좌 순.
+export function previewEpisodeCompanions(cases, row) {
+  return cases.filter(item => item.code !== row.code && canTransferAlert(item))
+    .map(item => ({ item, ...sharedCaseEvidence(row, item) }))
+    .filter(({ transactions, accounts }) => transactions.length || accounts.length)
+    .sort((a, b) => b.transactions.length - a.transactions.length || b.accounts.length - a.accounts.length
+      || a.item.code.localeCompare(b.item.code));
 }
 
 export function previewEpisodeWillDissolve(episode, unlinkCount) {

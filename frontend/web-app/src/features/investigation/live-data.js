@@ -14,6 +14,7 @@ const empty = { transactions: [], cases: [], mine: [], businessAt: undefined };
 let board;
 let source;
 let loading;
+let loadedAt;
 // 서버가 받아들인 조사 시작·판정을 board 를 다시 받기 전에 받아 둔 응답에 먼저 반영한다.
 // 그 동작 전에 출발한 board 응답이 늦게 와도 덮이지 않게 두었다가, 서버 응답에 반영된 것이 보이면 지운다.
 const startedLocally = new Map(); // Alert caseId → 착수 시각
@@ -47,6 +48,14 @@ export function markLiveReviewStarted(caseId) {
 export function markLiveJudged(row, judgment) {
   judgedLocally.set(caseKey(row.kind === 'Episode' ? 'EPISODE' : 'ALERT', row.caseId), judgment);
   applyLocalChanges();
+}
+
+/** 사건마다 화면에 보이는 상태 값을 한 줄로 묶는다. 주기적으로 다시 받은 board 와 비교해 바뀐 건수를 센다. */
+export function liveCaseSignatures() {
+  return new Map((board?.cases ?? []).map(item => [caseKey(item.kind, item.caseId), [
+    item.status, item.outcome, item.assigneeId, item.readAt, item.reviewStartedAt, item.closedAt, item.episodeId,
+    item.dueOn, item.members?.length, item.edits?.length, item.judgment?.id,
+  ].join('|')]));
 }
 
 export const caseCode = item =>
@@ -93,6 +102,7 @@ function caseRow(item, transactions, userId, codes) {
     // 열람 여부는 서버가 기억한다. 방금 연 사건은 다시 받아 오기 전에도 읽은 것으로 보인다.
     unread: assigned && status === '처리 전' && !item.readAt && !wasPreviewCaseRead(code),
     date: dateFromCode(code), createdAt, assignedAt: item.assignedAt, completedAt: item.closedAt ?? undefined,
+    reviewStartedAt: item.reviewStartedAt ?? undefined,
     hour: Number(kstTimestamp(createdAt).slice(11, 13)) - 9, elapsed: item.ageDays,
     score: Math.round((item.summary.riskScore ?? 0) * 100),
     pattern: `${item.summary.primaryType}${share == null ? '' : ` ${Math.round(share * 100)}%`}`,
@@ -143,6 +153,7 @@ export const liveCodes = prefix => prefix === 'T' ? [] : liveSource().cases
 export function loadLiveSource() {
   loading ??= getJson('/api/v1/review/board').then(next => {
     board = next;
+    loadedAt = Date.now();
     applyLocalChanges();
     source = build();
     return source;
@@ -156,8 +167,12 @@ export function rebuildLiveSource() {
   return liveSource();
 }
 
+/** 마지막으로 board 를 받은 시각(ms). 화면의 'N분 전 기준' 표시에 쓴다. */
+export const liveLoadedAt = () => loadedAt;
+
 export function resetLiveSource() {
   board = undefined;
+  loadedAt = undefined;
   source = undefined;
   startedLocally.clear();
   judgedLocally.clear();

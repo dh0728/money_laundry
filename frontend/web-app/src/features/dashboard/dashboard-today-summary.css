@@ -1,24 +1,42 @@
-.dashboard-today-date {
-  margin-inline-start: var(--aml-space-12);
-  font-weight: normal;
-  white-space: nowrap;
-}
-.dashboard-today-metrics > * { gap: var(--aml-space-4) }
+/* 오늘의 업무: 지표 다섯 개를 패널 한 장씩으로 나란히 둔다. */
+.dashboard-today-metrics.aml-grid { gap: var(--workspace-panel-gap) }
+.dashboard-today-metrics .aml-stack { gap: var(--aml-space-4) }
 .dashboard-today-metrics .meter {
   --meter-fill: var(--dashboard-metric-ink, var(--muted-text));
   --meter-height: var(--aml-space-8);
 }
+/* 카드 바탕은 지표 색(tone)을 옅게 깐다. 값이 없거나 0인 카드는 tone이 없어 기본 면 그대로다. */
+.dashboard-today-metrics > [data-kpi-tone] {
+  --panel-material-solid: color-mix(in srgb, var(--information-panel-surface), var(--dashboard-metric-ink) var(--review-lane-tint));
+}
+/* 파랑(진행 중)은 푸른 기본 패널과 가까워서 한 단계 더 진하게 깐다. */
+.dashboard-today-metrics > [data-kpi-tone="in-progress"] {
+  --panel-material-solid: color-mix(in srgb, var(--information-panel-surface), var(--dashboard-metric-ink) var(--kpi-card-info-tint));
+}
+/* 숫자는 글자색으로 두고 위험(suspect)만 지표 색을 쓴다. 0은 흐리게 낮춘다. */
+.dashboard-today-metrics [data-kpi-tone="suspect"] strong { color: var(--dashboard-metric-ink) }
+.dashboard-today-metrics [data-kpi-quiet] strong { color: var(--muted-text) }
+.dashboard-today-empty {
+  color: var(--muted-text);
+  font-size: var(--aml-type-body-size);
+  font-weight: var(--aml-type-body-strong-weight);
+  line-height: var(--workspace-kpi-value-size);
+}
 .dashboard-today-metrics strong {
-  color: var(--dashboard-metric-ink, inherit);
   font-size: var(--workspace-kpi-value-size);
   line-height: var(--metric-value-line-height);
   font-weight: var(--aml-type-metric-weight);
   font-variant-numeric: tabular-nums;
 }
-@media (width < 930px) {
-  .dashboard-today-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)) }
+/* 좁아지면 3장 + 2장, 더 좁으면 2장 + 2장 + 1장으로 줄을 채운다. */
+@media (width < 68rem) {
+  .dashboard-today-metrics { grid-template-columns: repeat(6, minmax(0, 1fr)) }
+  .dashboard-today-metrics > * { grid-column: span 2 }
+  .dashboard-today-metrics > :nth-child(n + 4) { grid-column: span 3 }
 }
 @media (width < 660px) {
   .dashboard-today-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .dashboard-today-metrics > *,
+  .dashboard-today-metrics > :nth-child(n + 4) { grid-column: auto }
+  .dashboard-today-metrics > :last-child { grid-column: 1 / -1 }
 }
-.dashboard-today-metrics.aml-grid { gap: var(--aml-space-24) }

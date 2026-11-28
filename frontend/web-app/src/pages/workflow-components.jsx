@@ -407,12 +407,12 @@ function CaseReviewActions({ overview }) {
       {canManageEpisodes && row.kind === 'Episode' && row.open && row.assigned && Boolean(row.linkedAlertCodes?.length)
         && <PrimaryButton tone="inverse" aria-haspopup="dialog" onClick={() => setEpisodeAction('unlink')}>Alert 연결 해제</PrimaryButton>}
       {episodeAction && <PreviewEpisodeDialog cases={reportData.cases} save={overview.saveEpisode} row={row}
-        bundle={episodeAction === 'bundle' ? bundle : undefined} unlink={episodeAction === 'unlink'}
+        bundle={episodeAction === 'bundle' ? bundle : undefined} unlink={episodeAction === 'unlink'} startNew={episodeAction === 'create'}
         onRelationRequest={episodeAction === 'bundle' ? onRelationRequest : undefined}
         onClose={saved => saved ? overview.refreshEpisode() : setEpisodeAction(null)} />}
       <CaseJudgment actor={user} bundleBlocked={bundleBlocked} onBundle={bundle ? () => setEpisodeAction('bundle') : undefined}
         onRelationRequest={onRelationRequest}
-        onTransfer={!bundleBlocked && canManageEpisodes && canTransferAlert(row) ? () => setEpisodeAction('transfer') : undefined} row={row} startReview={overview.startReview} save={overview.saveJudgment}
+        onTransfer={!bundleBlocked && canManageEpisodes && canTransferAlert(row) ? create => setEpisodeAction(create ? 'create' : 'transfer') : undefined} row={row} startReview={overview.startReview} save={overview.saveJudgment}
         onSavedClose={overview.onJudgmentClose} onReport={overview.onJudgmentReport}
         nextCase={nextReviewCase(reportData?.cases, row.code)} onOpenNext={overview.onJudgmentNext} onOpenList={overview.onJudgmentList} />
     </ScreenActions>

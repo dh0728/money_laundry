@@ -60,6 +60,41 @@ class BlockGraphTests(unittest.TestCase):
         self.assertEqual(graph.focal_accounts, (1,))
         self.assertEqual(batch.flow_batch().graphs[0].seed_ids, (100, 101))
 
+    CONTEXT_ROWS = fan("A", 2) + [  # seeds at 0h and 6h: padded span -24h ~ 30h
+        (300, -20, "X", "A"),     # into the centre
+        (301, 29, "AR1", "Y"),    # out of a spoke
+        (302, 31, "A", "Z"),      # 25h after the last seed: outside
+        (303, -30, "W", "AR0"),   # 30h before the first seed: outside
+        (304, 3, "Q", "R"),       # no core account
+        (305, 27, "V", "AR0"),    # 27h after AR0's own seed but inside the block's span
+    ]
+
+    def context(self, eligible, **options):
+        return build_block_graphs(FlowIndex(table(self.CONTEXT_ROWS)), [100, 101],
+                                  replace(BlockPolicy(), **options), context_eligible=eligible).graphs[0]
+
+    def test_context_is_every_core_account_within_the_padded_span(self):
+        graph = self.context(None)
+        self.assertEqual(graph.seed_ids, (100, 101))
+        self.assertEqual(graph.context_ids, (300, 301, 305))
+        self.assertEqual(graph.flow_graph().context_ids, (300, 301, 305))
+        self.assertNotIn("CONTEXT_SELECTION", graph.limits)
+
+    def test_context_keeps_only_scored_transactions(self):
+        scores = {key: .5 for key in range(300, 306)}
+        del scores[300]
+        scores[100] = .9  # a core transaction is never context
+        self.assertEqual(self.context(scores).context_ids, (301, 305))
+        self.assertEqual(BlockPolicy().context_score_min, 0.01)
+        with self.assertRaises(ValueError):
+            replace(BlockPolicy(), context_score_min=1).validate()
+
+    def test_context_cap_keeps_the_highest_scores(self):
+        graph = self.context({300: .2, 301: .9, 305: .2}, context_max=2)
+        self.assertEqual(graph.context_ids, (300, 301))  # .9 first, then the lower ID of the tie
+        self.assertIn("CONTEXT_SELECTION", graph.limits)
+        self.assertEqual(BlockPolicy().context_max, 200)
+
     def test_star_gap_and_width_cut_intervals(self):
         self.assertEqual(self.build(fan("A", 2, step=96.0), [100, 101]).graphs[0].seed_ids, (100, 101))
         self.assertEqual(self.build(fan("A", 2, step=96.5), [100, 101]).graphs, ())

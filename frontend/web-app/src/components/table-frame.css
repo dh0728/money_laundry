@@ -161,6 +161,11 @@
   background-color: var(--selection-surface);
   color: var(--selection-ink);
 }
+/* 선택된(검정) 행 안의 옅은 태그(tint)는 묻혀서 진한 면으로 되돌린다. */
+.data-table-frame tbody tr[data-selected="true"] .semantic-tag[data-emphasis="tint"] {
+  --tag-fill: var(--tag-solid-fill, var(--tag-pattern-fill));
+  --tag-ink: var(--tag-solid-ink, var(--status-accent-light-ink));
+}
 .data-table-frame[data-invert-selected-controls="true"] tbody tr[data-selected="true"] {
   --divider: var(--selection-divider);
   --hover: var(--selection-hover);

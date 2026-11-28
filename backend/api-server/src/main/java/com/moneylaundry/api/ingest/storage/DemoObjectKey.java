@@ -10,7 +10,7 @@ public final class DemoObjectKey {
     String expression =
         prefix
             ? "(?:requests|results)/[0-9]+/(?:BINARY|TYPE)/[0-9a-f-]{36}/"
-            : "uploads/[0-9]+/[0-9]+/[^/]+";
+            : "uploads/ledger/[0-9]+/[^/]+"; // UploadService key: uploads/ledger/{uploadId}/{file}
     if (!key.matches(expression)) throw new IllegalArgumentException("Invalid cleanup key");
   }
 }

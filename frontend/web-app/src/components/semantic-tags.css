@@ -3,8 +3,8 @@
   --tag-danger-ink: var(--aml-figma-contents-status-danger-default);
   --tag-positive-ink: var(--aml-figma-contents-status-positive-default);
   --tag-caution-ink: var(--aml-figma-contents-status-caution-default);
-  --tag-pattern-fill: var(--selection-surface);
-  --tag-pattern-ink: var(--selection-ink);
+  /* ID·패턴·건수 같은 중립 태그는 놓인 바탕을 글자색으로 살짝 어둡게 한 면이다. 선택색(검정)은 선택 상태에만 쓴다. */
+  --tag-pattern-fill: color-mix(in srgb, currentColor var(--tag-neutral-fill-strength), transparent);
 }
 
 .semantic-tag-group {
@@ -21,7 +21,7 @@
 
 .semantic-tag {
   --tag-fill: var(--tag-pattern-fill);
-  --tag-ink: var(--tag-pattern-ink);
+  --tag-ink: var(--tag-pattern-ink, var(--text));
   --tag-font: var(--aml-type-label-weight) var(--aml-type-label-size)/var(--aml-type-label-lineHeight) var(--aml-font-mono);
   display: inline-flex;
   align-items: center;
@@ -42,14 +42,17 @@
 }
 .semantic-tag[data-tone="danger"] {
   --tag-solid-fill: var(--status-danger-accent);
+  --tag-tint-ink: var(--tag-danger-ink);
 }
 .semantic-tag[data-tone="positive"] {
   --tag-solid-fill: var(--status-positive-accent);
   --tag-solid-ink: var(--status-accent-dark-ink);
+  --tag-tint-ink: var(--tag-positive-ink);
 }
 .semantic-tag[data-tone="caution"] {
   --tag-solid-fill: var(--status-caution-accent);
   --tag-solid-ink: var(--status-accent-dark-ink);
+  --tag-tint-ink: var(--tag-caution-ink);
 }
 .semantic-tag[data-tone="pending"] {
   --tag-solid-fill: var(--status-pending-accent);
@@ -63,8 +66,25 @@
 .semantic-tag[data-emphasis="solid"][data-tone]:not([data-tone="neutral"]) {
   --tag-ink: var(--tag-solid-ink, var(--status-accent-light-ink));
 }
+/* 위험 점수·경과일 태그(tint): 지표색을 옅게 깐 바탕에 같은 계열의 진한 글자. 색 있는 카드 위에서도 비치도록 반투명으로 깐다. */
+.semantic-tag[data-emphasis="tint"] {
+  --tag-fill: color-mix(in srgb, var(--tag-solid-fill, var(--text)) var(--tag-tint-strength), transparent);
+  --tag-ink: var(--tag-tint-ink, var(--text));
+}
+/* 선택된(검정) 카드·목록 항목 안에서는 옅은 바탕이 묻혀서 진한 면으로 되돌린다. 표의 선택 행은 table-frame.css에 둔다. */
+:is([data-glow-surface][data-selected], .animated-list__item[data-selected]) .semantic-tag[data-emphasis="tint"] {
+  --tag-fill: var(--tag-solid-fill, var(--tag-pattern-fill));
+  --tag-ink: var(--tag-solid-ink, var(--status-accent-light-ink));
+}
 .semantic-tag[data-tag="model-score"] {
   padding-inline: var(--aml-space-4);
+}
+/* 패턴 이름 뒤 확률은 한 단계 흐리게 둔다. */
+.semantic-tag[data-tag="pattern"] > span + span { color: var(--muted-text) }
+/* 담당자는 분류가 아니라 이름이라 면 없이 아이콘과 글자만 둔다. */
+.semantic-tag[data-tag="case-actor"] {
+  --tag-fill: transparent;
+  padding-inline: 0;
 }
 .semantic-tag[data-tag="pattern"][data-emphasis="subtle"] {
   --tag-fill: var(--information-panel-surface);
@@ -109,8 +129,9 @@
   --review-status-accent: var(--review-status-done-accent);
 }
 .button.semantic-tag[data-tag="link"] {
-  --button-hover-bg: var(--tag-ink);
-  --button-active-bg: var(--tag-ink);
+  --tag-hover-fill: color-mix(in srgb, currentColor var(--tag-neutral-hover-strength), transparent);
+  --button-hover-bg: var(--tag-hover-fill);
+  --button-active-bg: var(--tag-hover-fill);
   flex: 0 0 auto;
   block-size: auto;
   min-block-size: calc(var(--aml-type-label-lineHeight) + 2 * var(--aml-space-2));
@@ -127,8 +148,7 @@
   vertical-align: middle;
 }
 .button.semantic-tag[data-tag="link"]:is(:hover, :focus-visible, :active) {
-  background-color: var(--tag-ink);
-  color: var(--tag-fill);
+  background-color: var(--tag-hover-fill);
 }
 .button.semantic-tag[data-tag="link"][data-record-link] {
   padding-inline: var(--aml-space-8);
@@ -136,17 +156,17 @@
 }
 .button.semantic-tag[data-tag="link"] code { font-size: inherit; font-weight: inherit }
 
+/* 적용한 조회 조건 칩. 조건을 적용한 도구 버튼과 같은 옅은 파란 면의 알약이고, 선택색(검정)은 쓰지 않는다. */
 .semantic-tag[data-tag="filter"] {
-  --tag-fill: var(--selection-surface);
-  --tag-ink: var(--selection-ink);
-  --focus-ring: var(--tag-ink);
+  --tag-fill: color-mix(in srgb, var(--status-info-accent) var(--query-applied-tint), transparent);
+  --tag-ink: var(--text);
   min-block-size: var(--aml-size-control-compact);
   block-size: auto;
   max-inline-size: 100%;
   align-items: stretch;
   gap: 0;
   padding: 0;
-  border: var(--aml-stroke-control) solid color-mix(in srgb, var(--tag-ink) var(--tag-filter-border-ink-strength), var(--tag-fill));
+  border-radius: var(--aml-radius-full);
   background: var(--tag-fill);
   color: var(--tag-ink);
   font: var(--tag-font);
@@ -162,17 +182,17 @@
   --button-active-bg: color-mix(in srgb, var(--tag-ink) var(--tag-filter-press-ink-strength), var(--tag-fill));
 }
 .filter-tag-label {
-  padding: var(--aml-space-4) var(--aml-space-8);
+  padding: var(--aml-space-4) var(--aml-space-4) var(--aml-space-4) var(--aml-space-12);
   white-space: normal;
   overflow-wrap: anywhere;
   text-align: start;
 }
 .filter-tag-remove {
   justify-content: center;
-  inline-size: var(--aml-space-24);
+  inline-size: var(--aml-size-control-compact);
   flex: none;
   padding: 0;
-  border-inline-start: var(--aml-stroke-divider) solid var(--selection-divider);
+  color: var(--muted-text);
 }
 
 .active-query-tags { display: flex; flex-wrap: wrap; align-items: center; gap: var(--aml-space-8) }
