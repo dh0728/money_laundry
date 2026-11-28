@@ -3,12 +3,11 @@ import GlideSelect from '../../components/react-bits/GlideSelect';
 import { Textarea } from '../../components/ui/textarea';
 import { ActionButton, ConfirmHoldButton, PrimaryButton } from '../../components/primary-button';
 import { DialogFrame } from '../../components/dialog-parts';
-import { Callout } from '../../components/Callout';
 import { canJudgePreviewCase, canStartPreviewReview, judgmentReasonLabels, judgmentTextLimit, validJudgmentDetails } from './case-judgment-data';
 import { enableBackdropDismissal } from '../../lib/overlay-dismissal.js';
 import { CountTag, ModelScoreTag, PatternTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
 import './case-judgment.css';
-import { Box, LineBreak, Text } from '../../components/layout-primitives';
+import { Box, Text } from '../../components/layout-primitives';
 
 function JudgmentTarget({ row, showVerdict = false }) {
   return <Box as="li" className="semantic-tag-group">
@@ -40,8 +39,8 @@ function JudgmentDetails({ evidence, observations, reason }) {
   </Box>;
 }
 
-export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onReport, onBundle, onTransfer, bundleBlocked, onRelationRequest,
-  nextCase, onOpenNext, onOpenList }) {
+// Episode 묶기는 'Episode로 묶기' 버튼(PreviewEpisodeDialog)이 맡는다. 이 창은 판정만 한다.
+export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onReport, nextCase, onOpenNext, onOpenList }) {
   const dialog = useRef(null);
   const title = useRef(null);
   const [verdict, setVerdict] = useState('');
@@ -50,13 +49,12 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
   const [confirm, setConfirm] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
-  const [requestSent, setRequestSent] = useState(false);
   const [starting, setStarting] = useState(false);
   const pending = row.status === '처리 전';
   const canStart = canStartPreviewReview(row, actor);
-  const actionLabel = pending && !onBundle && !bundleBlocked ? '조사 시작' : '판정';
+  const actionLabel = pending ? '조사 시작' : '판정';
   const eligible = canJudgePreviewCase(row, actor);
-  const actionEnabled = Boolean(bundleBlocked || onBundle) || (pending ? canStart : eligible && !result);
+  const actionEnabled = pending ? canStart : eligible && !result;
   const reasonLabel = judgmentReasonLabels[reasonCategory];
   const details = { rationale };
   const valid = eligible && (verdict === 'normal' || verdict === 'abnormal') && Boolean(reasonLabel)
@@ -79,11 +77,7 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
   }
 
   function open() {
-    if (onBundle) {
-      onBundle();
-      return;
-    }
-    if (pending && !bundleBlocked) {
+    if (pending) {
       begin();
       return;
     }
@@ -98,7 +92,6 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
     setRationale('');
     setConfirm(false);
     setError('');
-    setRequestSent(false);
   }
 
   function submit(event) {
@@ -131,17 +124,13 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
   return <>
     <PrimaryButton tone="brand" className="case-judgment-trigger" disabled={!actionEnabled || starting}
       aria-busy={starting || undefined}
-      aria-haspopup={pending && !onBundle && !bundleBlocked ? undefined : 'dialog'}
-      aria-controls={onBundle ? 'case-bundle-dialog' : pending && !bundleBlocked ? undefined : 'case-judgment-dialog'}
+      aria-haspopup={pending ? undefined : 'dialog'}
+      aria-controls={pending ? undefined : 'case-judgment-dialog'}
       onHold={open}>{actionLabel}</PrimaryButton>
     <DialogFrame id="case-judgment-dialog" className="case-judgment-dialog" ref={dialog} onClose={close} onSubmit={submit}
       titleId="case-judgment-title" titleRef={title} closeLabel="판정 창 닫기"
       title={result ? '판정 완료' : confirm ? '판정 내용 확인' : `${row.kind} 판정`}
       actions={<>
-        {bundleBlocked && canStart && <ActionButton shape="pill" surface="floating" disabled={starting}
-          onClick={begin}>조사 시작</ActionButton>}
-        {onRelationRequest && !requestSent && <ActionButton shape="pill" surface="floating"
-          onClick={() => onRelationRequest(rationale.trim(), () => setRequestSent(true))}>관리자에게 요청 보내기</ActionButton>}
         {result ? <>
           {/* 판정을 마치면 대시보드를 거치지 않고 다음 건이나 보던 목록으로 바로 간다. */}
           {onOpenList && <ActionButton shape="pill" surface="floating" onClick={onOpenList}>{row.kind} 목록으로</ActionButton>}
@@ -163,11 +152,6 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
           </>}
       </>}>
       <Box className="case-judgment-body">
-        {bundleBlocked && <Callout className="case-judgment-bundle-notice">
-          <Text as="strong">Episode 편입 전 확인</Text><LineBreak />
-          {bundleBlocked}
-        </Callout>}
-        {requestSent && <Text role="status">관리자에게 연관 업무 검토 요청을 보냈습니다.</Text>}
         <JudgmentTargets row={row} />
         {result ? <Box className="case-judgment-summary">
           <Text role="status"><Text as="code">{result.id}</Text>에 판정이 저장되었습니다.</Text>
@@ -188,17 +172,8 @@ export function CaseJudgment({ row, actor, startReview, save, onSavedClose, onRe
               options={[
                 { value: 'normal', label: row.kind === 'Alert' ? '정상 종결' : '정상' },
                 { value: 'abnormal', label: row.kind === 'Alert' ? '단독 의심 종결' : '이상' },
-                ...(onTransfer ? [{ value: 'transfer', label: '기존 Episode에 편입' },
-                  ...(row.kind === 'Alert' ? [{ value: 'create', label: '새 Episode 만들기' }] : [])] : []),
               ]}
-              onChange={value => {
-                if (value === 'transfer' || value === 'create') {
-                  dialog.current.close();
-                  onTransfer(value === 'create');
-                } else {
-                  setVerdict(value);
-                }
-              }} />
+              onChange={setVerdict} />
             <GlideSelect fullWidth ariaLabel="판정 사유 유형" placeholder="판정 사유 유형 선택"
               value={reasonCategory} onChange={setReasonCategory}
               options={Object.entries(judgmentReasonLabels).map(([value, label]) => ({ value, label }))} />

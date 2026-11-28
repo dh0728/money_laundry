@@ -66,12 +66,12 @@ function OwnerFlowMarkers({ path, markers, duration, still }) {
   </g>;
 }
 
-export function OwnerFlowEdge({ path, label, pressed, muted, onSelect, memberships, color, reveal, design,
+export function OwnerFlowEdge({ path, label, pressed, muted, context, onSelect, memberships, color, reveal, design,
   pulse, pulseColor, width, height, markers, detail }) {
   const line = <path className="owner-edge-visible" d={path} stroke={color}
     strokeWidth={pressed ? design.edgeSelectedStroke : design.edgeStroke} />;
   return <g className="owner-time-edge" role="button" tabIndex={0} aria-label={label} aria-pressed={pressed}
-    data-muted={muted || undefined} onClick={onSelect} onKeyDown={event => selectWithKeyboard(event, onSelect)}>
+    data-muted={muted || undefined} data-context={context || undefined} onClick={onSelect} onKeyDown={event => selectWithKeyboard(event, onSelect)}>
     <title>{[label, ...memberships.map(({ id }) => id)].join(' · ')}</title>
     {reveal ? <GraphFlowReveal key={`reveal-${pulse.startedAt}`} path={path} pulse={pulse} width={width} height={height}>
       {line}
@@ -79,7 +79,7 @@ export function OwnerFlowEdge({ path, label, pressed, muted, onSelect, membershi
     {markers && !reveal && <OwnerFlowMarkers path={path} {...markers} />}
     {pulse && <GraphFlowStroke key={`stroke-${pulse.startedAt}`} path={path} pulse={pulse} color={pulseColor} />}
     <path className="owner-edge-hit" d={path} stroke="transparent" strokeWidth={design.edgeTargetWidth} />
-    {detail && <text x={detail.x} y={detail.y - 7}>{detail.count}건</text>}
+    {detail && <text x={detail.x} y={detail.y - 7}>{detail.text ?? `${detail.count}건`}</text>}
   </g>;
 }
 
@@ -99,13 +99,14 @@ export function OwnerFlowLane({ name, x, y, width, height, headerHeight, offset,
   </g>;
 }
 
-export function OwnerFlowAccount({ id, owner, x, y, width, height, offset, pressed, muted, dragging, design,
+export function OwnerFlowAccount({ id, owner, x, y, width, height, offset, pressed, muted, context, dragging, design,
   incoming, outgoing, color, shared, badge, onSelect, dragHandlers }) {
   const centerY = y + height / 2;
   return <g className="owner-time-node" role="button" tabIndex={0}
     transform={`translate(${offset.x} ${offset.y})`}
-    data-account={id} data-dragging={dragging || undefined} data-muted={muted || undefined}
-    aria-label={`${id} · ${owner}${shared ? ` · Alert ${shared}건 공유` : ''}`} aria-pressed={pressed} {...dragHandlers}
+    data-account={id} data-dragging={dragging || undefined} data-muted={muted || undefined} data-context={context || undefined}
+    style={{ '--owner-account-ink': color }}
+    aria-label={`${id} · ${owner}${shared ? ` · Alert ${shared}건 공유` : ''}${context ? ' · 주변 거래에만 나오는 계좌' : ''}`} aria-pressed={pressed} {...dragHandlers}
     onClick={onSelect} onKeyDown={event => selectWithKeyboard(event, onSelect)}>
     <rect x={x + 2} y={y} width={width - 4} height={height} rx={design.accountRadius} />
     <path className="owner-account-divider" d={`M ${x + 2} ${y} h ${width - 4}`} />

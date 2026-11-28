@@ -63,6 +63,11 @@ export interface SankeyLinkProps {
   stroke?: string;
   /** Stroke opacity. Default: 0.5 */
   strokeOpacity?: number;
+  /** Per-link stroke opacity (overrides strokeOpacity for that link) */
+  getLinkOpacity?: (
+    link: SankeyLinkType<SankeyNodeDatum, SankeyLinkDatum>,
+    index: number
+  ) => number | undefined;
   /** Opacity when another link/node is hovered. Default: 0.1 */
   fadedOpacity?: number;
   /** Use gradient from source to target color. Default: true */
@@ -197,6 +202,7 @@ export function SankeyLink({
   reveal = true,
   stroke,
   strokeOpacity = 0.5,
+  getLinkOpacity,
   fadedOpacity = 0.1,
   useGradient = true,
   getNodeColor,
@@ -375,7 +381,7 @@ export function SankeyLink({
               onMouseLeave={handleMouseLeave}
               path={path}
               stroke={linkStroke}
-              strokeOpacity={strokeOpacity}
+              strokeOpacity={getLinkOpacity?.(link, index) ?? strokeOpacity}
               totalLinks={links.length}
               width={linkWidth}
             />

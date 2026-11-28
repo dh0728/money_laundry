@@ -73,6 +73,8 @@ function sortRows(rows, active) {
 }
 
 export const sortSavedTableRows = (rows, scope) => sortRows(rows, savedSorts.get(scope));
+// 표 밖(예: 화면 아래 버튼)에서 그 표에 체크한 행을 읽는다.
+export const savedTableSelection = scope => [...(savedSelections.get(scope) ?? [])];
 
 export function useTableSort(rows, scope) {
   const [active, setActive] = useState(() => savedSorts.get(scope) ?? null);

@@ -240,6 +240,7 @@
 }
 .preview-case-table code { font-family: var(--aml-font-mono) }
 .case-evidence-table { min-block-size: 0 }
+.case-evidence-table tr[data-review-role="context"] > td { color: var(--muted-text) }
 .case-table-pages { display: contents }
 .screen-layout:has(> [data-workflow="case-overview"]) > .screen-table {
   min-block-size: 0;

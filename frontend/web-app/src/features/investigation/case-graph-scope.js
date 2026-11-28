@@ -26,28 +26,42 @@ export const graphVerdictLabels = {
 
 export const graphPartyId = (party, ownerView) => (ownerView && party.owner?.trim()) || party.code;
 
+// Alert 구성원 중 주변 거래(CONTEXT)와 판정 거래(그 밖)를 나눈다. 역할이 없는 거래는 판정 거래로 본다.
+export const isContextTransaction = row => row?.reviewRole === 'CONTEXT';
+export const transactionRoleLabels = { subject: '판정 거래', context: '주변 거래' };
+export const transactionRoleLabel = row => transactionRoleLabels[isContextTransaction(row) ? 'context' : 'subject'];
+// 주변 거래로만 이루어진 계좌·연결인지 본다.
+export const contextOnly = entry => entry.contextCodes?.size > 0 && entry.contextCodes.size === entry.codes.size;
+export function transactionRoleSummary(rows) {
+  const context = rows.filter(isContextTransaction).length;
+  return context ? `${transactionRoleLabels.subject} ${rows.length - context}건 · ${transactionRoleLabels.context} ${context}건` : undefined;
+}
+
 export function buildCaseNetwork(transactions, ownerView = false) {
   const nodes = new Map();
   const edges = new Map();
-  const update = (entry, code, score) => {
+  const update = (entry, code, score, context) => {
     entry.codes.add(code);
+    if (context) entry.contextCodes.add(code);
     if (graphRiskBand(score) !== 'unknown') entry.peakScore = Math.max(entry.peakScore ?? score, score);
   };
-  const nodeFor = (party, code, score) => {
+  const nodeFor = (party, code, score, context) => {
     const id = graphPartyId(party, ownerView);
-    const node = nodes.get(id) ?? { id, owner: party.owner?.trim(), accounts: new Set(), codes: new Set() };
+    const node = nodes.get(id) ?? { id, owner: party.owner?.trim(), accounts: new Set(), codes: new Set(), contextCodes: new Set() };
     node.accounts.add(party.code);
-    update(node, code, score);
+    update(node, code, score, context);
     nodes.set(id, node);
     return node.id;
   };
-  for (const { code, from, to, verdict, score } of transactions) {
-    const source = nodeFor(from, code, score);
-    const target = nodeFor(to, code, score);
+  for (const row of transactions) {
+    const { code, from, to, verdict, score } = row;
+    const context = isContextTransaction(row);
+    const source = nodeFor(from, code, score, context);
+    const target = nodeFor(to, code, score, context);
     const id = `${source}>${target}`;
-    const edge = edges.get(id) ?? { id, source, target, codes: new Set(), verdicts: new Set() };
+    const edge = edges.get(id) ?? { id, source, target, codes: new Set(), contextCodes: new Set(), verdicts: new Set() };
     edge.verdicts.add(verdict === 'normal' || verdict === 'abnormal' ? verdict : 'unjudged');
-    update(edge, code, score);
+    update(edge, code, score, context);
     edges.set(id, edge);
   }
   return { nodes: [...nodes.values()], edges: [...edges.values()] };

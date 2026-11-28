@@ -108,6 +108,12 @@ export function LinkTag({ code, href, children, className = '', ...props }) {
   </ActionButton>;
 }
 
+export function TransactionRoleTag({ context }) {
+  return <span className="semantic-tag" data-tag="transaction-role" data-role={context ? 'context' : 'subject'}>
+    {context ? '주변 거래' : '판정 거래'}
+  </span>;
+}
+
 export function CaseActorTag({ children }) {
   return <span className="semantic-tag" data-tag="case-actor"><UserRound className="semantic-tag-icon" aria-hidden="true" />{children}</span>;
 }

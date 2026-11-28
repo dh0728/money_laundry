@@ -2,11 +2,11 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { createPortal } from 'react-dom';
 import ForceGraph2D from 'react-force-graph-2d';
 import { configureDevAccountForces, seedComponentPositions } from './0.24.0/force-layout';
-import { graphRiskBand, graphVerdict, graphVerdictLabels } from '../investigation/case-graph-scope';
+import { contextOnly, graphRiskBand, graphVerdict, graphVerdictLabels, transactionRoleLabels } from '../investigation/case-graph-scope';
 import { caseMembership, caseShapePoints, caseShortLabel, flowMarkers } from './graph-case-groups';
 import { GraphZoomControls } from './preview-graph-controls';
 import { readGraphCanvasPulse, readGraphFlowMarkers } from '../../components/charts/charts/graph-flow-pulse';
-import { readCanvasColors } from '../../components/charts/chart-design-values';
+import { readCanvasColors, readChartNumber } from '../../components/charts/chart-design-values';
 import { makeGraphSnapshot, registerGraphSnapshot } from '../../lib/preview-visual-export';
 import { buildHopTimePlan, readGraphTimeAxisDesign, projectGraphTimeTicks,
   patternHomeForce, patternVelocityDecay } from './pattern-graph-time';
@@ -80,7 +80,23 @@ function avoidEdgeLabelCollisions(nodes, edges, selection, pixel) {
   }
 }
 
-function graphGeometry(coords, visible, groups, colors, selection, highlight, point, unit, showDetails, ownerView, zoom = unit) {
+// 주변 거래로만 이루어진 선은 흐린 점선, 계좌는 속이 빈 원으로 그린다.
+export function readContextDesign() {
+  return {
+    opacity: readChartNumber('--case-graph-context-opacity', .4),
+    dash: readChartNumber('--case-graph-context-dash', 6),
+    gap: readChartNumber('--case-graph-context-gap', 5),
+  };
+}
+
+function edgeRoleText(edge) {
+  if (!edge.contextCodes?.size) return `${edge.codes.size}건`;
+  return contextOnly(edge) ? `${transactionRoleLabels.context} ${edge.codes.size}건`
+    : `${edge.codes.size}건 · ${transactionRoleLabels.context} ${edge.contextCodes.size}건`;
+}
+
+function graphGeometry(coords, visible, groups, colors, selection, highlight, point, unit, showDetails, ownerView, zoom = unit,
+  contextDesign = readContextDesign()) {
   const edgeUnit = unit / Math.max(1, zoom);
   const nodes = visible.nodes.flatMap(node => {
     const position = coords.get(node.id);
@@ -89,8 +105,10 @@ function graphGeometry(coords, visible, groups, colors, selection, highlight, po
     const shared = caseIds.length > 1;
     const dimmed = highlight && !caseIds.includes(highlight);
     const label = [node.id, ownerView && `계좌 ${node.accounts.size}개`, shared && caseIds.map(caseShortLabel).join('·')].filter(Boolean).join(' · ');
+    const tone = dimmed ? colors.dimmed : colors[graphRiskBand(node.peakScore)];
+    const hollow = contextOnly(node);
     return [{ id: node.id, ...point(position.x, position.y), r: renderedRadius(node, zoom) * unit, caseIds,
-      fill: dimmed ? colors.dimmed : colors[graphRiskBand(node.peakScore)],
+      fill: hollow ? colors.axisFill : tone, outline: hollow ? tone : undefined, outlineWidth: 2.5 * edgeUnit,
       // 여러 Alert가 함께 쓰는 계좌는 Alert 색을 나눈 고리와 '공유 N' 배지로 표시한다.
       ring: shared ? caseIds.map(id => highlight && highlight !== id ? colors.dimmed : colors[id]) : undefined,
       badge: shared ? `공유 ${caseIds.length}` : undefined, badgeFill: colors.ink, badgeInk: colors.axisFill,
@@ -106,24 +124,27 @@ function graphGeometry(coords, visible, groups, colors, selection, highlight, po
     const caseIds = caseMembership(groups, edge.codes);
     const label = graphVerdictLabels[graphVerdict(edge.verdicts)];
     const dimmed = highlight && !caseIds.includes(highlight);
+    const context = contextOnly(edge);
     return [{ id: edge.id, caseIds, ...edgeShape(source, target, directions.has(`${edge.target}>${edge.source}`)),
       stroke: dimmed ? colors.dimmed : colors[graphRiskBand(edge.peakScore)],
       width: (selection?.has(edge.id) ? 5 : 3) * edgeUnit,
+      dash: context ? [contextDesign.dash * edgeUnit, contextDesign.gap * edgeUnit] : undefined,
+      opacity: context && !selection?.has(edge.id) ? contextDesign.opacity : 1,
       text: showDetails && (visible.edges.length <= 16 || selection?.has(edge.id))
-        ? [`${edge.codes.size}건`, label, caseIds.length > 1 && caseIds.map(caseShortLabel).join('·')].filter(Boolean).join(' · ') : undefined,
+        ? [edgeRoleText(edge), label, caseIds.length > 1 && caseIds.map(caseShortLabel).join('·')].filter(Boolean).join(' · ') : undefined,
       textColor: colors.ink }];
   });
   if (showDetails) avoidEdgeLabelCollisions(nodes, edges, selection, unit / zoom);
   return { nodes, edges };
 }
 
-function paintLine(context, { path, stroke, width, opacity = 1 }) {
+function paintLine(context, { path, stroke, width, opacity = 1, dash }) {
   context.save();
   context.globalAlpha = opacity;
   context.strokeStyle = stroke;
   context.lineWidth = width;
-  context.lineCap = 'round';
-  context.setLineDash([]);
+  context.lineCap = dash ? 'butt' : 'round';
+  context.setLineDash(dash ?? []);
   context.stroke(new Path2D(path));
   context.restore();
 }
@@ -149,7 +170,8 @@ function edgeMarkers(edge, { pixel, design, elapsed, shapes, colors, highlight, 
   const outside = highlight && !edge.caseIds.includes(highlight);
   return flowMarkers(edge.caseIds, length, spacing, shift).map(({ t, caseId }) => {
     const { x, y } = curvePoint(edge.curve, t);
-    const fade = elapsed === undefined ? 1 : Math.max(0, Math.min(1, t / design.fadeShare, (1 - t) / design.fadeShare));
+    const fade = (edge.opacity ?? 1) *
+      (elapsed === undefined ? 1 : Math.max(0, Math.min(1, t / design.fadeShare, (1 - t) / design.fadeShare)));
     if (caseId === undefined) {
       return { x, y, r: design.dotRadius * pixel, fill: colors.ink, opacity: fade * design.dotOpacity * (outside ? .3 : 1) };
     }
@@ -335,6 +357,7 @@ export function ForceCaseCanvas({
   const [flowStart] = useState(() => performance.now());
   const shapes = useMemo(() => new Map(groups.map(group => [group.id, group.shape])), [groups]);
   const [axisDesign] = useState(readGraphTimeAxisDesign);
+  const [contextDesign] = useState(readContextDesign);
   const timePlan = useMemo(() => buildHopTimePlan(records ?? [], network.nodes), [records, network]);
   const [data, setData] = useState(() => simulationData(network, positions, timePlan));
   const currentLayout = useRef({ network, positions, timePlan });
@@ -413,7 +436,7 @@ export function ForceCaseCanvas({
     const engine = graph.current;
     if (!engine || !ready || !visible.nodes.length) return null;
     const detail = graphGeometry(coordinates(), visible, groups, colors, selection, highlightedCase,
-      (x, y) => engine.graph2ScreenCoords(x, y), engine.zoom(), showDetails, ownerView);
+      (x, y) => engine.graph2ScreenCoords(x, y), engine.zoom(), showDetails, ownerView, engine.zoom(), contextDesign);
     const markers = detail.edges.flatMap(edge => edgeMarkers(edge,
       { pixel: 1, design: markerDesign, shapes, colors, highlight: highlightedCase, dense }));
     const nodes = detail.nodes.map(node => ({ ...node, badgeHeight: markerDesign.badgeHeight }));
@@ -434,12 +457,16 @@ export function ForceCaseCanvas({
       nodeRelSize={1} nodeLabel={node => {
         const time = timePlan?.first.get(node.id);
         const hop = timePlan?.hops.get(node.id);
-        return <Text as="span">{node.id}{hop === undefined ? '' : ` · 홉 ${hop}`}{time === undefined ? '' : ` · 첫 거래 ${timePlan.formatTime(time)} KST`}</Text>;
+        const entry = visibleNodes.get(node.id);
+        const role = entry && contextOnly(entry) ? ` · ${transactionRoleLabels.context}에만 나오는 계좌` : '';
+        return <Text as="span">{node.id}{hop === undefined ? '' : ` · 홉 ${hop}`}{time === undefined ? '' : ` · 첫 거래 ${timePlan.formatTime(time)} KST`}{role}</Text>;
       }}
       linkLabel={link => {
         const edge = visibleEdges.get(link.id);
         if (!edge) return '';
-        const direction = `${edge.source} → ${edge.target} · ${graphVerdictLabels[graphVerdict(edge.verdicts)]}`;
+        const roles = edge.contextCodes?.size ? ` · ${transactionRoleLabels.subject} ${edge.codes.size - edge.contextCodes.size}건`
+          + ` · ${transactionRoleLabels.context} ${edge.contextCodes.size}건` : '';
+        const direction = `${edge.source} → ${edge.target} · ${graphVerdictLabels[graphVerdict(edge.verdicts)]}${roles}`;
         const times = [...edge.codes].map(code => timePlan?.byCode.get(code)).filter(Number.isFinite);
         if (!times.length) return <Text as="span">{direction}</Text>;
         const first = Math.min(...times);
@@ -485,7 +512,7 @@ export function ForceCaseCanvas({
         if (timePlan && graph.current) drawTimeAxis(context, graph.current, scale,
           timeAxisMarks(timePlan, graph.current, size, axisDesign), colors, false);
         const model = graphGeometry(coordinates(), visible, groups, colors, selection, highlightedCase,
-          (x, y) => ({ x, y }), 1, showDetails, ownerView, scale);
+          (x, y) => ({ x, y }), 1, showDetails, ownerView, scale, contextDesign);
         drawing = { nodes: new Map(model.nodes.map(node => [node.id, node])),
           edges: new Map(model.edges.map(edge => [edge.id, edge])) };
         const reveal = activeFlow ? (performance.now() - activeFlow.startedAt) / pulseDesign.revealDuration : 1;
@@ -527,6 +554,7 @@ export function ForceCaseCanvas({
         context.arc(dot.x, dot.y, dot.r, 0, Math.PI * 2);
         context.fillStyle = dot.fill;
         context.fill();
+        if (dot.outline) { context.strokeStyle = dot.outline; context.lineWidth = dot.outlineWidth; context.stroke(); }
         if (dot.stroke) { context.strokeStyle = dot.stroke; context.lineWidth = 2 / scale; context.stroke(); }
         if (dot.ring) paintSharedNode(context, dot, 1 / scale, markerDesign.badgeHeight);
         if (!dot.text) return;

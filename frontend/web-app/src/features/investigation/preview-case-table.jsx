@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { CaseDataTable, RecordIdCell } from './case-table-components';
-import { ModelScoreTag, ReviewStatusTag, reviewStatusLabel, VerdictTag, verdictLabels } from '../../components/semantic-tags';
+import { ModelScoreTag, ReviewStatusTag, reviewStatusLabel, TransactionRoleTag, VerdictTag, verdictLabels } from '../../components/semantic-tags';
+import { isContextTransaction, transactionRoleLabel } from './case-graph-scope';
 import { currencyColumn, SortableTableHead, tableCount,
   recordRowProps, useTableSelection, useTableSort } from '../../components/workflow-table';
 import { csvDownloadEntry, dateFromCode, inDateRange, TableQueryTools } from '../../components/query-controls';
@@ -27,10 +28,15 @@ const analysisColumns = [
   ...columns.slice(4, 6), { name: '판정', value: row => verdictLabels[row.verdict] }, columns[6],
 ];
 
+// 주변 거래가 섞여 있을 때만 '구분' 칸을 보여 준다.
+const roleColumn = { name: '구분', value: row => transactionRoleLabel(row) };
+
 export function TransactionEvidenceTable({ title, transactions = [], showScore = false, analysis = false,
   linkedSelection, selectionControl, highlightedCodes }) {
   const scoresVisible = showScore || analysis;
-  const headers = analysis ? analysisColumns : scoresVisible ? [columns[0], scoreColumn, ...columns.slice(1)] : columns;
+  const rolesVisible = transactions.some(isContextTransaction);
+  const baseHeaders = analysis ? analysisColumns : scoresVisible ? [columns[0], scoreColumn, ...columns.slice(1)] : columns;
+  const headers = rolesVisible ? [baseHeaders[0], roleColumn, ...baseHeaders.slice(1)] : baseHeaders;
   const [method, setMethod] = useState('all');
   const [range, setRange] = useState();
   const methods = [...new Set(transactions.map(row => row.method))];
@@ -44,10 +50,10 @@ export function TransactionEvidenceTable({ title, transactions = [], showScore =
       options: ['전체', ...methods].map((label, index) => ({ label, value: index ? label : 'all' })) } : undefined,
     period: lastCode ? { asOf: dateFromCode(lastCode), range, onChange: setRange } : undefined,
     entries: sorting.rows.length ? [csvDownloadEntry('표시 중인 근거 거래', 'evidence-transactions', [
-      '거래', ...(scoresVisible ? ['모델 점수'] : []), '시각', '송금 계좌', ...(analysis ? ['송금 소유주'] : []),
+      '거래', ...(rolesVisible ? ['구분'] : []), ...(scoresVisible ? ['모델 점수'] : []), '시각', '송금 계좌', ...(analysis ? ['송금 소유주'] : []),
       '수취 계좌', ...(analysis ? ['수취 소유주'] : []), '금액', '통화', '결제 수단', '판정', '조사 상태',
     ], sorting.rows.map(row => [
-      row.code, ...(scoresVisible ? [row.score ?? ''] : []), row.timestamp, row.from.code, ...(analysis ? [row.from.owner ?? ''] : []),
+      row.code, ...(rolesVisible ? [transactionRoleLabel(row)] : []), ...(scoresVisible ? [row.score ?? ''] : []), row.timestamp, row.from.code, ...(analysis ? [row.from.owner ?? ''] : []),
       row.to.code, ...(analysis ? [row.to.owner ?? ''] : []),
       row.amount, row.currency, row.method, analysis ? verdictLabels[row.verdict] : row.verdict, reviewStatusLabel(row.status),
     ]))] : [],
@@ -61,10 +67,14 @@ export function TransactionEvidenceTable({ title, transactions = [], showScore =
         </SortableTableHead>)}
       </TableRow></TableHeader>
       <TableBody>
-        {sorting.rows.map(({ code, timestamp, from, to, amount, currency, method, status, verdict, score }) =>
-          <TableRow key={code} data-verdict={verdict} data-selected={selection.has(code) || undefined}
+        {sorting.rows.map(row => {
+          const { code, timestamp, from, to, amount, currency, method, status, verdict, score } = row;
+          const context = isContextTransaction(row);
+          return <TableRow key={code} data-verdict={verdict} data-selected={selection.has(code) || undefined}
+            data-review-role={rolesVisible ? context ? 'context' : 'subject' : undefined}
             related={highlightedCodes?.has(code)} {...recordRowProps}>
             <RecordIdCell code={code} />
+            {rolesVisible && <TableCell><TransactionRoleTag context={context} /></TableCell>}
             {scoresVisible && <TableCell>{Number.isFinite(score)
               ? <ModelScoreTag score={score} /> : '—'}</TableCell>}
             <TableCell><Text as="time" dateTime={timestamp.replace(' ', 'T') + '+09:00'}>{timestamp}</Text></TableCell>
@@ -80,7 +90,8 @@ export function TransactionEvidenceTable({ title, transactions = [], showScore =
             </> : <TableCell><Box className="semantic-tag-group">
               <VerdictTag verdict={verdict} /><ReviewStatusTag status={status} />
             </Box></TableCell>}
-          </TableRow>)}
+          </TableRow>;
+        })}
         {!sorting.rows.length && <TableRow><TableCell colSpan={headers.length}>
           {transactions.length ? '조회 조건과 일치하는 거래가 없습니다.' : '연결된 거래가 없습니다.'}
         </TableCell></TableRow>}

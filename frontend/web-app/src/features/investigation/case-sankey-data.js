@@ -1,4 +1,4 @@
-import { graphPartyId, graphRiskBand } from './case-graph-scope';
+import { graphPartyId, graphRiskBand, isContextTransaction } from './case-graph-scope';
 
 function addAmount(totals, currency, amount) {
   if (currency && Number.isFinite(amount) && amount >= 0) {
@@ -19,15 +19,17 @@ export function caseSankeyGraph(rows, ownerView = false) {
     }
     return indices.get(name);
   }
-  for (const { code, currency, amount, from, to, score, verdict } of rows) {
+  for (const row of rows) {
+    const { code, currency, amount, from, to, score, verdict } = row;
     if (!from?.code || !to?.code || seen.has(code)) continue;
     seen.add(code);
     const source = indexFor(from);
     const target = indexFor(to);
     const key = `${source}:${target}`;
-    const link = links.get(key) ?? { source, target, value: 0, codes: new Set(), amounts: new Map(), verdicts: new Set() };
+    const link = links.get(key) ?? { source, target, value: 0, codes: new Set(), contextCodes: new Set(), amounts: new Map(), verdicts: new Set() };
     link.value += 1;
     link.codes.add(code);
+    if (isContextTransaction(row)) link.contextCodes.add(code);
     link.verdicts.add(verdict);
     addAmount(link.amounts, currency, amount);
     addAmount(nodes[source].outgoing, currency, amount);

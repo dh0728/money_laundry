@@ -37,6 +37,52 @@ export function canTransferAlert(row) {
   return row.kind === 'Alert' && row.assigned && row.open && row.verdict === 'unjudged' && !row.episodeCode;
 }
 
+// Episode로 묶을 수 없는 이유. 묶을 수 있으면 빈 문자열이다.
+export function transferBlockReason(row) {
+  if (!row || canTransferAlert(row)) return '';
+  if (row.kind !== 'Alert') return 'Alert 아님';
+  if (row.episodeCode) return '기존 Episode 소속';
+  if (!row.open || row.verdict !== 'unjudged') return '판정 완료';
+  return '다른 담당자';
+}
+
+// 이유별 개수. 표시 순서는 판정 완료 → 다른 담당자 → 기존 Episode 소속이다.
+export function transferBlockCounts(rows) {
+  const counts = new Map([['판정 완료', 0], ['다른 담당자', 0], ['기존 Episode 소속', 0]]);
+  for (const row of rows) {
+    const reason = transferBlockReason(row);
+    if (reason) counts.set(reason, (counts.get(reason) ?? 0) + 1);
+  }
+  return [...counts].filter(([, count]) => count > 0);
+}
+
+// 고른 업무끼리 겹치는 계좌·거래와, 다른 어느 업무와도 겹치지 않는 업무. 2건 미만이면 떨어진 업무를 따지지 않는다.
+export function bundleConnection(rows) {
+  const accountOwners = new Map();
+  const transactionOwners = new Map();
+  const add = (map, key, code) => {
+    const owners = map.get(key) ?? new Set();
+    owners.add(code);
+    map.set(key, owners);
+  };
+  for (const row of rows) {
+    for (const record of row.related ?? []) {
+      add(transactionOwners, record.code, row.code);
+      add(accountOwners, record.from.code, row.code);
+      add(accountOwners, record.to.code, row.code);
+    }
+  }
+  const shared = map => [...map].filter(([, owners]) => owners.size > 1);
+  const sharedAccounts = shared(accountOwners);
+  const sharedTransactions = shared(transactionOwners);
+  const linked = new Set([...sharedAccounts, ...sharedTransactions].flatMap(([, owners]) => [...owners]));
+  return {
+    accounts: sharedAccounts.map(([code]) => code),
+    transactions: sharedTransactions.map(([code]) => code),
+    isolated: rows.length > 1 ? rows.map(row => row.code).filter(code => !linked.has(code)) : [],
+  };
+}
+
 // Alert와 계좌·거래를 공유하면서 함께 묶을 수 있는(내 담당·열림·미판정·미편입) Alert. 공유 거래가 많은 순, 그다음 공유 계좌 순.
 export function previewEpisodeCompanions(cases, row) {
   return cases.filter(item => item.code !== row.code && canTransferAlert(item))
